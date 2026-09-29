@@ -1,0 +1,34 @@
+# --- KiCad ---------------------------------------------------------------
+# Per-user project-local state and lock files
+*.kicad_prl
+~*.lck
+# KiCad automatic backups
+*-backups/
+fp-info-cache
+*.kicad_sch-bak
+*.kicad_pcb-bak
+# Generated exports; regenerate with kicad-cli
+*.net
+*-schematic.pdf
+gerbers/
+jlcpcb/
+
+# --- ESP-IDF / firmware --------------------------------------------------
+build/
+build-host/
+sdkconfig
+sdkconfig.old
+managed_components/
+dependencies.lock
+*.o
+*.d
+
+# --- OpenSCAD ------------------------------------------------------------
+*.stl
+*.3mf
+*.amf
+
+# --- Editors / OS --------------------------------------------------------
+.history/
+.vscode/
+.DS_Store

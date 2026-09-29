@@ -1,5 +1,5 @@
 <!--
-SPDX-FileCopyrightText: 2026 Bernhard Trinnes
+SPDX-FileCopyrightText: 2026 Bitcrush Testing
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
@@ -78,7 +78,7 @@ See [requirements §5](docs/requirements.md#5-safety-requirements).
 
 GPL-3.0-or-later. See [`LICENSE`](LICENSE).
 
-    Copyright (C) 2026 Bernhard Trinnes
+    Copyright (C) 2026 Bitcrush Testing
 
     This program is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by the Free

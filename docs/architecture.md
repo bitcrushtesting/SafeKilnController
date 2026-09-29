@@ -1,5 +1,5 @@
 <!--
-SPDX-FileCopyrightText: 2026 Bernhard Trinnes
+SPDX-FileCopyrightText: 2026 Bitcrush Testing
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
@@ -53,6 +53,8 @@ as a decision in [§3](#3-key-decisions).
 | **AD-05** | **Heat enable is a software-generated square wave into a hardware charge pump**, not a static level. | `SR-02`, `HR-07`, and gives `SR-14` for free: a hung safety task stops toggling and the contactor drops in ~1 s with no code involved. | Requires the RC/charge-pump circuit on the board; the toggle must never be delegated to a hardware PWM peripheral, or the property is lost. |
 | **AD-06** | **The setpoint generator is separate from the PID.** The program produces a moving setpoint; the PID only ever tracks the setpoint it is given. | `FR-CTL-09`. The two hardest pieces of behaviour — curve execution with hold-back, and loop tuning — become independently testable. Also makes manual mode and autotune trivially reuse the same PID. | An extra component and an extra data hand-off per cycle. |
 | **AD-07** | **The SSR window is driven by a 10 ms periodic timer callback** that reads a duty value published atomically by the control task. | `FR-CTL-07`, `FR-CTL-08`, `NFR-04`. Switching precision is decoupled from the 1 s control period and from any task scheduling delay. | The callback runs in a timer context: it must be allocation-free, lock-free and short. |
+| **AD-17** | **Heater current is measured gated to the commanded output state**, not continuously averaged: conduction current is sampled inside a commanded-on interval and leakage current inside a commanded-off interval, each after a settle delay. | `FR-CUR-04`. A time-proportional output at 2 % duty is off 98 % of the time; a blind average would read ~2 % of full current and make `SR-25`/`SR-26` meaningless. Gating is what turns the measurement into a statement about the *relay*. | The sampler must know the window phase, so it is driven by the same 10 ms timer that owns the SSR pin (`AD-07`), not by an independent ADC loop. Windows too short to measure are skipped rather than mis-measured. |
+| **AD-18** | **The log record grows from 16 to 20 bytes** to carry current and its validity flags. | `FR-CUR-09`. Current without a flag saying whether the sample was a conduction, leakage or skipped measurement is uninterpretable. | 204 records per sector instead of 255; capacity falls from 362 h to **290 h** at the default interval, still well above the 150 h of `FR-LOG-07`. Recomputed in [§10.4](#104-flash-endurance-analysis). |
 | **AD-08** | **Sample logs live in a dedicated raw flash partition as a circular array of fixed 16-byte records**, not in a filesystem. | `FR-LOG-05`–`FR-LOG-08`, `CON-03`. A filesystem adds metadata writes, fragmentation, and a torn-write failure mode across structures we do not control. A ring of fixed records has a trivially provable wear pattern ([§10.4](#104-flash-endurance-analysis)) and a reader that cannot be confused by a power cut. | A bespoke store to implement and test; no `ls` over logs. Mitigated by `tools/logdump`. |
 | **AD-09** | **The log is also the power-loss journal.** Recovery state is reconstructed from the log tail rather than from a separate periodic write. | `FR-RUN-08`, `FR-RUN-09`, `NFR-14`. Removes a 60 000-write-per-run NVS hot spot; the data was already being written. | Recovery granularity equals the log sample interval (default 10 s), which is well inside the `FR-RUN-08` tolerance. |
 | **AD-10** | **Configuration in NVS; programs and run records in LittleFS.** | Config is small, typed, and benefits from NVS wear levelling. Programs are user files that want names, import/export and atomic replace. | Two storage mechanisms to initialise; acceptable, both are ESP-IDF-supported. |
@@ -125,10 +127,11 @@ flowchart TD
 | `pid` | PID computation: P/I/D terms, anti-windup, derivative on measurement, bumpless transfer, output clamping. Pure function of state + inputs + `dt`. | — | Host unit, host integration |
 | `setpoint` | Executes a profile: advances segment index, ramps the setpoint, applies hold-back, enforces dwell tolerance and acknowledgement gates, computes remaining and predicted end times. | `profile` | Host unit, host integration |
 | `profile` | Program data model, validation, duration prediction, JSON encode/decode. | `configmodel` (for limits) | Host unit |
-| `safety` | All detection rules of requirements `SR-04`–`SR-13`. Consumes a plant snapshot, emits a verdict: heat permitted or a specific fault. Stateful (timers, baselines) but pure. | `configmodel` | Host unit, host integration, fault-injection suite |
+| `safety` | All detection rules of requirements `SR-04`–`SR-13` and the current-based relay rules `SR-25`–`SR-30`, including the weld-discrimination sequence of `SR-27`. Consumes a plant snapshot, emits a verdict: heat permitted or a specific fault. Stateful (timers, baselines) but pure. | `configmodel` | Host unit, host integration, fault-injection suite |
 | `autotune` | Relay-autotune state machine, peak detection, cycle qualification, `Ku`/`Tu` identification, gain-rule application. | `pid` (types only) | Host unit, host integration |
 | `window` | Duty → on/off decision for the current 10 ms tick, honouring minimum on/off time. | — | Host unit |
 | `tempfilt` | First-order filter, calibration, rate-of-change regression. | — | Host unit |
+| `current` | RMS accumulation over whole mains cycles, window gating and settle handling, CT calibration, reference-current learning, deviation and wear tracking. Pure: fed raw ADC samples plus the window phase. | — | Host unit, integration |
 | `logrec` | Log record and sector-header encode/decode, CRC, torn-record detection, decimation with extrema preservation. | — | Host unit (incl. fuzz) |
 | `configmodel` | Configuration schema: item table with type, unit, range, default; validation; versioned migration; JSON projection. | — | Host unit |
 | `runstate` | Run record model; reconstruction of resume state from a log tail. | `logrec`, `profile` | Host unit |
@@ -146,6 +149,7 @@ double is a compile-time-checked substitution.
 | `port_alarm` | `set(pattern)` | GPIO; spy |
 | `port_display` | `blit(framebuffer)`, `set_contrast()`, `present()` | SSD1306 over I²C; in-memory framebuffer for golden-image tests |
 | `port_input` | `poll(→ events)` | PCNT + GPIO; scripted event source |
+| `port_current` | `start_burst(window_phase)`, `read_burst(→ samples, n)`, `present()` | ADC continuous-mode DMA burst; simulator; scripted sample source |
 | `port_clock` | `now_monotonic_us()`, `now_wall_utc()`, `wall_valid()` | `esp_timer` + SNTP; virtual clock driven by the test |
 | `port_logstore` | `append(record)`, `iterate(range, cb)`, `stats()`, `erase_all()` | Raw partition ring; RAM-backed and file-backed fakes |
 | `port_kvstore` | `get/set/erase(namespace, key, blob)` | NVS; in-memory fake |
@@ -185,6 +189,7 @@ double is a compile-time-checked substitution.
 | `safety` | 1 | 20 | timer | 100 ms | 3 kB | No |
 | `control` | 1 | 18 | timer | 250 ms … 5 s (cfg, default 1 s) | 4 kB | No |
 | `acquire` | 1 | 19 | timer | 250 ms | 3 kB | SPI only, bounded |
+| `current` | 1 | 17 | burst complete | per output window | 3 kB | No (DMA completion) |
 | `logger` | 0 | 8 | queue | on demand | 3 kB | Yes (flash) |
 | `hmi` | 0 | 6 | timer | 100 ms | 4 kB | I²C only, bounded |
 | `httpd` | 0 | 5 | socket | — | 8 kB | Yes |
@@ -457,6 +462,12 @@ row below is one host test (`TR-09`, `TR-23`).
 | `SR-11` | Enclosure over-temperature | case PV | > 70 °C | Latch 12 |
 | `SR-12` | Insulation degradation | energy-to-temperature vs. baseline | > 1.3 × baseline | **Warning 101** only |
 | `SR-13` | Deadline missed | cycle timestamps | > 2 × period | Latch 13 / 14 |
+| `SR-25` | Relay fail-on | current in an off-window | > 0.5 A for 2 windows | Latch 21, drop contactor |
+| `SR-26` | Relay/element fail-off | current in an on-window | < 20 % of reference for 30 s | Latch 23 |
+| `SR-27` | Weld discrimination | current after contactor dropped | persists > 2 s | Latch 22 (welded) else 21 (SSR) |
+| `SR-28` | Current deviation | current vs. run reference | warn 10 %, latch 25 % | Warning 112 / Latch 24 |
+| `SR-29` | Over-current | current | > 120 % of nominal | Latch 25 |
+| `SR-30` | Relay wear | switch counts, intermittent mismatches | configurable life limit | **Warning 109 / 110** only |
 | `SR-14` | Watchdog | task WDT, RTC WDT | per task deadline | Reset; charge pump decays |
 | `SR-15` | Brownout | brownout detector | IDF default | Reset to safe state |
 
@@ -504,6 +515,9 @@ typedef struct {
     float    rate_c_per_h;
     float    setpoint_c;
     uint16_t duty_permille;
+    float    current_a;            /* last valid RMS measurement             */
+    float    current_ref_a;        /* run reference, FR-CUR-08               */
+    uint8_t  current_flags;        /* conduction / leakage / skipped / stale */
     uint16_t tc_fault_bits, case_fault_bits;
     uint8_t  state, segment_index, segment_count;
     bool     heat_authorised, holdback_active, duty_saturated;
@@ -516,6 +530,8 @@ typedef struct {
     uint8_t        end_reason;      /* completed / aborted / fault / power loss */
     uint8_t        fault_code;
     float          kp, ki, kd;
+    float          current_ref_a;         /* FR-CUR-08, baseline for SR-28     */
+    uint32_t       contactor_ops, ssr_ops;/* FR-CUR-13 wear counters           */
     uint32_t       first_seq, last_seq;   /* extent in the log ring            */
     bool           samples_truncated;     /* FR-LOG-09                         */
     kiln_program_t program_as_run;        /* FR-PRG-11                         */
@@ -542,7 +558,8 @@ For an 8 MB device (`NFR-13`); a 16 MB device enlarges only the log partition.
 
 ### 10.2 Log record format
 
-Fixed 16 bytes, 4-byte aligned so `esp_partition_write` needs no read-modify-write:
+Fixed **20 bytes** (`AD-18`), 4-byte aligned so `esp_partition_write` needs no
+read-modify-write:
 
 | Off | Size | Field | Encoding |
 |---|---|---|---|
@@ -551,10 +568,18 @@ Fixed 16 bytes, 4-byte aligned so `esp_partition_write` needs no read-modify-wri
 | 6 | 2 | `kiln_filt` | int16, 0.1 °C |
 | 8 | 2 | `setpoint` | int16, 0.1 °C |
 | 10 | 2 | `case_c` | int16, 0.1 °C |
-| 12 | 1 | `duty` | 0…200 = 0…100 % in 0.5 % steps |
-| 13 | 1 | `segment` | 0…31, 0xFF = not applicable |
-| 14 | 1 | `state_flags` | state in low nibble; hold-back, saturation, TC fault, wall-time-valid in high nibble |
-| 15 | 1 | `crc8` | over bytes 0…14 |
+| 12 | 2 | `current_ca` | uint16, 0.01 A (0…655 A) |
+| 14 | 1 | `duty` | 0…200 = 0…100 % in 0.5 % steps |
+| 15 | 1 | `segment` | 0…31, 0xFF = not applicable |
+| 16 | 1 | `state_flags` | state in low nibble; hold-back, saturation, TC fault, wall-time-valid in high nibble |
+| 17 | 1 | `current_flags` | conduction / leakage / skipped / stale / CT fault |
+| 18 | 1 | `reserved` | 0, keeps the record 4-byte aligned |
+| 19 | 1 | `crc8` | over bytes 0…18 |
+
+`current_flags` is not optional padding: `FR-CUR-04` means a given sample's
+current may be a conduction measurement, a leakage measurement, or a window that
+was too short to measure at all. Without the flag a reader cannot tell 0.0 A
+"the relay is correctly off" from 0.0 A "we did not look".
 
 Sector header, 16 bytes at the start of each 4 kB sector:
 
@@ -566,11 +591,11 @@ Sector header, 16 bytes at the start of each 4 kB sector:
 | 12 | 2 | `format_version` |
 | 14 | 2 | `crc16` |
 
-So each 4 kB sector holds `(4096 − 16) / 16 = 255` records.
+So each 4 kB sector holds `(4096 − 16) / 20 = 204` records.
 
 ### 10.3 Ring behaviour
 
-- **Capacity:** `2 MB / 4 kB = 512` sectors × 255 = **130 560 records** = **362 h** at the default 10 s interval, against the 150 h of `FR-LOG-07`.
+- **Capacity:** `2 MB / 4 kB = 512` sectors × 204 = **104 448 records** = **290 h** at the default 10 s interval, against the 150 h of `FR-LOG-07`.
 - **Head discovery on boot:** read the 512 sector headers (8 kB total) and take the highest valid `seq`; then scan that sector for the first erased slot (all-`0xFF`). Bounded, fast, and needs no separate metadata to be consistent with the data.
 - **Torn write:** a record whose `crc8` fails, or which is partially `0xFF`, terminates the scan of that sector and is skipped by readers (`FR-LOG-08`). At most the one in-flight record is lost.
 - **Wrap:** the next sector is erased immediately *before* it is first written, never in advance, so a power loss can never destroy data that the index still claims exists.
@@ -579,10 +604,10 @@ So each 4 kB sector holds `(4096 − 16) / 16 = 255` records.
 
 ### 10.4 Flash endurance analysis
 
-One sector fills in `255 × 10 s = 42.5 min` of logging, so one erase per 42.5 min
-of *running*. Continuous 24/7 operation for 10 years gives
-`87 600 h / 42.5 min ≈ 123 700` sector erases spread over 512 sectors ≈ **242
-erases per sector** — 0.5 % of the 100 000-cycle budget of `ASM-08`, and far
+One sector fills in `204 × 10 s = 34 min` of logging, so one erase per 34 min of
+*running*. Continuous 24/7 operation for 10 years gives
+`87 600 h / 34 min ≈ 154 600` sector erases spread over 512 sectors ≈ **302
+erases per sector** — 0.6 % of the 100 000-cycle budget of `ASM-08`, and far
 inside the 50 000 of `NFR-14`. Realistic hobby use (a few hundred hours a year)
 is two orders of magnitude below that again.
 
@@ -642,6 +667,8 @@ set (`FR-WEB-23`).
 | `GET` | `/api/runs` | Run records, newest first | `FR-LOG-09` |
 | `GET` | `/api/log` | `?run=&from=&to=&max_points=&format=json\|csv` | `FR-LOG-10`, `FR-WEB-18` |
 | `DELETE` | `/api/log` | Erase all sample logs | `FR-LOG-13` |
+| `GET` | `/api/current` | Live RMS current, reference current, power, energy, wear counters | `FR-CUR-07`, `FR-CUR-13` |
+| `POST` | `/api/current/calibrate` | One-point calibration against a reference reading | `FR-CUR-06` |
 | `GET` | `/api/storage` | Log and filesystem health | `FR-LOG-15` |
 | `GET` | `/api/net` | WiFi diagnostics | `FR-NET-09` |
 | `POST` | `/api/ota` | Upload firmware | `FR-UPD-01` |
@@ -803,13 +830,21 @@ T[n+1] = T[n] + dt/tau * (K * u_delayed(n) + T_ambient - T[n]) + noise(seed)
 ```
 
 Configurable `K`, `tau`, dead time, ambient, heat-loss nonlinearity at high
-temperature, and sensor noise. Deterministic from a seed, so a failure replays
+temperature, and sensor noise. The simulator also produces a heater **current**
+consistent with the commanded output state and the injected electrical faults
+(`TR-27`), so the current rules are driven by the same plant as the thermal ones
+and a fault shows up in both channels exactly as it would on a real kiln. Deterministic from a seed, so a failure replays
 exactly (`TR-12`). Injectable faults, each mapping to a safety rule:
 
 | Injection | Exercises |
 |---|---|
-| Element open / partially failed | `SR-07` |
-| SSR shorted (heats at 0 % duty) | `SR-08` |
+| Element open / partially failed | `SR-07`, `SR-26`, `SR-28` |
+| Relay fail-on (current with duty 0) | `SR-25` |
+| Relay fail-off (no current with duty > 0) | `SR-26` |
+| Welded contactor (current persists after contactor opened) | `SR-27` |
+| Over-current | `SR-29` |
+| Current transformer disconnected | `FR-CUR-11`, `FR-CUR-12` |
+| SSR shorted (heats at 0 % duty) | `SR-08`, `SR-25` |
 | TC open / short / out of range | `SR-04` |
 | TC reversed | `SR-05` |
 | TC stuck | `SR-06` |
@@ -823,7 +858,7 @@ exactly (`TR-12`). Injectable faults, each mapping to a safety rule:
 
 | Level | Where | Content |
 |---|---|---|
-| Unit | Host | `pid`, `setpoint`, `profile`, `safety` (rule by rule), `autotune`, `window`, `tempfilt`, `logrec`, `configmodel`, `runstate` |
+| Unit | Host | `pid`, `setpoint`, `profile`, `safety` (rule by rule), `autotune`, `window`, `tempfilt`, `current`, `logrec`, `configmodel`, `runstate` |
 | Fuzz | Host | `logrec` decode over arbitrary bytes; JSON program and config decode |
 | Integration | Host | Real core against the simulator: full programs end to end, every fault injection, autotune convergence across plant parameter sets, power-loss recovery at random instants, hold-back, dwell tolerance, 168 h accelerated soak |
 | Golden image | Host | HMI screens rendered to a framebuffer and compared byte-for-byte |
@@ -878,6 +913,7 @@ Requirement-level traceability is maintained mechanically by `tools/trace`
 | Requirement group | Realised by | Verified at |
 |---|---|---|
 | `FR-ACQ` | `kiln_hal_esp32s3/max31856`, `core/tempfilt`, `acquire` task | Unit, driver, integration |
+| `FR-CUR` | `core/current`, `hal/adc_ct`, `current` task | Unit, integration, driver, HIL |
 | `FR-CTL` | `core/pid`, `core/setpoint`, `core/window`, `control` task, `heat_window` | Unit, integration, driver (timing) |
 | `FR-TUN` | `core/autotune` | Unit, integration across plant sets |
 | `FR-PRG` | `core/profile`, `app/program_store` | Unit, API |
@@ -890,6 +926,7 @@ Requirement-level traceability is maintained mechanically by `tools/trace`
 | `FR-UPD` | `kiln_web/ota` | API, target |
 | `SR-01`…`SR-03` | `AD-04`, `AD-05`, `HR-07` circuit | Analysis, HIL |
 | `SR-04`…`SR-13` | `core/safety` rule table ([§8.2](#82-rule-table)) | One host test per rule + fault injection |
+| `SR-25`…`SR-30` | `core/safety` current rules + `core/current` | One host test per rule; `SR-27` also on HIL |
 | `SR-14`…`SR-15` | IDF watchdog and brownout configuration, charge pump | Target, HIL |
 | `SR-16`…`SR-24` | `app/run_controller`, `core/faults`, documentation | Integration, inspection |
 | `NFR-01`…`NFR-04` | `AD-13`, `AD-15`, task table ([§6.1](#61-tasks)) | Instrumented target |
@@ -906,6 +943,8 @@ Requirement-level traceability is maintained mechanically by `tools/trace`
 | The charge-pump enable circuit (`AD-05`) is unfamiliar and could be built wrong or "simplified" to a static GPIO. | The central safety property of the design is silently lost. | The HIL suite verifies contactor release on halting the safety task; the schematic and this document both mark the circuit as safety-critical. |
 | 2 MB OTA partition becomes tight with assets embedded. | Update path breaks late in development. | CI size report on every build; asset budget of [§12.4](#124-asset-budget); 1.4 MB unallocated flash as headroom. |
 | Host-testable core drifts as hardware access is added "just this once". | The testability driver erodes. | `tools/layercheck` is CI-blocking (`TR-01`), not advisory. |
+| A three-phase kiln is monitored on one phase only (`ASM-10`), so a fault confined to another phase escapes the current rules. | A failed element goes undetected electrically. | The thermal backstop (`SR-07`, `SR-28` on total heat input) still catches it, more slowly. `OQ-06` decides whether to fit three CTs; the `current` component takes a channel index so a second and third are additive rather than a rewrite. |
+| CT fitted to the wrong conductor, or clipped around both conductors (net current zero). | Current reads ~0 always; `SR-26` fires on every run, or worse the installer disables monitoring. | Commissioning procedure verifies a plausible reference current before the first firing; `FR-CUR-11` distinguishes "no signal at all" from "zero current". |
 | Single-zone assumption (`ASM-02`) proves wrong for a real kiln. | Rework of the control path. | `control` already takes a zone context ([`AD-03`](#3-key-decisions)); `OQ-05` is to be resolved before the control component is frozen. |
 
 ## 17. Implementation phasing
@@ -916,6 +955,7 @@ Requirement-level traceability is maintained mechanically by `tools/trace`
 | **M2 — Measure** | MAX31856 adapter, `tempfilt`, OLED, encoder, default screen. | `FR-ACQ`, `FR-HMI-01`–`FR-HMI-05` pass; current and target temperature on the display. |
 | **M3 — Control** | `pid`, `window`, `setpoint`, `profile`, `control` task, heat output. | A program runs closed-loop against the simulator to `NFR-05`. |
 | **M4 — Safety** | `core/safety`, safety task, charge-pump enable, latching, watchdogs. | Every rule in [§8.2](#82-rule-table) has a passing automated test; HIL confirms contactor release. |
+| **M4b — Current** | `core/current`, CT adapter, `SR-25`–`SR-30`, weld discrimination. | Every current rule has a passing automated test; HIL confirms `SR-27` against an emulated welded contactor. |
 | **M5 — Persist** | Log ring, run index, programs, configuration, power-loss recovery. | `FR-LOG`, `FR-CFG`, `FR-RUN-08` pass; endurance analysis confirmed by measurement. |
 | **M6 — Web** | HTTP server, REST API, SSE, dashboard, chart, program editor, settings, OTA. | `FR-WEB`, `FR-UPD` pass; API suite green. |
 | **M7 — Tune** | `autotune` and its UI. | `FR-TUN` passes across the simulator's plant parameter sweep. |
