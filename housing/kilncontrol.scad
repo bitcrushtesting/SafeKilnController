@@ -83,6 +83,15 @@ enc_shaft_d = 7.5;   // 6 mm shaft + clearance for the threaded bushing
 enc_nut_d   = 10.0;  // recess for the mounting nut
 enc_nut_h   = 1.2;
 
+// Sound port over the on-board buzzer (BZ1, TMB12A05, 12 mm dia). A buzzer
+// sealed inside the box is heavily muffled, and SR-20 depends on the operator
+// actually hearing it, so the lid is perforated above it.
+buzz_x        = 45;    // centre of BZ1, relative to the PCB origin
+buzz_y        = 15;
+buzz_port_d   = 11.0;  // diameter of the perforated area
+buzz_hole_d   = 1.6;   // individual hole
+buzz_hole_ring= 7;     // holes in the outer ring
+
 usb_x       = 0;     // USB-C access on the -X wall, centred on this Y
 usb_y       = 20;
 usb_w       = 11.0;
@@ -274,6 +283,17 @@ module lid() {
                 cyl(h = lid_t + 3.02, d = enc_shaft_d, anchor = BOTTOM);
             translate([pcb_ox + enc_x, pcb_oy + enc_y, lid_t - enc_nut_h])
                 cyl(h = enc_nut_h + 0.01, d = enc_nut_d, anchor = BOTTOM);
+
+            // Buzzer sound port: a centre hole plus a ring, which lets the
+            // sound out without leaving an opening big enough to drop debris
+            // straight onto the board.
+            translate([pcb_ox + buzz_x, pcb_oy + buzz_y, -0.01]) {
+                cyl(h = lid_t + 3.02, d = buzz_hole_d, anchor = BOTTOM);
+                for (i = [0 : buzz_hole_ring - 1])
+                    rotate([0, 0, i * 360 / buzz_hole_ring])
+                        right(buzz_port_d/2 - buzz_hole_d)
+                            cyl(h = lid_t + 3.02, d = buzz_hole_d, anchor = BOTTOM);
+            }
         }
     }
 }

@@ -562,7 +562,7 @@ stateDiagram-v2
 | **SR-17** | A latched fault shall persist across power loss, and shall require an explicit operator acknowledgement to clear. The system shall not silently self-recover. | T |
 | **SR-18** | The system shall refuse to clear a fault while its triggering condition is still present. | T |
 | **SR-19** | Each fault shall have a unique, stable numeric code and a human-readable cause, presented on both the display and the web interface, and documented. | T,I |
-| **SR-20** | The alarm output shall be asserted on any fault and on program completion, and shall be distinguishable between the two. | D |
+| **SR-20** | The on-board buzzer ([HR-09](#6-hardware-interface-requirements)) shall sound on any fault and on program completion, and the two shall be audibly distinguishable by their pattern. | D |
 | **SR-21** | Heating outputs shall be de-energised during reset, boot, firmware update and any transition through an undefined software state. | T,I |
 | **SR-22** | Every safety detection threshold shall be configurable within a bounded range, and no range shall permit disabling a detection entirely except where explicitly stated ([SR-12](#52-detection-requirements) warning only). | I,T |
 | **SR-23** | The maximum chamber temperature shall be configurable only up to an absolute compile-time ceiling of **1350 °C**, and every temperature setpoint, program target and tuning setpoint shall be clamped to the configured maximum. | T |
@@ -585,7 +585,9 @@ stateDiagram-v2
 | **HR-06** | The heater modulation output shall drive a zero-cross-switching SSR rated for the kiln's current with a documented margin. | M | I |
 | **HR-07** | The heat-enable output shall drive the safety contactor through a circuit that requires a **periodic software refresh** to hold the contactor closed, so that a hung or crashed MCU releases it ([SR-02](#51-safety-principles)). | M | I,T |
 | **HR-08** | All heater and contactor control outputs shall have external pull-downs to the de-energised state, and shall not use pins that are strapping pins or that glitch during reset or boot on the ESP32-S3. | M | I,T |
-| **HR-09** | The system shall provide an alarm output capable of driving a buzzer and/or an auxiliary relay. | M | I |
+| **HR-09** | The system shall carry an **on-board** audible alarm: a 5 V active (self-driving) magnetic buzzer switched low-side from the alarm GPIO, so that annunciation needs no external component or field wiring. | M | I |
+| **HR-19** | Every test point shall be a surface pad on the **top copper layer only**, so the whole board can be probed without turning it over or removing it from its enclosure. No test point shall be placed on the bottom layer. | M | I |
+| **HR-20** | Test-point pads shall be small enough not to drive the board area, and shall carry no drilled hole. 1.5 mm square is the design value. | S | I |
 | **HR-10** | Pin assignments shall be defined in one place per board variant and shall not be duplicated across the codebase. | M | I |
 | **HR-11** | The design shall include a **current transformer (Stromwandler)** around one heater conductor, downstream of the safety contactor and the SSR, sized for the kiln's rated current with headroom, and preferably split-core so it can be fitted without breaking the heater wiring. | M | I |
 | **HR-16** | The current transformer shall be a **voltage-output type with an integral burden resistor**, or shall have a burden resistor permanently fitted at the board. A current-output CT whose burden can be disconnected shall not be used, because an open secondary carrying primary current develops dangerous voltages. | M | I |
