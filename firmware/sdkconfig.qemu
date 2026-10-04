@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 Bitcrush Testing
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Overlay for running the firmware under QEMU with the kiln process simulated.
+#
+#   idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.qemu" \
+#          set-target esp32s3 build qemu monitor
+#
+# Why a simulated plant rather than emulated peripherals: QEMU's esp32s3 model
+# covers the CPU, memory, flash and UART.  It does not model a MAX31856 on SPI,
+# an SSD1306 on I2C, the ADC, or PCNT -- so there is nothing for a thermocouple
+# driver to talk to and nothing for the CT front end to sample.  AD-01 is what
+# makes this work anyway: the plant substitutes at the *port* boundary, which is
+# the same seam the host tests use, so the code under test is the real control and
+# safety path rather than a mock of it.
+#
+# What this configuration therefore exercises: the task structure and its
+# periods, the real core logic end to end against a plant that responds, the
+# window and current-gating timing, the state machine, and every fault injection
+# -- all on the target's own compiler, scheduler and FPU.  What it cannot
+# exercise: the drivers, the charge-pump release of AD-05, and anything else that
+# needs a pin.  Those are target-and-HIL work (TR-17).
+
+CONFIG_KILN_PLANT_SIM=y
+
+# A watchdog panic in QEMU is noise rather than signal: the host is not real time,
+# so a long gdb pause or a slow host looks like a hung task.  Keep the watchdog
+# on, so the subscribe/feed path is still exercised, but do not reboot on it.
+CONFIG_ESP_TASK_WDT_PANIC=n
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=30
+
+# QEMU's flash is an image file; brownout detection has nothing to detect.
+CONFIG_ESP_BROWNOUT_DET=n
+
+# Readable console output, since watching the firing *is* the point here.
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+CONFIG_LOG_MAXIMUM_LEVEL_DEBUG=y

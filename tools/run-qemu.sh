@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Bitcrush Testing
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Build and run the firmware under QEMU with the kiln process simulated.
+#
+# Usage:  tools/run-qemu.sh [build|run|clean]     (default: build then run)
+#
+# Requires ESP-IDF 5.2 or newer with QEMU support installed:
+#     . $IDF_PATH/export.sh
+#     idf.py --preview install-qemu     # or: python -m idf_tools install qemu-xtensa
+#
+# What this exercises, and what it does not, is set out in firmware/sdkconfig.qemu.
+# In short: the real control and safety path against a plant that responds, on
+# the target's own compiler and scheduler -- but no drivers and no charge pump.
+
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fw="$here/../firmware"
+action="${1:-all}"
+
+if [[ -z "${IDF_PATH:-}" ]]; then
+    echo "IDF_PATH is not set. Run '. \$IDF_PATH/export.sh' first." >&2
+    exit 1
+fi
+
+cd "$fw"
+
+case "$action" in
+clean)
+    rm -rf build sdkconfig
+    ;;
+build|all)
+    # The overlay order matters: sdkconfig.qemu wins where the two disagree.
+    export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.qemu"
+    idf.py set-target esp32s3
+    idf.py build
+    ;;
+esac
+
+case "$action" in
+run|all)
+    cat <<'BANNER'
+
+--------------------------------------------------------------------
+ KilnControl under QEMU -- simulated plant, no hardware driven.
+
+ The firing starts by itself.  Keys (press 'h' for the full list):
+   s start   a abort   p pause   r resume   c clear fault   i idle
+   1 relay fail-on (SR-25/SR-27)     2 relay fail-off (SR-26)
+   3 welded contactor (SR-27)        4 partial element loss (SR-28)
+   5 over-current (SR-29)            6 CT disconnected (FR-CUR-11)
+   7 SSR shorted (SR-08/SR-25)       8 thermocouple open (SR-04)
+   9 thermocouple stuck (SR-06)      0 lid open (SR-07)
+   x clear all injections
+
+ Simulated time runs 60x by default (CONFIG_KILN_SIM_TIME_ACCEL),
+ so a four-hour schedule completes in about four minutes.
+
+ Ctrl-] to leave the monitor.
+--------------------------------------------------------------------
+
+BANNER
+    idf.py qemu monitor
+    ;;
+esac

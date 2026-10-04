@@ -1,0 +1,56 @@
+# SPDX-FileCopyrightText: 2026 Bitcrush Testing
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+menu "KilnControl"
+
+config KILN_PLANT_SIM
+    bool "Simulate the kiln process instead of driving hardware"
+    default n
+    help
+        Bind the thermocouple, heater-output, current and switching-counter
+        ports to kiln_sim rather than to the board's adapters.
+
+        This is how the firmware runs under QEMU, whose esp32s3 model provides
+        a CPU, memory, flash and a UART but no SPI thermocouple front end, no
+        I2C display and no ADC.  Substituting at the port boundary (AD-01) means
+        the control and safety path under test is the real one; only the
+        hardware edges are replaced.
+
+        Never enable this for a build that will be flashed to a kiln: the SSR
+        and contactor outputs are not driven at all.
+
+config KILN_SIM_TIME_ACCEL
+    int "Simulated time acceleration"
+    depends on KILN_PLANT_SIM
+    range 1 600
+    default 60
+    help
+        Multiplier applied both to the plant integration and to the dt handed to
+        the acquisition, control and safety cycles, so the two stay consistent.
+
+        A kiln has a time constant of tens of minutes, so watching a firing in
+        real time is not practical.  At 60 a four-hour schedule completes in four
+        minutes.
+
+        The 10 ms output window and the current-measurement settle and burst
+        timings are deliberately NOT accelerated: those are real hardware
+        timings, and leaving them real is what makes the gating of AD-17
+        meaningful here.
+
+config KILN_SIM_AUTOSTART
+    bool "Start a built-in example program at boot"
+    depends on KILN_PLANT_SIM
+    default y
+    help
+        Begin firing shortly after boot, so that `idf.py qemu monitor` shows a
+        running kiln without any input.  Press 'a' to abort, 's' to start again.
+
+config KILN_SIM_AUTOSTART_PROGRAM
+    int "Which built-in example to start"
+    depends on KILN_SIM_AUTOSTART
+    range 0 2
+    default 1
+    help
+        0 = Bisque cone 06, 1 = Glaze cone 6, 2 = Glass fuse (full).
+
+endmenu

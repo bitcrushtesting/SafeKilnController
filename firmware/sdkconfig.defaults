@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 Bitcrush Testing
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Baseline configuration for the real board.  Anything safety-relevant is here
+# rather than left at an IDF default, because a default can change under us.
+
+CONFIG_IDF_TARGET="esp32s3"
+
+# --- partitions (architecture section 10.1) ---
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+
+# --- SR-14: watchdogs.  The task WDT covers control and safety, and its expiry
+# must reset rather than merely complain: a hung safety task stops toggling the
+# charge pump, and the contactor drops in about a second (AD-05).
+CONFIG_ESP_TASK_WDT_EN=y
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=5
+CONFIG_ESP_TASK_WDT_PANIC=y
+CONFIG_ESP_INT_WDT=y
+CONFIG_ESP_INT_WDT_TIMEOUT_MS=300
+
+# --- SR-15 / NFR-15: brownout detection, and a panic that reboots into a known
+# state rather than sitting at a prompt with the heaters in whatever state they
+# were in.
+CONFIG_ESP_BROWNOUT_DET=y
+CONFIG_ESP_BROWNOUT_DET_LVL_SEL_7=y
+CONFIG_ESP_SYSTEM_PANIC_PRINT_REBOOT=y
+
+# --- AD-15: control and safety on core 1, connectivity on core 0 ---
+CONFIG_FREERTOS_UNICORE=n
+CONFIG_FREERTOS_HZ=1000
+
+# --- NFR-25 ---
+CONFIG_COMPILER_WARN_WRITE_STRINGS=y
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=6144
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
