@@ -242,6 +242,67 @@ KILN_TEST(sr26_uses_the_nominal_floor_before_a_reference_exists)
     CHECK_EQ_INT(got, KILN_FAULT_NO_HEATER_CURRENT);
 }
 
+KILN_TEST(sr26_needs_a_run_of_low_windows_and_not_just_an_elapsed_timer)
+{
+    /* Elapsed time alone can be tipped over by one unrepresentative measurement
+     * that happens to be the last before the window expires.  Requiring a run of
+     * them is strictly more evidence for the same conclusion. */
+    kiln_safety_t s;
+    kiln_safety_cfg_t c = cfg();
+    c.fail_off_min_windows = 3;
+    kiln_safety_init(&s, &c);
+    kiln_safety_begin_run(&s, NULL);
+
+    kiln_safety_input_t in = base();
+    in.duty_permille = 800;
+    in.current_ref_a = 30.0f;
+
+    /* One low window, then the timer runs well past its threshold with no
+     * further measurements at all. */
+    conduction(&in, 1.0f);
+    (void)kiln_safety_eval(&s, &in, 0.1f);
+    CHECK_EQ_UINT(s.fail_off_windows, 1u);
+
+    in.current_fresh = false;
+    kiln_fault_t got = KILN_FAULT_NONE;
+    for (int i = 0; i < 1000 && got == KILN_FAULT_NONE; i++) {
+        got = kiln_safety_eval(&s, &in, 0.1f).fault;
+    }
+    CHECK_EQ_INT(got, KILN_FAULT_NONE);
+    CHECK(s.fail_off_timer_s > c.fail_off_window_s);
+
+    /* The remaining windows arrive and it latches. */
+    conduction(&in, 1.0f);
+    (void)kiln_safety_eval(&s, &in, 0.1f);
+    conduction(&in, 1.0f);
+    CHECK_EQ_INT(kiln_safety_eval(&s, &in, 0.1f).fault, KILN_FAULT_NO_HEATER_CURRENT);
+}
+
+KILN_TEST(sr26_a_single_good_window_clears_the_accumulated_evidence)
+{
+    /* The first on-window of a run can be caught while the contactor is still
+     * closing and read near zero through no fault of the kiln.  One healthy
+     * measurement has to undo that. */
+    kiln_safety_t s;
+    const kiln_safety_cfg_t c = cfg();
+    kiln_safety_init(&s, &c);
+    kiln_safety_begin_run(&s, NULL);
+
+    kiln_safety_input_t in = base();
+    in.duty_permille = 800;
+    in.current_ref_a = 30.0f;
+
+    conduction(&in, 0.1f);
+    (void)kiln_safety_eval(&s, &in, 0.1f);
+    (void)kiln_safety_eval(&s, &in, 0.1f);
+    CHECK(s.fail_off_windows > 0u);
+
+    conduction(&in, 29.0f);
+    (void)kiln_safety_eval(&s, &in, 0.1f);
+    CHECK_EQ_UINT(s.fail_off_windows, 0u);
+    CHECK_NEAR(s.fail_off_timer_s, 0.0f, 0.001f);
+}
+
 KILN_TEST(sr26_does_not_trip_on_healthy_current)
 {
     kiln_safety_t s;

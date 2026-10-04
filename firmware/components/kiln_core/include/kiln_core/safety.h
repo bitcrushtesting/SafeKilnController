@@ -100,6 +100,15 @@ typedef struct {
     float    fail_off_fraction;
     float    fail_off_min_a;
     float    fail_off_window_s;
+    /* And a minimum number of consecutive low measurements, not elapsed time
+     * alone.  SR-25 counts windows and is the more robust rule for it: a rule
+     * decided purely on a timer can be tipped over by one unrepresentative
+     * measurement that happens to be the last before the window expires -- the
+     * first on-window of a run, say, caught while the contactor is still
+     * closing and reading near zero through no fault of the kiln.  Requiring
+     * both is strictly more evidence for the same conclusion and costs a
+     * fraction of a second. */
+    uint8_t  fail_off_min_windows;
 
     /* SR-27 weld discrimination.  NFR-27 allows 1 s from the offending window to
      * de-energising and a further 3 s to the verdict, so the wait for the
@@ -111,6 +120,7 @@ typedef struct {
     float    deviation_warn_frac;
     float    deviation_fault_frac;
     float    deviation_window_s;
+    uint8_t  deviation_min_windows;   /* as fail_off_min_windows */
 
     /* SR-29 over-current */
     float    overcurrent_a;
@@ -230,8 +240,10 @@ typedef struct {
     uint8_t  fail_on_count;            /* SR-25 consecutive off-windows       */
     uint8_t  overcurrent_count;        /* SR-29                               */
     float    fail_off_timer_s;         /* SR-26                               */
+    uint8_t  fail_off_windows;         /* consecutive low conduction windows  */
     bool     fail_off_below;           /* last conduction window was low      */
     float    deviation_timer_s;        /* SR-28                               */
+    uint8_t  deviation_windows;
 
     kiln_weld_phase_t weld_phase;      /* SR-27 */
     float             weld_timer_s;

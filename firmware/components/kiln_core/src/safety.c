@@ -47,6 +47,7 @@ void kiln_safety_cfg_defaults(kiln_safety_cfg_t *cfg)
 
         .fail_off_fraction        = 0.20f,   /* SR-26 */
         .fail_off_window_s        = 30.0f,
+        .fail_off_min_windows     = 3,
 
         /* SR-27 / NFR-27: 2 s for the contactor to drop, 3 s total to a verdict. */
         .weld_wait_s              = 2.0f,
@@ -55,6 +56,7 @@ void kiln_safety_cfg_defaults(kiln_safety_cfg_t *cfg)
         .deviation_warn_frac      = 0.10f,   /* SR-28 */
         .deviation_fault_frac     = 0.25f,
         .deviation_window_s       = 30.0f,
+        .deviation_min_windows    = 3,
 
         .overcurrent_windows      = 2,       /* SR-29 */
 
@@ -99,6 +101,8 @@ static bool clamp_cfg(kiln_safety_cfg_t *c)
         c->weld_verdict_s = c->weld_wait_s + 0.25f;
     }
     if (c->mismatch_episodes_warn == 0) c->mismatch_episodes_warn = 3;
+    if (c->fail_off_min_windows == 0)    c->fail_off_min_windows = 1;
+    if (c->deviation_min_windows == 0)   c->deviation_min_windows = 1;
 
     return memcmp(&in, c, sizeof(in)) != 0;
 }
@@ -132,8 +136,10 @@ void kiln_safety_begin_run(kiln_safety_t *s, const kiln_insulation_baseline_t *b
     s->fail_on_count         = 0;
     s->overcurrent_count     = 0;
     s->fail_off_timer_s      = 0.0f;
+    s->fail_off_windows      = 0;
     s->fail_off_below        = false;
     s->deviation_timer_s     = 0.0f;
+    s->deviation_windows     = 0;
     s->weld_phase            = KILN_WELD_IDLE;
     s->weld_timer_s          = 0.0f;
     s->weld_saw_current      = false;
@@ -528,6 +534,7 @@ static kiln_fault_t rule_fail_off(kiln_safety_t *s, const kiln_safety_input_t *i
             s->fail_off_episode_open = false;
         }
         s->fail_off_timer_s = 0.0f;
+        s->fail_off_windows = 0;
         s->fail_off_below   = false;
         return KILN_FAULT_NONE;
     }
@@ -541,23 +548,31 @@ static kiln_fault_t rule_fail_off(kiln_safety_t *s, const kiln_safety_input_t *i
     if (cur_is_conduction(in)) {
         s->fail_off_below = in->current_a < threshold;
         if (s->fail_off_below) {
+            if (s->fail_off_windows < 255u) s->fail_off_windows++;
             s->fail_off_episode_open = true;
-        } else if (s->fail_off_episode_open) {
-            if (s->mismatch_episodes < 0xFFFFu) s->mismatch_episodes++;
-            s->fail_off_episode_open = false;
-            s->fail_off_timer_s      = 0.0f;
+        } else {
+            if (s->fail_off_episode_open) {
+                if (s->mismatch_episodes < 0xFFFFu) s->mismatch_episodes++;
+                s->fail_off_episode_open = false;
+            }
+            s->fail_off_windows = 0;
+            s->fail_off_timer_s = 0.0f;
         }
     }
 
-    /* The timer runs on wall time, not on measurement count: FR-CUR-05 skips
-     * short windows, and a low duty would otherwise stretch "30 s" into an hour. */
     if (!s->fail_off_below) {
         s->fail_off_timer_s = 0.0f;
+        s->fail_off_windows = 0;
         return KILN_FAULT_NONE;
     }
 
+    /* The elapsed time is tracked on wall time -- FR-CUR-05 skips short windows,
+     * and a low duty would otherwise stretch "30 s" into an hour -- but the
+     * verdict needs both that *and* a run of low measurements.  See
+     * fail_off_min_windows for why one of the two is not enough. */
     s->fail_off_timer_s += dt_s;
-    if (s->fail_off_timer_s >= s->cfg.fail_off_window_s) {
+    if (s->fail_off_timer_s >= s->cfg.fail_off_window_s &&
+        s->fail_off_windows >= s->cfg.fail_off_min_windows) {
         s->fail_off_episode_open = false;
         return KILN_FAULT_NO_HEATER_CURRENT;
     }
@@ -582,12 +597,16 @@ static kiln_fault_t rule_deviation(kiln_safety_t *s, const kiln_safety_input_t *
     }
 
     if (d >= s->cfg.deviation_fault_frac) {
+        if (in->current_fresh && s->deviation_windows < 255u) s->deviation_windows++;
         s->deviation_timer_s += dt_s;
-        if (s->deviation_timer_s >= s->cfg.deviation_window_s) {
+        /* Both, as for SR-26. */
+        if (s->deviation_timer_s >= s->cfg.deviation_window_s &&
+            s->deviation_windows >= s->cfg.deviation_min_windows) {
             return KILN_FAULT_CURRENT_DEVIATION;
         }
     } else {
         s->deviation_timer_s = 0.0f;
+        s->deviation_windows = 0;
     }
     return KILN_FAULT_NONE;
 }
