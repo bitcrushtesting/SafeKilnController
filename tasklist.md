@@ -470,6 +470,59 @@ adapter from §C; and `OQ-06` (one CT or three) is still open — `kiln_current_
 one channel so a second and third are additive, per architecture §16, but D1
 should settle it before the component is frozen.
 
+### B.5 — Found while building the CI, 2026-10-04
+
+Driving the real image end to end (§C8) turned up two more defects, both now
+fixed, and one open question.
+
+- **The charge-pump decay must not be accelerated.** `AD-05`'s pump is hardware
+  with a real 1 s time constant, but the simulator integrates in accelerated
+  seconds, so under `CONFIG_KILN_SIM_TIME_ACCEL` it expired between two safety
+  refreshes 100 ms apart and dropped the contactor continuously — which then
+  reads, entirely correctly, as no heater current and latches `SR-26` within
+  seconds of starting a firing. `main.c` now scales it. The general rule, worth
+  remembering for anything else added to the simulator: a time constant that
+  belongs to the *hardware* does not accelerate with the plant.
+
+- **`main.c`'s demonstration gains were four times too high** for the default
+  simulated plant and its 90 s of transport lag, which produced 24 °C of
+  tracking error and tripped `SR-08` on residual heat soak. Now derived for that
+  plant and checked against it: 5.7 °C worst error through the cone 6 example.
+
+  A related observation that needed no change: `SR-08`'s `uncommanded_settle_s`
+  has to exceed the plant's transport lag, or residual soak after a duty-zero
+  stretch reads as a shorted SSR. The 60 s default is adequate with a controller
+  that is not bang-banging, and was left alone on that basis rather than moved
+  on thin evidence.
+
+- **`SR-26` and `SR-28` now require a run of consecutive qualifying measurements
+  as well as their elapsed window.** `SR-25` counts windows and is the more
+  robust rule for it; a rule decided purely on a timer can be tipped over by one
+  unrepresentative measurement that happens to be the last before the window
+  expires — the first on-window of a run, say, caught while the contactor is
+  still closing and reading near zero through no fault of the kiln. Three
+  windows by default, which is a fraction of a second. This was *not* the cause
+  of the failure above, which was the charge pump; it is a separate robustness
+  improvement made while looking at it.
+
+- **`FR-CUR-08` as written may never establish a reference on a real firing,
+  which disarms `SR-28`.** The requirement says "the median conduction current
+  measured while the elements are cold **and fully on**", implemented literally:
+  duty at maximum, below `ref_cold_max_c`. But a program ramping from cold at a
+  modest rate never commands full duty — the cone 6 example settles around
+  10–25 % — so no reference is learned and `SR-28`, having nothing to compare
+  against, never arms. `SR-26` is unaffected: it falls back to the
+  nominal-derived floor.
+
+  There is a defensible broader reading. During *any* conduction window the
+  elements are by definition fully on, and RMS conduction current does not depend
+  on duty, so any valid cold conduction measurement is the same physical
+  quantity — and `FR-CUR-05` already discards windows too short to measure.
+  Adopting it would make `SR-28` work on every firing. That is a requirements
+  interpretation rather than an implementation choice, so it has been left as it
+  stands and flagged here: **decide this alongside OQ-07.**
+
+
 ---
 
 ## C. Build, test and CI infrastructure
@@ -512,11 +565,18 @@ build file in the repository.
 - [ ] **C7. `tools/logdump`.** Decode a log partition dump to CSV — also the
   cross-check for the `logrec` codec.
 
-- [ ] **C8. `.github/workflows/`.** The six parallel jobs of architecture §14.6,
-  all merge-blocking: layercheck + SPDX; host unit and integration with coverage,
-  ASan and UBSan; `idf.py build` for esp32s3 with a size report; clang-tidy and
-  cppcheck with `-Wall -Wextra -Werror` (NFR-25); web lint and asset budget;
-  QEMU driver and API tests. Add a KiCAD ERC gate (see A11).
+- [x] **C8. `.github/workflows/`.** `ci.yml` runs five of the six jobs of
+  architecture §14.6, all merge-blocking: the layering and SPDX checks; host
+  tests plain and under ASan/UBSan; coverage with TR-19's line floor enforced at
+  90 % (measured 97.5 %); the `esp32s3` build with a size report against NFR-13;
+  and a QEMU job that boots the real image and asserts it reaches Running, is
+  granted heat authority, passes 100 °C and latches no fault. `release.yml`
+  builds and publishes on a `v*` tag.
+
+  Still outstanding: clang-tidy and cppcheck; web lint and the asset budget,
+  which need `web/` (C9); the API suite, which needs `kiln_web`; TR-19's 100 %
+  safety-branch floor (C10 — branch coverage is ~83 %, reported but not gated);
+  and the KiCAD ERC gate of A11.
 
 - [ ] **C9. `web/`.** Empty. FR-WEB and CON-06 need UI sources with a build output
   vendored into `kiln_web/assets`, inside the asset budget of architecture §12.4.

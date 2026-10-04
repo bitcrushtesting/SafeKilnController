@@ -17,6 +17,7 @@ jlcpcb/
 build/
 build-host/
 build-*/
+coverage/
 sdkconfig
 sdkconfig.old
 managed_components/

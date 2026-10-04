@@ -1,0 +1,291 @@
+# SPDX-FileCopyrightText: 2026 Bitcrush Testing
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Per TR-24, everything here blocks merge.  Architecture 14.6 describes six
+# parallel jobs; these are the ones the repository can run today -- clang-tidy
+# and cppcheck, the web asset budget and the API suite arrive with the
+# components they check (tasklist C8).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A superseded push has nothing useful left to say.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # CON-01 fixes ESP-IDF 5.x.  Pinned rather than floating: a toolchain that
+  # changes under a safety-relevant build is a variable nobody asked for.
+  IDF_VERSION: v5.3
+
+jobs:
+  # --- architecture 14.5 enforcement -------------------------------------
+  checks:
+    name: Layering and licence hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: kiln_core has no platform dependency (TR-01, AD-14)
+        run: |
+          # The property AD-14 rests on, and the one that erodes first: one
+          # esp_*/freertos include in the core and the host tests stop building,
+          # which is how a testability driver gets quietly dropped.  The full
+          # check over preprocessor output is tasklist C5; a grep already catches
+          # every way this has actually happened.
+          if grep -rnE '#include[[:space:]]*[<"](esp_|freertos/|driver/|soc/|hal/|nvs|sdkconfig)' \
+                  firmware/components/kiln_core firmware/components/kiln_ports; then
+            echo "::error::kiln_core or kiln_ports references a platform header"
+            exit 1
+          fi
+          echo "clean"
+
+      - name: kiln_ports is headers only (architecture 4, rule 2)
+        run: |
+          if find firmware/components/kiln_ports -name '*.c' | grep -q .; then
+            echo "::error::kiln_ports must contain no sources"
+            exit 1
+          fi
+          echo "clean"
+
+      - name: SPDX header on every source file (NFR-18, CON-04)
+        run: |
+          missing=0
+          while IFS= read -r f; do
+            grep -q 'SPDX-License-Identifier' "$f" \
+              || { echo "::error file=$f::no SPDX header"; missing=1; }
+          done < <(git ls-files \
+                     '*.c' '*.h' '*.md' 'CMakeLists.txt' '*/CMakeLists.txt' \
+                     'firmware/**/Kconfig*' 'firmware/*.csv' 'firmware/sdkconfig.*' \
+                     'tools/*.sh' '.github/workflows/*.yml' \
+                   | grep -v '^LICENSE')
+          exit $missing
+
+  # --- architecture 14.4: unit, integration and fuzz, on the host --------
+  host-tests:
+    name: Host tests (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: plain
+            cmake_flags: ''
+          - name: asan+ubsan
+            cmake_flags: '-DENABLE_ASAN=ON'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build-host -S firmware/test/host ${{ matrix.cmake_flags }}
+
+      - name: Build
+        run: cmake --build build-host -j"$(nproc)"
+
+      - name: Test
+        run: ctest --test-dir build-host --output-on-failure
+
+  # TR-19.  The line floor is enforced; measured at 97.5 % on kiln_core when
+  # this was written, so 90 % is a floor with room above it rather than a
+  # number chosen to match whatever the code happened to do.
+  #
+  # Still outstanding (tasklist C10): TR-19 also wants *100 % of safety decision
+  # branches*, and branch coverage is around 83 % overall.  Reported here so the
+  # gap is visible; gating it needs the remaining branches either covered or
+  # individually justified, which is work rather than a flag.
+  coverage:
+    name: Coverage (TR-19)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install gcovr
+        run: pipx install gcovr
+
+      - name: Build instrumented and run
+        run: |
+          cmake -B build-cov -S firmware/test/host -DENABLE_COVERAGE=ON
+          cmake --build build-cov -j"$(nproc)"
+          ctest --test-dir build-cov --output-on-failure
+
+      - name: Report and enforce the line floor
+        run: |
+          # pipefail, or tee would swallow the --fail-under-line verdict.
+          set -o pipefail
+          mkdir -p coverage
+          gcovr --root . \
+                --filter 'firmware/components/kiln_core/src/' \
+                --exclude-unreachable-branches \
+                --fail-under-line 90 \
+                --txt coverage/report.txt \
+                --html-details coverage/index.html \
+                --print-summary \
+                build-cov | tee coverage/summary.txt
+
+      - name: Summarise
+        if: always()
+        run: |
+          {
+            echo '### kiln_core coverage (TR-19)'
+            echo
+            echo '```'
+            cat coverage/summary.txt 2>/dev/null || echo 'not produced'
+            echo '```'
+            echo
+            echo '<details><summary>Per file</summary>'
+            echo
+            echo '```'
+            cat coverage/report.txt 2>/dev/null || echo 'not produced'
+            echo '```'
+            echo
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage/
+          if-no-files-found: warn
+
+  # --- architecture 14.6: the target build ------------------------------
+  firmware:
+    name: Firmware build (esp32s3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Only the simulated-plant configuration builds today: the hardware
+      # adapters do not exist, and main.c refuses to build without a plant
+      # rather than silently producing an image that drives nothing.  When
+      # kiln_hal_esp32s3 lands, build that configuration here too -- it is the
+      # one that matters for a release.
+      # One container run, so the size report cannot disagree with the image it
+      # describes.
+      - name: Build and size report
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: ${{ env.IDF_VERSION }}
+          target: esp32s3
+          path: firmware
+          command: |
+            export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.qemu"
+            idf.py build
+            idf.py size > build/size.txt
+            idf.py size-components > build/size-components.txt
+
+      # Summarised from a normal step: $GITHUB_STEP_SUMMARY is a path on the
+      # runner, and the step above runs in a container that mounts only the
+      # workspace.
+      - name: Summarise the image size
+        run: |
+          {
+            echo '### Image size'
+            echo
+            echo 'NFR-13: the application must fit a 2 MB OTA slot.'
+            echo '```'
+            cat firmware/build/size.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-esp32s3-simulated
+          path: |
+            firmware/build/kilncontrol.bin
+            firmware/build/kilncontrol.elf
+            firmware/build/kilncontrol.map
+            firmware/build/bootloader/bootloader.bin
+            firmware/build/partition_table/partition-table.bin
+            firmware/build/flasher_args.json
+            firmware/build/size.txt
+            firmware/build/size-components.txt
+          if-no-files-found: error
+
+  # --- architecture 14.6: boot the image and watch it fire ---------------
+  #
+  # Not a substitute for the host integration suite, which covers far more and
+  # runs in seconds.  What this adds is the one thing the host cannot: that the
+  # real image, built by the real toolchain, boots on the target's scheduler and
+  # FPU and gets as far as running a program.  Everything about the plant is
+  # simulated -- see docs/simulation.md for what that does and does not prove.
+  qemu-smoke:
+    name: QEMU boot and firing smoke test
+    runs-on: ubuntu-latest
+    needs: firmware
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and run under QEMU
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: ${{ env.IDF_VERSION }}
+          target: esp32s3
+          path: firmware
+          command: |
+            export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.qemu"
+            python "$IDF_PATH/tools/idf_tools.py" install qemu-xtensa
+            . "$IDF_PATH/export.sh"
+            idf.py build
+            # No monitor: it wants a tty.  Serial goes to stdout, and the
+            # firmware prints a telemetry line a second.
+            timeout --signal=KILL 180 idf.py qemu > qemu.log 2>&1 || true
+            tail -40 qemu.log
+
+      - name: Assert it booted and started firing
+        run: |
+          log=firmware/qemu.log
+          test -s "$log" || { echo "::error::QEMU produced no output"; exit 1; }
+
+          fail=0
+          want() {
+            if grep -qE "$1" "$log"; then
+              echo "ok: $2"
+            else
+              echo "::error::$2 -- expected /$1/ in the QEMU log"
+              fail=1
+            fi
+          }
+
+          want 'KilnControl starting'            'the composition root ran'
+          want 'SIMULATED PLANT'                 'the simulated plant was bound'
+          want 'started "'                       'a program was accepted and started'
+          want '^\[RUN'                          'the run controller reached Running'
+          want 'HEAT'                            'the safety supervisor granted heat authority'
+
+          # The kiln has to actually get somewhere: a controller that boots and
+          # then sits at ambient would satisfy every check above.  The state is
+          # padded inside its brackets, so strip the whole bracketed field before
+          # reading the temperature rather than counting on where it lands.
+          if ! awk '/^\[/ { gsub(/\[[^]]*\]/, ""); if ($1+0 > 100) found = 1 }
+                    END { exit !found }' "$log"; then
+            echo "::error::the simulated kiln never passed 100 degC"
+            fail=1
+          fi
+
+          # And it has to get there without tripping a rule.  A spurious fault is
+          # the failure mode that matters most: a rule that stops a working kiln
+          # is worse than no rule, because it gets switched off.
+          if grep -qE '^\s+FAULT [0-9]+' "$log"; then
+            echo "::error::a fault latched during an unperturbed firing"
+            grep -E '^\s+FAULT [0-9]+' "$log" | head -5
+            fail=1
+          fi
+
+          exit $fail
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qemu-log
+          path: firmware/qemu.log
+          if-no-files-found: warn

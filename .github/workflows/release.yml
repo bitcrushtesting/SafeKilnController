@@ -1,0 +1,187 @@
+# SPDX-FileCopyrightText: 2026 Bitcrush Testing
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Tag a release and this builds it:
+#
+#     git tag -a v0.2.0 -m 'what changed' && git push origin v0.2.0
+#
+# Read the warning in the generated notes before flashing anything.  Until
+# kiln_hal_esp32s3 exists, the only configuration that builds is the one with
+# the kiln process simulated, and it drives no outputs at all.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build'
+        required: true
+
+permissions:
+  contents: write      # to create the release
+
+env:
+  IDF_VERSION: v5.3
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          # Full history, so the notes can be generated from the range since the
+          # previous tag.
+          fetch-depth: 0
+
+      - name: Establish the version
+        id: version
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          prev="$(git describe --tags --abbrev=0 "${tag}^" 2>/dev/null || true)"
+          echo "prev=$prev" >> "$GITHUB_OUTPUT"
+          echo "Building $tag (previous: ${prev:-none})"
+
+      # The logic gate first.  A release whose safety rules are untested is not a
+      # release, and this is the cheap check: seconds, and it covers every SR.
+      - name: Host tests must pass before anything is published
+        run: |
+          cmake -B build-host -S firmware/test/host -DENABLE_ASAN=ON
+          cmake --build build-host -j"$(nproc)"
+          ctest --test-dir build-host --output-on-failure
+
+      - name: Build firmware
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: ${{ env.IDF_VERSION }}
+          target: esp32s3
+          path: firmware
+          command: |
+            export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.qemu"
+            idf.py build
+            # One image covering bootloader, partition table and app, so flashing
+            # is a single command and cannot be done half way.
+            idf.py merge-bin -o build/kilncontrol-merged.bin
+            idf.py size > build/size.txt
+            idf.py size-components > build/size-components.txt
+
+      - name: Assemble the artifacts
+        run: |
+          tag='${{ steps.version.outputs.tag }}'
+          # SIMULATED belongs in the filename and not only in the notes: a file
+          # outlives the page it was downloaded from.
+          base="kilncontrol-${tag}-esp32s3-SIMULATED"
+          mkdir -p dist
+
+          cp firmware/build/kilncontrol-merged.bin  "dist/${base}-merged.bin"
+          cp firmware/build/kilncontrol.bin         "dist/${base}-app.bin"
+          cp firmware/build/kilncontrol.elf         "dist/${base}.elf"
+          cp firmware/build/kilncontrol.map         "dist/${base}.map"
+          cp firmware/build/bootloader/bootloader.bin \
+                                                    "dist/${base}-bootloader.bin"
+          cp firmware/build/partition_table/partition-table.bin \
+                                                    "dist/${base}-partition-table.bin"
+          cp firmware/build/flasher_args.json       "dist/${base}-flasher_args.json"
+          cp firmware/build/size.txt                "dist/${base}-size.txt"
+          cp firmware/build/size-components.txt     "dist/${base}-size-components.txt"
+          # The resolved configuration, so the image can be reproduced.
+          cp firmware/sdkconfig                     "dist/${base}-sdkconfig"
+
+          ( cd dist && sha256sum ./* > SHA256SUMS )
+          ls -l dist
+
+      - name: Write the release notes
+        run: |
+          tag='${{ steps.version.outputs.tag }}'
+          prev='${{ steps.version.outputs.prev }}'
+          base="kilncontrol-${tag}-esp32s3-SIMULATED"
+
+          # Built line by line rather than from a heredoc: a heredoc inside a
+          # YAML block scalar carries the block's indentation into its output,
+          # and four spaces in Markdown is a code block.
+          {
+            echo '> [!CAUTION]'
+            echo '> **This build cannot control a kiln. Do not flash it to one.**'
+            echo '>'
+            echo '> The hardware adapters (`kiln_hal_esp32s3`) do not exist yet, so the'
+            echo '> only configuration that builds is the one with the kiln process'
+            echo '> *simulated* (`CONFIG_KILN_PLANT_SIM`). The SSR and contactor outputs'
+            echo '> are never driven and the temperatures it reports are invented.'
+            echo '>'
+            echo '> It is published so that the control and safety logic can be run and'
+            echo '> reviewed on an emulated ESP32-S3.'
+            echo
+            echo '## Running it'
+            echo
+            echo 'From source, which also gets you the fault-injection keys:'
+            echo
+            echo '```sh'
+            echo '. "$IDF_PATH/export.sh" && idf.py --preview install-qemu'
+            echo 'tools/run-qemu.sh'
+            echo '```'
+            echo
+            echo 'Or boot the published image directly:'
+            echo
+            echo '```sh'
+            echo 'qemu-system-xtensa -nographic -machine esp32s3 \'
+            echo "  -drive file=${base}-merged.bin,if=mtd,format=raw"
+            echo '```'
+            echo
+            echo 'See [`docs/simulation.md`](docs/simulation.md) for what the simulated'
+            echo 'plant does and does not prove.'
+            echo
+            echo '## Verification'
+            echo
+            echo 'Host suites, run against this commit under AddressSanitizer and UBSan:'
+            echo
+            echo '```'
+            for t in build-host/test_*; do
+              [ -x "$t" ] || continue
+              printf '%-22s %s\n' "$(basename "$t" | sed 's/^test_//')" \
+                                  "$("$t" 2>/dev/null | tail -1)"
+            done
+            echo '```'
+            echo
+            echo 'Not covered by any of it: the device drivers, and the charge-pump'
+            echo 'release of `AD-05` — the central safety property of the design, which'
+            echo 'needs real hardware to verify (`TR-17`, `SR-02`).'
+            echo
+            echo '## Changes'
+            echo
+            if [ -n "$prev" ]; then
+              git log --no-merges --format='- %s' "${prev}..${tag}"
+              echo
+              echo "[Full diff](https://github.com/${GITHUB_REPOSITORY}/compare/${prev}...${tag})"
+            else
+              echo 'First tagged build.'
+            fi
+            echo
+            echo '## Checksums'
+            echo
+            echo '```'
+            cat dist/SHA256SUMS
+            echo '```'
+          } > release-notes.md
+
+          cat release-notes.md
+
+      # gh is on the runner already, so this needs no third-party action.
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag='${{ steps.version.outputs.tag }}'
+          # Marked a prerelease for as long as the published image is the
+          # simulated one.  Drop --prerelease once there is a build that can
+          # actually drive a kiln.
+          gh release create "$tag" \
+            --title "$tag" \
+            --notes-file release-notes.md \
+            --prerelease \
+            --verify-tag \
+            dist/*

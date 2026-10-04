@@ -43,6 +43,11 @@ cmake -B build-host -S firmware/test/host && cmake --build build-host
 ctest --test-dir build-host
 ```
 
+CI runs the layering and licence checks, the host suites plain and under
+AddressSanitizer/UBSan, a coverage gate, the `esp32s3` build with a size report,
+and a QEMU job that boots the real image and watches it fire. Tagging `v*`
+builds a release.
+
 | Document | Contents |
 |---|---|
 | [`docs/requirements.md`](docs/requirements.md) | Requirements specification — functional, safety, non-functional, hardware-interface and testability requirements, each with an identifier and a verification method. |
