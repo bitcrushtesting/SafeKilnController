@@ -1,0 +1,110 @@
+/* SPDX-FileCopyrightText: 2026 Bitcrush Testing
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * kiln_core/faults -- SR-19 and requirements Appendix A.  The table's order is
+ * load-bearing (the codes are stable and never reused), so this is the
+ * consistency test architecture section 5.1 asks for.
+ */
+
+#include <string.h>
+#include "kiln_check.h"
+#include "kiln/err.h"
+#include "kiln_core/faults.h"
+
+KILN_TEST(sr19_every_fault_code_has_a_label_a_cause_and_a_requirement)
+{
+    for (int c = KILN_FAULT_TC_OPEN; c < KILN_FAULT_MAX; c++) {
+        const kiln_fault_t code = (kiln_fault_t)c;
+
+        const char *label = kiln_fault_label(code);
+        CHECK_MSG(strcmp(label, "UNKNOWN") != 0, "fault %d has no label", c);
+        /* The local display is 128 px wide, so the short label has to be short. */
+        CHECK_MSG(strlen(label) <= 12u, "fault %d label \"%s\" is too long", c, label);
+
+        const char *cause = kiln_fault_cause(code);
+        CHECK_MSG(strcmp(cause, "Unknown fault code.") != 0, "fault %d has no cause", c);
+        /* An operator-facing cause is a sentence, not a word. */
+        CHECK_MSG(strlen(cause) > 20u, "fault %d cause is too terse", c);
+
+        const char *req = kiln_fault_requirement(code);
+        CHECK_MSG(req[0] != '\0', "fault %d traces to no requirement", c);
+    }
+}
+
+KILN_TEST(the_current_fault_codes_are_the_ones_appendix_a_allocates)
+{
+    CHECK_EQ_INT(KILN_FAULT_UNCOMMANDED_CURRENT, 21);
+    CHECK_EQ_INT(KILN_FAULT_CONTACTOR_WELDED,    22);
+    CHECK_EQ_INT(KILN_FAULT_NO_HEATER_CURRENT,   23);
+    CHECK_EQ_INT(KILN_FAULT_CURRENT_DEVIATION,   24);
+    CHECK_EQ_INT(KILN_FAULT_OVERCURRENT,         25);
+    CHECK_EQ_INT(KILN_FAULT_CT_FAULT,            26);
+
+    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_UNCOMMANDED_CURRENT), "SR-25");
+    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_CONTACTOR_WELDED),    "SR-27");
+    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_NO_HEATER_CURRENT),   "SR-26");
+    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_CURRENT_DEVIATION),   "SR-28");
+    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_OVERCURRENT),         "SR-29");
+    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_CT_FAULT),            "FR-CUR-11");
+}
+
+KILN_TEST(sr27_tells_the_operator_to_isolate_the_kiln)
+{
+    /* The one fault whose operator instruction is an action on the supply, not a
+     * diagnosis.  If this text ever loses it, the fault becomes unactionable. */
+    const char *cause = kiln_fault_cause(KILN_FAULT_CONTACTOR_WELDED);
+    CHECK(strstr(cause, "ISOLATE") != NULL);
+    CHECK(strstr(cause, "welded") != NULL);
+}
+
+KILN_TEST(every_warning_bit_has_a_label_and_a_cause)
+{
+    for (int b = 0; b < KILN_WARN_COUNT; b++) {
+        const kiln_warn_bit_t bit = (kiln_warn_bit_t)b;
+        CHECK_MSG(strcmp(kiln_warn_label(bit), "UNKNOWN") != 0,
+                  "warning bit %d has no label", b);
+        CHECK_MSG(strcmp(kiln_warn_cause(bit), "Unknown warning.") != 0,
+                  "warning bit %d has no cause", b);
+        CHECK_MSG(strlen(kiln_warn_label(bit)) <= 12u,
+                  "warning bit %d label is too long", b);
+    }
+}
+
+KILN_TEST(warning_codes_start_at_101_and_match_appendix_a)
+{
+    CHECK_EQ_UINT(kiln_warn_code(KILN_WARN_INSULATION),  101u);
+    CHECK_EQ_UINT(kiln_warn_code(KILN_WARN_RELAY_WEAR),  109u);
+    CHECK_EQ_UINT(kiln_warn_code(KILN_WARN_RELAY_SUSPECT), 110u);
+    CHECK_EQ_UINT(kiln_warn_code(KILN_WARN_CURRENT_OFF), 111u);
+    CHECK_EQ_UINT(kiln_warn_code(KILN_WARN_CURRENT_DEV), 112u);
+}
+
+KILN_TEST(out_of_range_codes_answer_safely)
+{
+    CHECK_STR_EQ(kiln_fault_label((kiln_fault_t)999), "UNKNOWN");
+    CHECK_STR_EQ(kiln_fault_cause((kiln_fault_t)999), "Unknown fault code.");
+    CHECK_STR_EQ(kiln_fault_requirement((kiln_fault_t)999), "");
+    CHECK_STR_EQ(kiln_warn_label((kiln_warn_bit_t)99), "UNKNOWN");
+    CHECK_STR_EQ(kiln_state_label((kiln_state_t)99), "?");
+}
+
+KILN_TEST(every_state_has_a_label_that_fits_the_display)
+{
+    for (int s = 0; s < KILN_STATE_COUNT; s++) {
+        const char *l = kiln_state_label((kiln_state_t)s);
+        CHECK(l[0] != '?');
+        CHECK(strlen(l) <= 6u);
+    }
+    /* KILN_STATE_COUNT is packed into a log nibble. */
+    CHECK(KILN_STATE_COUNT <= 15);
+}
+
+KILN_TEST(every_error_code_has_a_message)
+{
+    for (int e = 0; e < KILN_ERR_COUNT; e++) {
+        const char *s = kiln_err_str((kiln_err_t)e);
+        CHECK(s != NULL);
+        CHECK_MSG(strcmp(s, "unknown error") != 0, "error %d has no message", e);
+    }
+    CHECK_STR_EQ(kiln_err_str((kiln_err_t)999), "unknown error");
+}
