@@ -38,8 +38,13 @@ typedef struct {
     uint8_t  current_flags; /* KILN_CURF_* */
 } kiln_log_sample_t;
 
-/* Encode / decode one record.  decode returns KILN_ERR_CORRUPT on a bad CRC or
- * an all-0xFF (erased, or torn) slot. */
+/* Encode / decode one record.
+ *
+ * decode distinguishes the two ways a slot can fail to hold a record, because
+ * the difference matters to the reader: KILN_ERR_NOT_FOUND for an all-0xFF slot,
+ * which is simply the end of what has been written, and KILN_ERR_CORRUPT for a
+ * bad CRC, which is a torn write or bit rot and means iteration should skip this
+ * record and carry on rather than stop. */
 void       kiln_logrec_encode(const kiln_log_sample_t *s, uint8_t out[KILN_LOG_RECORD_BYTES]);
 kiln_err_t kiln_logrec_decode(const uint8_t rec[KILN_LOG_RECORD_BYTES], kiln_log_sample_t *out);
 
@@ -84,12 +89,30 @@ typedef struct {
     uint32_t           from_ms, to_ms;
     uint32_t           bucket_ms;
     uint32_t           accepted;     /* samples that landed in a bucket */
+    uint16_t           folds;        /* doublings so far, for diagnostics */
+    bool               unbounded;    /* to_ms was 0: width grows as needed */
 } kiln_decimator_t;
 
 /* from_ms/to_ms bound the range; max_points is the caller's pixel budget.
- * Passing to_ms == 0 means "unbounded", resolved on the first sample. */
-void kiln_decimator_init(kiln_decimator_t *d, kiln_log_bucket_t *storage,
-                         uint16_t max_points, uint32_t from_ms, uint32_t to_ms);
+ *
+ * to_ms == 0 means "unbounded" -- the usual case for "show me this run", where
+ * the caller does not know the extent before reading it.  The bucket width then
+ * starts fine and *doubles* whenever the buckets fill, folding adjacent pairs
+ * together as it goes.  That costs one O(capacity) pass per doubling, which is
+ * about seventeen passes for a 10 h run, and in exchange an open-ended query
+ * returns a downsampled view of the whole run instead of the first N samples of
+ * it -- which is what FR-LOG-10 asks for and what a chart needs.
+ *
+ * Extrema survive folding: a bucket's min and max are the min and max of the two
+ * it was built from, so the brief excursion FR-LOG-11 cares about is still there
+ * at any zoom level.
+ *
+ * Zeroes `storage` for `max_points` buckets, so the caller may pass ordinary
+ * uninitialised stack memory.
+ *
+ * Returns KILN_ERR_INVALID_ARG for a NULL target or storage. */
+kiln_err_t kiln_decimator_init(kiln_decimator_t *d, kiln_log_bucket_t *storage,
+                               uint16_t max_points, uint32_t from_ms, uint32_t to_ms);
 void kiln_decimator_push(kiln_decimator_t *d, const kiln_log_sample_t *s);
 
 #endif

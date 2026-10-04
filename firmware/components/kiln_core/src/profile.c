@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <stddef.h>
 #include <string.h>
 #include "kiln_core/profile.h"
 
@@ -16,12 +17,36 @@ static kiln_prog_validation_t fail(kiln_prog_valid_t code, uint8_t seg)
     return r;
 }
 
+/* A fixed array is a C string only if it contains a NUL. */
+static bool terminated(const char *buf, size_t cap)
+{
+    for (size_t i = 0; i < cap; i++) {
+        if (buf[i] == '\0') return true;
+    }
+    return false;
+}
+
+void kiln_profile_terminate_strings(kiln_program_t *p)
+{
+    if (!p) return;
+    p->name[KILN_PROGRAM_NAME_LEN - 1]        = '\0';
+    p->description[KILN_PROGRAM_DESC_LEN - 1] = '\0';
+}
+
 kiln_prog_validation_t kiln_profile_validate(const kiln_program_t *p, float max_temp_c)
 {
-    if (!p) return fail(KILN_PROG_ERR_NO_SEGMENTS, KILN_SEG_NONE);
+    /* Distinct from "no segments": a NULL program is a caller bug, an empty one
+     * is a bad program, and reporting the second for the first sends whoever is
+     * reading the message looking in the wrong place. */
+    if (!p) return fail(KILN_PROG_ERR_NULL, KILN_SEG_NONE);
 
     if (p->schema_version != KILN_PROGRAM_SCHEMA_VERSION) {
         return fail(KILN_PROG_ERR_SCHEMA, KILN_SEG_NONE);
+    }
+    /* NFR-19, before anything reads either string. */
+    if (!terminated(p->name, KILN_PROGRAM_NAME_LEN) ||
+        !terminated(p->description, KILN_PROGRAM_DESC_LEN)) {
+        return fail(KILN_PROG_ERR_NAME_UNTERMINATED, KILN_SEG_NONE);
     }
     if (p->name[0] == '\0') {
         return fail(KILN_PROG_ERR_NAME_EMPTY, KILN_SEG_NONE);
@@ -67,6 +92,7 @@ const char *kiln_profile_validation_str(kiln_prog_valid_t code)
 {
     switch (code) {
     case KILN_PROG_OK:                        return "ok";
+    case KILN_PROG_ERR_NULL:                  return "no program supplied";
     case KILN_PROG_ERR_NO_SEGMENTS:           return "program has no segments";
     case KILN_PROG_ERR_TOO_MANY_SEGMENTS:     return "too many segments";
     case KILN_PROG_ERR_TARGET_ABOVE_MAX:      return "target above the configured maximum temperature";
@@ -74,6 +100,7 @@ const char *kiln_profile_validation_str(kiln_prog_valid_t code)
     case KILN_PROG_ERR_RATE_RANGE:            return "ramp rate out of range";
     case KILN_PROG_ERR_DWELL_RANGE:           return "dwell time out of range";
     case KILN_PROG_ERR_NAME_EMPTY:            return "program name is empty";
+    case KILN_PROG_ERR_NAME_UNTERMINATED:     return "program name or description is not terminated";
     case KILN_PROG_ERR_TOO_LONG:              return "program would take longer than 168 hours";
     case KILN_PROG_ERR_SCHEMA:                return "unsupported program schema version";
     }

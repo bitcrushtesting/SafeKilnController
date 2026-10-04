@@ -44,8 +44,37 @@ typedef struct { float kp, ki, kd; } kiln_gains_t;
 
 typedef struct {
     float    setpoint_c;
+    /* SR-23 requires *every* temperature setpoint, program target and tuning
+     * setpoint to be clamped to the configured maximum -- not only to the
+     * compile-time ceiling.  It arrives here rather than being left to the
+     * caller by comment, so that it is enforced where it cannot be forgotten. */
+    float    max_temp_c;
     uint16_t amplitude_permille;   /* d: FR-TUN-04, 100..1000, default 500 */
     float    hysteresis_c;         /* FR-TUN-04, 0.1..20, default 1        */
+
+    /* Peak detection's confirmation threshold, independent of the relay band.
+     *
+     * Measured against a synthetic oscillation (see the host suite), because the
+     * expectation here is easy to get backwards:
+     *
+     *  - On a *clean* oscillation there is no amplitude bias at all.  An extreme
+     *    is confirmed once the measurement has reversed by this much, but the
+     *    value recorded is the extreme itself, not the value that confirmed it --
+     *    so Ku comes out exact whatever the threshold.
+     *  - What the threshold actually buys is noise immunity, and it is not
+     *    optional: with 0.5 degC of sensor noise a threshold of 0.25 degC lets
+     *    noise manufacture extrema, cycles never agree within FR-TUN-05's
+     *    tolerances, and the procedure fails on its timeout having learned
+     *    nothing.
+     *  - Noise that does get through inflates the measured half-amplitude (peak
+     *    plus noise, trough minus noise), and since Ku = 4d/(pi*a) that biases Ku
+     *    *low* -- about 9 % low at 0.5 degC of noise on a 5 degC oscillation.
+     *    Low Ku means gentler gains, which is the conservative direction.
+     *
+     * So: comfortably above the sensor noise, and the amplitude bias it costs is
+     * in the safe direction.  0 means "use hysteresis_c". */
+    float    peak_threshold_c;
+
     float    timeout_s;            /* FR-TUN-07, 600..28800, default 7200  */
     uint8_t  required_cycles;      /* FR-TUN-05, default 3 (after the first
                                     * is discarded)                        */
@@ -85,18 +114,31 @@ typedef struct {
     kiln_tune_cycle_t cycles[KILN_TUNE_MAX_CYCLES];
     uint8_t           cycle_count;   /* recorded, including the discarded first */
 
+    uint32_t bad_calls;              /* NFR-17: contract violations by the caller */
+
     /* results */
     float ku, tu;
     kiln_gains_t gains[KILN_TUNE_RULE_COUNT];
     kiln_fault_t fail_reason;
 } kiln_autotune_t;
 
-/* setpoint_c must already have been range-checked by the caller against the
- * configured maximum and ambient + 50 degC (FR-TUN-03). */
+/* SR-23 is enforced here: setpoint_c is clamped to cfg->max_temp_c and to the
+ * compile-time ceiling.  FR-TUN-03's "ambient + 50 degC" lower bound still
+ * belongs to the caller, which is the only party that knows ambient.
+ *
+ * Returns KILN_ERR_RANGE when the tuning setpoint had to be clamped: the
+ * procedure will run, but not at the temperature that was asked for. */
 kiln_err_t kiln_autotune_start(kiln_autotune_t *at, const kiln_tune_cfg_t *cfg);
 
-/* One control cycle.  Returns the duty being requested, per mille. */
-uint16_t kiln_autotune_tick(kiln_autotune_t *at, float pv_c, float dt_s);
+/* One control cycle.  Returns the duty being requested, per mille.
+ *
+ * rate_c_per_h must be the *filtered* rate, i.e. kiln_tempfilt_rate().  A
+ * single-sample difference cannot serve: at a 0.25 s cycle, 0.5 degC of sensor
+ * noise is 7200 degC/h against a settle threshold of 30, so the settle test could
+ * essentially never pass and SETTLE always fell through on its 30 min timeout
+ * instead of on the transient having died away. */
+uint16_t kiln_autotune_tick(kiln_autotune_t *at, float pv_c,
+                            float rate_c_per_h, float dt_s);
 
 void kiln_autotune_cancel(kiln_autotune_t *at);
 

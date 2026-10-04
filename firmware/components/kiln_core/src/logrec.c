@@ -129,7 +129,14 @@ kiln_err_t kiln_logrec_decode(const uint8_t rec[KILN_LOG_RECORD_BYTES],
     out->setpoint_c    = dec_temp(get_i16(&rec[8]));
     out->case_c        = dec_temp(get_i16(&rec[10]));
     out->current_a     = (float)get_u16(&rec[12]) / 100.0f;
-    out->duty_permille = (uint16_t)(rec[14] * 5u);
+    /* The encoder clamps to 200 half-percent steps, but a decoder reads bytes
+     * that may have come from a future encoder or from a corruption that happens
+     * to satisfy an 8-bit CRC -- and 255 * 5 is 1275, outside the duty range
+     * every consumer of this struct assumes. */
+    {
+        const uint16_t duty = (uint16_t)(rec[14] * 5u);
+        out->duty_permille = duty > KILN_DUTY_MAX ? (uint16_t)KILN_DUTY_MAX : duty;
+    }
     out->segment       = rec[15];
     out->state         = (uint8_t)(rec[16] & 0x0Fu);
     out->flags         = (uint8_t)(rec[16] & 0xF0u);
@@ -170,12 +177,23 @@ kiln_err_t kiln_logrec_decode_hdr(const uint8_t in[KILN_LOG_HEADER_BYTES],
 
 /* --- decimation -------------------------------------------------------- */
 
-void kiln_decimator_init(kiln_decimator_t *d, kiln_log_bucket_t *storage,
-                         uint16_t max_points, uint32_t from_ms, uint32_t to_ms)
+kiln_err_t kiln_decimator_init(kiln_decimator_t *d, kiln_log_bucket_t *storage,
+                               uint16_t max_points, uint32_t from_ms, uint32_t to_ms)
 {
+    /* Validated before the memset, not after: kiln_decimator_push checks all
+     * three of its pointers, and an initialiser that writes through a pointer it
+     * has not checked is the less careful of the pair. */
+    if (!d || !storage) return KILN_ERR_INVALID_ARG;
+
     memset(d, 0, sizeof(*d));
     d->buckets  = storage;
     d->capacity = max_points ? max_points : 1u;
+
+    /* The storage too, not just the state.  push distinguishes a fresh bucket
+     * from an accumulating one by its count being zero, so uninitialised caller
+     * storage means the first sample in each bucket never initialises its
+     * min/max and the series come out as whatever was on the stack. */
+    memset(storage, 0, (size_t)d->capacity * sizeof(*storage));
     d->from_ms  = from_ms;
     d->to_ms    = to_ms;
 
@@ -183,8 +201,58 @@ void kiln_decimator_init(kiln_decimator_t *d, kiln_log_bucket_t *storage,
         const uint32_t span = to_ms - from_ms;
         d->bucket_ms = span / d->capacity;
         if (d->bucket_ms == 0) d->bucket_ms = 1;
+    } else {
+        /* Unbounded: start at the finest width and let folding find the scale. */
+        d->unbounded = true;
+        d->bucket_ms = 1u;
     }
-    /* bucket_ms == 0 means "not yet known": resolved on first push. */
+    return KILN_OK;
+}
+
+static void bucket_merge(kiln_log_bucket_t *dst, const kiln_log_bucket_t *src)
+{
+    if (src->count == 0) return;
+    if (dst->count == 0) {
+        *dst = *src;
+        return;
+    }
+    /* The earlier bucket's timestamp wins; the extrema of both survive, which is
+     * the property FR-LOG-11 needs to hold at every zoom level. */
+    if (src->kiln_min_c < dst->kiln_min_c) dst->kiln_min_c = src->kiln_min_c;
+    if (src->kiln_max_c > dst->kiln_max_c) dst->kiln_max_c = src->kiln_max_c;
+    if (src->sp_min_c   < dst->sp_min_c)   dst->sp_min_c   = src->sp_min_c;
+    if (src->sp_max_c   > dst->sp_max_c)   dst->sp_max_c   = src->sp_max_c;
+    if (src->case_min_c < dst->case_min_c) dst->case_min_c = src->case_min_c;
+    if (src->case_max_c > dst->case_max_c) dst->case_max_c = src->case_max_c;
+    if (src->cur_min_a  < dst->cur_min_a)  dst->cur_min_a  = src->cur_min_a;
+    if (src->cur_max_a  > dst->cur_max_a)  dst->cur_max_a  = src->cur_max_a;
+    if (src->duty_min   < dst->duty_min)   dst->duty_min   = src->duty_min;
+    if (src->duty_max   > dst->duty_max)   dst->duty_max   = src->duty_max;
+    dst->flags         = (uint8_t)(dst->flags | src->flags);
+    dst->current_flags = (uint8_t)(dst->current_flags | src->current_flags);
+    dst->state         = src->state;      /* the later state in the pair */
+    dst->count         = (uint16_t)(dst->count + src->count);
+}
+
+/* Double the bucket width, folding pairs: 0+1 -> 0, 2+3 -> 1, and so on. */
+static void fold_pairs(kiln_decimator_t *d)
+{
+    const uint16_t used = d->used;
+    uint16_t out = 0;
+
+    for (uint16_t i = 0; i < used; i += 2u, out++) {
+        kiln_log_bucket_t merged = d->buckets[i];
+        if ((uint16_t)(i + 1u) < used) bucket_merge(&merged, &d->buckets[i + 1u]);
+        d->buckets[out] = merged;
+    }
+    for (uint16_t i = out; i < used; i++) {
+        const kiln_log_bucket_t empty = {0};
+        d->buckets[i] = empty;
+    }
+
+    d->used = out;
+    d->bucket_ms *= 2u;
+    d->folds++;
 }
 
 void kiln_decimator_push(kiln_decimator_t *d, const kiln_log_sample_t *s)
@@ -193,17 +261,25 @@ void kiln_decimator_push(kiln_decimator_t *d, const kiln_log_sample_t *s)
     if (s->t_rel_ms < d->from_ms) return;
     if (d->to_ms > d->from_ms && s->t_rel_ms > d->to_ms) return;
 
-    uint16_t idx;
-    if (d->bucket_ms > 0) {
-        const uint32_t off = s->t_rel_ms - d->from_ms;
-        const uint32_t i   = off / d->bucket_ms;
-        idx = (i >= d->capacity) ? (uint16_t)(d->capacity - 1u) : (uint16_t)i;
-    } else {
-        /* Unbounded range: fill sequentially, then fold pairs is out of scope --
-         * callers with an open range pass a capacity they are happy to fill. */
-        if (d->used >= d->capacity) return;
-        idx = d->used;
+    if (d->bucket_ms == 0) d->bucket_ms = 1u;   /* cannot happen; cheap to hold */
+
+    const uint32_t off = s->t_rel_ms - d->from_ms;
+    uint32_t       i   = off / d->bucket_ms;
+
+    if (i >= d->capacity) {
+        if (d->unbounded) {
+            /* Make room by halving the resolution, as many times as it takes --
+             * at most 32, since bucket_ms doubles each time. */
+            while (i >= d->capacity && d->bucket_ms <= (UINT32_MAX / 2u)) {
+                fold_pairs(d);
+                i = off / d->bucket_ms;
+            }
+        }
+        /* A bounded range cannot grow: a sample at exactly to_ms belongs in the
+         * last bucket. */
+        if (i >= d->capacity) i = (uint32_t)(d->capacity - 1u);
     }
+    const uint16_t idx = (uint16_t)i;
 
     kiln_log_bucket_t *b = &d->buckets[idx];
 

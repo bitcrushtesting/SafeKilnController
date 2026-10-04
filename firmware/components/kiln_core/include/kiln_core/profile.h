@@ -19,6 +19,7 @@
 
 typedef enum {
     KILN_PROG_OK = 0,
+    KILN_PROG_ERR_NULL,
     KILN_PROG_ERR_NO_SEGMENTS,
     KILN_PROG_ERR_TOO_MANY_SEGMENTS,
     KILN_PROG_ERR_TARGET_ABOVE_MAX,
@@ -26,6 +27,7 @@ typedef enum {
     KILN_PROG_ERR_RATE_RANGE,
     KILN_PROG_ERR_DWELL_RANGE,
     KILN_PROG_ERR_NAME_EMPTY,
+    KILN_PROG_ERR_NAME_UNTERMINATED,
     KILN_PROG_ERR_TOO_LONG,
     KILN_PROG_ERR_SCHEMA,
 } kiln_prog_valid_t;
@@ -36,8 +38,20 @@ typedef struct {
 } kiln_prog_validation_t;
 
 /* FR-PRG-05.  max_temp_c is the configured kiln maximum; the compile-time
- * ceiling of SR-23 is enforced regardless of what is passed in. */
+ * ceiling of SR-23 is enforced regardless of what is passed in.
+ *
+ * NFR-19: a program arrives from the network and from flash, so it is untrusted
+ * input.  name and description are fixed arrays that a decoder may have filled
+ * to the last byte, and the struct is memcpy'd wholesale into kiln_setpoint_t --
+ * so an unterminated string here becomes an out-of-bounds read in every later
+ * printf, strlen and JSON encode of it.  Validation rejects that rather than
+ * quietly repairing it; kiln_profile_terminate_strings is for a decoder that
+ * would rather repair at the boundary. */
 kiln_prog_validation_t kiln_profile_validate(const kiln_program_t *p, float max_temp_c);
+
+/* Force both fixed strings to be NUL-terminated, truncating if necessary.  For
+ * use at a decode boundary, before validation. */
+void kiln_profile_terminate_strings(kiln_program_t *p);
 const char *kiln_profile_validation_str(kiln_prog_valid_t code);
 
 /* FR-PRG-06: predicted duration assuming the kiln keeps up, starting from

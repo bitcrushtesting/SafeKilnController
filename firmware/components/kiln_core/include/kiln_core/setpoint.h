@@ -58,8 +58,14 @@ kiln_err_t kiln_setpoint_start(kiln_setpoint_t *st,
                                const kiln_program_t *prog,
                                float pv_c);
 
-/* One control cycle. */
-void kiln_setpoint_tick(kiln_setpoint_t *st, float pv_c, float dt_s);
+/* One control cycle.
+ *
+ * NFR-17: returns KILN_ERR_INVALID_ARG for a NULL generator, a non-positive or
+ * non-finite dt_s or a non-finite pv_c, and KILN_ERR_STATE when there is nothing
+ * to advance (not started, finished, or frozen awaiting an acknowledgement).
+ * Previously all of these returned silently, so a stalled clock looked exactly
+ * like a program running correctly. */
+kiln_err_t kiln_setpoint_tick(kiln_setpoint_t *st, float pv_c, float dt_s);
 
 /* FR-PRG-03: release a segment that is waiting for the operator. */
 kiln_err_t kiln_setpoint_ack(kiln_setpoint_t *st);
@@ -70,8 +76,21 @@ kiln_err_t kiln_setpoint_replace_remaining(kiln_setpoint_t *st,
                                            const kiln_program_t *updated);
 
 /* FR-PRG-06 / FR-RUN-05: seconds still to run, assuming the kiln keeps up.
- * Computed by running this same generator forward over a copy, so there is no
- * second estimator that can drift out of agreement with the executor. */
+ *
+ * Closed form.  These are display and API calls, served from the HMI and web
+ * tasks, and the arithmetic is a sum of ramp spans over rates plus dwell times --
+ * so simulating it a second at a time, up to 720 000 iterations over a ~440 byte
+ * stack copy of the whole generator, bought agreement with the executor at the
+ * price of a multi-millisecond blocking loop against NFR-02's 50 ms ceiling.
+ *
+ * Agreement is instead maintained by test: the host suite runs the generator
+ * forward as an oracle and asserts the closed form matches it, which is the same
+ * guarantee without the cost.  Expect agreement to within one second per
+ * segment; the ramp count is a ceiling over a float accumulation.
+ *
+ * The estimate is optimistic through a cooling segment, because FR-CTL-13 makes
+ * cooling passive -- a real kiln cools as fast as it cools, not at the rate the
+ * program names.  Stated here and in the API documentation (tasklist D4). */
 uint32_t kiln_setpoint_remaining_s(const kiln_setpoint_t *st);
 
 /* Seconds remaining in the current segment, same assumption. */
