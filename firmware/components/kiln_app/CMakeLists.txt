@@ -1,7 +1,12 @@
 # SPDX-FileCopyrightText: 2026 Bitcrush Testing
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-set(KILN_APP_SRCS src/app.c)
+set(KILN_APP_SRCS
+    src/app.c
+    src/program_store.c
+    src/run_index.c
+    src/settings.c
+)
 
 if(ESP_PLATFORM)
     idf_component_register(

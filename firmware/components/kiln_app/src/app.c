@@ -3,6 +3,9 @@
 
 #include <string.h>
 #include "kiln_app/app.h"
+#include "kiln_app/program_store.h"
+#include "kiln_app/run_index.h"
+#include "kiln_app/settings.h"
 
 /* --- configuration fan-out --------------------------------------------- */
 
@@ -159,7 +162,153 @@ kiln_err_t kiln_app_apply_config(kiln_app_t *app, const kiln_config_t *cfg,
     if (e != KILN_OK) return e;
 
     push_config(app);
+    kiln_app_log_event(app, KILN_LOGE_CONFIG_CHANGE);   /* FR-LOG-04 */
+
+    /* FR-CFG-01: a change that is not persisted is a change the next boot
+     * forgets, which is indistinguishable to the operator from it not having
+     * been applied. */
+    if (app->ports.kvstore) {
+        const kiln_err_t pe = kiln_settings_save(app->ports.kvstore, &app->cfg);
+        if (pe != KILN_OK) {
+            app->config_storage_failed = true;
+            return pe;
+        }
+        app->config_storage_failed = false;
+    }
     return KILN_OK;
+}
+
+/* --- logging (FR-LOG) -------------------------------------------------- */
+
+/* Enqueue, never write.  Architecture 10.3: the control task enqueues and only
+ * the logger touches flash, so nothing on the control path can be delayed by an
+ * erase -- and a full queue drops the sample and counts it rather than stalling
+ * a firing (FR-LOG-14). */
+static void log_enqueue(kiln_app_t *app, const kiln_log_sample_t *s)
+{
+    const uint16_t next = (uint16_t)((app->log_head + 1u) % KILN_APP_LOG_QUEUE);
+    if (next == app->log_tail) {
+        app->log_dropped++;
+        return;
+    }
+    kiln_logrec_encode(s, app->log_q[app->log_head]);
+    app->log_head = next;
+}
+
+static void build_sample(const kiln_app_t *app, kiln_log_event_t event,
+                         kiln_log_sample_t *out)
+{
+    memset(out, 0, sizeof(*out));
+
+    /* Relative to the run start, from accumulated dt rather than a clock: the
+     * monotonic figure is the one FR-LOG-12 requires every record to carry, and
+     * it is meaningful even when the wall clock never synced. */
+    const double ms = app->run_elapsed_s * 1000.0;
+    out->t_rel_ms      = (ms < 0.0) ? 0u
+                       : (ms > (double)UINT32_MAX ? UINT32_MAX : (uint32_t)ms);
+    out->kiln_raw_c    = app->kiln_raw_c;
+    out->kiln_filt_c   = app->kiln_c;
+    out->setpoint_c    = kiln_setpoint_value(&app->sp);
+    out->case_c        = app->case_c;
+    out->current_a     = kiln_current_amps(&app->cur);
+    out->duty_permille = app->duty_request;
+    out->segment       = app->state == KILN_STATE_RUNNING
+                       ? kiln_setpoint_segment(&app->sp) : KILN_SEG_NONE;
+    out->state         = (uint8_t)app->state;
+    out->current_flags = kiln_current_flags(&app->cur);
+    out->event         = (uint8_t)event;
+
+    if (kiln_setpoint_holdback(&app->sp)) out->flags |= KILN_LOGF_HOLDBACK;
+    if (app->pid.saturated)               out->flags |= KILN_LOGF_SATURATED;
+    if (app->tc_fault_bits != 0)          out->flags |= KILN_LOGF_TC_FAULT;
+
+    /* FR-LOG-12: a record logged before time sync says so, so a reader never
+     * mistakes a relative timestamp for a wall-clock one. */
+    if (app->ports.clock && app->ports.clock->wall_valid &&
+        app->ports.clock->wall_valid(app->ports.clock->ctx)) {
+        out->flags |= KILN_LOGF_WALL_VALID;
+    }
+}
+
+void kiln_app_log_event(kiln_app_t *app, kiln_log_event_t event)
+{
+    if (!app) return;
+
+    kiln_log_sample_t s;
+    build_sample(app, event, &s);
+    log_enqueue(app, &s);
+}
+
+uint32_t kiln_app_log_drain(kiln_app_t *app, uint32_t max_records)
+{
+    if (!app) return 0;
+
+    const kiln_port_logstore_t *ls = app->ports.logstore;
+    if (!ls || !ls->append) {
+        /* Nowhere to put them: discard rather than fill the queue and then start
+         * dropping the *newest*, which is the half worth keeping. */
+        app->log_tail = app->log_head;
+        return 0;
+    }
+
+    uint32_t written = 0;
+    while (written < max_records && app->log_tail != app->log_head) {
+        const kiln_err_t e = ls->append(ls->ctx, app->log_q[app->log_tail]);
+        if (e != KILN_OK) {
+            /* FR-LOG-14: counted and warned about, never fatal.  The record is
+             * dropped rather than retried forever, because a store that is
+             * failing will fail the retry too and the queue has a firing behind
+             * it. */
+            app->log_errors++;
+            app->log_tail = (uint16_t)((app->log_tail + 1u) % KILN_APP_LOG_QUEUE);
+            break;
+        }
+        app->log_tail = (uint16_t)((app->log_tail + 1u) % KILN_APP_LOG_QUEUE);
+        app->log_written++;
+        written++;
+    }
+    return written;
+}
+
+/* FR-LOG-01/03: the periodic sample, plus FR-LOG-04's out-of-band records when
+ * something actually happened. */
+static void log_cycle(kiln_app_t *app, float dt_s)
+{
+    const bool logging_state = app->state == KILN_STATE_RUNNING ||
+                               app->state == KILN_STATE_PAUSED  ||
+                               app->state == KILN_STATE_MANUAL  ||
+                               app->state == KILN_STATE_AUTOTUNE;
+
+    if ((uint8_t)app->state != app->last_logged_state) {
+        app->last_logged_state = (uint8_t)app->state;
+        kiln_app_log_event(app, KILN_LOGE_STATE_CHANGE);
+    }
+    if (app->warnings != app->last_logged_warnings) {
+        /* Only a *new* warning is news; one clearing is covered by the next
+         * sample carrying the new mask. */
+        if ((app->warnings & ~app->last_logged_warnings) != 0) {
+            kiln_app_log_event(app, KILN_LOGE_WARNING);
+        }
+        app->last_logged_warnings = app->warnings;
+    }
+
+    if (!logging_state) {
+        app->log_accum_s = 0.0;
+        return;
+    }
+
+    app->log_accum_s += (double)dt_s;
+    const double interval = (double)app->cfg.log_interval_s;
+    if (interval > 0.0 && app->log_accum_s >= interval) {
+        app->log_accum_s -= interval;
+        kiln_app_log_event(app, KILN_LOGE_SAMPLE);
+    }
+
+    /* FR-LOG-14 / warning 103, live: the operator should know the chart will
+     * have holes in it, and should know while the firing is still running. */
+    if (app->log_dropped > 0 || app->log_errors > 0 || !app->ports.logstore) {
+        app->warnings |= KILN_WARN_BIT(KILN_WARN_LOG_UNAVAIL);
+    }
 }
 
 /* --- acquisition (FR-ACQ) ---------------------------------------------- */
@@ -302,6 +451,7 @@ void kiln_app_window_tick(kiln_app_t *app, uint32_t dt_ms)
 /* --- control (FR-CTL) -------------------------------------------------- */
 
 static void finish_run(kiln_app_t *app, kiln_run_end_t reason, kiln_fault_t fault);
+static void persist_fault(kiln_app_t *app, kiln_fault_t fault, uint32_t warnings);
 
 void kiln_app_control_cycle(kiln_app_t *app, float dt_s)
 {
@@ -376,6 +526,8 @@ void kiln_app_control_cycle(kiln_app_t *app, float dt_s)
     if (app->kiln_c > app->record.peak_c) app->record.peak_c = app->kiln_c;
     app->record.energy_wh    = (float)kiln_current_energy_wh(&app->cur);
     app->record.current_ref_a = kiln_current_ref(&app->cur);
+
+    log_cycle(app, dt_s);
 }
 
 /* --- safety (SR-*) ----------------------------------------------------- */
@@ -464,14 +616,24 @@ void kiln_app_safety_cycle(kiln_app_t *app, float dt_s)
     }
 
     if (v.fault != KILN_FAULT_NONE) {
-        /* SR-17: latch, and stop.  The run record keeps the cause. */
-        if (app->state != KILN_STATE_FAULT) {
-            finish_run(app, KILN_END_FAULT, v.fault);
-        }
+        const bool newly_latched = (app->state != KILN_STATE_FAULT);
+
+        /* Heat off first, and before anything that could take time. */
         app->fault           = v.fault;
         app->duty_request    = 0;
         app->heat_authorised = false;
         if (h->force_off) h->force_off(h->ctx);
+
+        if (newly_latched) {
+            kiln_app_log_event(app, KILN_LOGE_FAULT);
+            persist_fault(app, v.fault, v.warnings);   /* SR-17, before the alarm */
+            finish_run(app, KILN_END_FAULT, v.fault);
+        }
+
+        /* SR-20: audibly distinguishable from completion, and sounded after the
+         * fault is in non-volatile storage -- SR-17 is explicit that an
+         * immediate power loss must not lose it, and the alarm is the point at
+         * which the operator starts reacting. */
         if (app->ports.alarm && app->ports.alarm->set) {
             app->ports.alarm->set(app->ports.alarm->ctx, KILN_ALARM_FAULT);
         }
@@ -513,6 +675,137 @@ void kiln_app_safety_cycle(kiln_app_t *app, float dt_s)
     }
 }
 
+/* --- persistence of the latched fault (SR-17) -------------------------- */
+
+static void persist_fault(kiln_app_t *app, kiln_fault_t fault, uint32_t warnings)
+{
+    if (!app->ports.kvstore) return;
+
+    kiln_latched_fault_t f = {0};
+    f.fault         = (uint8_t)fault;
+    f.state         = (uint8_t)app->state;
+    f.run_id        = app->record.run_id;
+    f.t_rel_ms      = (uint32_t)(app->run_elapsed_s * 1000.0);
+    f.kiln_c        = app->kiln_c;
+    f.setpoint_c    = kiln_setpoint_value(&app->sp);
+    f.case_c        = app->case_c;
+    f.current_a     = kiln_current_amps(&app->cur);
+    f.duty_permille = app->duty_request;
+    f.warnings      = warnings;
+
+    if (app->ports.clock && app->ports.clock->wall_valid &&
+        app->ports.clock->wall_valid(app->ports.clock->ctx)) {
+        f.wall_utc_s = app->ports.clock->now_wall_utc_s(app->ports.clock->ctx);
+    }
+
+    (void)kiln_settings_save_fault(app->ports.kvstore, &f);
+    app->latched       = f;
+    app->latched_valid = true;
+}
+
+/* --- boot -------------------------------------------------------------- */
+
+kiln_err_t kiln_app_boot(kiln_app_t *app, kiln_reset_cause_t cause, float outage_s)
+{
+    if (!app) return KILN_ERR_INVALID_ARG;
+
+    kiln_err_t result = KILN_OK;
+
+    /* Configuration first: everything below is configured by it. */
+    if (app->ports.kvstore) {
+        kiln_config_t stored;
+        const kiln_err_t e = kiln_settings_load(app->ports.kvstore, &stored);
+
+        if (e == KILN_OK || e == KILN_ERR_UNSUPPORTED) {
+            app->cfg = stored;
+            push_config(app);
+            /* A migrated or repaired configuration is written back, or the
+             * migration runs again on every boot and the repair never sticks. */
+            if (e == KILN_ERR_UNSUPPORTED) {
+                (void)kiln_settings_save(app->ports.kvstore, &app->cfg);
+            }
+        } else if (e == KILN_ERR_NOT_FOUND) {
+            /* First boot: persist the defaults so the next one is a plain load. */
+            (void)kiln_settings_save(app->ports.kvstore, &app->cfg);
+        } else {
+            /* FR-CFG-05: defaults are in use and the operator is told.  Not a
+             * reason to refuse to run -- a kiln with default limits is safer
+             * than a kiln that will not answer. */
+            app->config_storage_failed = true;
+            result = KILN_ERR_IO;
+        }
+
+        /* SR-17: a fault latched before the power went out is still latched. */
+        kiln_latched_fault_t f;
+        if (kiln_settings_load_fault(app->ports.kvstore, &f) == KILN_OK) {
+            app->latched       = f;
+            app->latched_valid = true;
+            app->fault         = (kiln_fault_t)f.fault;
+            app->state         = KILN_STATE_FAULT;
+        }
+    }
+
+    /* FR-PRG-09: the examples, idempotently. */
+    if (app->ports.filestore) {
+        (void)kiln_program_store_seed(app->ports.filestore);
+
+        /* Run numbering continues across a reboot rather than restarting and
+         * colliding with records already on disk. */
+        app->next_run_id = kiln_run_index_next_run_id(app->ports.filestore);
+
+        /* SR-12's baseline is the run history. */
+        kiln_insulation_baseline_t baseline;
+        if (kiln_run_index_baseline(app->ports.filestore, 2, &baseline) == KILN_OK) {
+            app->baseline       = baseline;
+            app->baseline_valid = true;
+        }
+    }
+
+    /* FR-RUN-08's band test compares the interrupted setpoint against the
+     * present temperature, so there has to *be* a present temperature: at this
+     * point nothing has been measured and app->kiln_c still holds its
+     * initialiser.  Deciding on that would refuse to resume any kiln that had
+     * got more than the band above ambient -- which is every kiln worth
+     * resuming.  One acquisition first, here rather than left to the caller,
+     * because the decision is meaningless without it. */
+    kiln_app_acquire_cycle(app, 0.0f);
+
+    /* FR-RUN-08 / AD-09: the log tail is the power-loss journal. */
+    app->recovery = (kiln_recovery_decision_t){0};
+    app->recovery.action = KILN_RECOVER_NO_RUN;
+
+    if (app->ports.logstore && app->ports.logstore->last_record &&
+        app->fault == KILN_FAULT_NONE) {
+        uint8_t rec[KILN_LOG_RECORD_BYTES];
+        kiln_log_sample_t tail;
+        const bool have =
+            app->ports.logstore->last_record(app->ports.logstore->ctx, 0, rec) == KILN_OK &&
+            kiln_logrec_decode(rec, &tail) == KILN_OK;
+
+        const kiln_recovery_cfg_t rc = {
+            .policy         = app->cfg.recovery_policy,
+            .max_outage_min = app->cfg.recovery_max_outage_min,
+            .band_c         = app->cfg.recovery_band_c,
+        };
+        app->recovery = kiln_runstate_decide(&rc, have ? &tail : NULL,
+                                             app->kiln_c, outage_s, cause);
+
+        if (app->recovery.action == KILN_RECOVER_REFUSED) {
+            /* FR-RUN-08's refusal is a latched fault, because the operator has to
+             * know the firing in the kiln was abandoned part-way. */
+            app->fault = app->recovery.fault;
+            app->state = KILN_STATE_FAULT;
+            persist_fault(app, app->fault, app->warnings);
+        } else if (app->recovery.action == KILN_RECOVER_ABORT) {
+            app->state = KILN_STATE_IDLE;
+        }
+    }
+
+    app->last_logged_state    = (uint8_t)app->state;
+    app->last_logged_warnings = app->warnings;
+    return result;
+}
+
 /* --- commands ---------------------------------------------------------- */
 
 static void finish_run(kiln_app_t *app, kiln_run_end_t reason, kiln_fault_t fault)
@@ -539,6 +832,23 @@ static void finish_run(kiln_app_t *app, kiln_run_end_t reason, kiln_fault_t faul
 
     if (app->ports.counters && app->ports.counters->flush) {
         (void)app->ports.counters->flush(app->ports.counters->ctx);
+    }
+
+    if (app->ports.clock && app->ports.clock->wall_valid &&
+        app->ports.clock->wall_valid(app->ports.clock->ctx)) {
+        app->record.end_wall_utc_s = app->ports.clock->now_wall_utc_s(app->ports.clock->ctx);
+    }
+
+    /* FR-LOG-04: the run end is an event, and it is written before the record is
+     * persisted so the log and the index cannot disagree about whether the run
+     * finished. */
+    kiln_app_log_event(app, KILN_LOGE_RUN_END);
+
+    /* FR-RUN-07 / FR-LOG-09.  A failure here is reported and not fatal: the
+     * firing is over, and losing its record is not a reason to refuse the next
+     * one. */
+    if (app->ports.filestore) {
+        (void)kiln_run_index_append(app->ports.filestore, &app->record);
     }
 
     if (reason == KILN_END_COMPLETE) {
@@ -602,12 +912,37 @@ kiln_err_t kiln_app_start(kiln_app_t *app, const kiln_program_t *prog)
     app->record.peak_c = app->kiln_c;
 
     kiln_pid_reset(&app->pid);
-    kiln_safety_begin_run(&app->safety, NULL);
+    kiln_safety_begin_run(&app->safety,
+                          app->baseline_valid ? &app->baseline : NULL);
     kiln_current_begin_run(&app->cur);
 
     app->run_elapsed_s = 0.0;
+    app->log_accum_s   = 0.0;
     app->heat_allowed  = kiln_setpoint_heat_allowed(&app->sp);
     app->state         = KILN_STATE_RUNNING;
+
+    if (app->ports.clock && app->ports.clock->wall_valid &&
+        app->ports.clock->wall_valid(app->ports.clock->ctx)) {
+        app->record.start_wall_utc_s =
+            app->ports.clock->now_wall_utc_s(app->ports.clock->ctx);
+    } else {
+        /* FR-LOG-12: no wall clock, so the run is identified by its id and its
+         * monotonic timestamps.  Recorded as unknown rather than as zero-as-a-
+         * date, which a reader would render as 1970. */
+        app->warnings |= KILN_WARN_BIT(KILN_WARN_TIME_UNSYNCED);
+    }
+
+    /* A run gets its own stretch of the ring, so iterate() can select by run
+     * without an index (architecture 10.3). */
+    if (app->ports.logstore && app->ports.logstore->begin_run) {
+        if (app->ports.logstore->begin_run(app->ports.logstore->ctx,
+                                           app->record.run_id) == KILN_OK) {
+            app->log_run_open = true;
+        } else {
+            app->warnings |= KILN_WARN_BIT(KILN_WARN_LOG_UNAVAIL);
+        }
+    }
+    kiln_app_log_event(app, KILN_LOGE_RUN_START);
     return KILN_OK;
 }
 
@@ -622,6 +957,7 @@ kiln_err_t kiln_app_pause(kiln_app_t *app)
     app->duty_request    = 0;
     app->heat_authorised = false;
     if (app->ports.heat->force_off) app->ports.heat->force_off(app->ports.heat->ctx);
+    kiln_app_log_event(app, KILN_LOGE_OPERATOR);
     return KILN_OK;
 }
 
@@ -633,6 +969,7 @@ kiln_err_t kiln_app_resume(kiln_app_t *app)
     /* FR-CTL-06: pick the output back up where it was rather than stepping. */
     (void)kiln_pid_bumpless(&app->pid, 0, kiln_setpoint_value(&app->sp), app->kiln_c);
     app->state = KILN_STATE_RUNNING;
+    kiln_app_log_event(app, KILN_LOGE_OPERATOR);
     return KILN_OK;
 }
 
@@ -673,8 +1010,16 @@ kiln_err_t kiln_app_clear_fault(kiln_app_t *app)
         return KILN_ERR_STATE;
     }
 
-    app->fault = KILN_FAULT_NONE;
-    app->state = KILN_STATE_IDLE;
+    app->fault         = KILN_FAULT_NONE;
+    app->state         = KILN_STATE_IDLE;
+    app->latched_valid = false;
+
+    /* The stored copy goes too, or the next boot latches it again (SR-17). */
+    if (app->ports.kvstore) {
+        (void)kiln_settings_clear_fault(app->ports.kvstore);
+    }
+    kiln_app_log_event(app, KILN_LOGE_OPERATOR);
+
     if (app->ports.alarm && app->ports.alarm->set) {
         app->ports.alarm->set(app->ports.alarm->ctx, KILN_ALARM_OFF);
     }
