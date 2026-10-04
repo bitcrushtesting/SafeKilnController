@@ -17,13 +17,38 @@ An open-source PID controller for electric ceramic and glass kilns, built on the
 
 ## Status
 
-**Design phase.** The requirements and the software architecture are written; no
-firmware has been implemented yet.
+**In development.** The control and safety logic is implemented and tested; the
+hardware adapters, the local display and the web interface are not.
+
+| Area | State |
+|---|---|
+| `kiln_core` — PID, setpoint generator, program model, safety supervisor (including the current-based relay rules), autotune, heater-current measurement, configuration model, run state, log codec | Implemented, host-tested |
+| `kiln_ports` — the interface headers everything hardware goes through | Complete for the above |
+| `kiln_sim` — plant simulator with heater current and electrical fault injection | Implemented |
+| `kiln_app` — task orchestration, mode state machine, heat authority | Implemented, minimal |
+| `kiln_hal_esp32s3` — MAX31856, SSD1306, encoder, outputs, flash log, NVS | **Not started** |
+| `kiln_hmi`, `kiln_web`, OTA | **Not started** |
+
+You can watch a complete firing, and break it in a dozen ways, without any
+hardware at all — see [`docs/simulation.md`](docs/simulation.md):
+
+```sh
+tools/run-qemu.sh          # the firmware on an emulated ESP32-S3, kiln simulated
+```
+
+or run the logic tests directly:
+
+```sh
+cmake -B build-host -S firmware/test/host && cmake --build build-host
+ctest --test-dir build-host
+```
 
 | Document | Contents |
 |---|---|
 | [`docs/requirements.md`](docs/requirements.md) | Requirements specification — functional, safety, non-functional, hardware-interface and testability requirements, each with an identifier and a verification method. |
 | [`docs/architecture.md`](docs/architecture.md) | Software architecture — key decisions, component decomposition, task and timing design, control and safety algorithms, persistence and flash-endurance design, REST API, and the build and test architecture. |
+| [`docs/simulation.md`](docs/simulation.md) | Running the firmware against a simulated kiln, on the host and under QEMU, including fault injection. |
+| [`tasklist.md`](tasklist.md) | Outstanding work, by priority. |
 
 Start with [`docs/requirements.md`](docs/requirements.md); the architecture
 document cites it throughout.

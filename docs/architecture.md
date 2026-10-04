@@ -125,7 +125,7 @@ flowchart TD
 | Component | Responsibility | Depends on | Verified by |
 |---|---|---|---|
 | `pid` | PID computation: P/I/D terms, anti-windup, derivative on measurement, bumpless transfer, output clamping. Pure function of state + inputs + `dt`. | — | Host unit, host integration |
-| `setpoint` | Executes a profile: advances segment index, ramps the setpoint, applies hold-back, enforces dwell tolerance and acknowledgement gates, computes remaining and predicted end times. | `profile` | Host unit, host integration |
+| `setpoint` | Executes a profile: advances segment index, ramps the setpoint, applies hold-back, enforces dwell tolerance and acknowledgement gates, computes remaining and predicted end times. Those estimates assume the kiln keeps up, and are **optimistic through a cooling segment**: `FR-CTL-13` makes cooling ramps passive, so a real kiln cools as fast as it cools rather than at the rate the program names. The API and the UI say so. | `profile` | Host unit, host integration |
 | `profile` | Program data model, validation, duration prediction, JSON encode/decode. | `configmodel` (for limits) | Host unit |
 | `safety` | All detection rules of requirements `SR-04`–`SR-13` and the current-based relay rules `SR-25`–`SR-30`, including the weld-discrimination sequence of `SR-27`. Consumes a plant snapshot, emits a verdict: heat permitted or a specific fault. Stateful (timers, baselines) but pure. | `configmodel` | Host unit, host integration, fault-injection suite |
 | `autotune` | Relay-autotune state machine, peak detection, cycle qualification, `Ku`/`Tu` identification, gain-rule application. | `pid` (types only) | Host unit, host integration |
@@ -456,7 +456,7 @@ row below is one host test (`TR-09`, `TR-23`).
 | `SR-05` | Reversed TC | PV falling while duty high | falling while duty > 50 % | Latch 6 |
 | `SR-06` | Stuck sensor | ΔPV over window, duty | < 2 °C over 10 min at > 50 % | Latch 7 |
 | `SR-07` | Runaway / heating failure | duty, rate of rise | > 80 % for 15 min with rate < 10 °C/h | Latch 8 |
-| `SR-08` | Uncommanded heating | duty, ΔPV | +5 °C over 3 min at 0 % duty | Latch 9, open contactor |
+| `SR-08` | Uncommanded heating | duty, ΔPV | +5 °C over 3 min at 0 % duty, after a 60 s settle | Latch 9, open contactor |
 | `SR-09` | Over-temperature | PV, `max_temp` | at limit → heat off; +10 °C → latch | Latch 10 |
 | `SR-10` | Setpoint excursion | PV − SP | > 50 °C for 2 min | Latch 11 |
 | `SR-11` | Enclosure over-temperature | case PV | > 70 °C | Latch 12 |
@@ -474,6 +474,24 @@ row below is one host test (`TR-09`, `TR-23`).
 The insulation baseline of `SR-12` is established from the run history: the
 median duty-seconds required to pass each 100 °C boundary across previous
 comparable runs, stored in the run index.
+
+Two parameters in the table deserve their own note, because both change when the
+rule is active rather than merely how sensitive it is:
+
+- **`SR-08`'s settle delay** (`uncommanded_settle_s`, default 60 s). After a spell
+  at high duty the measured temperature keeps climbing for a while as heat soaks
+  inward from the elements, and arming immediately would read that as a shorted
+  SSR. The consequence is worth stating plainly: during a normal firing duty is
+  rarely zero for a full minute, so **`SR-08` is effectively inactive while
+  running**. That is precisely why `SR-25` — which sees the same failure in amps,
+  inside a second — is the primary detection and `SR-08` the backstop for a kiln
+  whose current monitoring is off or whose transformer has failed (`FR-CUR-12`).
+- **`SR-05`'s confirmation window** (`reversed_confirm_s`, default 30 s). The drop
+  must persist, not merely occur. A kiln with transport lag whose gains are
+  imperfect overshoots and then coasts down several degrees while the controller
+  is already pushing duty back up; an instantaneous test reads that as a reversed
+  probe and stops a healthy firing. A genuinely reversed couple falls
+  monotonically and does not come back, so the confirmation costs it nothing.
 
 ### 8.3 Fault latching
 

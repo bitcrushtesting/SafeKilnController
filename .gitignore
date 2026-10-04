@@ -16,6 +16,7 @@ jlcpcb/
 # --- ESP-IDF / firmware --------------------------------------------------
 build/
 build-host/
+build-*/
 sdkconfig
 sdkconfig.old
 managed_components/
