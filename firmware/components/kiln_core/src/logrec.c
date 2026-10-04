@@ -101,7 +101,9 @@ void kiln_logrec_encode(const kiln_log_sample_t *s, uint8_t out[KILN_LOG_RECORD_
     out[15] = s->segment;
     out[16] = (uint8_t)((s->state & 0x0Fu) | (s->flags & 0xF0u));
     out[17] = s->current_flags;
-    out[18] = 0u;                      /* reserved, keeps 4-byte alignment */
+    /* FR-LOG-04.  This was AD-18's reserved byte; an event code is what it was
+     * being reserved for. */
+    out[18] = (uint8_t)(s->event < KILN_LOGE_COUNT ? s->event : KILN_LOGE_SAMPLE);
     out[19] = kiln_crc8(out, KILN_LOG_RECORD_BYTES - 1);
 }
 
@@ -141,6 +143,7 @@ kiln_err_t kiln_logrec_decode(const uint8_t rec[KILN_LOG_RECORD_BYTES],
     out->state         = (uint8_t)(rec[16] & 0x0Fu);
     out->flags         = (uint8_t)(rec[16] & 0xF0u);
     out->current_flags = rec[17];
+    out->event         = rec[18] < KILN_LOGE_COUNT ? rec[18] : (uint8_t)KILN_LOGE_SAMPLE;
     return KILN_OK;
 }
 

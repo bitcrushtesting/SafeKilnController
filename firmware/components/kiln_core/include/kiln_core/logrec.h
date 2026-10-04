@@ -24,6 +24,24 @@
 #define KILN_LOGF_TC_FAULT   (1u << 6)
 #define KILN_LOGF_WALL_VALID (1u << 7)
 
+/* FR-LOG-04: besides the periodic sample, a record is written out of band on
+ * every state transition, fault, warning, configuration change and operator
+ * action.  The code says which, so the log can be read as a narrative rather
+ * than as a temperature series with unexplained steps in it -- and it costs
+ * nothing: it occupies the byte AD-18's layout was already carrying as
+ * reserved. */
+typedef enum {
+    KILN_LOGE_SAMPLE = 0,       /* the periodic sample of FR-LOG-03 */
+    KILN_LOGE_RUN_START,
+    KILN_LOGE_RUN_END,
+    KILN_LOGE_STATE_CHANGE,
+    KILN_LOGE_FAULT,
+    KILN_LOGE_WARNING,
+    KILN_LOGE_CONFIG_CHANGE,
+    KILN_LOGE_OPERATOR,
+    KILN_LOGE_COUNT,
+} kiln_log_event_t;
+
 typedef struct {
     uint32_t t_rel_ms;      /* since run start; 49 days of range */
     float    kiln_raw_c;
@@ -36,6 +54,7 @@ typedef struct {
     uint8_t  state;         /* kiln_state_t */
     uint8_t  flags;         /* KILN_LOGF_* (high nibble semantics) */
     uint8_t  current_flags; /* KILN_CURF_* */
+    uint8_t  event;         /* kiln_log_event_t (FR-LOG-04) */
 } kiln_log_sample_t;
 
 /* Encode / decode one record.

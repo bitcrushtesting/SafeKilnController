@@ -35,6 +35,14 @@ typedef enum {
     KILN_END_COUNT,
 } kiln_run_end_t;
 
+/* FR-LOG-09: the run records of the 20 most recent runs are kept even once
+ * their samples have been overwritten by the ring, and such a run is *marked* --
+ * otherwise a chart with no data in it is indistinguishable from a run that
+ * never logged, and the operator is left wondering which. */
+#define KILN_RUN_FLAG_TRUNCATED  (1u << 0)
+/* The run was still open when the controller lost power or reset. */
+#define KILN_RUN_FLAG_INTERRUPTED (1u << 1)
+
 /* FR-RUN-07 */
 typedef struct {
     uint32_t       run_id;
@@ -46,6 +54,7 @@ typedef struct {
     char           gain_set_name[KILN_CFG_GAINSET_LEN];
     uint8_t        end_reason;          /* kiln_run_end_t                  */
     uint8_t        fault;               /* kiln_fault_t, when end_reason is FAULT */
+    uint8_t        flags;               /* KILN_RUN_FLAG_*                 */
     uint32_t       log_first_ms, log_last_ms;   /* log extent              */
     float          peak_c;
     float          current_ref_a;       /* FR-CUR-08, required by FR-RUN-07 */

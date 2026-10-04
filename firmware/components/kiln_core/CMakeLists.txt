@@ -12,6 +12,7 @@ set(KILN_CORE_SRCS
     src/err.c
     src/faults.c
     src/logrec.c
+    src/logring.c
     src/pid.c
     src/profile.c
     src/runstate.c
