@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 #include "kiln_sim/sim.h"
 
@@ -483,6 +484,118 @@ static kiln_err_t sim_ctr_reset(void *ctx, const kiln_switch_counters_t *to)
     if (!s || !to) return KILN_ERR_INVALID_ARG;
     s->counters = *to;
     return KILN_OK;
+}
+
+/* --- RAM file store ---------------------------------------------------- */
+
+void kiln_sim_fs_init(kiln_sim_fs_t *fs)
+{
+    if (fs) memset(fs, 0, sizeof(*fs));
+}
+
+static int sfs_find(kiln_sim_fs_t *fs, const char *path)
+{
+    for (int i = 0; i < KILN_SIM_FS_FILES; i++) {
+        if (fs->files[i].used && strcmp(fs->files[i].path, path) == 0) return i;
+    }
+    return -1;
+}
+
+static kiln_err_t sfs_read(void *ctx, const char *path, void *out,
+                           size_t cap, size_t *len)
+{
+    kiln_sim_fs_t *fs = (kiln_sim_fs_t *)ctx;
+    if (!fs || !path || !out) return KILN_ERR_INVALID_ARG;
+
+    const int i = sfs_find(fs, path);
+    if (i < 0) return KILN_ERR_NOT_FOUND;
+    if (fs->files[i].len > cap) return KILN_ERR_NO_SPACE;
+
+    memcpy(out, fs->files[i].data, fs->files[i].len);
+    if (len) *len = fs->files[i].len;
+    return KILN_OK;
+}
+
+static kiln_err_t sfs_write(void *ctx, const char *path, const void *data, size_t len)
+{
+    kiln_sim_fs_t *fs = (kiln_sim_fs_t *)ctx;
+    if (!fs || !path || !data) return KILN_ERR_INVALID_ARG;
+    if (len > KILN_SIM_FS_FILE_MAX) return KILN_ERR_NO_SPACE;
+    if (strlen(path) >= KILN_PATH_MAX) return KILN_ERR_INVALID_ARG;
+
+    int i = sfs_find(fs, path);
+    if (i < 0) {
+        for (int k = 0; k < KILN_SIM_FS_FILES; k++) {
+            if (!fs->files[k].used) { i = k; break; }
+        }
+        if (i < 0) return KILN_ERR_NO_SPACE;
+        fs->files[i].used = true;
+        snprintf(fs->files[i].path, sizeof(fs->files[i].path), "%s", path);
+    }
+    memcpy(fs->files[i].data, data, len);
+    fs->files[i].len = (uint16_t)len;
+    return KILN_OK;
+}
+
+static kiln_err_t sfs_remove(void *ctx, const char *path)
+{
+    kiln_sim_fs_t *fs = (kiln_sim_fs_t *)ctx;
+    if (!fs || !path) return KILN_ERR_INVALID_ARG;
+
+    const int i = sfs_find(fs, path);
+    if (i < 0) return KILN_ERR_NOT_FOUND;
+    memset(&fs->files[i], 0, sizeof(fs->files[i]));
+    return KILN_OK;
+}
+
+static kiln_err_t sfs_exists(void *ctx, const char *path)
+{
+    kiln_sim_fs_t *fs = (kiln_sim_fs_t *)ctx;
+    if (!fs || !path) return KILN_ERR_INVALID_ARG;
+    return sfs_find(fs, path) >= 0 ? KILN_OK : KILN_ERR_NOT_FOUND;
+}
+
+static kiln_err_t sfs_list(void *ctx, const char *dir,
+                           bool (*fn)(void *user, const char *name, size_t size),
+                           void *user)
+{
+    kiln_sim_fs_t *fs = (kiln_sim_fs_t *)ctx;
+    if (!fs || !dir || !fn) return KILN_ERR_INVALID_ARG;
+
+    const size_t dlen = strlen(dir);
+    for (int i = 0; i < KILN_SIM_FS_FILES; i++) {
+        if (!fs->files[i].used) continue;
+        if (strncmp(fs->files[i].path, dir, dlen) != 0) continue;
+        if (!fn(user, fs->files[i].path, fs->files[i].len)) break;
+    }
+    return KILN_OK;
+}
+
+static kiln_err_t sfs_usage(void *ctx, size_t *total, size_t *used)
+{
+    kiln_sim_fs_t *fs = (kiln_sim_fs_t *)ctx;
+    if (!fs) return KILN_ERR_INVALID_ARG;
+
+    size_t u = 0;
+    for (int i = 0; i < KILN_SIM_FS_FILES; i++) {
+        if (fs->files[i].used) u += fs->files[i].len;
+    }
+    if (total) *total = (size_t)KILN_SIM_FS_FILES * KILN_SIM_FS_FILE_MAX;
+    if (used)  *used  = u;
+    return KILN_OK;
+}
+
+void kiln_sim_fs_bind(kiln_sim_fs_t *fs, kiln_port_filestore_t *out)
+{
+    if (!fs || !out) return;
+    memset(out, 0, sizeof(*out));
+    out->ctx          = fs;
+    out->read         = sfs_read;
+    out->write_atomic = sfs_write;
+    out->remove       = sfs_remove;
+    out->exists       = sfs_exists;
+    out->list         = sfs_list;
+    out->usage        = sfs_usage;
 }
 
 /* --- binding ----------------------------------------------------------- */

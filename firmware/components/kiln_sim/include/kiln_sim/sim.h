@@ -25,6 +25,7 @@
 #include "kiln/types.h"
 #include "kiln_ports/port_counters.h"
 #include "kiln_ports/port_current.h"
+#include "kiln_ports/port_filestore.h"
 #include "kiln_ports/port_heat.h"
 #include "kiln_ports/port_tc.h"
 
@@ -170,6 +171,35 @@ typedef struct {
     kiln_port_current_t  current;
     kiln_port_counters_t counters;
 } kiln_sim_ports_t;
+
+/* --- a RAM file store ---------------------------------------------------- */
+
+/* Programs and run records need somewhere to go, and the LittleFS adapter does
+ * not exist yet -- it is not in the IDF tree and CON-04 forbids pulling it at
+ * build time, so it has to be vendored.  Until then this stands in, so the
+ * persistence path of FR-PRG and FR-RUN-07 is exercised end to end rather than
+ * skipped.
+ *
+ * It is RAM, so nothing survives a reboot.  That is a visible limitation of the
+ * simulated build and not a design choice: everything above it behaves exactly as
+ * it will against flash, which is the point of the port boundary.
+ *
+ * Sized for the three seeded examples plus a handful of run records -- about
+ * 8 kB, which is affordable on a device with no PSRAM (NFR-11). */
+#define KILN_SIM_FS_FILES    12
+#define KILN_SIM_FS_FILE_MAX 640
+
+typedef struct {
+    struct {
+        char    path[KILN_PATH_MAX];
+        uint8_t data[KILN_SIM_FS_FILE_MAX];
+        uint16_t len;
+        bool    used;
+    } files[KILN_SIM_FS_FILES];
+} kiln_sim_fs_t;
+
+void kiln_sim_fs_init(kiln_sim_fs_t *fs);
+void kiln_sim_fs_bind(kiln_sim_fs_t *fs, kiln_port_filestore_t *out);
 
 void kiln_sim_bind(kiln_sim_t *s, kiln_sim_ports_t *out);
 

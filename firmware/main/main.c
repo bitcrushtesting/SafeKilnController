@@ -21,8 +21,11 @@
 #include "sdkconfig.h"
 
 #include "kiln_app/app.h"
+#include "kiln_app/run_index.h"
 #include "kiln_core/faults.h"
+#include "kiln_core/logring.h"
 #include "kiln_core/profile.h"
+#include "kiln_hal/hal_esp32s3.h"
 #include "kiln_ports/port_system.h"
 
 #ifdef CONFIG_KILN_PLANT_SIM
@@ -46,9 +49,20 @@ static const char *TAG = "kiln";
 
 static kiln_app_t s_app;
 
+/* Persistence is real even in the simulated build: NVS and the log partition are
+ * flash, and QEMU emulates flash.  Only the plant is simulated. */
+static kiln_port_flash_t    s_flash;
+static kiln_port_kvstore_t  s_kv;
+static kiln_port_clock_t    s_clock;
+static kiln_port_system_t   s_system;
+static kiln_logring_t       s_ring;
+static kiln_port_logstore_t s_logstore;
+
 #ifdef CONFIG_KILN_PLANT_SIM
-static kiln_sim_t       s_sim;
-static kiln_sim_ports_t s_sim_ports;
+static kiln_sim_t             s_sim;
+static kiln_sim_ports_t       s_sim_ports;
+static kiln_sim_fs_t          s_sim_fs;      /* until the LittleFS adapter exists */
+static kiln_port_filestore_t  s_fs;
 #endif
 
 /* --- port_alarm: a stub, until the buzzer adapter exists ---------------- */
@@ -121,6 +135,22 @@ static void control_task(void *arg)
         kiln_app_control_cycle(&s_app, (float)CONTROL_PERIOD_MS / 1000.0f * TIME_ACCEL);
         esp_task_wdt_reset();
         vTaskDelayUntil(&next, period);
+    }
+}
+
+/* The only task that touches flash (FR-LOG-14, architecture 6.1).  Core 0, so an
+ * erase -- tens of milliseconds -- cannot delay control or safety on core 1. */
+static void logger_task(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        /* A bounded batch, so a backlog is worked off without monopolising the
+         * flash for a whole queue's worth of erases. */
+        if (kiln_app_log_drain(&s_app, 8) == 0) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
     }
 }
 
@@ -211,6 +241,27 @@ static void handle_key(int ch)
     case 'x': kiln_sim_clear(&s_sim, 0xFFFFFFFFu);
               ESP_LOGW(TAG, "all injections cleared"); break;
     case 'h': print_help(); break;
+    case 'l': {
+        /* FR-LOG-13 is an operator action with a warning attached; here it is
+         * just the quickest way to see the ring start over. */
+        ESP_LOGW(TAG, "erasing the sample log: %s",
+                 kiln_err_str(kiln_logring_erase_all(&s_ring)));
+        break;
+    }
+    case 'R': {
+        const uint8_t n = kiln_run_index_count(&s_fs);
+        printf("\n  %u stored run record(s)\n", n);
+        for (uint8_t i = 0; i < KILN_RUN_SLOTS; i++) {
+            kiln_run_record_t r;
+            if (kiln_run_index_get_slot(&s_fs, i, &r) != KILN_OK) continue;
+            printf("    run %-4u %-28s peak %6.1f degC  %6u s  %s%s\n",
+                   (unsigned)r.run_id, r.program.name, (double)r.peak_c,
+                   (unsigned)r.duration_s, kiln_run_end_str((kiln_run_end_t)r.end_reason),
+                   (r.flags & KILN_RUN_FLAG_TRUNCATED) ? "  [samples overwritten]" : "");
+        }
+        printf("\n");
+        break;
+    }
     default: break;
     }
 }
@@ -238,6 +289,14 @@ static void report(void)
            s.heat_authorised ? "  HEAT" : "",
            s.holdback_active ? "  HOLDBACK" : "",
            kiln_sim_contactor(&s_sim) ? "  [contactor closed]" : "");
+
+    kiln_logstore_stats_t ls;
+    if (kiln_logring_stats(&s_ring, &ls) == KILN_OK) {
+        printf("    log: %u records, %u sectors erased, %u dropped, %u errors%s\n",
+               (unsigned)ls.records_stored, (unsigned)ls.erase_count,
+               (unsigned)s_app.log_dropped, (unsigned)s_app.log_errors,
+               ls.available ? "" : "  [UNAVAILABLE]");
+    }
 
     if (s_app.fault != KILN_FAULT_NONE) {
         printf("    FAULT %u %s (%s): %s\n",
@@ -284,33 +343,58 @@ static void console_task(void *arg)
 
 #endif /* CONFIG_KILN_PLANT_SIM */
 
-/* --- reset cause (NFR-15, SR-14, SR-15) -------------------------------- */
-
-static kiln_reset_cause_t map_reset_cause(void)
-{
-    switch (esp_reset_reason()) {
-    case ESP_RST_POWERON:  return KILN_RESET_POWER_ON;
-    case ESP_RST_SW:       return KILN_RESET_SOFTWARE;
-    case ESP_RST_PANIC:    return KILN_RESET_PANIC;
-    case ESP_RST_TASK_WDT: return KILN_RESET_TASK_WDT;
-    case ESP_RST_INT_WDT:  return KILN_RESET_INT_WDT;
-    case ESP_RST_WDT:      return KILN_RESET_RTC_WDT;
-    case ESP_RST_BROWNOUT: return KILN_RESET_BROWNOUT;
-    case ESP_RST_DEEPSLEEP:return KILN_RESET_DEEPSLEEP;
-    case ESP_RST_EXT:      return KILN_RESET_EXTERNAL;
-    default:               return KILN_RESET_UNKNOWN;
-    }
-}
-
 void app_main(void)
 {
-    const kiln_reset_cause_t cause = map_reset_cause();
+    /* NFR-15 / SR-14 / SR-15: the reset cause decides whether an interrupted
+     * firing may be resumed at all, so it is read before anything else can
+     * overwrite it. */
+    kiln_hal_system_init(&s_system);
+    const kiln_reset_cause_t cause = s_system.reset_cause(s_system.ctx);
 
-    ESP_LOGI(TAG, "KilnControl starting; reset cause %d%s", (int)cause,
-             kiln_reset_was_abnormal(cause) ? " (ABNORMAL)" : "");
+    kiln_fw_info_t fw = {0};
+    (void)s_system.fw_info(s_system.ctx, &fw);
+    ESP_LOGI(TAG, "KilnControl %s (%s, IDF %s) on %s",
+             fw.version, fw.build_time, fw.idf_version, fw.target);
+    ESP_LOGI(TAG, "reset cause %d%s", (int)cause,
+             kiln_reset_was_abnormal(cause) ? "  (ABNORMAL -- SR-14)" : "");
 
     kiln_app_ports_t ports = {0};
     ports.alarm = &s_alarm_port;
+
+    /* --- storage, which is real flash even here --------------------------- */
+
+    kiln_hal_clock_init(&s_clock);
+    ports.clock = &s_clock;
+
+    if (kiln_hal_kvstore_init(&s_kv) == KILN_OK) {
+        ports.kvstore = &s_kv;
+    } else {
+        /* FR-CFG-05: defaults, and a warning.  A kiln with default limits is
+         * safer than a kiln that refuses to boot. */
+        ESP_LOGE(TAG, "no NVS: configuration will not persist");
+    }
+
+    if (kiln_hal_flash_init(KILN_HAL_LOG_PARTITION, &s_flash) == KILN_OK) {
+        const kiln_err_t me = kiln_logring_mount(&s_ring, &s_flash);
+        if (me == KILN_OK || me == KILN_ERR_CORRUPT) {
+            /* CORRUPT here means "no sector header anywhere", which is what a
+             * blank partition looks like -- not a problem, just an empty log. */
+            kiln_logring_bind(&s_ring, &s_logstore);
+            ports.logstore = &s_logstore;
+
+            kiln_logstore_stats_t st;
+            if (kiln_logring_stats(&s_ring, &st) == KILN_OK) {
+                ESP_LOGI(TAG, "log: %u records stored of %u (%u h at %u s), "
+                              "%u sectors",
+                         (unsigned)st.records_stored, (unsigned)st.records_total,
+                         (unsigned)(st.records_total * 10u / 3600u), 10u,
+                         (unsigned)st.sectors_total);
+            }
+        } else {
+            /* FR-LOG-14: carry on without a log, and warn. */
+            ESP_LOGE(TAG, "log partition unreadable: %s", kiln_err_str(me));
+        }
+    }
 
 #ifdef CONFIG_KILN_PLANT_SIM
     kiln_sim_cfg_t sc;
@@ -335,6 +419,12 @@ void app_main(void)
     ports.heat     = &s_sim_ports.heat;
     ports.current  = &s_sim_ports.current;
     ports.counters = &s_sim_ports.counters;
+
+    /* Programs and run records.  RAM, until LittleFS is vendored -- see the note
+     * on kiln_sim_fs_t. */
+    kiln_sim_fs_init(&s_sim_fs);
+    kiln_sim_fs_bind(&s_sim_fs, &s_fs);
+    ports.filestore = &s_fs;
 
     ESP_LOGW(TAG, "SIMULATED PLANT: no hardware output is driven. "
                   "time acceleration %gx", (double)TIME_ACCEL);
@@ -362,9 +452,40 @@ void app_main(void)
         return;
     }
 
+    /* Configuration, seeded programs, the run-id sequence, SR-17's latched fault
+     * and FR-RUN-08's recovery decision.  The outage length is unknown here: a
+     * device with no RTC battery cannot tell how long it was off, and FR-RUN-08
+     * treats an unknown outage as too long, which is the conservative reading. */
+    const kiln_err_t be = kiln_app_boot(&s_app, cause, -1.0f);
+    if (be != KILN_OK) {
+        ESP_LOGE(TAG, "configuration storage failed; defaults are in use");
+    }
+
+    const kiln_recovery_decision_t *rec = kiln_app_recovery(&s_app);
+    if (rec->action != KILN_RECOVER_NO_RUN) {
+        ESP_LOGW(TAG, "interrupted firing: %s", rec->reason ? rec->reason : "");
+    }
+    if (s_app.fault != KILN_FAULT_NONE) {
+        ESP_LOGE(TAG, "FAULT %u %s latched: %s", (unsigned)s_app.fault,
+                 kiln_fault_label(s_app.fault), kiln_fault_cause(s_app.fault));
+    }
+
+    /* FR-LOG-09: the ring only goes back so far, and a run whose samples have
+     * gone is marked so a chart with no data in it is not a mystery. */
+    if (ports.filestore && ports.logstore) {
+        uint8_t oldest[KILN_LOG_RECORD_BYTES];
+        if (kiln_logring_last_record(&s_ring, 0, oldest) == KILN_OK) {
+            /* The run id of the oldest *sector*, which is what the ring knows. */
+            (void)kiln_run_index_mark_truncated(ports.filestore, s_ring.run_id);
+        }
+    }
+
 #ifdef CONFIG_KILN_PLANT_SIM
     xTaskCreatePinnedToCore(plant_task, "plant", 3072, NULL, 10, NULL, 0);
 #endif
+
+    /* Core 0 and low priority: the one task allowed to block on flash. */
+    xTaskCreatePinnedToCore(logger_task, "logger", 3072, NULL, 8, NULL, 0);
 
     /* AD-15: control and safety on core 1, where the WiFi stack cannot reach
      * them.  Priorities from the table in architecture section 6.1. */

@@ -7,5 +7,9 @@
 idf_component_register(
     SRCS "main.c"
     INCLUDE_DIRS ""
-    REQUIRES kiln_app kiln_core kiln_ports kiln_sim esp_timer driver
+    REQUIRES kiln_app kiln_core kiln_ports kiln_sim kiln_hal_esp32s3 esp_timer
+    # ESP-IDF 6.0 split the monolithic `driver` component per peripheral, so ask
+    # for the one that is actually used rather than dragging in I2C, TWAI and the
+    # touch sensor to get a UART.
+    PRIV_REQUIRES esp_driver_uart
 )
