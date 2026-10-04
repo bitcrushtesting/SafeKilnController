@@ -315,6 +315,18 @@ void app_main(void)
 #ifdef CONFIG_KILN_PLANT_SIM
     kiln_sim_cfg_t sc;
     kiln_sim_cfg_defaults(&sc);
+
+    /* The charge pump is hardware and does not accelerate.  Everything the
+     * simulator integrates is in accelerated seconds, so a decay expressed in
+     * real seconds would expire between two safety refreshes 100 ms apart and
+     * drop the contactor continuously -- which then reads, correctly, as no
+     * heater current and latches SR-26 within seconds of starting a firing.
+     *
+     * Scaling it keeps the circuit's *real* 1 s against the real refresh rate.
+     * The same reasoning applies to anything else in the simulator whose time
+     * constant belongs to the hardware rather than to the kiln. */
+    sc.enable_decay_s = 1.0f * TIME_ACCEL;
+
     kiln_sim_init(&s_sim, &sc);
     kiln_sim_bind(&s_sim, &s_sim_ports);
 
@@ -332,12 +344,17 @@ void app_main(void)
 
     kiln_config_t cfg;
     kiln_config_defaults(&cfg);
-    /* Gains that are at least in the right order of magnitude for the default
-     * simulated plant, so a firing tracks rather than oscillates.  FR-TUN-11's
-     * warning 108 stands until this kiln has actually been tuned. */
-    cfg.kp = 8.0f;
-    cfg.ki = 0.004f;
-    cfg.kd = 120.0f;
+    /* Gains for the *default simulated plant* -- 1500 degC of authority, a 40 min
+     * time constant and 90 s of transport lag -- derived the way you would for
+     * any FOPDT process and then checked against it: worst tracking error 5.7
+     * degC through the cone 6 example, against the 23.9 degC and a tripped SR-08
+     * that a four-times-higher proportional gain produced.
+     *
+     * They are not gains for a real kiln.  FR-TUN-11's warning 108 stands until
+     * one has actually been tuned, which is what FR-TUN exists for. */
+    cfg.kp = 1.5f;
+    cfg.ki = 0.006f;
+    cfg.kd = 90.0f;
 
     const kiln_err_t e = kiln_app_init(&s_app, &ports, &cfg);
     if (e != KILN_OK) {
