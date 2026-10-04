@@ -12,6 +12,7 @@
 #ifndef KILN_TYPES_H
 #define KILN_TYPES_H
 
+#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -30,6 +31,11 @@
 #define KILN_MAX_GAIN_SETS       4       /* FR-TUN-13 */
 
 #define KILN_DUTY_MAX            1000u   /* per mille */
+
+/* HR-12: SSR1 and SSR2.  A single-zone kiln (ASM-02) drives both with the same
+ * duty; the array dimension exists so independently switched element groups do
+ * not need a second implementation. */
+#define KILN_HEAT_CHANNELS       2
 
 #define KILN_SEG_NONE            0xFFu
 
@@ -188,8 +194,33 @@ typedef struct {
 
 /* --- small helpers ----------------------------------------------------- */
 
+/* NFR-17, SR-01: a non-finite number must not be able to travel through the
+ * control path.  Both comparisons in a naive clamp are false for a NaN, so a
+ * clamp that does not say otherwise passes NaN straight through every range
+ * check built on it -- and a NaN duty, integral or filter state is persistent
+ * once it is in there.  These two are the only sanctioned way in. */
+static inline bool kiln_is_finite(float v)
+{
+    return isfinite(v) != 0;
+}
+
+/* Substitute a known-safe value for a non-finite one.  Used at the acquisition
+ * boundary; the core asserts instead, because by then it is a caller bug. */
+static inline float kiln_sanitisef(float v, float fallback)
+{
+    return kiln_is_finite(v) ? v : fallback;
+}
+
+/* Clamps, and maps a non-finite input to lo rather than propagating it.
+ *
+ * lo is the conservative end for the duties and rates this is used on, but it is
+ * NOT conservative for a temperature -- a NaN reading clamped to the floor reads
+ * as a cold kiln.  Temperatures are therefore gated by validity at the
+ * acquisition boundary (tempfilt rejects a non-finite sample) and again in
+ * safety (an invalid reading withholds heat), and never rely on this. */
 static inline float kiln_clampf(float v, float lo, float hi)
 {
+    if (!kiln_is_finite(v)) return lo;
     return v < lo ? lo : (v > hi ? hi : v);
 }
 

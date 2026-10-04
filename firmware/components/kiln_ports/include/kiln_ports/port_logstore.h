@@ -1,9 +1,10 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * The circular sample log (AD-08).  A raw flash partition of fixed 16 byte
- * records, not a filesystem: the wear pattern is provable and a power cut can
- * damage at most the record in flight.
+ * The circular sample log (AD-08).  A raw flash partition of fixed 20 byte
+ * records (AD-18: 16 before FR-CUR-09 added heater current), not a filesystem:
+ * the wear pattern is provable and a power cut can damage at most the record in
+ * flight.
  */
 #ifndef KILN_PORT_LOGSTORE_H
 #define KILN_PORT_LOGSTORE_H
