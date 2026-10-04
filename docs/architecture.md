@@ -63,6 +63,7 @@ as a decision in [§3](#3-key-decisions).
 | **AD-13** | **Tasks communicate by queues and immutable snapshots**, with no mutex on the control path. | `NFR-01`, `NFR-02`. Removes priority inversion and unbounded blocking as a class of failure. | Snapshot copying each cycle; at ~64 bytes per snapshot this is negligible. |
 | **AD-14** | **Dual-target build**: the same core sources compile as ESP-IDF components and as a plain CMake library for host tests. | `TR-01`, `TR-13`, `TR-19`. Coverage and sanitisers are available where the logic actually lives. | The core may not include a single IDF header; enforced by a build check ([§14.5](#145-enforcement)). |
 | **AD-15** | **Core affinity split**: connectivity and UI on core 0, control and safety on core 1. | `NFR-01`, `NFR-02`. WiFi (priority 23) and lwIP cannot preempt the control or safety task at all, so their deadlines do not depend on radio behaviour. | The core is tied to a dual-core target; `CON-02` fixes ESP32-S3, which is dual-core. |
+| **AD-19** | **The log ring is `kiln_core/logring` over a `port_flash`**, not logic inside the log-store adapter. | Everything interesting about the ring is a decision with a failure mode `FR-LOG-06` and `FR-LOG-08` name explicitly: head discovery across 512 sector headers, erase-immediately-before-write ordering so a power cut cannot destroy data the index still claims, and terminating a sector scan at a torn record. Behind `esp_partition` none of it is testable; in the core it is driven by a fake that can cut power mid-write. Revises [§5.2](#52-ports)'s original placement. | One more port, and the core now provides an implementation of `port_logstore` rather than only consuming ports. The adapter in exchange has no logic left to get wrong — three calls that pass straight through. |
 | **AD-16** | **The web UI is served only through the public REST API** it documents. | `FR-WEB-19`. The API is exercised by the UI on every use, so it cannot rot; and the UI is replaceable. | No shortcuts for the UI; occasionally a slightly chattier interaction. |
 
 ## 4. Layering and dependency rules
@@ -133,6 +134,7 @@ flowchart TD
 | `tempfilt` | First-order filter, calibration, rate-of-change regression. | — | Host unit |
 | `current` | RMS accumulation over whole mains cycles, window gating and settle handling, CT calibration, reference-current learning, deviation and wear tracking. Pure: fed raw ADC samples plus the window phase. | — | Host unit, integration |
 | `logrec` | Log record and sector-header encode/decode, CRC, torn-record detection, decimation with extrema preservation. | — | Host unit (incl. fuzz) |
+| `logring` | The circular store itself (`AD-19`): head discovery, wrap and erase ordering, torn-record handling, run selection, store statistics. Pure logic over `port_flash`. | `logrec` | Host unit (incl. power-cut injection) |
 | `configmodel` | Configuration schema: item table with type, unit, range, default; validation; versioned migration; JSON projection. | — | Host unit |
 | `runstate` | Run record model; reconstruction of resume state from a log tail. | `logrec`, `profile` | Host unit |
 | `faults` | Fault and warning code tables with descriptions ([requirements Appendix A](requirements.md#appendix-a--fault-code-allocation)). | — | Inspection + code-generated consistency test |
@@ -151,7 +153,11 @@ double is a compile-time-checked substitution.
 | `port_input` | `poll(→ events)` | PCNT + GPIO; scripted event source |
 | `port_current` | `start_burst(window_phase)`, `read_burst(→ samples, n)`, `present()` | ADC continuous-mode DMA burst; simulator; scripted sample source |
 | `port_clock` | `now_monotonic_us()`, `now_wall_utc()`, `wall_valid()` | `esp_timer` + SNTP; virtual clock driven by the test |
-| `port_logstore` | `append(record)`, `iterate(range, cb)`, `stats()`, `erase_all()` | Raw partition ring; RAM-backed and file-backed fakes |
+| `port_flash` | `info()`, `read()`, `write()`, `erase()` | `esp_partition`; RAM fake with NOR semantics and power-cut injection |
+| `port_logstore` | `append(record)`, `iterate(range, cb)`, `stats()`, `erase_all()` | `kiln_core/logring` over `port_flash` (`AD-19`) |
+| `port_counters` | `load()`, `add_contactor_ops()`, `add_ssr_ops()`, `flush()` | NVS with RAM accumulation (`FR-CUR-13`); spy |
+| `port_system` | `reset_cause()`, `fw_info()`, `stats()`, `wdt_subscribe/feed()` | `esp_system` + task WDT; stub |
+| `port_update` | `begin/write/finish()`, `confirm_running()`, `rollback()` | `esp_ota_ops`; stub |
 | `port_kvstore` | `get/set/erase(namespace, key, blob)` | NVS; in-memory fake |
 | `port_filestore` | `list/read/write/delete(path)` | LittleFS; temp-directory fake on host |
 | `port_net` | `state()`, `connect()`, `start_ap()`, `stats()` | WiFi + mDNS + SNTP; stub |

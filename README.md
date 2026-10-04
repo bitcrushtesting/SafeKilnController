@@ -25,8 +25,9 @@ hardware adapters, the local display and the web interface are not.
 | `kiln_core` — PID, setpoint generator, program model, safety supervisor (including the current-based relay rules), autotune, heater-current measurement, configuration model, run state, log codec | Implemented, host-tested |
 | `kiln_ports` — the interface headers everything hardware goes through | Complete for the above |
 | `kiln_sim` — plant simulator with heater current and electrical fault injection | Implemented |
-| `kiln_app` — task orchestration, mode state machine, heat authority | Implemented, minimal |
-| `kiln_hal_esp32s3` — MAX31856, SSD1306, encoder, outputs, flash log, NVS | **Not started** |
+| `kiln_app` — task orchestration, mode state machine, heat authority, logging, persistence, power-loss recovery | Implemented, host-tested |
+| `kiln_hal_esp32s3` — log partition, NVS, clock, reset cause, watchdog | Implemented, builds for esp32s3 |
+| `kiln_hal_esp32s3` — MAX31856, SSD1306, encoder, SSR outputs, CT front end, LittleFS | **Not started** |
 | `kiln_hmi`, `kiln_web`, OTA | **Not started** |
 
 You can watch a complete firing, and break it in a dozen ways, without any

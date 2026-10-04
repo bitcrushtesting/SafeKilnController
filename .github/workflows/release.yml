@@ -24,7 +24,7 @@ permissions:
   contents: write      # to create the release
 
 env:
-  IDF_VERSION: v5.3
+  IDF_VERSION: v6.0.1
 
 jobs:
   release:

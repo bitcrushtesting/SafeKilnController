@@ -578,6 +578,81 @@ build file in the repository.
   safety-branch floor (C10 — branch coverage is ~83 %, reported but not gated);
   and the KiCAD ERC gate of A11.
 
+---
+
+## E. Milestone M5 — Persist (done 2026-10-04)
+
+Architecture §17's M5: log ring, run index, programs, configuration,
+power-loss recovery. Exit criterion was "`FR-LOG`, `FR-CFG`, `FR-RUN-08` pass;
+endurance analysis confirmed by measurement".
+
+- [x] **E1. The circular log ring**, as `kiln_core/logring` over a new
+  `port_flash` rather than inside the adapter — recorded as **AD-19**, because it
+  revises architecture §5.2. Head discovery, wrap and erase ordering, torn-record
+  handling and run selection are all host-tested through a flash fake that
+  enforces NOR semantics and can cut power mid-write.
+
+- [x] **E2. Endurance confirmed by measurement**, which was the part of the exit
+  criterion that needed evidence rather than arithmetic: 150 h of logging costs
+  265 sector erases, one per 34 minutes of running, matching §10.4 — the figure
+  the whole ten-year `NFR-14` argument rests on. Capacity measures 104 448
+  records, 290 h at the default interval against `FR-LOG-07`'s 150 h.
+
+  Measured against the *algorithm*, not the device. On-device measurement is
+  still M8 work.
+
+- [x] **E3. `FR-LOG-04`'s out-of-band records**, using the byte AD-18's layout was
+  already carrying as reserved. The log now reads as a narrative — run start,
+  state change, fault, warning, configuration change, operator action — rather
+  than as a temperature series with unexplained steps in it.
+
+- [x] **E4. `app/settings`, `app/program_store`, `app/run_index`** (architecture
+  §5.3), plus the logging queue of §10.3 and `SR-17`'s latched fault written with
+  a snapshot and committed before the alarm sounds.
+
+- [x] **E5. `FR-RUN-08` power-loss recovery** from the log tail (`AD-09`), with a
+  test that counts NVS writes across two minutes of firing and finds none — which
+  is the whole point of the decision.
+
+- [x] **E6. The esp32s3 adapters that have no logic left in them**: log
+  partition, NVS, clock, reset cause, watchdog. Verified by building: ESP-IDF
+  6.0.1, 236 kB image, 89 % of the OTA slot free.
+
+### E.1 — Found while building M5
+
+- **`kiln_app_boot` decided `FR-RUN-08`'s band test against an unmeasured
+  temperature.** The rule compares the interrupted setpoint against the present
+  temperature, and at boot nothing has been acquired, so `kiln_c` still held its
+  initialiser of 20 °C. Every kiln more than the band above ambient was refused —
+  which is every kiln worth resuming. It now acquires once before deciding.
+
+- **A host-only component cannot live under `firmware/components/`.** ESP-IDF
+  treats everything there as part of the image, so the host fakes moved to
+  `firmware/host/`. Structural, rather than an `EXCLUDE_COMPONENTS` list someone
+  has to maintain.
+
+- **ESP-IDF 6.0 split the monolithic `driver` component per peripheral.** The CI
+  pin moved from the speculative `v5.3` to the `v6.0.1` the build is actually
+  verified against.
+
+### E.2 — Still outstanding for M5's neighbours
+
+- [ ] **E7. Vendor LittleFS and write the file-store adapter.** `AD-10` puts
+  programs and run records in LittleFS, which is not in the ESP-IDF tree, and
+  `CON-04` forbids a build-time fetch — so it has to be vendored rather than
+  pulled as a managed component. Until then the simulated build uses a RAM file
+  store in `kiln_sim`, so the path is exercised but nothing survives a reboot.
+
+- [ ] **E8. Persist `FR-CUR-13`'s switching counters.** They are accumulated and
+  exposed and feed `SR-30`, but the `port_counters` adapter does not exist, so
+  they restart at zero on every boot and the wear warning can never fire on a
+  real kiln.
+
+- [ ] **E9. The remaining M2/M4b adapters**: MAX31856, SSD1306, encoder, SSR
+  outputs and the CT front end. These are what stand between the current state
+  and a kiln that can actually be fired.
+
+
 - [ ] **C9. `web/`.** Empty. FR-WEB and CON-06 need UI sources with a build output
   vendored into `kiln_web/assets`, inside the asset budget of architecture §12.4.
 

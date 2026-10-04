@@ -23,9 +23,11 @@ permissions:
   contents: read
 
 env:
-  # CON-01 fixes ESP-IDF 5.x.  Pinned rather than floating: a toolchain that
-  # changes under a safety-relevant build is a variable nobody asked for.
-  IDF_VERSION: v5.3
+  # Pinned to the version the build is actually verified against, rather than
+  # floating: a toolchain that changes under a safety-relevant build is a
+  # variable nobody asked for.  Note that 6.0 split the monolithic `driver`
+  # component per peripheral, which is why main/ asks for esp_driver_uart.
+  IDF_VERSION: v6.0.1
 
 jobs:
   # --- architecture 14.5 enforcement -------------------------------------
