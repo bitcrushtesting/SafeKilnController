@@ -52,6 +52,7 @@ builds a release.
 | Document | Contents |
 |---|---|
 | [`docs/requirements.md`](docs/requirements.md) | Requirements specification — functional, safety, non-functional, hardware-interface and testability requirements, each with an identifier and a verification method. |
+| [`docs/safety.md`](docs/safety.md) | Safety concept — hazard analysis, safety goals, the layered protection concept and the independence claimed between layers, detection coverage and timing, residual risk, and the obligations on the installer and on anyone changing the design. |
 | [`docs/architecture.md`](docs/architecture.md) | Software architecture — key decisions, component decomposition, task and timing design, control and safety algorithms, persistence and flash-endurance design, REST API, and the build and test architecture. |
 | [`docs/simulation.md`](docs/simulation.md) | Running the firmware against a simulated kiln, on the host and under QEMU, including fault injection. |
 | [`tasklist.md`](tasklist.md) | Outstanding work, by priority. |
@@ -103,7 +104,9 @@ are at risk.
 - Mains wiring must be carried out by a competent person in accordance with local regulation.
 - Do not fire unattended.
 
-See [requirements §5](docs/requirements.md#5-safety-requirements).
+The hazards, the layered protection concept and the risk that remains are
+set out in [`docs/safety.md`](docs/safety.md); the requirements it derives from
+are [requirements §5](docs/requirements.md#5-safety-requirements).
 
 ## License
 
