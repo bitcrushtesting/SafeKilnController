@@ -10,10 +10,10 @@ endif()
 
 idf_component_register(
     SRCS
-        "src/hal_flash.c"
-        "src/hal_kvstore.c"
-        "src/hal_clock.c"
-        "src/hal_system.c"
+        "src/hal_flash.cpp"
+        "src/hal_kvstore.cpp"
+        "src/hal_clock.cpp"
+        "src/hal_system.cpp"
     INCLUDE_DIRS "include"
     REQUIRES kiln_ports esp_timer
     PRIV_REQUIRES spi_flash nvs_flash esp_app_format esp_system esp_hal_wdt

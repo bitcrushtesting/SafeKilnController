@@ -232,7 +232,7 @@ static inline double kiln_current_energy_wh(const kiln_current_t *c) { return c-
  * reporting a transformer fault.  FR-CUR-12's start gate. */
 static inline bool kiln_current_available(const kiln_current_t *c)
 {
-    return c->cfg.enabled && !(c->flags & KILN_CURF_CT_FAULT);
+    return c->cfg.enabled && ((c->flags & KILN_CURF_CT_FAULT) == 0u);
 }
 
 #endif /* KILN_CORE_CURRENT_H */

@@ -201,7 +201,7 @@ typedef struct {
  * once it is in there.  These two are the only sanctioned way in. */
 static inline bool kiln_is_finite(float v)
 {
-    return isfinite(v) != 0;
+    return static_cast<int>(isfinite(v)) != 0;
 }
 
 /* Substitute a known-safe value for a non-finite one.  Used at the acquisition
@@ -220,14 +220,20 @@ static inline float kiln_sanitisef(float v, float fallback)
  * safety (an invalid reading withholds heat), and never rely on this. */
 static inline float kiln_clampf(float v, float lo, float hi)
 {
-    if (!kiln_is_finite(v)) return lo;
+    if (!kiln_is_finite(v)) {
+        return lo;
+    }
     return v < lo ? lo : (v > hi ? hi : v);
 }
 
 static inline uint16_t kiln_clampu16(int32_t v, uint16_t lo, uint16_t hi)
 {
-    if (v < (int32_t)lo) return lo;
-    if (v > (int32_t)hi) return hi;
+    if (v < (int32_t)lo) {
+        return lo;
+    }
+    if (v > (int32_t)hi) {
+        return hi;
+    }
     return (uint16_t)v;
 }
 

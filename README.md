@@ -13,7 +13,7 @@ An open-source PID controller for electric ceramic and glass kilns, built on the
 - **PID with automatic tuning** — relay (Åström–Hägglund) autotune on the real kiln; no manual gain hunting.
 - **Safety first** — thermal runaway, thermocouple failure, shorted-SSR and over-temperature detection, with a safety supervisor that has sole authority over a heat-enable line that decays unless actively refreshed.
 - **Self-contained** — no SD card, no external database, no cloud. Logs live in a circular partition on internal flash; web assets are embedded in the firmware.
-- **Designed for testability** — all decision logic is hardware-free C that runs on a development host against a simulated kiln.
+- **Designed for testability** — all decision logic is hardware-free C++ that runs on a development host against a simulated kiln.
 
 ## Status
 

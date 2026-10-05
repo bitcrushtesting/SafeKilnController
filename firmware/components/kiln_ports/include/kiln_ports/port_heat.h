@@ -57,8 +57,10 @@ typedef struct kiln_port_heat {
 static inline void kiln_port_heat_set_duty_all(const kiln_port_heat_t *h,
                                                uint16_t permille)
 {
-    if (!h || !h->set_duty) return;
-    const uint8_t n = h->channel_count ? h->channel_count(h->ctx) : 1u;
+    if ((h == nullptr) || (h->set_duty == nullptr)) {
+        return;
+    }
+    const uint8_t n = (h->channel_count != nullptr) ? h->channel_count(h->ctx) : 1u;
     for (uint8_t c = 0; c < n && c < KILN_HEAT_CHANNELS; c++) {
         h->set_duty(h->ctx, c, permille);
     }

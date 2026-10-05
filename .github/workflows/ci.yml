@@ -2,9 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Per TR-24, everything here blocks merge.  Architecture 14.6 describes six
-# parallel jobs; these are the ones the repository can run today -- clang-tidy
-# and cppcheck, the web asset budget and the API suite arrive with the
-# components they check (tasklist C8).
+# parallel jobs; the web asset budget arrives with the component it checks
+# (tasklist C8).  Static analysis (NFR-25) is the `tidy` job below.
 
 name: CI
 
@@ -23,6 +22,12 @@ permissions:
   contents: read
 
 env:
+  # Pinned for the same reason IDF_VERSION is: a check set that changes under a
+  # safety-relevant build is a variable nobody asked for.  A new LLVM adds
+  # checks, and with WarningsAsErrors: '*' a new check is a red build on a
+  # commit that changed nothing.
+  LLVM_VERSION: '20'
+
   # Pinned to the version the build is actually verified against, rather than
   # floating: a toolchain that changes under a safety-relevant build is a
   # variable nobody asked for.  Note that 6.0 split the monolithic `driver`
@@ -53,7 +58,7 @@ jobs:
 
       - name: kiln_ports is headers only (architecture 4, rule 2)
         run: |
-          if find firmware/components/kiln_ports -name '*.c' | grep -q .; then
+          if find firmware/components/kiln_ports -name '*.cpp' | grep -q .; then
             echo "::error::kiln_ports must contain no sources"
             exit 1
           fi
@@ -66,7 +71,7 @@ jobs:
             grep -q 'SPDX-License-Identifier' "$f" \
               || { echo "::error file=$f::no SPDX header"; missing=1; }
           done < <(git ls-files \
-                     '*.c' '*.h' '*.md' 'CMakeLists.txt' '*/CMakeLists.txt' \
+                     '*.cpp' '*.h' '*.md' 'CMakeLists.txt' '*/CMakeLists.txt' \
                      'firmware/**/Kconfig*' 'firmware/*.csv' 'firmware/sdkconfig.*' \
                      'tools/*.sh' '.github/workflows/*.yml' \
                    | grep -v '^LICENSE')
@@ -95,6 +100,41 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build-host --output-on-failure
+
+  # --- NFR-25 / TR-24: static analysis -----------------------------------
+  #
+  # Fully blocking: WarningsAsErrors is '*' in .clang-tidy and there is no
+  # suppressions baseline.  Every check that fires today was either fixed or
+  # switched off with a written reason in that file -- so a finding here is
+  # genuinely new, not a pre-existing one that drifted into view.
+  #
+  # NOT MISRA, and the config says so at length: clang-tidy implements no MISRA
+  # checks in any release, and the hicpp-* module that approximated High
+  # Integrity C++ was removed from LLVM entirely.  What runs here is that same
+  # content under its current names (cppcoreguidelines-*, bugprone-*, cert-*).
+  tidy:
+    name: Static analysis (clang-tidy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-tidy ${{ env.LLVM_VERSION }}
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc >/dev/null
+          sudo add-apt-repository -y \
+            "deb http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-${LLVM_VERSION} main"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq "clang-tidy-${LLVM_VERSION}"
+          sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy \
+            "/usr/bin/clang-tidy-${LLVM_VERSION}" 100
+          clang-tidy --version
+
+      - name: Generate the compile database
+        run: cmake -B build-host -S firmware/test/host -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Analyse
+        run: tools/tidy.sh
 
   # TR-19.  The line floor is enforced; measured at 97.5 % on kiln_core when
   # this was written, so 90 % is a floor with room above it rather than a
@@ -258,7 +298,11 @@ jobs:
             fi
           }
 
-          want 'KilnControl starting'            'the composition root ran'
+          # The banner is "KilnControl <ver> (<built>, IDF <ver>) on <target>".
+          # This assertion previously looked for 'KilnControl starting', which
+          # the firmware has never printed -- so it could only ever have passed
+          # vacuously or failed.  Matched against what main.cpp actually logs.
+          want 'kiln: KilnControl .* on esp32s3' 'the composition root ran'
           want 'SIMULATED PLANT'                 'the simulated plant was bound'
           want 'started "'                       'a program was accepted and started'
           want '^\[RUN'                          'the run controller reached Running'

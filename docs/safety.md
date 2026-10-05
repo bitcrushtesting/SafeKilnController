@@ -458,6 +458,7 @@ it.
 | Heat authority stays in one place — the safety supervisor — and no other code path may grant it. | `AD-04` |
 | The thermal rules and the current rules are both load-bearing. Neither may be removed because the other exists. | [§6](#6-independence), [requirements §5.2](requirements.md#52-detection-requirements) |
 | A new fault code must be given an explicit clearability decision; it does not inherit one. | [§7.4](#74-reaction-and-recovery) |
+| **No part of this project may be described as MISRA-compliant.** `clang-tidy` implements no MISRA checks in any release; the `hicpp-*` module that approximated High Integrity C++ is gone from LLVM; cppcheck's free addon is MISRA **C** 2012 only and needs non-redistributable rule texts. Real MISRA C++:2023 checking is commercial. What `.clang-tidy` enforces is a high-integrity profile, which is a different and more honest claim. | `AD-20`, `.clang-tidy` |
 | A change to a safety rule requires a host test that fails before it and passes after. | `TR-25` |
 | Safety decision branches stay at 100 % coverage; the gate is CI-blocking, not advisory. | `TR-19`, `TR-24` |
 | The core stays free of hardware, RTOS and IDF references, so every rule remains host-testable. | `TR-01`, `AD-01`, `AD-14`, enforced by `tools/layercheck` |

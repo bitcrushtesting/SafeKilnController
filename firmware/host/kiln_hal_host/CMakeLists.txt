@@ -11,7 +11,7 @@
 # These are the per-port fakes architecture 5.2 lists against each port, shared
 # by the test suites and by any host-side harness.
 
-add_library(kiln_hal_host STATIC src/hal_host.c)
+add_library(kiln_hal_host STATIC src/hal_host.cpp)
 target_include_directories(kiln_hal_host PUBLIC include)
 target_link_libraries(kiln_hal_host PUBLIC kiln_ports)
-set_target_properties(kiln_hal_host PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON)
+set_target_properties(kiln_hal_host PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)

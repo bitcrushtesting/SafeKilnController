@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 Bitcrush Testing
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The ESP-IDF-facing adapter layer, analysed against the target compile
+# database (see tools/tidy-target.sh).  One check is relaxed, and only here:
+#
+#   pro-type-union-access .. fires five times, every one of them inside
+#                            ESP_LOGE/ESP_LOGI expanding to IDF's internal
+#                            __esp_log_config.data union.  There is no union
+#                            in this component's own code.
+InheritParentConfig: true
+Checks: >
+  -cppcoreguidelines-pro-type-union-access

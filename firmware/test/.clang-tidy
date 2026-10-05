@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Bitcrush Testing
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Test code inherits the root profile and relaxes the checks that only make
+# sense against production code.  Every one of these is disabled because the
+# test is *deliberately* doing the thing the check objects to -- which is what
+# a negative test is.  None of them is disabled in firmware/components.
+#
+#   EnumCastOutOfRange ..... test_faults casts 999 and 99 to a fault code, and
+#                            test_safety_current casts 200, precisely to prove
+#                            an out-of-range code is rejected (SR-19).
+#   NullDereference ........ the suites pass NULL deliberately to check the
+#                            NFR-17 argument guards return an error instead of
+#                            faulting.
+#   insecureAPI.strcpy ..... fixed test fixtures of known length.
+#   signed-char-misuse ..... the fuzz and profile suites feed deliberately
+#                            hostile bytes.
+#   simplify-boolean-expr .. fires inside the check-macro expansion, not in
+#                            anything a person wrote.
+InheritParentConfig: true
+Checks: >
+  -clang-analyzer-optin.core.EnumCastOutOfRange,
+  -clang-analyzer-core.NullDereference,
+  -clang-analyzer-security.insecureAPI.strcpy,
+  -bugprone-signed-char-misuse,
+  -cert-str34-c,
+  -readability-simplify-boolean-expr

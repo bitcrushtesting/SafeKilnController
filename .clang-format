@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 Bitcrush Testing
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Matches the style the tree is already written in, rather than imposing a new
+# one: 4-space indent, 100 columns, brace on its own line for a function and
+# attached for a control statement, pointer bound to the name.  This file is
+# consulted by clang-tidy's --fix (FormatStyle: file), so a mismatch here
+# silently reformats every region a fix touches -- which is exactly what the
+# previous `BasedOnStyle: Google` did, leaving 2-space fragments inside
+# 4-space functions.
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 100
+BreakBeforeBraces: Stroustrup
+PointerAlignment: Right
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AlignTrailingComments: true
+KeepEmptyLinesAtTheStartOfBlocks: false
+SortIncludes: false

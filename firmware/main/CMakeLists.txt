@@ -5,7 +5,7 @@
 # only place that binds a port to a concrete adapter.
 
 idf_component_register(
-    SRCS "main.c"
+    SRCS "main.cpp"
     INCLUDE_DIRS ""
     REQUIRES kiln_app kiln_core kiln_ports kiln_sim kiln_hal_esp32s3 esp_timer
     # ESP-IDF 6.0 split the monolithic `driver` component per peripheral, so ask

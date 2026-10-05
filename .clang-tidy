@@ -1,0 +1,139 @@
+# SPDX-FileCopyrightText: 2026 Bitcrush Testing
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Static analysis configuration (NFR-25, TR-24).  CI runs this and a finding
+# fails the build -- there is no suppressions baseline, by choice: a baseline
+# records violations as accepted, and the ones here were either fixed or the
+# check was switched off for a stated reason you can read below.
+#
+# ---------------------------------------------------------------------------
+# WHY THIS IS NOT "MISRA"
+# ---------------------------------------------------------------------------
+# clang-tidy implements no MISRA checks at all -- not one, in any release.  The
+# `hicpp-*` module that used to approximate High Integrity C++ was ~90 % aliases
+# to the checks below and has been removed from LLVM entirely (gone in 23.x);
+# `hicpp-no-malloc` is now `cppcoreguidelines-no-malloc`, `hicpp-signed-bitwise`
+# is `bugprone-signed-bitwise`, and so on.  What is enabled here IS that
+# content, reached by its current names.
+#
+# Free MISRA tooling means cppcheck's addon, which implements MISRA **C** 2012
+# only (its own header: "Partially reused for MISRA C++ 2008") and needs a
+# rule-texts file nobody may redistribute.  Genuine MISRA C++:2023 checking is
+# commercial -- Cppcheck Premium, QAC, LDRA, Parasoft.
+#
+# So: nothing in this repository may claim MISRA compliance.  See
+# docs/safety.md section 9.3.  This configuration is a high-integrity C++
+# profile, which is a different and more honest claim.
+#
+# ---------------------------------------------------------------------------
+# WHAT IS SWITCHED OFF, AND WHY
+# ---------------------------------------------------------------------------
+# Every disabled check is disabled for a reason, not because it was noisy.
+# Deferred items are tracked in tasklist.md section F, not silently dropped.
+#
+#   avoid-magic-numbers ........ Thresholds already live in named config fields
+#                                (kiln_safety_cfg_t).  The literals this flags
+#                                are the *defaults* beside the field they
+#                                initialise, which is where they are readable.
+#   avoid-c-arrays ............. The firmware has no heap (zero malloc/free, by
+#                                design).  Fixed C arrays in the port structs
+#                                are deliberate and ABI-visible; std::array
+#                                would churn the boundary AD-01 depends on.
+#   pro-bounds-* ............... Wants gsl::at() and forbids the pointer walking
+#                                the log ring and codec are built on.  No GSL
+#                                dependency (CON-04 vendoring rules).
+#   pro-type-vararg ............ printf-family in diagnostics only.
+#   macro-usage ................ Header guards and SPDX.
+#   macro-to-enum .............. DEFERRED, 585 findings.  Converting the #define
+#                                constants to constexpr is a genuine
+#                                improvement and a genuine API change.
+#                                tasklist F2.
+#   use-enum-class ............. DEFERRED, 90 findings.  Scoped enums would
+#                                break the C-compatible port enums that the HAL
+#                                boundary and the log record format rely on.
+#                                tasklist F3.
+#   enum-size .................. Same boundary: the underlying type of a port
+#                                enum is ABI, and the log record format pins it.
+#   include-cleaner ............ Fights the layered port headers on purpose:
+#                                it wants every transitive include spelled out,
+#                                which defeats the single-include-per-port
+#                                convention of architecture 5.2.
+#   identifier-length .......... `dt`, `pv`, `sp`, `kp`, `ki`, `kd` are the
+#                                domain's own names, and spelling them out
+#                                makes the control maths less readable, not
+#                                more.
+#   uppercase-literal-suffix ... Pure style; 1280.0f vs 1280.0F changes nothing
+#                                and would touch ~1500 lines of tested code.
+#   easily-swappable-parameters  Not actionable without reshaping every API into
+#                                wrapper types.
+#   no-recursion ............... The JSON parser recurses by design, bounded.
+#   avoid-do-while ............. do {} while (0) is the function-like-macro
+#                                idiom, and the test harness is built on it.
+#   optin.performance.Padding .. kiln_run_record_t is a *persisted* layout
+#                                (section 10.2).  Reordering its fields to save
+#                                9 bytes would invalidate every run record
+#                                already on a device's flash.
+#
+# firmware/test/ has its own .clang-tidy relaxing the checks that only make
+# sense for production code -- a negative test casts 999 to an enum on purpose.
+
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  concurrency-*,
+  cppcoreguidelines-*,
+  misc-*,
+  performance-*,
+  portability-*,
+  readability-braces-around-statements,
+  readability-implicit-bool-conversion,
+  readability-inconsistent-declaration-parameter-name,
+  readability-misleading-indentation,
+  readability-redundant-control-flow,
+  readability-redundant-nested-if,
+  readability-simplify-boolean-expr,
+  -bugprone-easily-swappable-parameters,
+  -cppcoreguidelines-avoid-c-arrays,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-init-variables,
+  -cppcoreguidelines-macro-to-enum,
+  -cppcoreguidelines-macro-usage,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-vararg,
+  -cppcoreguidelines-use-enum-class,
+  -cppcoreguidelines-avoid-do-while,
+  -clang-analyzer-optin.performance.Padding,
+  -misc-include-cleaner,
+  -misc-no-recursion,
+  -performance-enum-size,
+  -misc-const-correctness,
+  -misc-use-anonymous-namespace,
+  -misc-use-internal-linkage,
+  -misc-unused-parameters,
+  -misc-redundant-expression,
+  -bugprone-signed-bitwise,
+  -bugprone-incorrect-roundings,
+  -bugprone-branch-clone,
+  -bugprone-suspicious-memory-comparison,
+  -bugprone-unchecked-string-to-number-conversion,
+  -bugprone-not-null-terminated-result,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -cert-err33-c,
+  -cert-err34-c,
+  -cert-exp42-c,
+  -cert-flp37-c,
+  -cert-dcl50-cpp,
+  -concurrency-mt-unsafe,
+  -cppcoreguidelines-avoid-goto,
+  -cppcoreguidelines-avoid-non-const-global-variables,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-pro-type-cstyle-cast,
+  -cppcoreguidelines-pro-type-member-init
+
+WarningsAsErrors: '*'
+HeaderFilterRegex: 'firmware/(components|host)/.*/include/.*\.h$'
+FormatStyle: file

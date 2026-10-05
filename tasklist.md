@@ -696,3 +696,125 @@ endurance analysis confirmed by measurement".
   OQ-03 (whole-life run-summary retention), OQ-05 (3-zone variant — affects
   whether the control path is written for one zone or N), OQ-07 (element
   temperature coefficient measured or entered).
+
+---
+
+## F. C++20 migration and static analysis (2026-10-05)
+
+The firmware moved from C99 to C++20 and `clang-tidy` now gates merge
+(`NFR-25`, `TR-24`, closing the static-analysis half of C8). The migration
+itself was small — 9 compile errors across 22 597 lines, all `= {0}` on a
+struct whose first member is an enum — because the codebase already had no
+heap, no VLAs, no `restrict` and explicit context structs.
+
+**Not MISRA, and no part of this may be described as MISRA.** `clang-tidy`
+implements no MISRA checks in any release, and the `hicpp-*` module that
+approximated High Integrity C++ has been removed from LLVM (absent in 23.x);
+its content now lives in `cppcoreguidelines-*`, `bugprone-*` and `cert-*`,
+which is what `.clang-tidy` enables. Free MISRA tooling is cppcheck's addon,
+which is MISRA **C** 2012 only and needs non-redistributable rule texts; real
+MISRA C++:2023 checking is commercial. See `.clang-tidy` and
+[`docs/safety.md`](docs/safety.md) section 9.3.
+
+Verified end to end on 2026-10-05 against ESP-IDF v6.0.1: 335 host tests green
+plain and under ASan/UBSan, the `esp32s3` image builds with **zero warnings**,
+and QEMU boots it and fires to 632 degC across two segments with no fault
+latched. The image is 235 920 bytes, 88.8 % of the OTA slot free (`NFR-13`) --
+**no size penalty against the C build**, which is what no exceptions, no RTTI,
+no STL containers and no heap buys.
+
+The target toolchain (GCC 15.2) caught six sites clang had not: partial
+designated initialisers, which C zero-fills silently and C++ reports under
+`-Wmissing-field-initializers`, plus one designator written out of declaration
+order. All six are now value-initialised and then assigned, which keeps that
+warning switched on -- it is what makes every site reconsider itself when a
+config struct gains a field.
+
+1 408 findings were fixed automatically and verified. The gate is green with
+**no suppressions baseline**:
+every remaining check is switched off in `.clang-tidy` with a written reason.
+The ones below are deferred work rather than permanent policy, each with the
+finding count measured on 2026-10-05.
+
+- [x] **F1. Analyse `kiln_hal_esp32s3`.** Done: `tools/tidy-target.sh` drives
+  from the database `idf.py` emits, filtered into something a clang front end
+  will accept (the xtensa flags and the `@response` file have to come out, and
+  the toolchain's picolibc headers go in). Found and fixed 42 findings the host
+  job could never see, plus one deliberate exception now carried as a narrow
+  `NOLINTNEXTLINE`: partition type `0x40` is not a named `esp_partition_type_t`
+  because IDF reserves `0x40..0xFE` for application-defined types
+  (architecture 10.1). `pro-type-union-access` is disabled for this component
+  only -- all five hits were inside `ESP_LOGx` expanding to IDF's own union.
+
+- [ ] **F1b. Run `tools/tidy-target.sh` in CI.** It is a local tool today. The
+  natural home is the `firmware` job, but that runs inside the Espressif
+  container, where the toolchain's picolibc path differs and `clang-tidy` is
+  not installed. Wiring it without checking that is a real risk of a **vacuous
+  pass** -- the script would find our files unparseable, report nothing and go
+  green -- so it wants doing against a real container run, not blind. The same
+  gap still covers `host/webhost`, which is its own CMake project.
+
+- [ ] **F2. `cppcoreguidelines-macro-to-enum` — 585 findings.** The `#define`
+  constants in `kiln/types.h` and friends want to become `constexpr`, which is
+  a genuine improvement (typed, scoped, debuggable) and a genuine API change.
+  Worth doing deliberately, in its own commit, with the log record format
+  checked against it.
+
+- [ ] **F3. `cppcoreguidelines-use-enum-class` — 90 findings.** Scoped enums
+  would break the C-compatible port enums the HAL boundary and the persisted
+  log record format rely on. Needs a decision about whether the port layer
+  stays C-callable (`AD-01`) before it can be actioned — possibly never.
+
+- [ ] **F4. `misc-use-anonymous-namespace` — 267 findings.** Translating
+  file-static functions to anonymous namespaces is the idiomatic C++ form and
+  purely mechanical, but it touches every source file and is better done when
+  it will not collide with other work in flight. `misc-use-internal-linkage`
+  (16) is the same question from the other side.
+
+- [ ] **F5. `bugprone-signed-bitwise` — 221 findings.** Mostly the flag and
+  fault-mask handling. Each site needs the operand made explicitly unsigned;
+  real value, and the single largest genuinely-defect-adjacent group.
+
+- [ ] **F6. `cppcoreguidelines-pro-type-cstyle-cast` — 73 findings.** C casts
+  to `static_cast`/`reinterpret_cast`. Mechanical, but a `reinterpret_cast` in
+  the log codec deserves reading rather than rewriting blind.
+
+- [ ] **F7. `misc-const-correctness` — 65 findings. Do not auto-apply.**
+  Applying it broke the build: it constifies the `void *ctx` parameters of
+  functions assigned into the port vtables, which is the ports-and-adapters
+  boundary `AD-01` rests on. It also rewrote two public signatures in
+  `logring.h`. Any pass over this must be done by hand, port boundary first.
+
+- [ ] **F8. Real findings turned up by the analysis, worth their own fixes:**
+  - `safety.cpp:119` and `current.cpp:92` — `clamp_cfg()` reports "was anything
+    clamped?" with `memcmp` over a struct that has padding. It works today
+    because the snapshot is a struct copy, but padding propagation is not
+    guaranteed by the standard, so a false "clamped" is possible. Both are in
+    safety code. Replace with an explicit `changed` flag set as each field is
+    clamped. (`bugprone-suspicious-memory-comparison`)
+  - `configmodel.cpp:240` — `memcpy` result is not null-terminated.
+    (`bugprone-not-null-terminated-result`)
+  - `logrec.cpp:101`, `pid.cpp:135`, `profile.cpp:151`, `sim.cpp:322` —
+    `(int)(x + 0.5)` rounds the wrong way for negative values. Check whether
+    each input can be negative; use `lroundf` where it can.
+    (`bugprone-incorrect-roundings`)
+  - `cert-err33-c` — 26 unchecked return values, against `NFR-17`'s rule that
+    no failure is silently dropped. Most are `snprintf` into a sized buffer,
+    but `NFR-17` says *every* error path is handled explicitly, so each wants
+    either a check or an explicit `(void)`.
+
+- [ ] **F9. `kiln_run_record_t` carries 9 padding bytes where 1 is optimal**
+  (`clang-analyzer-optin.performance.Padding`, disabled). Reordering would
+  invalidate every run record already on a device, so it can only change
+  alongside a record-format version bump — if at all.
+
+- [x] **F11. CI's QEMU assertion was stale.** It asserted the firmware logs
+  `KilnControl starting`; the firmware has never printed that, at HEAD or
+  before, so that line could only fail. Now matched against what `main.cpp`
+  actually logs. Worth noting as a reminder that an assertion nobody has seen
+  pass is not evidence of anything.
+
+- [ ] **F10. cppcheck as a second opinion.** Not configured. Its value here
+  would be the MISRA C 2012 addon, which no longer applies now the firmware is
+  C++; its general analysis overlaps `clang-analyzer-*` heavily. Low priority,
+  and worth deciding against explicitly rather than leaving open.
