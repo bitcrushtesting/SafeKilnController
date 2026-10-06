@@ -3,7 +3,9 @@
 
 #include "kiln_core/tempfilt.h"
 
-static void clamp_cfg(kiln_tempfilt_cfg_t *c)
+namespace {
+
+void clamp_cfg(kiln_tempfilt_cfg_t *c)
 {
     c->offset_c     = kiln_clampf(c->offset_c, -50.0f, 50.0f);
     c->gain         = kiln_clampf(c->gain, 0.90f, 1.10f);
@@ -15,6 +17,8 @@ static void clamp_cfg(kiln_tempfilt_cfg_t *c)
         c->rate_window_s = KILN_RATE_WINDOW_MAX_S;
     }
 }
+
+} // namespace
 
 void kiln_tempfilt_init(kiln_tempfilt_t *f, const kiln_tempfilt_cfg_t *cfg)
 {
@@ -46,6 +50,8 @@ void kiln_tempfilt_reset(kiln_tempfilt_t *f)
     f->rate_c_per_h  = 0.0f;
 }
 
+namespace {
+
 /* Least-squares slope over the decimated history, in degC per hour.
  * Samples are 1/KILN_DECIM_HZ apart by construction, so x is the sample index.
  *
@@ -54,7 +60,7 @@ void kiln_tempfilt_reset(kiln_tempfilt_t *f)
  * accumulators are the only concern, and at 300 samples of at most 1350 degC the
  * largest term is ~1.2e8 against float's ~1.7e38 -- no overflow, and the slope
  * is wanted to a tenth of a degC per hour, not to machine precision. */
-static float regress_rate_per_h(const kiln_tempfilt_t *f)
+float regress_rate_per_h(const kiln_tempfilt_t *f)
 {
     const uint16_t n_want = (uint16_t)(f->cfg.rate_window_s * KILN_DECIM_HZ);
     const uint16_t n = f->hist_count < n_want ? f->hist_count : n_want;
@@ -87,7 +93,7 @@ static float regress_rate_per_h(const kiln_tempfilt_t *f)
     return slope_per_step * (float)KILN_DECIM_HZ * 3600.0f;
 }
 
-static void hist_push(kiln_tempfilt_t *f, float v)
+void hist_push(kiln_tempfilt_t *f, float v)
 {
     f->hist_c[f->hist_head] = v;
     f->hist_head = (uint16_t)((f->hist_head + 1u) % KILN_RATE_MAX_POINTS);
@@ -95,6 +101,8 @@ static void hist_push(kiln_tempfilt_t *f, float v)
         f->hist_count++;
     }
 }
+
+} // namespace
 
 bool kiln_tempfilt_push(kiln_tempfilt_t *f, float raw_sensor_c, float dt_s)
 {

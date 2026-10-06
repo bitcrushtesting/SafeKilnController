@@ -22,9 +22,9 @@
 #include "kiln_web/api.h"
 #include "kiln_web/json.h"
 
-#define LOG_SECTORS  24u
-#define SECTOR_BYTES 4096u
-#define BODY_CAP     16384u
+constexpr size_t LOG_SECTORS  = 24u;
+constexpr size_t SECTOR_BYTES = 4096u;
+constexpr size_t BODY_CAP     = 16384u;
 
 typedef struct {
     uint8_t               flash_storage[LOG_SECTORS * SECTOR_BYTES];
@@ -210,7 +210,7 @@ static void expect_read_only(rig_t *r, kiln_http_method_t m, const char *path,
  * dozen members each, and an 800-point log query is ten thousand numbers.  Both
  * are legitimate responses, so the test's budget has to exceed them or the test
  * is measuring its own array size. */
-#define RTOKS 40000
+constexpr size_t RTOKS = 40000;
 static kiln_json_tok_t g_toks[RTOKS];
 
 static int parse_resp(const kiln_api_resp_t *resp)
@@ -799,7 +799,7 @@ typedef struct { char buf[262144]; size_t len; bool fail_after; size_t fail_at; 
 
 static bool sink_write(void *user, const char *data, size_t len)
 {
-    sink_t *s = (sink_t *)user;
+    sink_t *s = static_cast<sink_t *>(user);
     if (s->fail_after && s->len >= s->fail_at) {
         return false;
     }
@@ -848,7 +848,7 @@ KILN_TEST(frlog10_a_log_query_decimates_to_the_requested_point_count)
     const uint32_t run = seed_a_run(&r);
 
     char q[64];
-    snprintf(q, sizeof(q), "run=%u&max_points=50", run);
+    (void)snprintf(q, sizeof(q), "run=%u&max_points=50", run);
     const kiln_api_resp_t resp = stream_log(&r, q);
 
     CHECK_EQ_INT(resp.status, 200);
@@ -908,7 +908,7 @@ KILN_TEST(frweb18_csv_is_offered_with_a_header_row)
     const uint32_t run = seed_a_run(&r);
 
     char q[64];
-    snprintf(q, sizeof(q), "run=%u&max_points=20&format=csv", run);
+    (void)snprintf(q, sizeof(q), "run=%u&max_points=20&format=csv", run);
     const kiln_api_resp_t resp = stream_log(&r, q);
 
     CHECK_EQ_INT(resp.status, 200);
@@ -1005,7 +1005,7 @@ KILN_TEST(a_client_that_disconnects_stops_the_scan)
     req.method = KILN_HTTP_GET;
     req.path   = "/api/log";
     char q[64];
-    snprintf(q, sizeof(q), "run=%u&max_points=500", run);
+    (void)snprintf(q, sizeof(q), "run=%u&max_points=500", run);
     req.query = q;
     req.authenticated = true;
 
@@ -1025,7 +1025,7 @@ KILN_TEST(frlog13_the_log_can_be_erased)
     const uint32_t run = seed_a_run(&r);
 
     char q[48];
-    snprintf(q, sizeof(q), "run=%u", run);
+    (void)snprintf(q, sizeof(q), "run=%u", run);
     CHECK(stream_log(&r, q).status == 200);
     const size_t before = g_sink.len;
     CHECK(before > 100);
@@ -1081,9 +1081,9 @@ KILN_TEST(frweb23_state_changing_endpoints_require_authentication)
 
     /* And the rule is by method, so a route added later is protected by default
      * rather than by someone remembering to list it. */
-    kiln_api_req_t nw = { .method = KILN_HTTP_POST, .path = "/api/something/new" };
+    const kiln_api_req_t nw = {.method = KILN_HTTP_POST, .path = "/api/something/new"};
     CHECK(kiln_api_needs_auth(&nw));
-    kiln_api_req_t rd = { .method = KILN_HTTP_GET, .path = "/api/anything" };
+    const kiln_api_req_t rd = {.method = KILN_HTTP_GET, .path = "/api/anything"};
     CHECK(!kiln_api_needs_auth(&rd));
 }
 
@@ -1136,8 +1136,8 @@ KILN_TEST(a_response_that_does_not_fit_says_so_rather_than_truncating)
     rig_init(&r);
 
     char tiny[48];
-    kiln_api_req_t req = { .method = KILN_HTTP_GET, .path = "/api/config",
-                           .authenticated = true };
+    const kiln_api_req_t req = {
+        .method = KILN_HTTP_GET, .path = "/api/config", .authenticated = true};
     kiln_api_resp_t resp = {};
     resp.body     = tiny;
     resp.body_cap = sizeof(tiny);
@@ -1199,13 +1199,13 @@ KILN_TEST(the_api_validates_its_own_arguments)
     kiln_api_resp_t resp = {};
     resp.body     = r.body;
     resp.body_cap = sizeof(r.body);
-    kiln_api_req_t req = { .method = KILN_HTTP_GET, .path = "/api/status",
-                           .authenticated = true };
+    const kiln_api_req_t req = {
+        .method = KILN_HTTP_GET, .path = "/api/status", .authenticated = true};
 
     CHECK_ERR(kiln_api_handle(NULL, &req, &resp), KILN_ERR_INVALID_ARG);
     CHECK_ERR(kiln_api_handle(&r.api, NULL, &resp), KILN_ERR_INVALID_ARG);
     CHECK_ERR(kiln_api_handle(&r.api, &req, NULL), KILN_ERR_INVALID_ARG);
 
-    kiln_api_req_t nopath = { .method = KILN_HTTP_GET, .authenticated = true };
+    const kiln_api_req_t nopath = {.method = KILN_HTTP_GET, .authenticated = true};
     CHECK_ERR(kiln_api_handle(&r.api, &nopath, &resp), KILN_ERR_INVALID_ARG);
 }

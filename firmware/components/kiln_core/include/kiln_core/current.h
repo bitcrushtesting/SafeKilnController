@@ -33,7 +33,7 @@
 /* FR-CUR-08: the reference is a median, so an outlier -- the one window that
  * caught a contactor still closing -- cannot move it.  Nine cold full-on windows
  * is a couple of minutes at the start of a firing. */
-#define KILN_CUR_REF_SAMPLES   9
+constexpr size_t KILN_CUR_REF_SAMPLES = 9;
 
 typedef struct {
     /* FR-CUR-12: with monitoring disabled every measurement is suppressed and

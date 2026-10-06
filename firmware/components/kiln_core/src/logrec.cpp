@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <math.h>
 #include <string.h>
 #include "kiln_core/logrec.h"
 
@@ -10,72 +11,98 @@
  * little work to justify 256 bytes of table. */
 uint8_t kiln_crc8(const uint8_t *data, size_t len)
 {
-    uint8_t crc = 0xFF;
+    /* The accumulator is wider than the result on purpose.  A uint8_t operand
+     * promotes to *int* before it is shifted, so the whole round would be done
+     * in signed arithmetic (bugprone-signed-bitwise); carrying it in uint32_t
+     * and masking back to 8 bits each round keeps every step unsigned and
+     * produces the identical value. */
+    uint32_t crc = 0xFFu;
     for (size_t i = 0; i < len; i++) {
         crc ^= data[i];
-        for (int b = 0; b < 8; b++) {
-            crc = (uint8_t)(((crc & 0x80u) != 0u) ? ((crc << 1) ^ 0x07u) : (crc << 1));
+        for (unsigned b = 0; b < 8u; b++) {
+            crc = ((crc & 0x80u) != 0u) ? ((crc << 1u) ^ 0x07u) : (crc << 1u);
+            crc &= 0xFFu;
         }
     }
-    return crc;
+    return (uint8_t)crc;
 }
 
 /* CRC-16/CCITT-FALSE */
-uint16_t kiln_crc16(const uint8_t *data, size_t len)
+/* Incremental so a caller that cannot hold the whole buffer -- fileslots
+ * validating a copy at mount -- gets the same value as one that can. */
+uint16_t kiln_crc16_update(uint16_t crc, const uint8_t *data, size_t len)
 {
-    uint16_t crc = 0xFFFFu;
+    /* As kiln_crc8: uint16_t promotes to int, so the accumulator is widened to
+     * keep the round unsigned and masked back to 16 bits.  The signature stays
+     * uint16_t -- it is what fileslots and the stores persist. */
+    uint32_t c = crc;
     for (size_t i = 0; i < len; i++) {
-        crc ^= (uint16_t)data[i] << 8;
-        for (int b = 0; b < 8; b++) {
-            crc = (uint16_t)(((crc & 0x8000u) != 0u) ? ((crc << 1) ^ 0x1021u) : (crc << 1));
+        c ^= (uint32_t)data[i] << 8u;
+        for (unsigned b = 0; b < 8u; b++) {
+            c = ((c & 0x8000u) != 0u) ? ((c << 1u) ^ 0x1021u) : (c << 1u);
+            c &= 0xFFFFu;
         }
     }
-    return crc;
+    return (uint16_t)c;
+}
+
+uint16_t kiln_crc16(const uint8_t *data, size_t len)
+{
+    return kiln_crc16_update(KILN_CRC16_INIT, data, len);
 }
 
 /* --- fixed point helpers ----------------------------------------------- */
 
-/* 0.1 degC resolution, saturating rather than wrapping. */
-static int16_t enc_temp(float c)
+namespace {
+
+/* 0.1 degC resolution, saturating rather than wrapping.
+ *
+ * Both halves of a naive clamp are false for a NaN, so the open-coded
+ * saturation this replaces passed one through to a cast that is undefined for
+ * it (types.h, "the only sanctioned way in").  A reading is substituted for 0
+ * rather than the floor: this is a log encoder, and -327.68 degC on a chart
+ * would read as a measurement.  lroundf() rounds half away from zero in both
+ * directions, which is what the ternary was open-coding
+ * (bugprone-incorrect-roundings). */
+int16_t enc_temp(float c)
 {
-    float v = c * 10.0f;
-    if (v > 32767.0f) {
-        v = 32767.0f;
-    }
-    if (v < -32768.0f) {
-        v = -32768.0f;
-    }
-    return (int16_t)(v >= 0.0f ? v + 0.5f : v - 0.5f);
+    const float v = kiln_clampf(kiln_sanitisef(c, 0.0f) * 10.0f, -32768.0f, 32767.0f);
+    return (int16_t)lroundf(v);
 }
 
-static float dec_temp(int16_t v) { return (float)v / 10.0f; }
+float dec_temp(int16_t v) { return (float)v / 10.0f; }
 
-static void put_u32(uint8_t *p, uint32_t v)
+void put_u32(uint8_t *p, uint32_t v)
 {
-    p[0] = (uint8_t)(v);       p[1] = (uint8_t)(v >> 8);
-    p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24);
+    p[0] = (uint8_t)(v);       p[1] = (uint8_t)(v >> 8u);
+    p[2] = (uint8_t)(v >> 16u); p[3] = (uint8_t)(v >> 24u);
 }
-static uint32_t get_u32(const uint8_t *p)
+uint32_t get_u32(const uint8_t *p)
 {
-    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
-           ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8u) |
+           ((uint32_t)p[2] << 16u) | ((uint32_t)p[3] << 24u);
 }
-static void put_i16(uint8_t *p, int16_t v)
+void put_i16(uint8_t *p, int16_t v)
 {
-    p[0] = (uint8_t)((uint16_t)v); p[1] = (uint8_t)((uint16_t)v >> 8);
+    p[0] = (uint8_t)((uint16_t)v); p[1] = (uint8_t)((uint16_t)v >> 8u);
 }
-static int16_t get_i16(const uint8_t *p)
+int16_t get_i16(const uint8_t *p)
 {
-    return (int16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
+    /* Assembled in uint32_t: a uint16_t operand promotes to int, which would
+     * make the shift signed.  The two-step narrowing is the same modular
+     * conversion the single cast was doing. */
+    return (int16_t)(uint16_t)((uint32_t)p[0] | ((uint32_t)p[1] << 8u));
 }
-static void put_u16(uint8_t *p, uint16_t v)
+void put_u16(uint8_t *p, uint16_t v)
 {
-    p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8);
+    p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8u);
 }
-static uint16_t get_u16(const uint8_t *p)
+uint16_t get_u16(const uint8_t *p)
 {
-    return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
+    return (uint16_t)((uint32_t)p[0] | ((uint32_t)p[1] << 8u));
 }
+
+} // namespace
 
 /* --- record ------------------------------------------------------------- */
 
@@ -91,14 +118,11 @@ void kiln_logrec_encode(const kiln_log_sample_t *s, uint8_t out[KILN_LOG_RECORD_
 
     /* Current in 10 mA steps: 0 .. 655.35 A, comfortably beyond FR-CUR-02's
      * 60 A range and finer than its 0.1 A resolution requirement. */
-    float ca = s->current_a * 100.0f;
-    if (ca < 0.0f) {
-        ca = 0.0f;
-    }
-    if (ca > 65535.0f) {
-        ca = 65535.0f;
-    }
-    put_u16(&out[12], (uint16_t)(ca + 0.5f));
+    /* kiln_clampf() rather than the two comparisons: a NaN current slipped
+     * past those and into an undefined cast, and here the floor IS the
+     * conservative end (0 A is "nothing measured"). */
+    const float ca = kiln_clampf(s->current_a * 100.0f, 0.0f, 65535.0f);
+    put_u16(&out[12], (uint16_t)lroundf(ca));
 
     /* Duty as 0..200 in half-percent steps: one byte is ample for a value the
      * window can only realise in ~0.5% increments anyway. */
@@ -238,7 +262,9 @@ kiln_err_t kiln_decimator_init(kiln_decimator_t *d, kiln_log_bucket_t *storage,
     return KILN_OK;
 }
 
-static void bucket_merge(kiln_log_bucket_t *dst, const kiln_log_bucket_t *src)
+namespace {
+
+void bucket_merge(kiln_log_bucket_t *dst, const kiln_log_bucket_t *src)
 {
     if (src->count == 0) {
         return;
@@ -286,7 +312,7 @@ static void bucket_merge(kiln_log_bucket_t *dst, const kiln_log_bucket_t *src)
 }
 
 /* Double the bucket width, folding pairs: 0+1 -> 0, 2+3 -> 1, and so on. */
-static void fold_pairs(kiln_decimator_t *d)
+void fold_pairs(kiln_decimator_t *d)
 {
     const uint16_t used = d->used;
     uint16_t out = 0;
@@ -307,6 +333,8 @@ static void fold_pairs(kiln_decimator_t *d)
     d->bucket_ms *= 2u;
     d->folds++;
 }
+
+} // namespace
 
 void kiln_decimator_push(kiln_decimator_t *d, const kiln_log_sample_t *s)
 {

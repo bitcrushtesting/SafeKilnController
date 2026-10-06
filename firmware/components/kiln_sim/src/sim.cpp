@@ -41,22 +41,26 @@ void kiln_sim_cfg_defaults(kiln_sim_cfg_t *cfg)
     *cfg = d;
 }
 
+namespace {
+
 /* xorshift32: deterministic, seeded, and adequate for sensor noise (TR-12). */
-static uint32_t rng_next(kiln_sim_t *s)
+uint32_t rng_next(kiln_sim_t *s)
 {
     uint32_t x = (s->rng != 0u) ? s->rng : 0x9E3779B9u;
-    x ^= x << 13;
-    x ^= x >> 17;
-    x ^= x << 5;
+    x ^= x << 13u;
+    x ^= x >> 17u;
+    x ^= x << 5u;
     s->rng = x;
     return x;
 }
 
 /* Uniform in [-1, 1]. */
-static float rng_sym(kiln_sim_t *s)
+float rng_sym(kiln_sim_t *s)
 {
     return (float)((double)rng_next(s) / 2147483647.5 - 1.0);
 }
+
+} // namespace
 
 void kiln_sim_init(kiln_sim_t *s, const kiln_sim_cfg_t *cfg)
 {
@@ -116,8 +120,10 @@ void kiln_sim_set_temperature(kiln_sim_t *s, float kiln_c)
 
 /* --- electrical model --------------------------------------------------- */
 
+namespace {
+
 /* The fraction of the elements still drawing current. */
-static float element_fraction(const kiln_sim_t *s)
+float element_fraction(const kiln_sim_t *s)
 {
     if ((s->inject & KILN_INJ_ELEMENT_OPEN) != 0u) {
         return 0.0f;
@@ -133,7 +139,7 @@ static float element_fraction(const kiln_sim_t *s)
 
 /* Is current actually flowing right now?  Three things in series, which is the
  * same series the safety argument of architecture section 8.1 rests on. */
-static bool conducting(const kiln_sim_t *s)
+bool conducting(const kiln_sim_t *s)
 {
     bool ssr = false;
     for (uint8_t c = 0; c < KILN_HEAT_CHANNELS; c++) {
@@ -154,7 +160,7 @@ static bool conducting(const kiln_sim_t *s)
     return ssr && s->contactor_closed;
 }
 
-static float current_now(const kiln_sim_t *s)
+float current_now(const kiln_sim_t *s)
 {
     if (!conducting(s)) {
         return s->cfg.leakage_a;
@@ -174,7 +180,7 @@ static float current_now(const kiln_sim_t *s)
 /* The electrical power actually reaching the elements, as a fraction of full.
  * Current and heat come from the same place, so an injected element failure
  * cannot show up in one channel and not the other. */
-static float heat_fraction(const kiln_sim_t *s)
+float heat_fraction(const kiln_sim_t *s)
 {
     if (!s->contactor_closed) {
         return 0.0f;
@@ -198,6 +204,8 @@ static float heat_fraction(const kiln_sim_t *s)
 
     return duty * element_fraction(s);
 }
+
+} // namespace
 
 /* --- plant ------------------------------------------------------------- */
 
@@ -319,7 +327,9 @@ void kiln_sim_step(kiln_sim_t *s, float dt_s)
             if (v > 4095.0f) {
                 v = 4095.0f;
             }
-            s->burst_buf[i] = (uint16_t)(v + 0.5f);
+            /* Clamped to [0, 4095] just above; lroundf() so the rounding does
+             * not depend on that staying true. */
+            s->burst_buf[i] = (uint16_t)lroundf(v);
         }
         s->burst_armed = false;
         s->burst_due_s = 0.0;
@@ -328,13 +338,15 @@ void kiln_sim_step(kiln_sim_t *s, float dt_s)
 
 /* --- port_tc ----------------------------------------------------------- */
 
-static kiln_err_t sim_tc_configure(void *ctx, kiln_tc_type_t type, uint8_t filter_hz)
+namespace {
+
+kiln_err_t sim_tc_configure(void *ctx, kiln_tc_type_t type, uint8_t filter_hz)
 {
     (void)ctx; (void)type; (void)filter_hz;
     return KILN_OK;
 }
 
-static uint16_t sim_tc_faults(const kiln_sim_t *s)
+uint16_t sim_tc_faults(const kiln_sim_t *s)
 {
     uint16_t bits = 0;
     if ((s->inject & KILN_INJ_TC_OPEN) != 0u) {
@@ -352,9 +364,9 @@ static uint16_t sim_tc_faults(const kiln_sim_t *s)
     return bits;
 }
 
-static kiln_err_t sim_tc_read(void *ctx, kiln_tc_reading_t *out)
+kiln_err_t sim_tc_read(void *ctx, kiln_tc_reading_t *out)
 {
-    kiln_sim_t *s = (kiln_sim_t *)ctx;
+    const kiln_sim_t *s = static_cast<const kiln_sim_t *>(ctx);
     if ((s == nullptr) || (out == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -369,9 +381,9 @@ static kiln_err_t sim_tc_read(void *ctx, kiln_tc_reading_t *out)
     return KILN_OK;
 }
 
-static kiln_err_t sim_case_read(void *ctx, kiln_tc_reading_t *out)
+kiln_err_t sim_case_read(void *ctx, kiln_tc_reading_t *out)
 {
-    kiln_sim_t *s = (kiln_sim_t *)ctx;
+    const kiln_sim_t *s = static_cast<const kiln_sim_t *>(ctx);
     if ((s == nullptr) || (out == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -384,11 +396,11 @@ static kiln_err_t sim_case_read(void *ctx, kiln_tc_reading_t *out)
 
 /* --- port_heat --------------------------------------------------------- */
 
-static uint8_t sim_heat_channels(void *ctx) { (void)ctx; return KILN_HEAT_CHANNELS; }
+uint8_t sim_heat_channels(void *ctx) { (void)ctx; return KILN_HEAT_CHANNELS; }
 
-static void sim_heat_set_duty(void *ctx, uint8_t channel, uint16_t permille)
+void sim_heat_set_duty(void *ctx, uint8_t channel, uint16_t permille)
 {
-    kiln_sim_t *s = (kiln_sim_t *)ctx;
+    kiln_sim_t *s = static_cast<kiln_sim_t *>(ctx);
     if ((s == nullptr) || channel >= KILN_HEAT_CHANNELS) {
         return;
     }
@@ -397,9 +409,9 @@ static void sim_heat_set_duty(void *ctx, uint8_t channel, uint16_t permille)
     s->duty_permille[channel] = s->forced_off ? 0u : d;
 }
 
-static void sim_heat_enable_refresh(void *ctx)
+void sim_heat_enable_refresh(void *ctx)
 {
-    kiln_sim_t *s = (kiln_sim_t *)ctx;
+    kiln_sim_t *s = static_cast<kiln_sim_t *>(ctx);
     if (s == nullptr) {
         return;
     }
@@ -410,9 +422,9 @@ static void sim_heat_enable_refresh(void *ctx)
     s->forced_off   = false;
 }
 
-static void sim_heat_drop_contactor(void *ctx)
+void sim_heat_drop_contactor(void *ctx)
 {
-    kiln_sim_t *s = (kiln_sim_t *)ctx;
+    kiln_sim_t *s = static_cast<kiln_sim_t *>(ctx);
     if (s == nullptr) {
         return;
     }
@@ -423,9 +435,9 @@ static void sim_heat_drop_contactor(void *ctx)
     }
 }
 
-static void sim_heat_force_off(void *ctx)
+void sim_heat_force_off(void *ctx)
 {
-    kiln_sim_t *s = (kiln_sim_t *)ctx;
+    kiln_sim_t *s = static_cast<kiln_sim_t *>(ctx);
     if (s == nullptr) {
         return;
     }
@@ -438,9 +450,9 @@ static void sim_heat_force_off(void *ctx)
     sim_heat_drop_contactor(ctx);
 }
 
-static bool sim_heat_is_off(void *ctx)
+bool sim_heat_is_off(void *ctx)
 {
-    kiln_sim_t *s = (kiln_sim_t *)ctx;
+    const kiln_sim_t *s = static_cast<const kiln_sim_t *>(ctx);
     if (s == nullptr) {
         return true;
     }
@@ -452,19 +464,21 @@ static bool sim_heat_is_off(void *ctx)
     return true;
 }
 
-static void sim_heat_set_level(void *ctx, uint8_t channel, bool on)
+void sim_heat_set_level(void *ctx, uint8_t channel, bool on)
 {
-    kiln_sim_set_ssr((kiln_sim_t *)ctx, channel, on);
+    kiln_sim_set_ssr(static_cast<kiln_sim_t *>(ctx), channel, on);
 }
 
-static uint32_t sim_heat_switch_count(void *ctx, uint8_t channel)
+uint32_t sim_heat_switch_count(void *ctx, uint8_t channel)
 {
-    kiln_sim_t *s = (kiln_sim_t *)ctx;
+    const kiln_sim_t *s = static_cast<const kiln_sim_t *>(ctx);
     if ((s == nullptr) || channel >= KILN_HEAT_CHANNELS) {
         return 0;
     }
     return s->switch_count[channel];
 }
+
+} // namespace
 
 /* The SSR pin level, published by whoever owns the window tick. */
 void kiln_sim_set_ssr(kiln_sim_t *s, uint8_t channel, bool on)
@@ -481,11 +495,13 @@ void kiln_sim_set_ssr(kiln_sim_t *s, uint8_t channel, bool on)
 
 /* --- port_current ------------------------------------------------------ */
 
-static uint8_t sim_cur_channels(void *ctx) { (void)ctx; return 1u; }
+namespace {
 
-static kiln_err_t sim_cur_configure(void *ctx, uint8_t channel, uint32_t rate_hz)
+uint8_t sim_cur_channels(void *ctx) { (void)ctx; return 1u; }
+
+kiln_err_t sim_cur_configure(void *ctx, uint8_t channel, uint32_t rate_hz)
 {
-    kiln_sim_t *s = (kiln_sim_t *)ctx;
+    kiln_sim_t *s = static_cast<kiln_sim_t *>(ctx);
     if ((s == nullptr) || channel != 0) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -496,10 +512,10 @@ static kiln_err_t sim_cur_configure(void *ctx, uint8_t channel, uint32_t rate_hz
     return KILN_OK;
 }
 
-static kiln_err_t sim_cur_start(void *ctx, uint8_t channel,
+kiln_err_t sim_cur_start(void *ctx, uint8_t channel,
                                 kiln_cur_window_t window, uint16_t n)
 {
-    kiln_sim_t *s = (kiln_sim_t *)ctx;
+    kiln_sim_t *s = static_cast<kiln_sim_t *>(ctx);
     if ((s == nullptr) || channel != 0 || n == 0) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -514,9 +530,9 @@ static kiln_err_t sim_cur_start(void *ctx, uint8_t channel,
     return KILN_OK;
 }
 
-static kiln_err_t sim_cur_read(void *ctx, uint8_t channel, kiln_cur_burst_t *out)
+kiln_err_t sim_cur_read(void *ctx, uint8_t channel, kiln_cur_burst_t *out)
 {
-    kiln_sim_t *s = (kiln_sim_t *)ctx;
+    kiln_sim_t *s = static_cast<kiln_sim_t *>(ctx);
     if ((s == nullptr) || channel != 0 || (out == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -538,9 +554,9 @@ static kiln_err_t sim_cur_read(void *ctx, uint8_t channel, kiln_cur_burst_t *out
     return KILN_OK;
 }
 
-static void sim_cur_abort(void *ctx, uint8_t channel)
+void sim_cur_abort(void *ctx, uint8_t channel)
 {
-    kiln_sim_t *s = (kiln_sim_t *)ctx;
+    kiln_sim_t *s = static_cast<kiln_sim_t *>(ctx);
     if ((s == nullptr) || channel != 0) {
         return;
     }
@@ -548,9 +564,9 @@ static void sim_cur_abort(void *ctx, uint8_t channel)
     s->burst_n     = 0;
 }
 
-static bool sim_cur_present(void *ctx, uint8_t channel)
+bool sim_cur_present(void *ctx, uint8_t channel)
 {
-    kiln_sim_t *s = (kiln_sim_t *)ctx;
+    const kiln_sim_t *s = static_cast<const kiln_sim_t *>(ctx);
     if ((s == nullptr) || channel != 0) {
         return false;
     }
@@ -559,9 +575,9 @@ static bool sim_cur_present(void *ctx, uint8_t channel)
 
 /* --- port_counters ----------------------------------------------------- */
 
-static kiln_err_t sim_ctr_load(void *ctx, kiln_switch_counters_t *out)
+kiln_err_t sim_ctr_load(void *ctx, kiln_switch_counters_t *out)
 {
-    kiln_sim_t *s = (kiln_sim_t *)ctx;
+    const kiln_sim_t *s = static_cast<const kiln_sim_t *>(ctx);
     if ((s == nullptr) || (out == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -569,33 +585,35 @@ static kiln_err_t sim_ctr_load(void *ctx, kiln_switch_counters_t *out)
     return KILN_OK;
 }
 
-static void sim_ctr_add_contactor(void *ctx, uint32_t n)
+void sim_ctr_add_contactor(void *ctx, uint32_t n)
 {
-    kiln_sim_t *s = (kiln_sim_t *)ctx;
+    kiln_sim_t *s = static_cast<kiln_sim_t *>(ctx);
     if (s != nullptr) {
         s->counters.contactor_ops += n;
     }
 }
 
-static void sim_ctr_add_ssr(void *ctx, uint8_t channel, uint32_t n)
+void sim_ctr_add_ssr(void *ctx, uint8_t channel, uint32_t n)
 {
-    kiln_sim_t *s = (kiln_sim_t *)ctx;
+    kiln_sim_t *s = static_cast<kiln_sim_t *>(ctx);
     if ((s != nullptr) && channel < KILN_HEAT_CHANNELS) {
         s->counters.ssr_ops[channel] += n;
     }
 }
 
-static kiln_err_t sim_ctr_flush(void *ctx) { (void)ctx; return KILN_OK; }
+kiln_err_t sim_ctr_flush(void *ctx) { (void)ctx; return KILN_OK; }
 
-static kiln_err_t sim_ctr_reset(void *ctx, const kiln_switch_counters_t *to)
+kiln_err_t sim_ctr_reset(void *ctx, const kiln_switch_counters_t *to)
 {
-    kiln_sim_t *s = (kiln_sim_t *)ctx;
+    kiln_sim_t *s = static_cast<kiln_sim_t *>(ctx);
     if ((s == nullptr) || (to == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
     s->counters = *to;
     return KILN_OK;
 }
+
+} // namespace
 
 /* --- RAM file store ---------------------------------------------------- */
 
@@ -606,9 +624,11 @@ void kiln_sim_fs_init(kiln_sim_fs_t *fs)
     }
 }
 
-static int sfs_find(kiln_sim_fs_t *fs, const char *path)
+namespace {
+
+int sfs_find(kiln_sim_fs_t *fs, const char *path)
 {
-    for (int i = 0; i < KILN_SIM_FS_FILES; i++) {
+    for (int i = 0; i < (int)KILN_SIM_FS_FILES; i++) {
         if (fs->files[i].used && strcmp(fs->files[i].path, path) == 0) {
             return i;
         }
@@ -616,10 +636,10 @@ static int sfs_find(kiln_sim_fs_t *fs, const char *path)
     return -1;
 }
 
-static kiln_err_t sfs_read(void *ctx, const char *path, void *out,
+kiln_err_t sfs_read(void *ctx, const char *path, void *out,
                            size_t cap, size_t *len)
 {
-    kiln_sim_fs_t *fs = (kiln_sim_fs_t *)ctx;
+    kiln_sim_fs_t *fs = static_cast<kiln_sim_fs_t *>(ctx);
     if ((fs == nullptr) || (path == nullptr) || (out == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -639,9 +659,9 @@ static kiln_err_t sfs_read(void *ctx, const char *path, void *out,
     return KILN_OK;
 }
 
-static kiln_err_t sfs_write(void *ctx, const char *path, const void *data, size_t len)
+kiln_err_t sfs_write(void *ctx, const char *path, const void *data, size_t len)
 {
-    kiln_sim_fs_t *fs = (kiln_sim_fs_t *)ctx;
+    kiln_sim_fs_t *fs = static_cast<kiln_sim_fs_t *>(ctx);
     if ((fs == nullptr) || (path == nullptr) || (data == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -654,23 +674,26 @@ static kiln_err_t sfs_write(void *ctx, const char *path, const void *data, size_
 
     int i = sfs_find(fs, path);
     if (i < 0) {
-        for (int k = 0; k < KILN_SIM_FS_FILES; k++) {
+        for (int k = 0; k < (int)KILN_SIM_FS_FILES; k++) {
             if (!fs->files[k].used) { i = k; break; }
         }
         if (i < 0) {
             return KILN_ERR_NO_SPACE;
         }
         fs->files[i].used = true;
-        snprintf(fs->files[i].path, sizeof(fs->files[i].path), "%s", path);
+        /* The strlen(path) >= KILN_PATH_MAX guard above already rejected
+         * anything that would truncate, so the copy cannot lose characters --
+         * a truncated path here would alias two files. */
+        (void)snprintf(fs->files[i].path, sizeof(fs->files[i].path), "%s", path);
     }
     memcpy(fs->files[i].data, data, len);
     fs->files[i].len = (uint16_t)len;
     return KILN_OK;
 }
 
-static kiln_err_t sfs_remove(void *ctx, const char *path)
+kiln_err_t sfs_remove(void *ctx, const char *path)
 {
-    kiln_sim_fs_t *fs = (kiln_sim_fs_t *)ctx;
+    kiln_sim_fs_t *fs = static_cast<kiln_sim_fs_t *>(ctx);
     if ((fs == nullptr) || (path == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -683,26 +706,26 @@ static kiln_err_t sfs_remove(void *ctx, const char *path)
     return KILN_OK;
 }
 
-static kiln_err_t sfs_exists(void *ctx, const char *path)
+kiln_err_t sfs_exists(void *ctx, const char *path)
 {
-    kiln_sim_fs_t *fs = (kiln_sim_fs_t *)ctx;
+    kiln_sim_fs_t *fs = static_cast<kiln_sim_fs_t *>(ctx);
     if ((fs == nullptr) || (path == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
     return sfs_find(fs, path) >= 0 ? KILN_OK : KILN_ERR_NOT_FOUND;
 }
 
-static kiln_err_t sfs_list(void *ctx, const char *dir,
+kiln_err_t sfs_list(void *ctx, const char *dir,
                            bool (*fn)(void *user, const char *name, size_t size),
                            void *user)
 {
-    kiln_sim_fs_t *fs = (kiln_sim_fs_t *)ctx;
+    kiln_sim_fs_t *fs = static_cast<kiln_sim_fs_t *>(ctx);
     if ((fs == nullptr) || (dir == nullptr) || (fn == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
 
     const size_t dlen = strlen(dir);
-    for (int i = 0; i < KILN_SIM_FS_FILES; i++) {
+    for (size_t i = 0; i < KILN_SIM_FS_FILES; i++) {
         if (!fs->files[i].used) {
             continue;
         }
@@ -716,15 +739,15 @@ static kiln_err_t sfs_list(void *ctx, const char *dir,
     return KILN_OK;
 }
 
-static kiln_err_t sfs_usage(void *ctx, size_t *total, size_t *used)
+kiln_err_t sfs_usage(void *ctx, size_t *total, size_t *used)
 {
-    kiln_sim_fs_t *fs = (kiln_sim_fs_t *)ctx;
+    const kiln_sim_fs_t *fs = static_cast<const kiln_sim_fs_t *>(ctx);
     if (fs == nullptr) {
         return KILN_ERR_INVALID_ARG;
     }
 
     size_t u = 0;
-    for (int i = 0; i < KILN_SIM_FS_FILES; i++) {
+    for (size_t i = 0; i < KILN_SIM_FS_FILES; i++) {
         if (fs->files[i].used) {
             u += fs->files[i].len;
         }
@@ -737,6 +760,8 @@ static kiln_err_t sfs_usage(void *ctx, size_t *total, size_t *used)
     }
     return KILN_OK;
 }
+
+} // namespace
 
 void kiln_sim_fs_bind(kiln_sim_fs_t *fs, kiln_port_filestore_t *out)
 {
@@ -755,21 +780,25 @@ void kiln_sim_fs_bind(kiln_sim_fs_t *fs, kiln_port_filestore_t *out)
 
 /* --- binding ----------------------------------------------------------- */
 
+namespace {
+
 /* SR-31.  Reports open for the switch injection, and -- because this is what
  * the hardware would do -- also while the port is "absent", since port_door.h
  * requires an adapter that cannot read the pin to report open rather than
  * closed. */
-static bool sim_door_is_open(void *ctx)
+bool sim_door_is_open(void *ctx)
 {
-    const kiln_sim_t *s = (const kiln_sim_t *)ctx;
+    const kiln_sim_t *s = static_cast<const kiln_sim_t *>(ctx);
     return (s->inject & KILN_INJ_DOOR_SWITCH_OPEN) != 0u;
 }
 
-static bool sim_door_is_present(void *ctx)
+bool sim_door_is_present(void *ctx)
 {
-    const kiln_sim_t *s = (const kiln_sim_t *)ctx;
+    const kiln_sim_t *s = static_cast<const kiln_sim_t *>(ctx);
     return (s->inject & KILN_INJ_DOOR_ABSENT) == 0u;
 }
+
+} // namespace
 
 void kiln_sim_bind(kiln_sim_t *s, kiln_sim_ports_t *out)
 {

@@ -146,7 +146,7 @@ KILN_TEST(exceeding_the_depth_limit_is_an_overflow_not_a_stack_overflow)
     char buf[256];
     kiln_json_t j;
     kiln_json_init(&j, buf, sizeof(buf));
-    for (int i = 0; i < KILN_JSON_MAX_DEPTH + 4; i++) {
+    for (size_t i = 0; i < KILN_JSON_MAX_DEPTH + 4; i++) {
         kiln_json_arr_open(&j);
     }
     CHECK(!kiln_json_ok(&j));
@@ -154,7 +154,7 @@ KILN_TEST(exceeding_the_depth_limit_is_an_overflow_not_a_stack_overflow)
 
 /* --- reading ----------------------------------------------------------- */
 
-#define TOKS 64
+constexpr size_t TOKS = 64;
 
 KILN_TEST(the_reader_finds_and_converts_members)
 {
@@ -340,7 +340,7 @@ KILN_TEST(the_reader_survives_arbitrary_bytes)
             /* Biased toward structural characters, so the parser's state machine
              * is actually exercised rather than rejecting on byte one. */
             static const char alphabet[] = "{}[]\",:0123456789.truefalsn \\ux-+e";
-            js[i] = alphabet[(rng >> 16) % (sizeof(alphabet) - 1u)];
+            js[i] = alphabet[(rng >> 16u) % (sizeof(alphabet) - 1u)];
         }
         js[len] = '\0';
 

@@ -35,13 +35,19 @@
 
 #include "kiln_hal/hal_esp32s3.h"
 
-static const char *TAG = "hal_net";
+namespace {
+
+const char *TAG = "hal_net";
+
+} // namespace
 
 /* FR-NET-03: 1 s doubling to 60 s.  The cap matters more than the curve: a
  * kiln may fire for a week, and a device that kept trying every second for
  * that long would spend real power on it. */
-#define RETRY_MIN_MS    1000u
-#define RETRY_MAX_MS   60000u
+constexpr uint32_t RETRY_MIN_MS = 1000u;
+constexpr uint32_t RETRY_MAX_MS = 60000u;
+
+namespace {
 
 typedef struct {
     kiln_net_state_t state;
@@ -62,14 +68,17 @@ typedef struct {
     esp_timer_handle_t retry_timer;
 } net_t;
 
-static net_t s_net;
+net_t s_net;
 
 /* The configuration strings are longer than the fields WiFi gives them, so a
  * plain copy can truncate.  Truncation here is not cosmetic: an SSID cut at 32
  * characters simply never associates, and the operator is left looking at a
  * kiln that will not join a network it can see.  Refusing and saying so is the
  * only useful behaviour. */
-static bool copy_checked(char *dst, size_t cap, const char *src, const char *what)
+/* dst is void *, not char *: the fields this fills are wifi_config_t's uint8_t
+ * SSID and passphrase arrays, and taking them as void * means the callers need
+ * no cast at all -- memcpy below wants void * regardless. */
+bool copy_checked(void *dst, size_t cap, const char *src, const char *what)
 {
     const size_t n = strlen(src);
     if (n >= cap) {
@@ -86,14 +95,14 @@ static bool copy_checked(char *dst, size_t cap, const char *src, const char *wha
 /* FR-NET-05: at least eight characters, device-unique, derived from the MAC so
  * it can be printed on the display and on a label rather than being a shared
  * secret every KilnControl in the world has. */
-static void default_ap_pass(char *out, size_t n)
+void default_ap_pass(char *out, size_t n)
 {
     uint8_t mac[6] = {};
     (void)esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP);
     (void)snprintf(out, n, "kiln%02X%02X%02X", mac[3], mac[4], mac[5]);
 }
 
-static void start_ap(const kiln_config_t *cfg)
+void start_ap(const kiln_config_t *cfg)
 {
     if (s_net.ap_started) {
         return;
@@ -105,16 +114,16 @@ static void start_ap(const kiln_config_t *cfg)
      * NOLINTNEXTLINE(bugprone-invalid-enum-default-initialization) */
     wifi_config_t ap = {};
     const char *ssid = (cfg->ap_ssid[0] != '\0') ? cfg->ap_ssid : "kilncontrol";
-    if (!copy_checked((char *)ap.ap.ssid, sizeof(ap.ap.ssid), ssid, "net.ap_ssid")) {
+    if (!copy_checked(ap.ap.ssid, sizeof(ap.ap.ssid), ssid, "net.ap_ssid")) {
         ssid = "kilncontrol";
-        (void)copy_checked((char *)ap.ap.ssid, sizeof(ap.ap.ssid), ssid, "fallback");
+        (void)copy_checked(ap.ap.ssid, sizeof(ap.ap.ssid), ssid, "fallback");
     }
-    ap.ap.ssid_len       = (uint8_t)strlen((const char *)ap.ap.ssid);
+    ap.ap.ssid_len       = (uint8_t)strlen(ssid); /* just copied from here */
     ap.ap.max_connection = 4;
     ap.ap.channel        = 1;
 
     if (cfg->ap_pass[0] != '\0' && strlen(cfg->ap_pass) >= 8u &&
-        copy_checked((char *)ap.ap.password, sizeof(ap.ap.password), cfg->ap_pass,
+        copy_checked(ap.ap.password, sizeof(ap.ap.password), cfg->ap_pass,
                      "net.ap_pass")) {
         ap.ap.authmode = WIFI_AUTH_WPA2_PSK;
     } else {
@@ -123,7 +132,7 @@ static void start_ap(const kiln_config_t *cfg)
          * "the installer did not set one" is not a reason to do that. */
         char gen[16];
         default_ap_pass(gen, sizeof(gen));
-        (void)copy_checked((char *)ap.ap.password, sizeof(ap.ap.password), gen, "default");
+        (void)copy_checked(ap.ap.password, sizeof(ap.ap.password), gen, "default");
         ap.ap.authmode = WIFI_AUTH_WPA2_PSK;
         ESP_LOGW(TAG, "no AP passphrase configured; using the device default '%s'", gen);
     }
@@ -139,7 +148,7 @@ static void start_ap(const kiln_config_t *cfg)
 
 /* --- events ------------------------------------------------------------- */
 
-static void retry_now(void *arg)
+void retry_now(void *arg)
 {
     (void)arg;
     if (s_net.state != KILN_NET_STA_CONNECTED) {
@@ -147,9 +156,9 @@ static void retry_now(void *arg)
     }
 }
 
-static void on_wifi(void *arg, esp_event_base_t base, int32_t id, void *data)
+void on_wifi(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
-    const kiln_config_t *cfg = (const kiln_config_t *)arg;
+    const kiln_config_t *cfg = static_cast<const kiln_config_t *>(arg);
 
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
         s_net.state            = KILN_NET_CONNECTING;
@@ -160,7 +169,7 @@ static void on_wifi(void *arg, esp_event_base_t base, int32_t id, void *data)
 
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
         const wifi_event_sta_disconnected_t *d =
-            (const wifi_event_sta_disconnected_t *)data;
+            static_cast<const wifi_event_sta_disconnected_t *>(data);
         s_net.last_reason = (d != nullptr) ? (uint8_t)d->reason : 0u;
         if (s_net.state == KILN_NET_STA_CONNECTED) {
             s_net.disconnects++;        /* FR-NET-09 */
@@ -187,18 +196,20 @@ static void on_wifi(void *arg, esp_event_base_t base, int32_t id, void *data)
     }
 
     if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
-        const ip_event_got_ip_t *e = (const ip_event_got_ip_t *)data;
+        const ip_event_got_ip_t *e = static_cast<const ip_event_got_ip_t *>(data);
         s_net.state       = KILN_NET_STA_CONNECTED;
         s_net.retry_ms    = RETRY_MIN_MS;
         s_net.up_since_us = esp_timer_get_time();
         if (e != nullptr) {
+            /* The cast is inside IDF's own IP2STR(); there is no cast here.
+             * NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast) */
             (void)snprintf(s_net.ip, sizeof(s_net.ip), IPSTR, IP2STR(&e->ip_info.ip));
         }
         ESP_LOGI(TAG, "connected, %s", s_net.ip);
     }
 }
 
-static void on_time_sync(struct timeval *tv)
+void on_time_sync(struct timeval *tv)
 {
     (void)tv;
     /* FR-LOG-12 and warning 105.  Wall time is for timestamps only: every
@@ -210,9 +221,9 @@ static void on_time_sync(struct timeval *tv)
 
 /* --- port_net ----------------------------------------------------------- */
 
-static kiln_err_t net_status(void *ctx, kiln_net_status_t *out)
+kiln_err_t net_status(void *ctx, kiln_net_status_t *out)
 {
-    const net_t *n = (const net_t *)ctx;
+    const net_t *n = static_cast<const net_t *>(ctx);
     if ((n == nullptr) || (out == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -241,6 +252,8 @@ static kiln_err_t net_status(void *ctx, kiln_net_status_t *out)
     return KILN_OK;
 }
 
+} // namespace
+
 kiln_err_t kiln_hal_net_init(const kiln_config_t *cfg, kiln_port_net_t *out)
 {
     if ((cfg == nullptr) || (out == nullptr)) {
@@ -266,7 +279,7 @@ kiln_err_t kiln_hal_net_init(const kiln_config_t *cfg, kiln_port_net_t *out)
     (void)esp_netif_create_default_wifi_sta();
     (void)esp_netif_create_default_wifi_ap();
 
-    wifi_init_config_t ic = WIFI_INIT_CONFIG_DEFAULT();
+    const wifi_init_config_t ic = WIFI_INIT_CONFIG_DEFAULT();
     if (esp_wifi_init(&ic) != ESP_OK) {
         return KILN_ERR_IO;
     }
@@ -289,9 +302,9 @@ kiln_err_t kiln_hal_net_init(const kiln_config_t *cfg, kiln_port_net_t *out)
         /* NOLINTNEXTLINE(bugprone-invalid-enum-default-initialization) */
         wifi_config_t sta = {};
         const bool ok =
-            copy_checked((char *)sta.sta.ssid, sizeof(sta.sta.ssid),
+            copy_checked(sta.sta.ssid, sizeof(sta.sta.ssid),
                          cfg->wifi_ssid, "net.wifi_ssid") &&
-            copy_checked((char *)sta.sta.password, sizeof(sta.sta.password),
+            copy_checked(sta.sta.password, sizeof(sta.sta.password),
                          cfg->wifi_pass, "net.wifi_pass");
         if (ok) {
             (void)esp_wifi_set_mode(WIFI_MODE_STA);

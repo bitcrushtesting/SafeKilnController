@@ -13,11 +13,11 @@
 #include "kiln/err.h"
 #include "kiln/types.h"
 
-#define KILN_LOG_RECORD_BYTES   20   /* AD-18: 20 B since FR-CUR-09 added current */
-#define KILN_LOG_SECTOR_BYTES   4096
-#define KILN_LOG_HEADER_BYTES   16
-#define KILN_LOG_RECS_PER_SECTOR ((KILN_LOG_SECTOR_BYTES - KILN_LOG_HEADER_BYTES) \
-                                  / KILN_LOG_RECORD_BYTES)   /* 204 */
+constexpr size_t KILN_LOG_RECORD_BYTES = 20;  /* AD-18: 20 B since FR-CUR-09 added current */
+constexpr size_t KILN_LOG_SECTOR_BYTES = 4096;
+constexpr size_t KILN_LOG_HEADER_BYTES = 16;
+constexpr size_t KILN_LOG_RECS_PER_SECTOR =
+    (KILN_LOG_SECTOR_BYTES - KILN_LOG_HEADER_BYTES) / KILN_LOG_RECORD_BYTES;  /* 204 */
 
 typedef struct {
     uint32_t sectors_total;

@@ -42,7 +42,7 @@ static kiln_cur_burst_t make_burst(const kiln_current_cfg_t *c, float rms_a,
         if (v > 4095.0) {
             v = 4095.0;
         }
-        g_samples[i] = (uint16_t)(v + 0.5);
+        g_samples[i] = (uint16_t)lround(v);
     }
 
     kiln_cur_burst_t b = {};
@@ -81,7 +81,7 @@ KILN_TEST(frcur02_measures_rms_to_the_required_accuracy)
         const uint16_t n = arm(&ch, KILN_CUR_WINDOW_ON);
         CHECK(n > 0);
 
-        kiln_cur_burst_t b = make_burst(&cc, wanted[i], KILN_CUR_WINDOW_ON, n);
+        const kiln_cur_burst_t b = make_burst(&cc, wanted[i], KILN_CUR_WINDOW_ON, n);
         CHECK_OK(kiln_current_push_burst(&ch, &b));
 
         /* FR-CUR-02: +/-3 % of reading or +/-0.3 A, whichever is greater. */
@@ -108,7 +108,7 @@ KILN_TEST(frcur03_result_is_independent_of_sampling_phase)
         for (uint16_t i = 0; i < n; i++) {
             const double phase = 2.0 * PI * cc.mains_hz *
                                  ((double)(i + shift * 7) / (double)cc.sample_rate_hz);
-            g_samples[i] = (uint16_t)(2048.0 + peak * sin(phase) + 0.5);
+            g_samples[i] = (uint16_t)lround(2048.0 + peak * sin(phase));
         }
         kiln_cur_burst_t b = {};
         b.samples = g_samples; b.count = n;
@@ -193,7 +193,7 @@ KILN_TEST(a_burst_from_the_wrong_window_is_rejected)
     CHECK_OK(kiln_current_init(&c, &cc));
 
     const uint16_t n = arm(&c, KILN_CUR_WINDOW_ON);
-    kiln_cur_burst_t b = make_burst(&cc, 25.0f, KILN_CUR_WINDOW_OFF, n);
+    const kiln_cur_burst_t b = make_burst(&cc, 25.0f, KILN_CUR_WINDOW_OFF, n);
     CHECK_ERR(kiln_current_push_burst(&c, &b), KILN_ERR_STATE);
 }
 
@@ -203,7 +203,7 @@ KILN_TEST(an_unrequested_burst_is_rejected)
     kiln_current_t c;
     CHECK_OK(kiln_current_init(&c, &cc));
 
-    kiln_cur_burst_t b = make_burst(&cc, 25.0f, KILN_CUR_WINDOW_ON, 160);
+    const kiln_cur_burst_t b = make_burst(&cc, 25.0f, KILN_CUR_WINDOW_ON, 160);
     CHECK_ERR(kiln_current_push_burst(&c, &b), KILN_ERR_STATE);
 }
 
@@ -222,7 +222,7 @@ KILN_TEST(an_unbounded_off_window_is_remeasured_so_sr25_keeps_its_evidence)
         const kiln_cur_action_t a =
             kiln_current_tick(&c, KILN_CUR_WINDOW_OFF, 60000u, 10u, &n);
         if (a == KILN_CUR_ACT_START_BURST) {
-            kiln_cur_burst_t b = make_burst(&cc, 0.0f, KILN_CUR_WINDOW_OFF, n);
+            const kiln_cur_burst_t b = make_burst(&cc, 0.0f, KILN_CUR_WINDOW_OFF, n);
             CHECK_OK(kiln_current_push_burst(&c, &b));
             measurements++;
         }
@@ -240,7 +240,7 @@ KILN_TEST(frcur06_one_point_calibration_makes_the_reading_match_the_meter)
     CHECK_OK(kiln_current_init(&c, &cc));
 
     const uint16_t n = arm(&c, KILN_CUR_WINDOW_ON);
-    kiln_cur_burst_t b = make_burst(&cc, 20.0f, KILN_CUR_WINDOW_ON, n);
+    const kiln_cur_burst_t b = make_burst(&cc, 20.0f, KILN_CUR_WINDOW_ON, n);
     CHECK_OK(kiln_current_push_burst(&c, &b));
 
     /* The reference meter says 22.0 A. */
@@ -249,7 +249,7 @@ KILN_TEST(frcur06_one_point_calibration_makes_the_reading_match_the_meter)
 
     /* And the next measurement of the same primary current reads the new figure. */
     (void)arm(&c, KILN_CUR_WINDOW_ON);
-    kiln_cur_burst_t b2 = make_burst(&cc, 20.0f, KILN_CUR_WINDOW_ON, n);
+    const kiln_cur_burst_t b2 = make_burst(&cc, 20.0f, KILN_CUR_WINDOW_ON, n);
     CHECK_OK(kiln_current_push_burst(&c, &b2));
     CHECK_NEAR(kiln_current_amps(&c), 22.0f, 0.7f);
 }
@@ -265,7 +265,7 @@ KILN_TEST(frcur06_refuses_to_calibrate_against_a_measurement_that_is_not_one)
 
     /* A leakage window is not a load. */
     const uint16_t n = arm(&c, KILN_CUR_WINDOW_OFF);
-    kiln_cur_burst_t b = make_burst(&cc, 0.3f, KILN_CUR_WINDOW_OFF, n);
+    const kiln_cur_burst_t b = make_burst(&cc, 0.3f, KILN_CUR_WINDOW_OFF, n);
     CHECK_OK(kiln_current_push_burst(&c, &b));
     CHECK_ERR(kiln_current_calibrate(&c, 20.0f), KILN_ERR_STATE);
 
@@ -280,7 +280,7 @@ KILN_TEST(frcur06_refuses_a_calibration_gain_outside_its_range)
     CHECK_OK(kiln_current_init(&c, &cc));
 
     const uint16_t n = arm(&c, KILN_CUR_WINDOW_ON);
-    kiln_cur_burst_t b = make_burst(&cc, 20.0f, KILN_CUR_WINDOW_ON, n);
+    const kiln_cur_burst_t b = make_burst(&cc, 20.0f, KILN_CUR_WINDOW_ON, n);
     CHECK_OK(kiln_current_push_burst(&c, &b));
 
     /* A meter reading 5x the measurement means the front end is wrong, not the
@@ -300,11 +300,11 @@ KILN_TEST(frcur08_learns_the_reference_from_cold_full_power_windows)
     kiln_current_note_plant(&c, 60.0f, KILN_DUTY_MAX, 1.0f);
 
     CHECK(!kiln_current_ref_valid(&c));
-    for (int i = 0; i < KILN_CUR_REF_SAMPLES; i++) {
+    for (size_t i = 0; i < KILN_CUR_REF_SAMPLES; i++) {
         const uint16_t n = arm(&c, KILN_CUR_WINDOW_ON);
         /* A spread around 30 A, including one outlier that a mean would feel. */
         const float a = (i == 3) ? 12.0f : 30.0f + (float)(i % 3) * 0.2f;
-        kiln_cur_burst_t b = make_burst(&cc, a, KILN_CUR_WINDOW_ON, n);
+        const kiln_cur_burst_t b = make_burst(&cc, a, KILN_CUR_WINDOW_ON, n);
         CHECK_OK(kiln_current_push_burst(&c, &b));
     }
     CHECK(kiln_current_ref_valid(&c));
@@ -321,9 +321,9 @@ KILN_TEST(frcur08_does_not_learn_a_reference_from_a_hot_or_partial_window)
 
     /* Hot: the temperature coefficient would bake itself into the baseline. */
     kiln_current_note_plant(&c, 900.0f, KILN_DUTY_MAX, 1.0f);
-    for (int i = 0; i < KILN_CUR_REF_SAMPLES + 2; i++) {
+    for (size_t i = 0; i < KILN_CUR_REF_SAMPLES + 2; i++) {
         const uint16_t n = arm(&c, KILN_CUR_WINDOW_ON);
-        kiln_cur_burst_t b = make_burst(&cc, 25.0f, KILN_CUR_WINDOW_ON, n);
+        const kiln_cur_burst_t b = make_burst(&cc, 25.0f, KILN_CUR_WINDOW_ON, n);
         CHECK_OK(kiln_current_push_burst(&c, &b));
     }
     CHECK(!kiln_current_ref_valid(&c));
@@ -331,9 +331,9 @@ KILN_TEST(frcur08_does_not_learn_a_reference_from_a_hot_or_partial_window)
     /* Not fully on: a partial window measures a different thing. */
     kiln_current_begin_run(&c);
     kiln_current_note_plant(&c, 50.0f, 500, 1.0f);
-    for (int i = 0; i < KILN_CUR_REF_SAMPLES + 2; i++) {
+    for (size_t i = 0; i < KILN_CUR_REF_SAMPLES + 2; i++) {
         const uint16_t n = arm(&c, KILN_CUR_WINDOW_ON);
-        kiln_cur_burst_t b = make_burst(&cc, 25.0f, KILN_CUR_WINDOW_ON, n);
+        const kiln_cur_burst_t b = make_burst(&cc, 25.0f, KILN_CUR_WINDOW_ON, n);
         CHECK_OK(kiln_current_push_burst(&c, &b));
     }
     CHECK(!kiln_current_ref_valid(&c));
@@ -351,9 +351,9 @@ KILN_TEST(sr28_deviation_corrects_for_the_element_temperature_coefficient)
 
     /* Learn 30 A cold. */
     kiln_current_note_plant(&c, 50.0f, KILN_DUTY_MAX, 1.0f);
-    for (int i = 0; i < KILN_CUR_REF_SAMPLES; i++) {
+    for (size_t i = 0; i < KILN_CUR_REF_SAMPLES; i++) {
         const uint16_t n = arm(&c, KILN_CUR_WINDOW_ON);
-        kiln_cur_burst_t b = make_burst(&cc, 30.0f, KILN_CUR_WINDOW_ON, n);
+        const kiln_cur_burst_t b = make_burst(&cc, 30.0f, KILN_CUR_WINDOW_ON, n);
         CHECK_OK(kiln_current_push_burst(&c, &b));
     }
     CHECK(kiln_current_ref_valid(&c));
@@ -364,7 +364,7 @@ KILN_TEST(sr28_deviation_corrects_for_the_element_temperature_coefficient)
      * firing that got hot. */
     kiln_current_note_plant(&c, 1050.0f, KILN_DUTY_MAX, 1.0f);
     const uint16_t n = arm(&c, KILN_CUR_WINDOW_ON);
-    kiln_cur_burst_t b = make_burst(&cc, 20.0f, KILN_CUR_WINDOW_ON, n);
+    const kiln_cur_burst_t b = make_burst(&cc, 20.0f, KILN_CUR_WINDOW_ON, n);
     CHECK_OK(kiln_current_push_burst(&c, &b));
 
     float dev = 99.0f;
@@ -373,7 +373,7 @@ KILN_TEST(sr28_deviation_corrects_for_the_element_temperature_coefficient)
 
     /* Lose a third of the elements at that temperature, and it shows. */
     (void)arm(&c, KILN_CUR_WINDOW_ON);
-    kiln_cur_burst_t b2 = make_burst(&cc, 13.3f, KILN_CUR_WINDOW_ON, n);
+    const kiln_cur_burst_t b2 = make_burst(&cc, 13.3f, KILN_CUR_WINDOW_ON, n);
     CHECK_OK(kiln_current_push_burst(&c, &b2));
     CHECK(kiln_current_deviation(&c, &dev));
     CHECK_NEAR(dev, -1.0f / 3.0f, 0.05f);
@@ -402,7 +402,7 @@ KILN_TEST(frcur07_derives_apparent_power_and_accumulates_energy)
     kiln_current_begin_run(&c);
 
     const uint16_t n = arm(&c, KILN_CUR_WINDOW_ON);
-    kiln_cur_burst_t b = make_burst(&cc, 30.0f, KILN_CUR_WINDOW_ON, n);
+    const kiln_cur_burst_t b = make_burst(&cc, 30.0f, KILN_CUR_WINDOW_ON, n);
     CHECK_OK(kiln_current_push_burst(&c, &b));
 
     /* 30 A at 230 V, resistive load assumed. */
@@ -429,7 +429,7 @@ KILN_TEST(frcur11_absent_transformer_is_distinguished_from_zero_current)
     /* A genuinely zero current still carries the channel's noise floor, and sits
      * on the bias the conditioning holds it at: a real, valid, zero reading. */
     uint16_t n = arm(&c, KILN_CUR_WINDOW_OFF);
-    kiln_cur_burst_t zero = make_burst(&cc, 0.0f, KILN_CUR_WINDOW_OFF, n);
+    const kiln_cur_burst_t zero = make_burst(&cc, 0.0f, KILN_CUR_WINDOW_OFF, n);
     CHECK_OK(kiln_current_push_burst(&c, &zero));
     CHECK(!(kiln_current_flags(&c) & KILN_CURF_CT_FAULT));
     CHECK(kiln_current_flags(&c) & KILN_CURF_LEAKAGE);
@@ -475,7 +475,7 @@ KILN_TEST(frcur12_disabled_monitoring_suppresses_every_measurement)
     CHECK_EQ_UINT(kiln_current_flags(&c), 0u);
     CHECK(!kiln_current_available(&c));
 
-    kiln_cur_burst_t b = make_burst(&cc, 30.0f, KILN_CUR_WINDOW_ON, 160);
+    const kiln_cur_burst_t b = make_burst(&cc, 30.0f, KILN_CUR_WINDOW_ON, 160);
     CHECK_ERR(kiln_current_push_burst(&c, &b), KILN_ERR_STATE);
 }
 
@@ -507,9 +507,9 @@ KILN_TEST(reconfiguring_the_scale_invalidates_the_learned_reference)
     kiln_current_begin_run(&c);
 
     kiln_current_note_plant(&c, 50.0f, KILN_DUTY_MAX, 1.0f);
-    for (int i = 0; i < KILN_CUR_REF_SAMPLES; i++) {
+    for (size_t i = 0; i < KILN_CUR_REF_SAMPLES; i++) {
         const uint16_t n = arm(&c, KILN_CUR_WINDOW_ON);
-        kiln_cur_burst_t b = make_burst(&cc, 30.0f, KILN_CUR_WINDOW_ON, n);
+        const kiln_cur_burst_t b = make_burst(&cc, 30.0f, KILN_CUR_WINDOW_ON, n);
         CHECK_OK(kiln_current_push_burst(&c, &b));
     }
     CHECK(kiln_current_ref_valid(&c));

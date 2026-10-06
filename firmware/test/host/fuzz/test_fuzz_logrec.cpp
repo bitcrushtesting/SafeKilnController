@@ -19,7 +19,7 @@ static uint32_t rng_state = 0x12345678u;
 static uint32_t rng(void)
 {
     uint32_t x = rng_state;
-    x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+    x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u;
     rng_state = x;
     return x;
 }
@@ -29,7 +29,7 @@ KILN_TEST(record_decode_survives_arbitrary_bytes)
     for (int iter = 0; iter < 200000; iter++) {
         uint8_t rec[KILN_LOG_RECORD_BYTES];
         for (size_t i = 0; i < sizeof(rec); i++) {
-            rec[i] = (uint8_t)(rng() >> 13);
+            rec[i] = (uint8_t)(rng() >> 13u);
         }
 
         kiln_log_sample_t out;
@@ -76,7 +76,7 @@ KILN_TEST(record_decode_survives_bytes_near_a_valid_record)
          * post-CRC path gets properly exercised. */
         const int muts = 1 + (int)(rng() % 3u);
         for (int m = 0; m < muts; m++) {
-            rec[rng() % KILN_LOG_RECORD_BYTES] = (uint8_t)(rng() >> 11);
+            rec[rng() % KILN_LOG_RECORD_BYTES] = (uint8_t)(rng() >> 11u);
         }
         if ((rng() & 1u) != 0u) {
             rec[KILN_LOG_RECORD_BYTES - 1] =
@@ -100,12 +100,12 @@ KILN_TEST(header_decode_survives_arbitrary_bytes)
     for (int iter = 0; iter < 200000; iter++) {
         uint8_t buf[KILN_LOG_HEADER_BYTES];
         for (size_t i = 0; i < sizeof(buf); i++) {
-            buf[i] = (uint8_t)(rng() >> 13);
+            buf[i] = (uint8_t)(rng() >> 13u);
         }
         if ((rng() & 1u) != 0u) {
             const uint16_t crc = kiln_crc16(buf, KILN_LOG_HEADER_BYTES - 2);
             buf[14] = (uint8_t)crc;
-            buf[15] = (uint8_t)(crc >> 8);
+            buf[15] = (uint8_t)(crc >> 8u);
         }
 
         kiln_log_sector_hdr_t out;

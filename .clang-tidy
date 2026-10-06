@@ -44,16 +44,20 @@
 #                                dependency (CON-04 vendoring rules).
 #   pro-type-vararg ............ printf-family in diagnostics only.
 #   macro-usage ................ Header guards and SPDX.
-#   macro-to-enum .............. DEFERRED, 585 findings.  Converting the #define
-#                                constants to constexpr is a genuine
-#                                improvement and a genuine API change.
-#                                tasklist F2.
-#   use-enum-class ............. DEFERRED, 90 findings.  Scoped enums would
-#                                break the C-compatible port enums that the HAL
-#                                boundary and the log record format rely on.
-#                                tasklist F3.
-#   enum-size .................. Same boundary: the underlying type of a port
-#                                enum is ABI, and the log record format pins it.
+#   use-enum-class ............. DEFERRED, 31 enums / 223 enumerators / 2 530
+#                                references.  The C-callability half of this
+#                                question is now settled -- nothing outside
+#                                app_main is extern "C", so the port layer is
+#                                C++ only -- but scoping the enumerators
+#                                renames the project's whole vocabulary, which
+#                                the requirements traceability greps for.
+#                                tasklist F3, still a decision rather than a
+#                                task.
+#   enum-size .................. The underlying type of a port enum is ABI, and
+#                                the log record format pins it (section 10.2),
+#                                so it cannot change without a format version
+#                                bump.  Same boundary as optin.performance.
+#                                Padding below.
 #   include-cleaner ............ Fights the layered port headers on purpose:
 #                                it wants every transitive include spelled out,
 #                                which defeats the single-include-per-port
@@ -74,8 +78,11 @@
 #                                9 bytes would invalidate every run record
 #                                already on a device's flash.
 #
-# firmware/test/ has its own .clang-tidy relaxing the checks that only make
-# sense for production code -- a negative test casts 999 to an enum on purpose.
+# Two component profiles narrow this further, each for a stated reason:
+# firmware/test/ (the KILN_TEST macro, and negative tests that cast 999 to an
+# enum on purpose) and firmware/components/kiln_hal_esp32s3/ (findings that
+# live inside ESP-IDF's own macros).  Read those files; neither relaxes
+# anything in firmware/components or firmware/main.
 
 Checks: >
   -*,
@@ -98,31 +105,22 @@ Checks: >
   -cppcoreguidelines-avoid-c-arrays,
   -cppcoreguidelines-avoid-magic-numbers,
   -cppcoreguidelines-init-variables,
-  -cppcoreguidelines-macro-to-enum,
   -cppcoreguidelines-macro-usage,
+  -cppcoreguidelines-use-enum-class,
   -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
   -cppcoreguidelines-pro-bounds-constant-array-index,
   -cppcoreguidelines-pro-bounds-pointer-arithmetic,
   -cppcoreguidelines-pro-type-vararg,
-  -cppcoreguidelines-use-enum-class,
   -cppcoreguidelines-avoid-do-while,
   -clang-analyzer-optin.performance.Padding,
   -misc-include-cleaner,
   -misc-no-recursion,
   -performance-enum-size,
-  -misc-const-correctness,
-  -misc-use-anonymous-namespace,
-  -misc-use-internal-linkage,
   -misc-unused-parameters,
   -misc-redundant-expression,
-  -bugprone-signed-bitwise,
-  -bugprone-incorrect-roundings,
   -bugprone-branch-clone,
-  -bugprone-suspicious-memory-comparison,
   -bugprone-unchecked-string-to-number-conversion,
-  -bugprone-not-null-terminated-result,
   -bugprone-implicit-widening-of-multiplication-result,
-  -cert-err33-c,
   -cert-err34-c,
   -cert-exp42-c,
   -cert-flp37-c,
@@ -131,8 +129,30 @@ Checks: >
   -cppcoreguidelines-avoid-goto,
   -cppcoreguidelines-avoid-non-const-global-variables,
   -cppcoreguidelines-owning-memory,
-  -cppcoreguidelines-pro-type-cstyle-cast,
   -cppcoreguidelines-pro-type-member-init
+
+# ---------------------------------------------------------------------------
+# CHECK OPTIONS
+# ---------------------------------------------------------------------------
+CheckOptions:
+  # const-correctness analyses local variables, not signatures.
+  #
+  # With parameters included it demands `const void *ctx` on every port adapter
+  # that only reads -- and `void *ctx` is the ports-and-adapters boundary AD-01
+  # rests on, the same signature for every slot in a vtable whether that slot
+  # mutates or not.  The check cannot tell a vtable slot from an ordinary
+  # helper, and it also wants `const char **argv` on main(), which is not a
+  # signature main() is allowed to have.
+  #
+  # So signatures are the author's call and locals are the check's.  Locals,
+  # pointees included, are still gated: what a function does with a pointer it
+  # derived itself is exactly what this is useful for.
+  # Note for whoever bumps LLVM_VERSION: this option does not exist before
+  # LLVM 21, and neither does the pointee analysis it governs.  Under the
+  # pinned 20 it is ignored and the check reports values only, so CI is a
+  # subset of what a newer local clang-tidy reports -- the safe direction, but
+  # it does mean a local run can be stricter than the gate.
+  misc-const-correctness.AnalyzeParameters: false
 
 WarningsAsErrors: '*'
 HeaderFilterRegex: 'firmware/(components|host)/.*/include/.*\.h$'

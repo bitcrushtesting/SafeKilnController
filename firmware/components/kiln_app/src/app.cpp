@@ -22,26 +22,28 @@ double kiln_app_energy_wh(const kiln_app_t *app)
 
 /* --- configuration fan-out --------------------------------------------- */
 
+namespace {
+
 /* One configuration struct, several core components with their own.  Doing the
  * translation in one function means a configuration item cannot reach one
  * consumer and miss another -- which is the failure mode FR-CFG-02's long list
  * invites. */
-static void push_config(kiln_app_t *app)
+void push_config(kiln_app_t *app)
 {
     const kiln_config_t *c = &app->cfg;
 
-    kiln_tempfilt_cfg_t tf = {
-        .offset_c      = c->cal_offset_c,
-        .gain          = c->cal_gain,
-        .filter_tau_s  = c->filter_tau_s,
+    const kiln_tempfilt_cfg_t tf = {
+        .offset_c = c->cal_offset_c,
+        .gain = c->cal_gain,
+        .filter_tau_s = c->filter_tau_s,
         .rate_window_s = c->rate_window_s,
     };
     kiln_tempfilt_reconfigure(&app->filt, &tf);
 
-    kiln_tempfilt_cfg_t cf = {
-        .offset_c      = c->case_cal_offset_c,
-        .gain          = c->case_cal_gain,
-        .filter_tau_s  = c->filter_tau_s,
+    const kiln_tempfilt_cfg_t cf = {
+        .offset_c = c->case_cal_offset_c,
+        .gain = c->case_cal_gain,
+        .filter_tau_s = c->filter_tau_s,
         .rate_window_s = c->rate_window_s,
     };
     kiln_tempfilt_reconfigure(&app->case_filt, &cf);
@@ -94,6 +96,8 @@ static void push_config(kiln_app_t *app)
     cc.element_tc_per_c = c->element_tc_per_c;
     (void)kiln_current_reconfigure(&app->cur, &cc);
 }
+
+} // namespace
 
 kiln_err_t kiln_app_init(kiln_app_t *app, const kiln_app_ports_t *ports,
                          const kiln_config_t *cfg)
@@ -207,11 +211,13 @@ kiln_err_t kiln_app_apply_config(kiln_app_t *app, const kiln_config_t *cfg,
 
 /* --- logging (FR-LOG) -------------------------------------------------- */
 
+namespace {
+
 /* Enqueue, never write.  Architecture 10.3: the control task enqueues and only
  * the logger touches flash, so nothing on the control path can be delayed by an
  * erase -- and a full queue drops the sample and counts it rather than stalling
  * a firing (FR-LOG-14). */
-static void log_enqueue(kiln_app_t *app, const kiln_log_sample_t *s)
+void log_enqueue(kiln_app_t *app, const kiln_log_sample_t *s)
 {
     const uint16_t next = (uint16_t)((app->log_head + 1u) % KILN_APP_LOG_QUEUE);
     if (next == app->log_tail) {
@@ -222,7 +228,7 @@ static void log_enqueue(kiln_app_t *app, const kiln_log_sample_t *s)
     app->log_head = next;
 }
 
-static void build_sample(const kiln_app_t *app, kiln_log_event_t event,
+void build_sample(const kiln_app_t *app, kiln_log_event_t event,
                          kiln_log_sample_t *out)
 {
     memset(out, 0, sizeof(*out));
@@ -262,6 +268,8 @@ static void build_sample(const kiln_app_t *app, kiln_log_event_t event,
         out->flags |= KILN_LOGF_WALL_VALID;
     }
 }
+
+} // namespace
 
 void kiln_app_log_event(kiln_app_t *app, kiln_log_event_t event)
 {
@@ -307,9 +315,11 @@ uint32_t kiln_app_log_drain(kiln_app_t *app, uint32_t max_records)
     return written;
 }
 
+namespace {
+
 /* FR-LOG-01/03: the periodic sample, plus FR-LOG-04's out-of-band records when
  * something actually happened. */
-static void log_cycle(kiln_app_t *app, float dt_s)
+void log_cycle(kiln_app_t *app, float dt_s)
 {
     const bool logging_state = app->state == KILN_STATE_RUNNING ||
                                app->state == KILN_STATE_PAUSED  ||
@@ -350,7 +360,7 @@ static void log_cycle(kiln_app_t *app, float dt_s)
 
 /* --- acquisition (FR-ACQ) ---------------------------------------------- */
 
-static void read_channel(const kiln_port_tc_t *port, kiln_tempfilt_t *filt,
+void read_channel(const kiln_port_tc_t *port, kiln_tempfilt_t *filt,
                          float dt_s, float *out_c, float *out_raw_c, float *out_cj_c,
                          uint16_t *out_bits, bool *out_valid)
 {
@@ -392,6 +402,8 @@ static void read_channel(const kiln_port_tc_t *port, kiln_tempfilt_t *filt,
     }
     *out_valid = true;
 }
+
+} // namespace
 
 void kiln_app_acquire_cycle(kiln_app_t *app, float dt_s)
 {
@@ -505,8 +517,12 @@ void kiln_app_window_tick(kiln_app_t *app, uint32_t dt_ms)
 
 /* --- control (FR-CTL) -------------------------------------------------- */
 
-static void finish_run(kiln_app_t *app, kiln_run_end_t reason, kiln_fault_t fault);
-static void persist_fault(kiln_app_t *app, kiln_fault_t fault, uint32_t warnings);
+namespace {
+
+void finish_run(kiln_app_t *app, kiln_run_end_t reason, kiln_fault_t fault);
+void persist_fault(kiln_app_t *app, kiln_fault_t fault, uint32_t warnings);
+
+} // namespace
 
 void kiln_app_control_cycle(kiln_app_t *app, float dt_s)
 {
@@ -591,13 +607,15 @@ void kiln_app_control_cycle(kiln_app_t *app, float dt_s)
 
 /* --- safety (SR-*) ----------------------------------------------------- */
 
-static bool is_heating_state(kiln_state_t s)
+namespace {
+
+bool is_heating_state(kiln_state_t s)
 {
     return s == KILN_STATE_RUNNING || s == KILN_STATE_MANUAL ||
            s == KILN_STATE_AUTOTUNE;
 }
 
-static void build_safety_input(const kiln_app_t *app, kiln_safety_input_t *in)
+void build_safety_input(const kiln_app_t *app, kiln_safety_input_t *in)
 {
     memset(in, 0, sizeof(*in));
 
@@ -654,6 +672,8 @@ static void build_safety_input(const kiln_app_t *app, kiln_safety_input_t *in)
         in->ssr_ops[ch] = app->counters.ssr_ops[ch];
     }
 }
+
+} // namespace
 
 void kiln_app_safety_cycle(kiln_app_t *app, float dt_s)
 {
@@ -760,7 +780,9 @@ void kiln_app_safety_cycle(kiln_app_t *app, float dt_s)
 
 /* --- persistence of the latched fault (SR-17) -------------------------- */
 
-static void persist_fault(kiln_app_t *app, kiln_fault_t fault, uint32_t warnings)
+namespace {
+
+void persist_fault(kiln_app_t *app, kiln_fault_t fault, uint32_t warnings)
 {
     if (app->ports.kvstore == nullptr) {
         return;
@@ -787,6 +809,8 @@ static void persist_fault(kiln_app_t *app, kiln_fault_t fault, uint32_t warnings
     app->latched       = f;
     app->latched_valid = true;
 }
+
+} // namespace
 
 /* --- boot -------------------------------------------------------------- */
 
@@ -895,7 +919,9 @@ kiln_err_t kiln_app_boot(kiln_app_t *app, kiln_reset_cause_t cause, float outage
 
 /* --- commands ---------------------------------------------------------- */
 
-static void finish_run(kiln_app_t *app, kiln_run_end_t reason, kiln_fault_t fault)
+namespace {
+
+void finish_run(kiln_app_t *app, kiln_run_end_t reason, kiln_fault_t fault)
 {
     /* Heat goes off here rather than on the next safety cycle.  The window tick
      * reads heat_authorised at 10 ms and the safety cycle runs at 100 ms, so
@@ -953,6 +979,8 @@ static void finish_run(kiln_app_t *app, kiln_run_end_t reason, kiln_fault_t faul
         app->state = (reason == KILN_END_FAULT) ? KILN_STATE_FAULT : KILN_STATE_IDLE;
     }
 }
+
+} // namespace
 
 kiln_err_t kiln_app_start(kiln_app_t *app, const kiln_program_t *prog)
 {

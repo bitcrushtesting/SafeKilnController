@@ -41,9 +41,11 @@
 #include "kiln_hal/board_pins.h"
 #include "kiln_hal/hal_esp32s3.h"
 
-static const char *TAG = "hal_heat";
+namespace {
 
-static const gpio_num_t s_ssr_pin[KILN_HEAT_CHANNELS] = {
+const char *TAG = "hal_heat";
+
+const gpio_num_t s_ssr_pin[KILN_HEAT_CHANNELS] = {
     (gpio_num_t)KILN_PIN_SSR1,
     (gpio_num_t)KILN_PIN_SSR2,
 };
@@ -56,11 +58,11 @@ typedef struct {
     bool     authorised;          /* refreshes are being accepted          */
 } heat_t;
 
-static heat_t s_heat;
+heat_t s_heat;
 
 /* --- port_heat ---------------------------------------------------------- */
 
-static uint8_t heat_channel_count(void *ctx)
+uint8_t heat_channel_count(void *ctx)
 {
     (void)ctx;
     /* HR-12: the board populates both. A single-zone kiln (ASM-02) drives them
@@ -68,7 +70,7 @@ static uint8_t heat_channel_count(void *ctx)
     return KILN_HEAT_CHANNELS;
 }
 
-static void heat_set_duty(void *ctx, uint8_t channel, uint16_t permille)
+void heat_set_duty(void *ctx, uint8_t channel, uint16_t permille)
 {
     (void)ctx;
     if (channel >= KILN_HEAT_CHANNELS) {
@@ -79,7 +81,7 @@ static void heat_set_duty(void *ctx, uint8_t channel, uint16_t permille)
     s_heat.duty[channel] = (permille > KILN_DUTY_MAX) ? KILN_DUTY_MAX : permille;
 }
 
-static void heat_set_level(void *ctx, uint8_t channel, bool on)
+void heat_set_level(void *ctx, uint8_t channel, bool on)
 {
     (void)ctx;
     if (channel >= KILN_HEAT_CHANNELS) {
@@ -94,7 +96,7 @@ static void heat_set_level(void *ctx, uint8_t channel, bool on)
     }
 }
 
-static void heat_enable_refresh(void *ctx)
+void heat_enable_refresh(void *ctx)
 {
     (void)ctx;
     if (!s_heat.authorised) {
@@ -105,7 +107,7 @@ static void heat_enable_refresh(void *ctx)
     gpio_set_level((gpio_num_t)KILN_PIN_HEAT_EN, s_heat.enable_phase ? 1 : 0);
 }
 
-static void heat_drop_contactor(void *ctx)
+void heat_drop_contactor(void *ctx)
 {
     (void)ctx;
     /* SR-27: stop feeding the pump and park the pin low, so the coil drops on
@@ -117,7 +119,7 @@ static void heat_drop_contactor(void *ctx)
     gpio_set_level((gpio_num_t)KILN_PIN_HEAT_EN, 0);
 }
 
-static void heat_force_off(void *ctx)
+void heat_force_off(void *ctx)
 {
     /* SR-16's first two steps, in that order: duty to zero at the pins, then
      * heat enable away.  Doing it the other way round would leave the SSRs
@@ -134,7 +136,7 @@ static void heat_force_off(void *ctx)
     heat_drop_contactor(ctx);
 }
 
-static bool heat_is_off(void *ctx)
+bool heat_is_off(void *ctx)
 {
     (void)ctx;
     for (uint8_t c = 0; c < KILN_HEAT_CHANNELS; c++) {
@@ -145,11 +147,13 @@ static bool heat_is_off(void *ctx)
     return !s_heat.authorised;
 }
 
-static uint32_t heat_switch_count(void *ctx, uint8_t channel)
+uint32_t heat_switch_count(void *ctx, uint8_t channel)
 {
     (void)ctx;
     return (channel < KILN_HEAT_CHANNELS) ? s_heat.switches[channel] : 0u;
 }
+
+} // namespace
 
 /* --- construction ------------------------------------------------------- */
 
@@ -165,8 +169,8 @@ void kiln_hal_heat_init(kiln_port_heat_t *out)
      * this call; the external one is what HR-08 actually requires, because an
      * internal pull-down is not configured until the firmware runs. */
     gpio_config_t io = {};
-    io.pin_bit_mask = (1ULL << KILN_PIN_SSR1) | (1ULL << KILN_PIN_SSR2) |
-                      (1ULL << KILN_PIN_HEAT_EN);
+    io.pin_bit_mask = (1ULL << (unsigned)KILN_PIN_SSR1) | (1ULL << (unsigned)KILN_PIN_SSR2) |
+                      (1ULL << (unsigned)KILN_PIN_HEAT_EN);
     io.mode         = GPIO_MODE_OUTPUT;
     io.pull_down_en = GPIO_PULLDOWN_ENABLE;
     io.pull_up_en   = GPIO_PULLUP_DISABLE;

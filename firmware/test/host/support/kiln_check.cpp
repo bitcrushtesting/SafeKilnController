@@ -23,22 +23,22 @@ int main(int argc, char **argv)
         }
 
         kiln_current_failures = 0;
-        printf("  %-58s", kiln_tests[i].name);
-        fflush(stdout);
+        (void)printf("  %-58s", kiln_tests[i].name);
+        (void)fflush(stdout);
         kiln_tests[i].fn();
         ran++;
 
         if (kiln_current_failures == 0) {
-            printf(" ok\n");
+            (void)printf(" ok\n");
         } else {
-            printf(" FAILED (%d)\n", kiln_current_failures);
+            (void)printf(" FAILED (%d)\n", kiln_current_failures);
             failed++;
         }
     }
 
-    printf("%d run, %d failed\n", ran, failed);
+    (void)printf("%d run, %d failed\n", ran, failed);
     if (ran == 0) {
-        fprintf(stderr, "no tests matched\n");
+        (void)fprintf(stderr, "no tests matched\n");
         return 2;
     }
     return failed == 0 ? 0 : 1;

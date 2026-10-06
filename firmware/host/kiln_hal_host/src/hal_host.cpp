@@ -29,14 +29,16 @@ void kiln_host_flash_power_on(kiln_host_flash_t *f)
     }
 }
 
-static bool in_range(const kiln_host_flash_t *f, uint32_t off, size_t len)
+namespace {
+
+bool in_range(const kiln_host_flash_t *f, uint32_t off, size_t len)
 {
     return (uint64_t)off + len <= (uint64_t)f->size_bytes;
 }
 
-static kiln_err_t hf_info(void *ctx, kiln_flash_info_t *out)
+kiln_err_t hf_info(void *ctx, kiln_flash_info_t *out)
 {
-    kiln_host_flash_t *f = (kiln_host_flash_t *)ctx;
+    const kiln_host_flash_t *f = static_cast<const kiln_host_flash_t *>(ctx);
     if ((f == nullptr) || (out == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -45,9 +47,9 @@ static kiln_err_t hf_info(void *ctx, kiln_flash_info_t *out)
     return KILN_OK;
 }
 
-static kiln_err_t hf_read(void *ctx, uint32_t off, void *out, size_t len)
+kiln_err_t hf_read(void *ctx, uint32_t off, void *out, size_t len)
 {
-    kiln_host_flash_t *f = (kiln_host_flash_t *)ctx;
+    kiln_host_flash_t *f = static_cast<kiln_host_flash_t *>(ctx);
     if ((f == nullptr) || (out == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -63,9 +65,9 @@ static kiln_err_t hf_read(void *ctx, uint32_t off, void *out, size_t len)
     return KILN_OK;
 }
 
-static kiln_err_t hf_write(void *ctx, uint32_t off, const void *data, size_t len)
+kiln_err_t hf_write(void *ctx, uint32_t off, const void *data, size_t len)
 {
-    kiln_host_flash_t *f = (kiln_host_flash_t *)ctx;
+    kiln_host_flash_t *f = static_cast<kiln_host_flash_t *>(ctx);
     if ((f == nullptr) || (data == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -81,7 +83,7 @@ static kiln_err_t hf_write(void *ctx, uint32_t off, const void *data, size_t len
         return KILN_ERR_IO;
     }
 
-    const uint8_t *src = (const uint8_t *)data;
+    const uint8_t *src = static_cast<const uint8_t *>(data);
 
     /* NOR: a write may only clear bits.  Anything else means the caller wrote
      * over un-erased space, which on real flash yields the AND of the two and is
@@ -112,9 +114,9 @@ static kiln_err_t hf_write(void *ctx, uint32_t off, const void *data, size_t len
     return KILN_OK;
 }
 
-static kiln_err_t hf_erase(void *ctx, uint32_t off, size_t len)
+kiln_err_t hf_erase(void *ctx, uint32_t off, size_t len)
 {
-    kiln_host_flash_t *f = (kiln_host_flash_t *)ctx;
+    kiln_host_flash_t *f = static_cast<kiln_host_flash_t *>(ctx);
     if (f == nullptr) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -141,6 +143,8 @@ static kiln_err_t hf_erase(void *ctx, uint32_t off, size_t len)
     return KILN_OK;
 }
 
+} // namespace
+
 void kiln_host_flash_bind(kiln_host_flash_t *f, kiln_port_flash_t *out)
 {
     if ((f == nullptr) || (out == nullptr)) {
@@ -162,7 +166,9 @@ void kiln_host_kv_init(kiln_host_kv_t *kv)
     }
 }
 
-static kiln_host_kv_entry_t *kv_find(kiln_host_kv_t *kv, const char *ns, const char *key)
+namespace {
+
+kiln_host_kv_entry_t *kv_find(kiln_host_kv_t *kv, const char *ns, const char *key)
 {
     for (size_t i = 0; i < KILN_HOST_KV_ENTRIES; i++) {
         if (!kv->entries[i].used) {
@@ -176,10 +182,10 @@ static kiln_host_kv_entry_t *kv_find(kiln_host_kv_t *kv, const char *ns, const c
     return NULL;
 }
 
-static kiln_err_t kv_get(void *ctx, const char *ns, const char *key,
+kiln_err_t kv_get(void *ctx, const char *ns, const char *key,
                          void *out, size_t cap, size_t *out_len)
 {
-    kiln_host_kv_t *kv = (kiln_host_kv_t *)ctx;
+    kiln_host_kv_t *kv = static_cast<kiln_host_kv_t *>(ctx);
     if ((kv == nullptr) || (ns == nullptr) || (key == nullptr) || (out == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -199,10 +205,10 @@ static kiln_err_t kv_get(void *ctx, const char *ns, const char *key,
     return KILN_OK;
 }
 
-static kiln_err_t kv_set(void *ctx, const char *ns, const char *key,
+kiln_err_t kv_set(void *ctx, const char *ns, const char *key,
                          const void *data, size_t len)
 {
-    kiln_host_kv_t *kv = (kiln_host_kv_t *)ctx;
+    kiln_host_kv_t *kv = static_cast<kiln_host_kv_t *>(ctx);
     if ((kv == nullptr) || (ns == nullptr) || (key == nullptr) || (data == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -225,8 +231,10 @@ static kiln_err_t kv_set(void *ctx, const char *ns, const char *key,
             return KILN_ERR_NO_SPACE;
         }
         e->used = true;
-        snprintf(e->ns, sizeof(e->ns), "%s", ns);
-        snprintf(e->key, sizeof(e->key), "%s", key);
+        /* The strlen guards above rejected anything that would truncate; a
+         * truncated namespace or key would collide two unrelated entries. */
+        (void)snprintf(e->ns, sizeof(e->ns), "%s", ns);
+        (void)snprintf(e->key, sizeof(e->key), "%s", key);
     }
     memcpy(e->value, data, len);
     e->len = len;
@@ -234,9 +242,9 @@ static kiln_err_t kv_set(void *ctx, const char *ns, const char *key,
     return KILN_OK;
 }
 
-static kiln_err_t kv_erase(void *ctx, const char *ns, const char *key)
+kiln_err_t kv_erase(void *ctx, const char *ns, const char *key)
 {
-    kiln_host_kv_t *kv = (kiln_host_kv_t *)ctx;
+    kiln_host_kv_t *kv = static_cast<kiln_host_kv_t *>(ctx);
     if ((kv == nullptr) || (ns == nullptr) || (key == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -249,9 +257,9 @@ static kiln_err_t kv_erase(void *ctx, const char *ns, const char *key)
     return KILN_OK;
 }
 
-static kiln_err_t kv_commit(void *ctx, const char *ns)
+kiln_err_t kv_commit(void *ctx, const char *ns)
 {
-    kiln_host_kv_t *kv = (kiln_host_kv_t *)ctx;
+    kiln_host_kv_t *kv = static_cast<kiln_host_kv_t *>(ctx);
     (void)ns;
     if (kv == nullptr) {
         return KILN_ERR_INVALID_ARG;
@@ -262,6 +270,8 @@ static kiln_err_t kv_commit(void *ctx, const char *ns)
     kv->commits++;
     return KILN_OK;
 }
+
+} // namespace
 
 void kiln_host_kv_bind(kiln_host_kv_t *kv, kiln_port_kvstore_t *out)
 {
@@ -286,7 +296,9 @@ void kiln_host_fs_init(kiln_host_fs_t *fs)
     fs->powered = true;
 }
 
-static kiln_host_file_t *fs_find(kiln_host_fs_t *fs, const char *path)
+namespace {
+
+kiln_host_file_t *fs_find(kiln_host_fs_t *fs, const char *path)
 {
     for (size_t i = 0; i < KILN_HOST_FS_FILES; i++) {
         if (fs->files[i].used && strcmp(fs->files[i].path, path) == 0) {
@@ -296,9 +308,9 @@ static kiln_host_file_t *fs_find(kiln_host_fs_t *fs, const char *path)
     return NULL;
 }
 
-static kiln_err_t fs_read(void *ctx, const char *path, void *out, size_t cap, size_t *len)
+kiln_err_t fs_read(void *ctx, const char *path, void *out, size_t cap, size_t *len)
 {
-    kiln_host_fs_t *fs = (kiln_host_fs_t *)ctx;
+    kiln_host_fs_t *fs = static_cast<kiln_host_fs_t *>(ctx);
     if ((fs == nullptr) || (path == nullptr) || (out == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -321,10 +333,10 @@ static kiln_err_t fs_read(void *ctx, const char *path, void *out, size_t cap, si
     return KILN_OK;
 }
 
-static kiln_err_t fs_write_atomic(void *ctx, const char *path,
+kiln_err_t fs_write_atomic(void *ctx, const char *path,
                                   const void *data, size_t len)
 {
-    kiln_host_fs_t *fs = (kiln_host_fs_t *)ctx;
+    kiln_host_fs_t *fs = static_cast<kiln_host_fs_t *>(ctx);
     if ((fs == nullptr) || (path == nullptr) || (data == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -359,16 +371,17 @@ static kiln_err_t fs_write_atomic(void *ctx, const char *path,
             return KILN_ERR_NO_SPACE;
         }
         f->used = true;
-        snprintf(f->path, sizeof(f->path), "%s", path);
+        /* Guarded by the strlen(path) >= KILN_PATH_MAX check above. */
+        (void)snprintf(f->path, sizeof(f->path), "%s", path);
     }
     memcpy(f->data, data, len);
     f->len = len;
     return KILN_OK;
 }
 
-static kiln_err_t fs_remove(void *ctx, const char *path)
+kiln_err_t fs_remove(void *ctx, const char *path)
 {
-    kiln_host_fs_t *fs = (kiln_host_fs_t *)ctx;
+    kiln_host_fs_t *fs = static_cast<kiln_host_fs_t *>(ctx);
     if ((fs == nullptr) || (path == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -384,20 +397,20 @@ static kiln_err_t fs_remove(void *ctx, const char *path)
     return KILN_OK;
 }
 
-static kiln_err_t fs_exists(void *ctx, const char *path)
+kiln_err_t fs_exists(void *ctx, const char *path)
 {
-    kiln_host_fs_t *fs = (kiln_host_fs_t *)ctx;
+    kiln_host_fs_t *fs = static_cast<kiln_host_fs_t *>(ctx);
     if ((fs == nullptr) || (path == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
     return (fs_find(fs, path) != nullptr) ? KILN_OK : KILN_ERR_NOT_FOUND;
 }
 
-static kiln_err_t fs_list(void *ctx, const char *dir,
+kiln_err_t fs_list(void *ctx, const char *dir,
                           bool (*fn)(void *user, const char *name, size_t size),
                           void *user)
 {
-    kiln_host_fs_t *fs = (kiln_host_fs_t *)ctx;
+    kiln_host_fs_t *fs = static_cast<kiln_host_fs_t *>(ctx);
     if ((fs == nullptr) || (dir == nullptr) || (fn == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -420,9 +433,9 @@ static kiln_err_t fs_list(void *ctx, const char *dir,
     return KILN_OK;
 }
 
-static kiln_err_t fs_usage(void *ctx, size_t *total, size_t *used)
+kiln_err_t fs_usage(void *ctx, size_t *total, size_t *used)
 {
-    kiln_host_fs_t *fs = (kiln_host_fs_t *)ctx;
+    const kiln_host_fs_t *fs = static_cast<const kiln_host_fs_t *>(ctx);
     if (fs == nullptr) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -441,6 +454,8 @@ static kiln_err_t fs_usage(void *ctx, size_t *total, size_t *used)
     }
     return KILN_OK;
 }
+
+} // namespace
 
 void kiln_host_fs_bind(kiln_host_fs_t *fs, kiln_port_filestore_t *out)
 {
@@ -477,21 +492,25 @@ void kiln_host_clock_advance(kiln_host_clock_t *c, uint64_t us)
     c->wall_utc_s += us / 1000000u;
 }
 
-static uint64_t hc_mono(void *ctx)
+namespace {
+
+uint64_t hc_mono(void *ctx)
 {
-    const kiln_host_clock_t *c = (const kiln_host_clock_t *)ctx;
+    const kiln_host_clock_t *c = static_cast<const kiln_host_clock_t *>(ctx);
     return (c != nullptr) ? c->mono_us : 0;
 }
-static bool hc_wall_valid(void *ctx)
+bool hc_wall_valid(void *ctx)
 {
-    const kiln_host_clock_t *c = (const kiln_host_clock_t *)ctx;
+    const kiln_host_clock_t *c = static_cast<const kiln_host_clock_t *>(ctx);
     return (c != nullptr) ? c->wall_valid : false;
 }
-static uint64_t hc_wall(void *ctx)
+uint64_t hc_wall(void *ctx)
 {
-    const kiln_host_clock_t *c = (const kiln_host_clock_t *)ctx;
+    const kiln_host_clock_t *c = static_cast<const kiln_host_clock_t *>(ctx);
     return (c != nullptr) ? c->wall_utc_s : 0;
 }
+
+} // namespace
 
 void kiln_host_clock_bind(kiln_host_clock_t *c, kiln_port_clock_t *out)
 {

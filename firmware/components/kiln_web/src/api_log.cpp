@@ -22,7 +22,9 @@
 
 /* Formatting buffer.  Sized for one bucket's worth of JSON with room to spare;
  * nothing here grows with the query. */
-#define CHUNK_BYTES 512
+constexpr size_t CHUNK_BYTES = 512;
+
+namespace {
 
 typedef struct {
     kiln_api_write_fn write;
@@ -32,7 +34,7 @@ typedef struct {
     size_t            len;
 } sink_t;
 
-static void sink_flush(sink_t *s)
+void sink_flush(sink_t *s)
 {
     if (s->failed || s->len == 0) {
         return;
@@ -43,7 +45,7 @@ static void sink_flush(sink_t *s)
     s->len = 0;
 }
 
-static void sink_put(sink_t *s, const char *data, size_t n)
+void sink_put(sink_t *s, const char *data, size_t n)
 {
     if (s->failed) {
         return;
@@ -64,9 +66,9 @@ static void sink_put(sink_t *s, const char *data, size_t n)
     }
 }
 
-static void sink_str(sink_t *s, const char *t) { sink_put(s, t, strlen(t)); }
+void sink_str(sink_t *s, const char *t) { sink_put(s, t, strlen(t)); }
 
-static void sink_fmt(sink_t *s, const char *fmt, ...)
+void sink_fmt(sink_t *s, const char *fmt, ...)
 {
     if (s->failed) {
         return;
@@ -81,7 +83,11 @@ static void sink_fmt(sink_t *s, const char *fmt, ...)
     }
 }
 
+} // namespace
+
 /* --- pass one: the time span -------------------------------------------- */
+
+namespace {
 
 typedef struct {
     uint32_t run_id;
@@ -91,9 +97,9 @@ typedef struct {
     bool     any;
 } span_ctx_t;
 
-static bool span_visit(void *user, uint32_t run, const uint8_t rec[KILN_LOG_RECORD_BYTES])
+bool span_visit(void *user, uint32_t run, const uint8_t rec[KILN_LOG_RECORD_BYTES])
 {
-    span_ctx_t *s = (span_ctx_t *)user;
+    span_ctx_t *s = static_cast<span_ctx_t *>(user);
     (void)run;
 
     kiln_log_sample_t sm;
@@ -118,7 +124,11 @@ static bool span_visit(void *user, uint32_t run, const uint8_t rec[KILN_LOG_RECO
     return true;
 }
 
+} // namespace
+
 /* --- pass two: decimate and emit --------------------------------------- */
+
+namespace {
 
 typedef struct {
     sink_t           *sink;
@@ -134,7 +144,7 @@ typedef struct {
     uint32_t          accepted;
 } emit_ctx_t;
 
-static void emit_bucket(emit_ctx_t *e)
+void emit_bucket(emit_ctx_t *e)
 {
     if (!e->have_bucket) {
         return;
@@ -168,7 +178,7 @@ static void emit_bucket(emit_ctx_t *e)
     e->have_bucket = false;
 }
 
-static void bucket_start(emit_ctx_t *e, const kiln_log_sample_t *s, uint32_t index)
+void bucket_start(emit_ctx_t *e, const kiln_log_sample_t *s, uint32_t index)
 {
     kiln_log_bucket_t *b = &e->bucket;
     memset(b, 0, sizeof(*b));
@@ -187,7 +197,7 @@ static void bucket_start(emit_ctx_t *e, const kiln_log_sample_t *s, uint32_t ind
     e->have_bucket  = true;
 }
 
-static void bucket_add(emit_ctx_t *e, const kiln_log_sample_t *s)
+void bucket_add(emit_ctx_t *e, const kiln_log_sample_t *s)
 {
     kiln_log_bucket_t *b = &e->bucket;
     if (s->kiln_filt_c < b->kiln_min_c) {
@@ -226,9 +236,9 @@ static void bucket_add(emit_ctx_t *e, const kiln_log_sample_t *s)
     b->count++;
 }
 
-static bool emit_visit(void *user, uint32_t run, const uint8_t rec[KILN_LOG_RECORD_BYTES])
+bool emit_visit(void *user, uint32_t run, const uint8_t rec[KILN_LOG_RECORD_BYTES])
 {
-    emit_ctx_t *e = (emit_ctx_t *)user;
+    emit_ctx_t *e = static_cast<emit_ctx_t *>(user);
     (void)run;
     if (e->sink->failed) {
         return false; /* the client went away */
@@ -267,6 +277,8 @@ static bool emit_visit(void *user, uint32_t run, const uint8_t rec[KILN_LOG_RECO
     bucket_start(e, &s, index);
     return true;
 }
+
+} // namespace
 
 /* --- entry point -------------------------------------------------------- */
 

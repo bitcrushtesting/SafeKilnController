@@ -47,12 +47,18 @@
 #include "kiln_hal/board_pins.h"
 #include "kiln_hal/hal_esp32s3.h"
 
-static const char *TAG = "hal_current";
+namespace {
+
+const char *TAG = "hal_current";
+
+} // namespace
 
 /* The pool holds a little over one burst, so a burst is never starved by the
  * driver wrapping, and a stale window is one flush away rather than many. */
 #define CUR_POOL_BYTES   (KILN_CUR_BURST_MAX * SOC_ADC_DIGI_RESULT_BYTES * 2u)
 #define CUR_FRAME_BYTES  (KILN_CUR_BURST_MAX * SOC_ADC_DIGI_RESULT_BYTES)
+
+namespace {
 
 typedef struct {
     adc_continuous_handle_t handle;
@@ -71,11 +77,11 @@ typedef struct {
     uint16_t          last_min, last_max;
 } cur_t;
 
-static cur_t s_cur;
+cur_t s_cur;
 
 /* --- helpers ------------------------------------------------------------ */
 
-static void drain_pool(cur_t *c)
+void drain_pool(cur_t *c)
 {
     uint8_t  scratch[256];
     uint32_t got = 0;
@@ -88,15 +94,15 @@ static void drain_pool(cur_t *c)
 
 /* --- port_current ------------------------------------------------------- */
 
-static uint8_t cur_channel_count(void *ctx)
+uint8_t cur_channel_count(void *ctx)
 {
     (void)ctx;
     return 1u;      /* see the note at the top of this file */
 }
 
-static kiln_err_t cur_configure(void *ctx, uint8_t channel, uint32_t sample_rate_hz)
+kiln_err_t cur_configure(void *ctx, uint8_t channel, uint32_t sample_rate_hz)
 {
-    cur_t *c = (cur_t *)ctx;
+    cur_t *c = static_cast<cur_t *>(ctx);
     if ((c == nullptr) || channel != 0u) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -146,10 +152,10 @@ static kiln_err_t cur_configure(void *ctx, uint8_t channel, uint32_t sample_rate
     return KILN_OK;
 }
 
-static kiln_err_t cur_start_burst(void *ctx, uint8_t channel,
+kiln_err_t cur_start_burst(void *ctx, uint8_t channel,
                                   kiln_cur_window_t window, uint16_t n_samples)
 {
-    cur_t *c = (cur_t *)ctx;
+    cur_t *c = static_cast<cur_t *>(ctx);
     if ((c == nullptr) || channel != 0u || n_samples == 0u) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -171,9 +177,9 @@ static kiln_err_t cur_start_burst(void *ctx, uint8_t channel,
     return KILN_OK;
 }
 
-static kiln_err_t cur_read_burst(void *ctx, uint8_t channel, kiln_cur_burst_t *out)
+kiln_err_t cur_read_burst(void *ctx, uint8_t channel, kiln_cur_burst_t *out)
 {
-    cur_t *c = (cur_t *)ctx;
+    cur_t *c = static_cast<cur_t *>(ctx);
     if ((c == nullptr) || channel != 0u || (out == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -190,9 +196,14 @@ static kiln_err_t cur_read_burst(void *ctx, uint8_t channel, kiln_cur_burst_t *o
            got > 0u) {
         const uint32_t n = got / SOC_ADC_DIGI_RESULT_BYTES;
         for (uint32_t i = 0; i < n && c->have < c->want; i++) {
-            const adc_digi_output_data_t *s =
-                (const adc_digi_output_data_t *)&frame[i * SOC_ADC_DIGI_RESULT_BYTES];
-            c->samples[c->have++] = (uint16_t)s->type2.data;
+            /* Copied out rather than read through a pointer aimed into the
+             * byte buffer: `frame` is a uint8_t array, so aliasing it as an
+             * adc_digi_output_data_t assumes an alignment adc_continuous_read
+             * does not promise.  The copy is one word and the compiler folds
+             * it away. */
+            adc_digi_output_data_t smp;
+            memcpy(&smp, &frame[i * SOC_ADC_DIGI_RESULT_BYTES], sizeof(smp));
+            c->samples[c->have++] = (uint16_t)smp.type2.data;
         }
     }
 
@@ -220,9 +231,9 @@ static kiln_err_t cur_read_burst(void *ctx, uint8_t channel, kiln_cur_burst_t *o
     return KILN_OK;
 }
 
-static void cur_abort_burst(void *ctx, uint8_t channel)
+void cur_abort_burst(void *ctx, uint8_t channel)
 {
-    cur_t *c = (cur_t *)ctx;
+    cur_t *c = static_cast<cur_t *>(ctx);
     if ((c == nullptr) || channel != 0u) {
         return;
     }
@@ -232,9 +243,9 @@ static void cur_abort_burst(void *ctx, uint8_t channel)
     drain_pool(c);
 }
 
-static bool cur_present(void *ctx, uint8_t channel)
+bool cur_present(void *ctx, uint8_t channel)
 {
-    cur_t *c = (cur_t *)ctx;
+    const cur_t *c = static_cast<const cur_t *>(ctx);
     if ((c == nullptr) || channel != 0u) {
         return false;
     }
@@ -254,6 +265,8 @@ static bool cur_present(void *ctx, uint8_t channel)
     const uint16_t avg = (uint16_t)(((uint32_t)c->last_min + c->last_max) / 2u);
     return (avg > (uint16_t)(mid - tol)) && (avg < (uint16_t)(mid + tol));
 }
+
+} // namespace
 
 /* --- construction ------------------------------------------------------- */
 

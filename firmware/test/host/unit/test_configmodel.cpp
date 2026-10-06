@@ -314,11 +314,11 @@ KILN_TEST(frcfg05_an_older_schema_is_migrated_with_defaults_for_new_items)
      * of the struct, which is what a previous firmware would have written. */
     const uint16_t short_payload = 64;
     blob[4] = 0; blob[5] = 0;
-    blob[6] = (uint8_t)short_payload; blob[7] = (uint8_t)(short_payload >> 8);
+    blob[6] = (uint8_t)short_payload; blob[7] = (uint8_t)(short_payload >> 8u);
     const size_t crc_at = 8u + short_payload;
     const uint16_t crc = kiln_crc16(blob, crc_at);
     blob[crc_at]     = (uint8_t)crc;
-    blob[crc_at + 1] = (uint8_t)(crc >> 8);
+    blob[crc_at + 1] = (uint8_t)(crc >> 8u);
 
     CHECK_ERR(kiln_config_decode(blob, crc_at + 2u, &out), KILN_ERR_UNSUPPORTED);
     /* The stored prefix survived; everything beyond it is at its default. */
@@ -342,7 +342,7 @@ KILN_TEST(frcfg05_a_newer_schema_is_not_guessed_at)
     const size_t crc_at = 8u + sizeof(kiln_config_t);
     const uint16_t crc = kiln_crc16(blob, crc_at);
     blob[crc_at] = (uint8_t)crc;
-    blob[crc_at + 1] = (uint8_t)(crc >> 8);
+    blob[crc_at + 1] = (uint8_t)(crc >> 8u);
 
     CHECK_ERR(kiln_config_decode(blob, len, &out), KILN_ERR_CORRUPT);
     CHECK_OK(kiln_config_validate(&out, NULL));

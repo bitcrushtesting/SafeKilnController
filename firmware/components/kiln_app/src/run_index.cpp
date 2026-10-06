@@ -6,15 +6,18 @@
 #include "kiln_app/run_index.h"
 #include "kiln_core/logrec.h"      /* kiln_crc16 */
 
-#define RUN_MAGIC      0x4E55521EU   /* "\x1eRUN" */
+constexpr uint32_t RUN_MAGIC = 0x4E55521EU;  /* "\x1eRUN" */
 #define RUN_BLOB_BYTES (8u + sizeof(kiln_run_record_t) + 2u)
 
-static void slot_path(uint8_t slot, char out[KILN_PATH_MAX])
+namespace {
+
+void slot_path(uint8_t slot, char out[KILN_PATH_MAX])
 {
-    snprintf(out, KILN_PATH_MAX, "/r/%02u", (unsigned)slot);
+    /* As program_store: "/r/255" at most, 6 of KILN_PATH_MAX's 64. */
+    (void)snprintf(out, KILN_PATH_MAX, "/r/%02u", (unsigned)slot);
 }
 
-static kiln_err_t read_slot(const kiln_port_filestore_t *fs, uint8_t slot,
+kiln_err_t read_slot(const kiln_port_filestore_t *fs, uint8_t slot,
                             kiln_run_record_t *out)
 {
     char path[KILN_PATH_MAX];
@@ -22,7 +25,7 @@ static kiln_err_t read_slot(const kiln_port_filestore_t *fs, uint8_t slot,
 
     uint8_t blob[RUN_BLOB_BYTES];
     size_t  len = 0;
-    kiln_err_t e = fs->read(fs->ctx, path, blob, sizeof(blob), &len);
+    const kiln_err_t e = fs->read(fs->ctx, path, blob, sizeof(blob), &len);
     if (e != KILN_OK) {
         return e;
     }
@@ -30,14 +33,14 @@ static kiln_err_t read_slot(const kiln_port_filestore_t *fs, uint8_t slot,
         return KILN_ERR_CORRUPT;
     }
 
-    const uint32_t magic = (uint32_t)blob[0] | ((uint32_t)blob[1] << 8) |
-                           ((uint32_t)blob[2] << 16) | ((uint32_t)blob[3] << 24);
+    const uint32_t magic = (uint32_t)blob[0] | ((uint32_t)blob[1] << 8u) |
+                           ((uint32_t)blob[2] << 16u) | ((uint32_t)blob[3] << 24u);
     if (magic != RUN_MAGIC) {
         return KILN_ERR_CORRUPT;
     }
 
-    const uint16_t crc = (uint16_t)(blob[RUN_BLOB_BYTES - 2] |
-                                    ((uint16_t)blob[RUN_BLOB_BYTES - 1] << 8));
+    const uint16_t crc = (uint16_t)((uint32_t)blob[RUN_BLOB_BYTES - 2] |
+                                    ((uint32_t)blob[RUN_BLOB_BYTES - 1] << 8u));
     if (kiln_crc16(blob, RUN_BLOB_BYTES - 2) != crc) {
         return KILN_ERR_CORRUPT;
     }
@@ -51,29 +54,31 @@ static kiln_err_t read_slot(const kiln_port_filestore_t *fs, uint8_t slot,
     return KILN_OK;
 }
 
-static kiln_err_t write_slot(const kiln_port_filestore_t *fs, uint8_t slot,
+kiln_err_t write_slot(const kiln_port_filestore_t *fs, uint8_t slot,
                              const kiln_run_record_t *r)
 {
     uint8_t blob[RUN_BLOB_BYTES];
     memset(blob, 0, sizeof(blob));
 
     blob[0] = (uint8_t)RUN_MAGIC;
-    blob[1] = (uint8_t)(RUN_MAGIC >> 8);
-    blob[2] = (uint8_t)(RUN_MAGIC >> 16);
-    blob[3] = (uint8_t)(RUN_MAGIC >> 24);
+    blob[1] = (uint8_t)(RUN_MAGIC >> 8u);
+    blob[2] = (uint8_t)(RUN_MAGIC >> 16u);
+    blob[3] = (uint8_t)(RUN_MAGIC >> 24u);
     blob[4] = 1;                                     /* record schema */
     blob[5] = (uint8_t)(sizeof(kiln_run_record_t));
-    blob[6] = (uint8_t)(sizeof(kiln_run_record_t) >> 8);
+    blob[6] = (uint8_t)(sizeof(kiln_run_record_t) >> 8u);
     memcpy(&blob[8], r, sizeof(*r));
 
     const uint16_t crc = kiln_crc16(blob, RUN_BLOB_BYTES - 2);
     blob[RUN_BLOB_BYTES - 2] = (uint8_t)crc;
-    blob[RUN_BLOB_BYTES - 1] = (uint8_t)(crc >> 8);
+    blob[RUN_BLOB_BYTES - 1] = (uint8_t)(crc >> 8u);
 
     char path[KILN_PATH_MAX];
     slot_path(slot, path);
     return fs->write_atomic(fs->ctx, path, blob, sizeof(blob));
 }
+
+} // namespace
 
 kiln_err_t kiln_run_index_append(const kiln_port_filestore_t *fs,
                                  const kiln_run_record_t *r)

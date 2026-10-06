@@ -16,8 +16,10 @@
 
 #include "kiln_hmi/draw.h"
 
+namespace {
+
 /* 95 printable ASCII glyphs, five columns each, bit 0 at the top. */
-static const uint8_t k_font5x7[95][5] = {
+const uint8_t k_font5x7[95][5] = {
     { 0x00, 0x00, 0x00, 0x00, 0x00 }, /* ' ' */
     { 0x00, 0x00, 0x2F, 0x00, 0x00 }, /* '!' */
     { 0x00, 0x03, 0x00, 0x03, 0x00 }, /* '"' */
@@ -114,9 +116,11 @@ static const uint8_t k_font5x7[95][5] = {
     { 0x41, 0x41, 0x36, 0x08, 0x00 }, /* '}' */
     { 0x06, 0x01, 0x02, 0x04, 0x03 }, /* '~' */};
 
-#define FONT_W   5
-#define FONT_ADV 6   /* one blank column between glyphs */
-#define FONT_H   7
+} // namespace
+
+constexpr int FONT_W   = 5;
+constexpr int FONT_ADV = 6;  /* one blank column between glyphs */
+constexpr int FONT_H   = 7;
 
 void kiln_fb_clear(kiln_fb_t *fb)
 {
@@ -134,7 +138,7 @@ void kiln_fb_pixel(kiln_fb_t *fb, int x, int y, bool on)
     /* x and y are clipped above, so this cannot overflow; the arithmetic is
      * done in size_t rather than cast afterwards so that is evident. */
     const size_t  idx  = ((size_t)y / 8u) * (size_t)KILN_DISPLAY_W + (size_t)x;
-    const uint8_t mask = (uint8_t)(1u << (y % 8));
+    const uint8_t mask = (uint8_t)(1u << ((unsigned)y % 8u));
     if (on) { fb->px[idx] |= mask; }
     else    { fb->px[idx] = (uint8_t)(fb->px[idx] & (uint8_t)~mask); }
 }
@@ -165,13 +169,15 @@ void kiln_fb_fill(kiln_fb_t *fb, int x, int y, int w, int h, bool on)
     }
 }
 
-static void glyph(kiln_fb_t *fb, int x, int y, char c, int scale, bool on)
+namespace {
+
+void glyph(kiln_fb_t *fb, int x, int y, char c, int scale, bool on)
 {
     if (c < 32 || c > 126) { c = '?'; }
     const uint8_t *g = k_font5x7[(unsigned char)c - 32];
     for (int col = 0; col < FONT_W; col++) {
         for (int row = 0; row < FONT_H; row++) {
-            if ((g[col] & (1u << row)) == 0u) { continue; }
+            if ((g[col] & (1u << (unsigned)row)) == 0u) { continue; }
             if (scale == 1) {
                 kiln_fb_pixel(fb, x + col, y + row, on);
             } else {
@@ -180,6 +186,8 @@ static void glyph(kiln_fb_t *fb, int x, int y, char c, int scale, bool on)
         }
     }
 }
+
+} // namespace
 
 void kiln_fb_text(kiln_fb_t *fb, int x, int y, const char *s, int scale, bool on)
 {

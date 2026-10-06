@@ -22,7 +22,7 @@
 #include "kiln/err.h"
 #include "kiln/types.h"
 
-#define KILN_TUNE_MAX_CYCLES 8
+constexpr size_t KILN_TUNE_MAX_CYCLES = 8;
 
 typedef enum {
     KILN_TUNE_IDLE = 0,

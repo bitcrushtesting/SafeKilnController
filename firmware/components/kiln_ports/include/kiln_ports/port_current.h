@@ -26,8 +26,8 @@
  * case is the highest sample rate at the lowest mains frequency: 8 kHz / 50 Hz
  * is 160 samples per cycle, and two cycles give the averaging a comfortable
  * margin, so 512 bounds every configuration the hardware supports. */
-#define KILN_CUR_BURST_MAX      512
-#define KILN_CUR_RATE_MIN_HZ    1000u   /* FR-CUR-03 */
+constexpr size_t KILN_CUR_BURST_MAX     = 512;
+constexpr uint32_t KILN_CUR_RATE_MIN_HZ = 1000u;  /* FR-CUR-03 */
 
 /* Which commanded interval a burst was taken in.  Not "what the current was" --
  * what the controller was *asking* for at the time, which is the whole content

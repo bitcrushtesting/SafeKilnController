@@ -15,14 +15,14 @@
 #include "kiln/types.h"
 #include "kiln_ports/port_logstore.h"
 
-#define KILN_LOG_MAGIC          0x474F4C4BU    /* "KLOG" little endian */
-#define KILN_LOG_FORMAT_VERSION 1
+constexpr uint32_t KILN_LOG_MAGIC          = 0x474F4C4BU;  /* "KLOG" little endian */
+constexpr uint16_t KILN_LOG_FORMAT_VERSION = 1;
 
 /* Flags packed into the high nibble of state_flags. */
-#define KILN_LOGF_HOLDBACK   (1u << 4)
-#define KILN_LOGF_SATURATED  (1u << 5)
-#define KILN_LOGF_TC_FAULT   (1u << 6)
-#define KILN_LOGF_WALL_VALID (1u << 7)
+constexpr uint32_t KILN_LOGF_HOLDBACK   = 1u << 4u;
+constexpr uint32_t KILN_LOGF_SATURATED  = 1u << 5u;
+constexpr uint32_t KILN_LOGF_TC_FAULT   = 1u << 6u;
+constexpr uint32_t KILN_LOGF_WALL_VALID = 1u << 7u;
 
 /* FR-LOG-04: besides the periodic sample, a record is written out of band on
  * every state transition, fault, warning, configuration change and operator
@@ -80,8 +80,11 @@ typedef struct {
 void       kiln_logrec_encode_hdr(const kiln_log_sector_hdr_t *h, uint8_t out[KILN_LOG_HEADER_BYTES]);
 kiln_err_t kiln_logrec_decode_hdr(const uint8_t in[KILN_LOG_HEADER_BYTES], kiln_log_sector_hdr_t *out);
 
+constexpr uint16_t KILN_CRC16_INIT = 0xFFFFu;
+
 uint8_t  kiln_crc8(const uint8_t *data, size_t len);
 uint16_t kiln_crc16(const uint8_t *data, size_t len);
+uint16_t kiln_crc16_update(uint16_t crc, const uint8_t *data, size_t len);
 
 /* --- decimation (FR-LOG-10, FR-LOG-11) ---------------------------------- */
 

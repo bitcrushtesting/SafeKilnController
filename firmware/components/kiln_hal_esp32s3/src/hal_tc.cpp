@@ -47,7 +47,11 @@
 #include "kiln_hal/board_pins.h"
 #include "kiln_hal/hal_esp32s3.h"
 
-static const char *TAG = "hal_tc";
+namespace {
+
+const char *TAG = "hal_tc";
+
+} // namespace
 
 /* --- register map ------------------------------------------------------- */
 
@@ -72,13 +76,19 @@ enum : uint8_t {
  * is the right way round next to a switching multi-kilowatt load (HR-15). */
 enum : uint8_t { CR1_AVG_4 = 0x20 };
 
-/* Fault status register bits. */
-enum : uint8_t {
-    SR_CJ_RANGE = 0x80, SR_TC_RANGE = 0x40,
-    SR_CJ_HIGH  = 0x20, SR_CJ_LOW   = 0x10,
-    SR_TC_HIGH  = 0x08, SR_TC_LOW   = 0x04,
-    SR_OVUV     = 0x02, SR_OPEN     = 0x01,
+/* Fault status register bits.  Unsigned underlying type, unlike the register
+ * addresses above: these are OR-ed together into masks, and a uint8_t
+ * enumerator promotes to *int* first, which makes the whole mask a signed
+ * bitwise operation (bugprone-signed-bitwise).  The register is still 8 bits
+ * wide; only the arithmetic changes. */
+enum : unsigned {
+    SR_CJ_RANGE = 0x80u, SR_TC_RANGE = 0x40u,
+    SR_CJ_HIGH  = 0x20u, SR_CJ_LOW   = 0x10u,
+    SR_TC_HIGH  = 0x08u, SR_TC_LOW   = 0x04u,
+    SR_OVUV     = 0x02u, SR_OPEN     = 0x01u,
 };
+
+namespace {
 
 typedef struct {
     spi_device_handle_t dev;
@@ -88,12 +98,12 @@ typedef struct {
 
 /* Two devices, fixed at build time by the board (HR-02).  A static pair in the
  * adapter, not a global in the core: AD-03's rule is about kiln_core. */
-static tc_dev_t  s_dev[2];
-static bool      s_bus_ready;
+tc_dev_t  s_dev[2];
+bool      s_bus_ready;
 
 /* --- register access ---------------------------------------------------- */
 
-static kiln_err_t reg_write(tc_dev_t *d, uint8_t addr, uint8_t value)
+kiln_err_t reg_write(tc_dev_t *d, uint8_t addr, uint8_t value)
 {
     uint8_t tx[2] = { (uint8_t)(addr | REG_WRITE), value };
     spi_transaction_t t = {};
@@ -105,7 +115,7 @@ static kiln_err_t reg_write(tc_dev_t *d, uint8_t addr, uint8_t value)
 /* Burst read of `len` registers from `addr`.  One transaction, because the
  * temperature and the fault status have to describe the same conversion: two
  * transactions could straddle one and report a reading the fault bits disown. */
-static kiln_err_t reg_read(tc_dev_t *d, uint8_t addr, uint8_t *out, size_t len)
+kiln_err_t reg_read(tc_dev_t *d, uint8_t addr, uint8_t *out, size_t len)
 {
     uint8_t tx[8] = { addr };
     uint8_t rx[8] = {};
@@ -125,9 +135,9 @@ static kiln_err_t reg_read(tc_dev_t *d, uint8_t addr, uint8_t *out, size_t len)
 
 /* --- port_tc ------------------------------------------------------------ */
 
-static kiln_err_t tc_configure(void *ctx, kiln_tc_type_t type, uint8_t line_filter_hz)
+kiln_err_t tc_configure(void *ctx, kiln_tc_type_t type, uint8_t line_filter_hz)
 {
-    tc_dev_t *d = (tc_dev_t *)ctx;
+    tc_dev_t *d = static_cast<tc_dev_t *>(ctx);
     if ((d == nullptr) || (d->dev == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -176,7 +186,9 @@ static kiln_err_t tc_configure(void *ctx, kiln_tc_type_t type, uint8_t line_filt
     return KILN_OK;
 }
 
-static uint16_t decode_faults(uint8_t sr)
+/* sr is taken as unsigned, not uint8_t: a uint8_t argument promotes to int at
+ * every one of the masks below. */
+uint16_t decode_faults(unsigned sr)
 {
     uint16_t bits = 0;
     if ((sr & SR_OPEN) != 0u)                       { bits |= KILN_TC_FAULT_OPEN; }
@@ -190,9 +202,9 @@ static uint16_t decode_faults(uint8_t sr)
     return bits;
 }
 
-static kiln_err_t tc_read(void *ctx, kiln_tc_reading_t *out)
+kiln_err_t tc_read(void *ctx, kiln_tc_reading_t *out)
 {
-    tc_dev_t *d = (tc_dev_t *)ctx;
+    tc_dev_t *d = static_cast<tc_dev_t *>(ctx);
     if ((d == nullptr) || (out == nullptr) || (d->dev == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -223,20 +235,37 @@ static kiln_err_t tc_read(void *ctx, kiln_tc_reading_t *out)
         return KILN_ERR_IO;
     }
 
-    /* Cold junction: 14-bit signed, 2^-6 degC per LSB (FR-ACQ-04). */
-    const int16_t cj_raw = (int16_t)(((uint16_t)r[0] << 8) | r[1]);
+    /* Cold junction: 14-bit signed, 2^-6 degC per LSB (FR-ACQ-04).
+     *
+     * Assembled unsigned and then reinterpreted as signed, rather than shifted
+     * as a signed value.  The hot junction below is why this matters rather
+     * than being a matter of taste: r[2] << 24 with r[2] >= 0x80 overflows
+     * int32_t, which is undefined behaviour, and 0x80 is exactly the case that
+     * says "below zero".  Done in uint32_t the shift is defined for every
+     * input, and the conversion back is the two's-complement reinterpretation
+     * the part's datasheet describes. */
+    const uint16_t cj_bits = (uint16_t)(((uint32_t)r[0] << 8u) | (uint32_t)r[1]);
+    const int16_t  cj_raw  = (int16_t)cj_bits;
+    /* NOLINTNEXTLINE(bugprone-signed-bitwise) -- arithmetic shift, see below */
     out->cj_c = (float)(cj_raw >> 2) / 64.0f;
 
-    /* Linearised hot junction: 19-bit signed, 2^-7 degC per LSB.  Sign-extend
-     * through a signed 32-bit shift rather than masking, so a negative reading
-     * stays negative -- which SR-05 depends on, since a reversed couple is
-     * detected by the reading *falling*. */
-    int32_t tc_raw = ((int32_t)r[2] << 24) | ((int32_t)r[3] << 16) | ((int32_t)r[4] << 8);
+    /* Linearised hot junction: 19-bit signed, 2^-7 degC per LSB. */
+    const uint32_t tc_bits = ((uint32_t)r[2] << 24u) | ((uint32_t)r[3] << 16u) |
+                             ((uint32_t)r[4] << 8u);
+    const int32_t  tc_raw  = (int32_t)tc_bits;
+    /* The shift back down is deliberately signed, which is the one case where
+     * bugprone-signed-bitwise has to be overruled rather than satisfied: an
+     * arithmetic shift sign-extends, and SR-05 depends on a negative reading
+     * staying negative, because a reversed couple is detected by the reading
+     * *falling*.  A logical shift would read -1 degC as +524 287.
+     * NOLINTNEXTLINE(bugprone-signed-bitwise) */
     out->temp_c = (float)(tc_raw >> 13) / 128.0f;
 
     out->fault_bits = decode_faults(r[5]);
     return KILN_OK;
 }
+
+} // namespace
 
 /* --- construction ------------------------------------------------------- */
 

@@ -11,9 +11,10 @@
  * component in the first place -- the logic belongs where a host test can reach
  * it (AD-01, AD-14).
  *
- * Not here yet: the LittleFS file store. LittleFS is not in the IDF tree and CON-04 forbids a
- * build-time fetch, so it has to be vendored rather than pulled as a managed
- * component.
+ * Deliberately not here: the file store.  Like the log ring it is logic with
+ * failure modes a host test has to be able to cut power on, so it lives in
+ * kiln_core/fileslots over a second instance of this component's port_flash
+ * (AD-21).  This component contributes the partition, not the format.
  *
  * Pin assignments are in board_pins.h and nowhere else (HR-10).
  */
@@ -38,6 +39,7 @@
 
 /* The raw log partition of architecture 10.1 (`kilnlog`, type 0x40). */
 #define KILN_HAL_LOG_PARTITION "kilnlog"
+#define KILN_HAL_FS_PARTITION  "kilnfs"
 
 /* Open the named data partition for the log ring.  Returns KILN_ERR_NOT_FOUND
  * when the partition table has no such entry, which is a build configuration

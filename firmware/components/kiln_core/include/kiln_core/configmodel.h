@@ -21,12 +21,12 @@
 #include "kiln/err.h"
 #include "kiln/types.h"
 
-#define KILN_CFG_SCHEMA_VERSION 1
+constexpr uint16_t KILN_CFG_SCHEMA_VERSION = 1;
 
-#define KILN_CFG_STR_LEN     33       /* WiFi SSID is 32 + NUL */
-#define KILN_CFG_PASS_LEN    65
-#define KILN_CFG_HOST_LEN    32
-#define KILN_CFG_GAINSET_LEN 24
+constexpr size_t KILN_CFG_STR_LEN     = 33;  /* WiFi SSID is 32 + NUL */
+constexpr size_t KILN_CFG_PASS_LEN    = 65;
+constexpr size_t KILN_CFG_HOST_LEN    = 32;
+constexpr size_t KILN_CFG_GAINSET_LEN = 24;
 
 typedef enum {
     KILN_CFG_T_BOOL = 0,
@@ -38,13 +38,13 @@ typedef enum {
 } kiln_cfg_type_t;
 
 /* FR-CFG-07: never serialised outward; the API reports only "set": true|false. */
-#define KILN_CFG_F_SECRET            (1u << 0)
+constexpr uint32_t KILN_CFG_F_SECRET = 1u << 0u;
 /* FR-CFG-04: takes effect only after a restart. */
-#define KILN_CFG_F_REBOOT            (1u << 1)
+constexpr uint32_t KILN_CFG_F_REBOOT = 1u << 1u;
 /* FR-CFG-08: safety-relevant, so refused while a run is in progress. */
-#define KILN_CFG_F_SAFETY            (1u << 2)
+constexpr uint32_t KILN_CFG_F_SAFETY = 1u << 2u;
 /* Not safety-relevant, but meaningless to change mid-run. */
-#define KILN_CFG_F_LOCKED_RUNNING    (1u << 3)
+constexpr uint32_t KILN_CFG_F_LOCKED_RUNNING = 1u << 3u;
 
 typedef struct {
     const char            *key;        /* stable API and NVS name            */
@@ -210,7 +210,7 @@ bool kiln_config_reboot_required(const kiln_config_t *a, const kiln_config_t *b)
 
 /* The stored blob is the struct plus a header and a CRC.  Fixed layout, so a
  * migration is a question of version rather than of parsing. */
-#define KILN_CFG_BLOB_MAGIC 0x47464343U   /* "CCFG" */
+constexpr uint32_t KILN_CFG_BLOB_MAGIC = 0x47464343U;  /* "CCFG" */
 
 size_t     kiln_config_blob_size(void);
 kiln_err_t kiln_config_encode(const kiln_config_t *cfg, void *out, size_t cap, size_t *len);

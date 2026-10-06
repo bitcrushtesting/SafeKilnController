@@ -147,7 +147,7 @@ divergences drive many requirements below:
 | MCU | ESP32-WROVER | ESP32-S3 ([HR-01](#6-hardware-interface-requirements)) | Explicit requirement |
 | TC front-end | MAX31855 (K only, ≤1350 °C) | MAX31856 (K/N/S/R/B/E/J/T, richer fault detection) | Diagnosability, [SR-04](#5-safety-requirements) |
 | PID gains | Manually tuned, documented by experiment | Automatic tuning on-device ([FR-TUN](#33-automatic-pid-tuning-fr-tun)) | Explicit requirement |
-| Storage | SPIFFS on internal flash, microSD board recommended | LittleFS + dedicated raw log partition, no SD card ([CON-03](#8-constraints)) | Explicit requirement |
+| Storage | SPIFFS on internal flash, microSD board recommended | Dedicated raw partitions, fixed slots for programs and run records and a circular ring for the log, no SD card and no filesystem ([CON-03](#8-constraints)) | Explicit requirement |
 | Heater current | Optional 30 A/1 V power meter, not used for protection | **Mandatory** current transformer driving relay fail-on / fail-off detection and weld discrimination ([FR-CUR](#312-heater-current-measurement-fr-cur), [SR-25](#52-detection-requirements)–[SR-30](#52-detection-requirements)) | Explicit requirement; resolves [OQ-02](#11-open-questions) |
 | Architecture | Arduino sketch, hardware access throughout | Layered, HAL-isolated, host-testable core ([TR](#7-testability-requirements)) | Explicit requirement: design for testability |
 

@@ -31,8 +31,8 @@
 #include "kiln_hmi/draw.h"
 #include "kiln_ports/port_input.h"
 
-#define KILN_HMI_MAX_PROGRAMS   20     /* FR-PRG: the store's slot count */
-#define KILN_HMI_NAME_LEN       24
+constexpr size_t KILN_HMI_MAX_PROGRAMS = 20;  /* FR-PRG: the store's slot count */
+constexpr size_t KILN_HMI_NAME_LEN     = 24;
 
 /* What the operator may set in motion from the local input (FR-HMI-10). */
 typedef enum {

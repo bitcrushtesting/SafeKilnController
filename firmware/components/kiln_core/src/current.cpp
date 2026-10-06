@@ -40,59 +40,71 @@ void kiln_current_cfg_defaults(kiln_current_cfg_t *cfg)
     *cfg = d;
 }
 
+namespace {
+
 /* Clamp the configuration into the ranges the requirements state, and report
  * whether anything had to be moved -- NFR-17 calls a silently corrected
  * configuration a defect, so the caller is told. */
-static bool clamp_cfg(kiln_current_cfg_t *c)
+bool clamp_cfg(kiln_current_cfg_t *c)
 {
-    const kiln_current_cfg_t in = *c;
+    bool moved = false;
 
     if (c->sample_rate_hz < KILN_CUR_RATE_MIN_HZ) {
         c->sample_rate_hz = KILN_CUR_RATE_MIN_HZ;
+        moved             = true;
     }
     if (c->sample_rate_hz > 100000u) {
         c->sample_rate_hz = 100000u;
+        moved             = true;
     }
     if (c->mains_hz != 50u && c->mains_hz != 60u) {
         c->mains_hz = 50u;
+        moved       = true;
     }
     if (c->cycles_per_burst == 0u) {
         c->cycles_per_burst = 1u;
+        moved               = true;
     }
     if (c->settle_ms > 200u) {
         c->settle_ms = 200u; /* FR-CUR-04 */
+        moved        = true;
     }
     if (c->remeasure_ms == 0u) {
         c->remeasure_ms = 250u;
+        moved           = true;
     }
 
-    c->cal_gain = kiln_clampf(c->cal_gain, 0.50f, 2.00f);                /* FR-CUR-06 */
+    moved |= kiln_clampf_moved(&c->cal_gain, 0.50f, 2.00f); /* FR-CUR-06 */
     if (!kiln_is_finite(c->zero_offset_a)) {
         c->zero_offset_a = 0.0f;
+        moved            = true;
     }
     if (!kiln_is_finite(c->ct_a_per_v) || c->ct_a_per_v <= 0.0f) {
         c->ct_a_per_v = 120.0f;
+        moved         = true;
     }
     if (!kiln_is_finite(c->adc_v_per_count) || c->adc_v_per_count <= 0.0f) {
         c->adc_v_per_count = 3.3f / 4095.0f;
+        moved              = true;
     }
-    c->noise_floor_counts = kiln_clampf(c->noise_floor_counts, 0.0f, 100.0f);
+    moved |= kiln_clampf_moved(&c->noise_floor_counts, 0.0f, 100.0f);
     if (c->bias_max_counts <= c->bias_min_counts) {
         c->bias_min_counts = 1600u;
         c->bias_max_counts = 2500u;
+        moved              = true;
     }
-    c->mains_v        = kiln_clampf(c->mains_v, 0.0f, 500.0f);
-    c->nominal_a      = kiln_clampf(c->nominal_a, 0.0f, 200.0f);
-    c->ref_cold_max_c = kiln_clampf(c->ref_cold_max_c, 20.0f, 600.0f);
-    c->ref_min_frac   = kiln_clampf(c->ref_min_frac, 0.05f, 0.95f);
-    c->ref_max_frac   = kiln_clampf(c->ref_max_frac, 1.05f, 5.0f);
+    moved |= kiln_clampf_moved(&c->mains_v, 0.0f, 500.0f);
+    moved |= kiln_clampf_moved(&c->nominal_a, 0.0f, 200.0f);
+    moved |= kiln_clampf_moved(&c->ref_cold_max_c, 20.0f, 600.0f);
+    moved |= kiln_clampf_moved(&c->ref_min_frac, 0.05f, 0.95f);
+    moved |= kiln_clampf_moved(&c->ref_max_frac, 1.05f, 5.0f);
     /* A plausible band for metallic and SiC elements; 0 disables. */
-    c->element_tc_per_c = kiln_clampf(c->element_tc_per_c, 0.0f, 0.01f);
+    moved |= kiln_clampf_moved(&c->element_tc_per_c, 0.0f, 0.01f);
 
-    return memcmp(&in, c, sizeof(in)) != 0;
+    return moved;
 }
 
-static void derive(kiln_current_t *c)
+void derive(kiln_current_t *c)
 {
     /* FR-CUR-03: a whole number of mains cycles.  Rounded up, so the burst is
      * never short of a cycle; the reduction trims to whole cycles using the rate
@@ -109,6 +121,8 @@ static void derive(kiln_current_t *c)
 
     c->amps_per_count = c->cfg.adc_v_per_count * c->cfg.ct_a_per_v;
 }
+
+} // namespace
 
 kiln_err_t kiln_current_init(kiln_current_t *c, const kiln_current_cfg_t *cfg)
 {
@@ -169,20 +183,24 @@ void kiln_current_begin_run(kiln_current_t *c)
 
 /* --- gating, FR-CUR-04 and FR-CUR-05 ------------------------------------ */
 
+namespace {
+
 /* Milliseconds one burst occupies at the configured rate. */
-static uint32_t burst_ms(const kiln_current_t *c)
+uint32_t burst_ms(const kiln_current_t *c)
 {
     const uint32_t ms = ((uint32_t)c->samples_per_burst * 1000u + c->cfg.sample_rate_hz - 1u)
                       / c->cfg.sample_rate_hz;
     return (ms != 0u) ? ms : 1u;
 }
 
-static void mark_skipped(kiln_current_t *c)
+void mark_skipped(kiln_current_t *c)
 {
     c->gate   = KILN_CUR_GATE_SKIPPED;
     c->flags  = (uint8_t)(KILN_CURF_SKIPPED | KILN_CURF_STALE);
     c->skipped++;
 }
+
+} // namespace
 
 kiln_cur_action_t kiln_current_tick(kiln_current_t *c,
                                     kiln_cur_window_t window,
@@ -267,11 +285,13 @@ kiln_cur_action_t kiln_current_tick(kiln_current_t *c,
 
 /* --- reduction, FR-CUR-02, FR-CUR-03, FR-CUR-11 ------------------------- */
 
+namespace {
+
 /* True RMS of the AC component.  The DC bias is measured rather than assumed,
  * because HR-17's mid-rail divider is a real resistor pair whose centre moves
  * with temperature and supply -- and because where it sits is itself the
  * FR-CUR-11 evidence that a transformer is connected at all. */
-static void reduce(const kiln_cur_burst_t *b, uint16_t n,
+void reduce(const kiln_cur_burst_t *b, uint16_t n,
                    float *bias_out, float *rms_out)
 {
     double sum = 0.0;
@@ -292,7 +312,7 @@ static void reduce(const kiln_cur_burst_t *b, uint16_t n,
 
 /* Keep the pool sorted on insert, so the median is just the middle element and
  * there is no scratch buffer or qsort in the core. */
-static void ref_pool_insert(kiln_current_t *c, float a)
+void ref_pool_insert(kiln_current_t *c, float a)
 {
     if (c->ref_pool_count >= KILN_CUR_REF_SAMPLES) {
         return;
@@ -322,6 +342,8 @@ static void ref_pool_insert(kiln_current_t *c, float a)
         }
     }
 }
+
+} // namespace
 
 kiln_err_t kiln_current_push_burst(kiln_current_t *c, const kiln_cur_burst_t *b)
 {

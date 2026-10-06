@@ -22,10 +22,16 @@
 
 #include "kiln_hal/hal_esp32s3.h"
 
-static const char *TAG = "hal_counters";
+namespace {
+
+const char *TAG = "hal_counters";
+
+} // namespace
 
 #define CTR_NAMESPACE "kiln_ctr"
 #define CTR_KEY       "switch"
+
+namespace {
 
 typedef struct {
     kiln_switch_counters_t live;      /* loaded total plus this session's adds */
@@ -33,9 +39,9 @@ typedef struct {
     bool                   loaded;
 } ctr_t;
 
-static ctr_t s_ctr;
+ctr_t s_ctr;
 
-static bool differs(const kiln_switch_counters_t *a, const kiln_switch_counters_t *b)
+bool differs(const kiln_switch_counters_t *a, const kiln_switch_counters_t *b)
 {
     if (a->contactor_ops != b->contactor_ops) {
         return true;
@@ -48,9 +54,9 @@ static bool differs(const kiln_switch_counters_t *a, const kiln_switch_counters_
     return false;
 }
 
-static kiln_err_t ctr_load(void *ctx, kiln_switch_counters_t *out)
+kiln_err_t ctr_load(void *ctx, kiln_switch_counters_t *out)
 {
-    ctr_t *s = (ctr_t *)ctx;
+    ctr_t *s = static_cast<ctr_t *>(ctx);
     if ((s == nullptr) || (out == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -85,25 +91,25 @@ static kiln_err_t ctr_load(void *ctx, kiln_switch_counters_t *out)
     return KILN_OK;
 }
 
-static void ctr_add_contactor(void *ctx, uint32_t n)
+void ctr_add_contactor(void *ctx, uint32_t n)
 {
-    ctr_t *s = (ctr_t *)ctx;
+    ctr_t *s = static_cast<ctr_t *>(ctx);
     if (s != nullptr) {
         s->live.contactor_ops += n;        /* RAM only: see the header comment */
     }
 }
 
-static void ctr_add_ssr(void *ctx, uint8_t channel, uint32_t n)
+void ctr_add_ssr(void *ctx, uint8_t channel, uint32_t n)
 {
-    ctr_t *s = (ctr_t *)ctx;
+    ctr_t *s = static_cast<ctr_t *>(ctx);
     if ((s != nullptr) && (channel < KILN_HEAT_CHANNELS)) {
         s->live.ssr_ops[channel] += n;
     }
 }
 
-static kiln_err_t ctr_flush(void *ctx)
+kiln_err_t ctr_flush(void *ctx)
 {
-    ctr_t *s = (ctr_t *)ctx;
+    ctr_t *s = static_cast<ctr_t *>(ctx);
     if (s == nullptr) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -128,9 +134,9 @@ static kiln_err_t ctr_flush(void *ctx)
     return e;
 }
 
-static kiln_err_t ctr_reset(void *ctx, const kiln_switch_counters_t *to)
+kiln_err_t ctr_reset(void *ctx, const kiln_switch_counters_t *to)
 {
-    ctr_t *s = (ctr_t *)ctx;
+    ctr_t *s = static_cast<ctr_t *>(ctx);
     if ((s == nullptr) || (to == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -140,6 +146,8 @@ static kiln_err_t ctr_reset(void *ctx, const kiln_switch_counters_t *to)
     s->loaded = true;
     return ctr_flush(ctx);
 }
+
+} // namespace
 
 kiln_err_t kiln_hal_counters_init(kiln_port_counters_t *out)
 {

@@ -77,7 +77,7 @@ typedef struct {
 /* Architecture 13.4 budgets 64 records for the log queue.  The control task
  * enqueues and only the logger touches flash (FR-LOG-14), so a full queue drops
  * the sample and counts it rather than stalling control. */
-#define KILN_APP_LOG_QUEUE 64
+constexpr size_t KILN_APP_LOG_QUEUE = 64;
 
 typedef struct {
     kiln_config_t    cfg;

@@ -62,7 +62,7 @@ KILN_TEST(sr25_latches_nothing_before_the_configured_window_count)
     leakage(&in, 1.0f);                       /* well over the 0.5 A threshold */
 
     /* One window is not two: a single measurement must not stop a firing. */
-    kiln_safety_verdict_t v = kiln_safety_eval(&s, &in, 0.1f);
+    const kiln_safety_verdict_t v = kiln_safety_eval(&s, &in, 0.1f);
     CHECK(v.heat_permitted);
     CHECK_EQ_INT(v.fault, KILN_FAULT_NONE);
     CHECK(!v.drop_contactor);
@@ -624,7 +624,7 @@ KILN_TEST(sr27_welded_contactor_is_never_clearable_by_acknowledgement)
 KILN_TEST(sr18_can_clear_is_an_allow_list_not_a_deny_list)
 {
     const kiln_safety_cfg_t c = cfg();
-    kiln_safety_input_t in = base();
+    const kiln_safety_input_t in = base();
 
     /* A code outside the enum stands in for the next fault someone adds: it must
      * default to needing a decision, not to being clearable. */

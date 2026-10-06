@@ -35,12 +35,12 @@ static kiln_hmi_view_t base_view(void)
     v.language          = KILN_LANG_EN;
     v.elapsed_s         = 3725;
     v.program_count     = 3;
-    snprintf(v.program_name[0], KILN_HMI_NAME_LEN, "Bisque 1000");
-    snprintf(v.program_name[1], KILN_HMI_NAME_LEN, "Glaze cone 6");
-    snprintf(v.program_name[2], KILN_HMI_NAME_LEN, "Test fire");
-    snprintf(v.hostname, sizeof(v.hostname), "kiln.local");
-    snprintf(v.ip, sizeof(v.ip), "192.168.1.40");
-    snprintf(v.version, sizeof(v.version), "v0.1-abc1234");
+    (void)snprintf(v.program_name[0], KILN_HMI_NAME_LEN, "Bisque 1000");
+    (void)snprintf(v.program_name[1], KILN_HMI_NAME_LEN, "Glaze cone 6");
+    (void)snprintf(v.program_name[2], KILN_HMI_NAME_LEN, "Test fire");
+    (void)snprintf(v.hostname, sizeof(v.hostname), "kiln.local");
+    (void)snprintf(v.ip, sizeof(v.ip), "192.168.1.40");
+    (void)snprintf(v.version, sizeof(v.version), "v0.1-abc1234");
     return v;
 }
 
@@ -51,7 +51,7 @@ static int ink(const kiln_hmi_t *h, int x0, int y0, int w, int hgt)
     for (int y = y0; y < y0 + hgt && y < KILN_DISPLAY_H; y++) {
         for (int x = x0; x < x0 + w && x < KILN_DISPLAY_W; x++) {
             const uint8_t b = kiln_hmi_frame(h)[(y / 8) * KILN_DISPLAY_W + x];
-            if ((b & (1u << (y % 8))) != 0u) { n++; }
+            if ((b & (1u << ((unsigned)y % 8u))) != 0u) { n++; }
         }
     }
     return n;

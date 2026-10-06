@@ -22,7 +22,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define KILN_JSON_MAX_DEPTH 12
+constexpr size_t KILN_JSON_MAX_DEPTH = 12;
 
 /* --- writing ----------------------------------------------------------- */
 

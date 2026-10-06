@@ -130,11 +130,65 @@ jobs:
             "/usr/bin/clang-tidy-${LLVM_VERSION}" 100
           clang-tidy --version
 
-      - name: Generate the compile database
-        run: cmake -B build-host -S firmware/test/host -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+      - name: Generate the compile databases
+        run: |
+          cmake -B build-host -S firmware/test/host -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          cmake -B build-webhost -S firmware/host/webhost -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
+      # Covers both databases: the host build and host/webhost, which is its own
+      # CMake project and went unanalysed until tasklist F1b.  The third, the
+      # ESP-IDF adapter layer, needs the target toolchain and is the job below.
       - name: Analyse
         run: tools/tidy.sh
+
+  # --- NFR-25 / TR-24: static analysis, target side (tasklist F1b) --------
+  #
+  # kiln_hal_esp32s3 cannot be analysed from the host database -- it needs the
+  # ESP-IDF and xtensa headers -- so it is driven from the database idf.py
+  # emits, inside the same container that produced it.  clang-tidy is not in
+  # that image, so it is installed there.
+  #
+  # The reason this is a job of its own rather than a step bolted onto
+  # `firmware`: it must be able to fail on its own terms.  tools/tidy-target.sh
+  # refuses to report clean unless it can prove it built an AST for every one
+  # of our translation units, because the obvious failure here is not a red
+  # build -- it is a green one that analysed nothing.
+  tidy-target:
+    name: Static analysis (esp32s3 adapters)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and analyse inside the IDF container
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: ${{ env.IDF_VERSION }}
+          target: esp32s3
+          path: firmware
+          command: |
+            export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.qemu"
+            idf.py build
+            # The image is Debian; clang-tidy comes from apt.llvm.org at the
+            # same pinned version the host-side job uses, so the two cannot
+            # disagree about which checks exist.
+            apt-get update -qq
+            apt-get install -y -qq wget gnupg lsb-release software-properties-common
+            wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+              | tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc >/dev/null
+            add-apt-repository -y \
+              "deb http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-${LLVM_VERSION} main"
+            apt-get update -qq
+            apt-get install -y -qq "clang-tidy-${LLVM_VERSION}"
+            update-alternatives --install /usr/bin/clang-tidy clang-tidy \
+              "/usr/bin/clang-tidy-${LLVM_VERSION}" 100
+            clang-tidy --version
+            # IDF_TOOLS_PATH is /opt/esp in this image; the script needs it to
+            # find the xtensa picolibc headers, and fails loudly without them
+            # rather than analysing nothing and calling it clean.
+            cd "$GITHUB_WORKSPACE"
+            tools/tidy-target.sh
+        env:
+          LLVM_VERSION: ${{ env.LLVM_VERSION }}
 
   # TR-19.  The line floor is enforced; measured at 97.5 % on kiln_core when
   # this was written, so 90 % is a floor with room above it rather than a

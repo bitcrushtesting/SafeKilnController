@@ -6,6 +6,8 @@
 #include <cstddef>
 #include <iterator>
 
+namespace {
+
 /* Each entry carries its own code, so the table's index relationship can be
  * asserted at compile time.  C++ has no array designators, and the bare
  * positional array a straight translation would give silently shifts every
@@ -33,7 +35,7 @@ typedef struct {
 } warn_entry_t;
 
 /* Indexed by kiln_fault_t; order is load-bearing and checked by a unit test. */
-static constexpr fault_entry_t k_faults[] = {
+constexpr fault_entry_t k_faults[] = {
     { KILN_FAULT_NONE,
         { "OK", "OK" },
         { "No fault",
@@ -176,7 +178,7 @@ static constexpr fault_entry_t k_faults[] = {
         "SR-31" },
 };
 
-static constexpr warn_entry_t k_warns[] = {
+constexpr warn_entry_t k_warns[] = {
     { KILN_WARN_INSULATION,
         { "INSULATION", "ISOLIERUNG" },
         { "This firing needed noticeably more energy than usual. Insulation or elements may be degrading.",
@@ -256,6 +258,8 @@ constexpr bool indexed_by_code(const T (&table)[N])
     return true;
 }
 
+} // namespace
+
 static_assert(std::size(k_faults) == KILN_FAULT_MAX,
               "k_faults must have one row per kiln_fault_t");
 static_assert(indexed_by_code<kiln_fault_t>(k_faults),
@@ -265,9 +269,11 @@ static_assert(std::size(k_warns) == KILN_WARN_COUNT,
 static_assert(indexed_by_code<kiln_warn_bit_t>(k_warns),
               "k_warns must be indexed by kiln_warn_bit_t");
 
+namespace {
+
 /* Seven entries, so a switch costs nothing and -Wswitch-enum makes a new state
  * a compile error until it is named. */
-static const char *state_name(kiln_state_t state)
+const char *state_name(kiln_state_t state)
 {
     switch (state) {
     case KILN_STATE_IDLE:     return "IDLE";
@@ -285,16 +291,18 @@ static const char *state_name(kiln_state_t state)
 /* A language outside the table, or one whose column was left empty, falls back
  * to English.  An operator who sees English has a worse day than one who sees
  * German; an operator who sees nothing cannot act at all. */
-static kiln_lang_t lang_ok(kiln_lang_t lang)
+kiln_lang_t lang_ok(kiln_lang_t lang)
 {
     return ((unsigned)lang < (unsigned)KILN_LANG_COUNT) ? lang : KILN_LANG_EN;
 }
 
-static const char *pick(const char *const by_lang[KILN_LANG_COUNT], kiln_lang_t lang)
+const char *pick(const char *const by_lang[KILN_LANG_COUNT], kiln_lang_t lang)
 {
     const char *v = by_lang[lang_ok(lang)];
     return (v != nullptr && v[0] != '\0') ? v : by_lang[KILN_LANG_EN];
 }
+
+} // namespace
 
 const char *kiln_lang_tag(kiln_lang_t lang)
 {

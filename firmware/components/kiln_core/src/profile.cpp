@@ -1,24 +1,27 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <math.h>
 #include <stddef.h>
 #include <string.h>
 #include "kiln_core/profile.h"
 
-static kiln_prog_validation_t ok_result(void)
+namespace {
+
+kiln_prog_validation_t ok_result(void)
 {
     kiln_prog_validation_t r = { KILN_PROG_OK, KILN_SEG_NONE };
     return r;
 }
 
-static kiln_prog_validation_t fail(kiln_prog_valid_t code, uint8_t seg)
+kiln_prog_validation_t fail(kiln_prog_valid_t code, uint8_t seg)
 {
     kiln_prog_validation_t r = { code, seg };
     return r;
 }
 
 /* A fixed array is a C string only if it contains a NUL. */
-static bool terminated(const char *buf, size_t cap)
+bool terminated(const char *buf, size_t cap)
 {
     for (size_t i = 0; i < cap; i++) {
         if (buf[i] == '\0') {
@@ -27,6 +30,8 @@ static bool terminated(const char *buf, size_t cap)
     }
     return false;
 }
+
+} // namespace
 
 void kiln_profile_terminate_strings(kiln_program_t *p)
 {
@@ -148,7 +153,10 @@ uint32_t kiln_profile_duration_s(const kiln_program_t *p, float start_c)
     if (total > (double)UINT32_MAX) {
         return UINT32_MAX;
     }
-    return (uint32_t)(total + 0.5);
+    /* Bounded to [0, UINT32_MAX] just above, so the rounding direction cannot
+     * matter -- llround() rather than lround() because long is 32 bits on the
+     * target and UINT32_MAX does not fit it. */
+    return (uint32_t)llround(total);
 }
 
 float kiln_profile_peak_c(const kiln_program_t *p)
@@ -182,6 +190,8 @@ void kiln_profile_init_empty(kiln_program_t *p, const char *name)
 
 /* --- built-in examples, FR-PRG-09 -------------------------------------- */
 
+namespace {
+
 typedef struct {
     const char    *name;
     const char    *desc;
@@ -189,7 +199,7 @@ typedef struct {
     kiln_segment_t segs[8];
 } example_t;
 
-static const example_t k_examples[] = {
+const example_t k_examples[] = {
     {
         "Bisque cone 06", "Slow bisque firing with a preheat and a hold at top.", 5,
         {
@@ -223,6 +233,8 @@ static const example_t k_examples[] = {
         }
     },
 };
+
+} // namespace
 
 uint8_t kiln_profile_example_count(void)
 {

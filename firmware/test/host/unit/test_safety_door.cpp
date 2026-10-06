@@ -162,7 +162,7 @@ KILN_TEST(sr31_a_fitted_and_shut_door_raises_no_warning)
     const kiln_safety_cfg_t c = cfg();
     kiln_safety_init(&s, &c);
 
-    kiln_safety_input_t in = base();
+    const kiln_safety_input_t in = base();
     const kiln_safety_verdict_t v = kiln_safety_eval(&s, &in, 0.1f);
     CHECK((v.warnings & KILN_WARN_BIT(KILN_WARN_DOOR_OFF)) == 0u);
 }

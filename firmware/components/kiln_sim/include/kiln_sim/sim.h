@@ -32,30 +32,36 @@
 
 /* --- fault injection (TR-27, architecture section 14.3) ----------------- */
 
-typedef enum {
+/* uint32_t rather than the implementation's choice: these are only ever used
+ * as a mask against kiln_sim_t.inject, which is a uint32_t, and an unscoped
+ * enum whose values all fit in int gets a *signed* underlying type -- which
+ * makes every KILN_INJ_A | KILN_INJ_B a signed bitwise operation
+ * (bugprone-signed-bitwise).  Not an ABI concern: nothing persists this and it
+ * crosses no port boundary. */
+typedef enum : uint32_t {
     /* electrical */
-    KILN_INJ_RELAY_FAIL_ON    = 1u << 0,   /* SR-25: current with duty 0      */
-    KILN_INJ_RELAY_FAIL_OFF   = 1u << 1,   /* SR-26: no current with duty > 0 */
-    KILN_INJ_CONTACTOR_WELD   = 1u << 2,   /* SR-27: current persists after
+    KILN_INJ_RELAY_FAIL_ON    = 1u << 0u,  /* SR-25: current with duty 0      */
+    KILN_INJ_RELAY_FAIL_OFF   = 1u << 1u,  /* SR-26: no current with duty > 0 */
+    KILN_INJ_CONTACTOR_WELD   = 1u << 2u,  /* SR-27: current persists after
                                             * the contactor is commanded open */
-    KILN_INJ_ELEMENT_PARTIAL  = 1u << 3,   /* SR-26, SR-28, SR-07            */
-    KILN_INJ_OVERCURRENT      = 1u << 4,   /* SR-29                          */
-    KILN_INJ_CT_DISCONNECTED  = 1u << 5,   /* FR-CUR-11, FR-CUR-12           */
-    KILN_INJ_SSR_SHORTED      = 1u << 6,   /* SR-08 and SR-25 together       */
+    KILN_INJ_ELEMENT_PARTIAL  = 1u << 3u,  /* SR-26, SR-28, SR-07            */
+    KILN_INJ_OVERCURRENT      = 1u << 4u,  /* SR-29                          */
+    KILN_INJ_CT_DISCONNECTED  = 1u << 5u,  /* FR-CUR-11, FR-CUR-12           */
+    KILN_INJ_SSR_SHORTED      = 1u << 6u,  /* SR-08 and SR-25 together       */
 
     /* sensing */
-    KILN_INJ_TC_OPEN          = 1u << 7,   /* SR-04                          */
-    KILN_INJ_TC_SHORT         = 1u << 8,
-    KILN_INJ_TC_RANGE         = 1u << 9,
-    KILN_INJ_TC_COMMS         = 1u << 10,
-    KILN_INJ_TC_REVERSED      = 1u << 11,  /* SR-05                          */
-    KILN_INJ_TC_STUCK         = 1u << 12,  /* SR-06                          */
-    KILN_INJ_TC_DRIFT         = 1u << 13,  /* FR-ACQ-08, SR-12               */
+    KILN_INJ_TC_OPEN          = 1u << 7u,  /* SR-04                          */
+    KILN_INJ_TC_SHORT         = 1u << 8u,
+    KILN_INJ_TC_RANGE         = 1u << 9u,
+    KILN_INJ_TC_COMMS         = 1u << 10u,
+    KILN_INJ_TC_REVERSED      = 1u << 11u, /* SR-05                          */
+    KILN_INJ_TC_STUCK         = 1u << 12u, /* SR-06                          */
+    KILN_INJ_TC_DRIFT         = 1u << 13u, /* FR-ACQ-08, SR-12               */
 
     /* plant */
-    KILN_INJ_LID_OPEN         = 1u << 14,  /* SR-07, FR-CTL-11               */
-    KILN_INJ_CASE_HEATING     = 1u << 15,  /* SR-11                          */
-    KILN_INJ_ELEMENT_OPEN     = 1u << 16,  /* SR-07 and SR-26                */
+    KILN_INJ_LID_OPEN         = 1u << 14u, /* SR-07, FR-CTL-11               */
+    KILN_INJ_CASE_HEATING     = 1u << 15u, /* SR-11                          */
+    KILN_INJ_ELEMENT_OPEN     = 1u << 16u, /* SR-07 and SR-26                */
 
     /* SR-31.  Separate from KILN_INJ_LID_OPEN on purpose: that one is the
      * *thermal* model -- an open lid losing heat, which is what SR-07 sees --
@@ -63,9 +69,9 @@ typedef enum {
      * is what lets a test exercise a switch that has failed open while the door
      * is shut, or a door genuinely open on a kiln with no interlock fitted.
      * A realistic "operator opened the door mid-firing" injects both. */
-    KILN_INJ_DOOR_SWITCH_OPEN = 1u << 17,
+    KILN_INJ_DOOR_SWITCH_OPEN = 1u << 17u,
     /* No interlock fitted at all -- stands SR-31 down, warning 113. */
-    KILN_INJ_DOOR_ABSENT      = 1u << 18,
+    KILN_INJ_DOOR_ABSENT      = 1u << 18u,
 } kiln_inject_t;
 
 typedef struct {
@@ -114,7 +120,7 @@ typedef struct {
 
 void kiln_sim_cfg_defaults(kiln_sim_cfg_t *cfg);
 
-#define KILN_SIM_DEAD_SLOTS 256
+constexpr size_t KILN_SIM_DEAD_SLOTS = 256;
 
 typedef struct {
     kiln_sim_cfg_t cfg;
@@ -187,11 +193,11 @@ typedef struct {
 
 /* --- a RAM file store ---------------------------------------------------- */
 
-/* Programs and run records need somewhere to go, and the LittleFS adapter does
- * not exist yet -- it is not in the IDF tree and CON-04 forbids pulling it at
- * build time, so it has to be vendored.  Until then this stands in, so the
- * persistence path of FR-PRG and FR-RUN-07 is exercised end to end rather than
- * skipped.
+/* A fallback, kept for the case where the flash-backed store of AD-21 does not
+ * come up: the simulated build mounts kiln_core/fileslots on the real kilnfs
+ * partition like any other build, because QEMU emulates flash.  This stands in
+ * only if that mount fails, so the persistence path of FR-PRG and FR-RUN-07 is
+ * exercised either way rather than skipped.
  *
  * It is RAM, so nothing survives a reboot.  That is a visible limitation of the
  * simulated build and not a design choice: everything above it behaves exactly as
@@ -199,8 +205,8 @@ typedef struct {
  *
  * Sized for the three seeded examples plus a handful of run records -- about
  * 8 kB, which is affordable on a device with no PSRAM (NFR-11). */
-#define KILN_SIM_FS_FILES    12
-#define KILN_SIM_FS_FILE_MAX 640
+constexpr size_t KILN_SIM_FS_FILES    = 12;
+constexpr size_t KILN_SIM_FS_FILE_MAX = 640;
 
 typedef struct {
     struct {

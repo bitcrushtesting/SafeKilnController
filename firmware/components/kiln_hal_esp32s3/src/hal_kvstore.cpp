@@ -12,9 +12,11 @@
 #include "nvs_flash.h"
 #include "kiln_hal/hal_esp32s3.h"
 
-static const char *TAG = "hal_nvs";
+namespace {
 
-static kiln_err_t map_err(esp_err_t e)
+const char *TAG = "hal_nvs";
+
+kiln_err_t map_err(esp_err_t e)
 {
     switch (e) {
     case ESP_OK:                      return KILN_OK;
@@ -26,7 +28,7 @@ static kiln_err_t map_err(esp_err_t e)
     }
 }
 
-static kiln_err_t kv_get(void *ctx, const char *ns, const char *key,
+kiln_err_t kv_get(void *ctx, const char *ns, const char *key,
                          void *out, size_t cap, size_t *out_len)
 {
     (void)ctx;
@@ -53,7 +55,7 @@ static kiln_err_t kv_get(void *ctx, const char *ns, const char *key,
     return KILN_OK;
 }
 
-static kiln_err_t kv_set(void *ctx, const char *ns, const char *key,
+kiln_err_t kv_set(void *ctx, const char *ns, const char *key,
                          const void *data, size_t len)
 {
     (void)ctx;
@@ -72,7 +74,7 @@ static kiln_err_t kv_set(void *ctx, const char *ns, const char *key,
     return map_err(e);
 }
 
-static kiln_err_t kv_erase(void *ctx, const char *ns, const char *key)
+kiln_err_t kv_erase(void *ctx, const char *ns, const char *key)
 {
     (void)ctx;
     if ((ns == nullptr) || (key == nullptr)) {
@@ -90,7 +92,7 @@ static kiln_err_t kv_erase(void *ctx, const char *ns, const char *key)
     return map_err(e);
 }
 
-static kiln_err_t kv_commit(void *ctx, const char *ns)
+kiln_err_t kv_commit(void *ctx, const char *ns)
 {
     (void)ctx;
     if (ns == nullptr) {
@@ -107,6 +109,8 @@ static kiln_err_t kv_commit(void *ctx, const char *ns)
     nvs_close(h);
     return map_err(e);
 }
+
+} // namespace
 
 kiln_err_t kiln_hal_kvstore_init(kiln_port_kvstore_t *out)
 {

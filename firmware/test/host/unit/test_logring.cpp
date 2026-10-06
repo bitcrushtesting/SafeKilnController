@@ -15,8 +15,8 @@
 #include "kiln_hal_host/hal_host.h"
 
 /* 16 sectors is enough to exercise wrap quickly; one test uses the real 2 MB. */
-#define TEST_SECTORS 16u
-#define SECTOR_BYTES 4096u
+constexpr size_t TEST_SECTORS = 16u;
+constexpr size_t SECTOR_BYTES = 4096u;
 
 typedef struct {
     uint8_t             storage[TEST_SECTORS * SECTOR_BYTES];
@@ -65,7 +65,7 @@ typedef struct {
 
 static bool counter(void *user, uint32_t run, const uint8_t rec[KILN_LOG_RECORD_BYTES])
 {
-    count_ctx_t *c = (count_ctx_t *)user;
+    count_ctx_t *c = static_cast<count_ctx_t *>(user);
     kiln_log_sample_t s;
     if (kiln_logrec_decode(rec, &s) != KILN_OK) {
         return true;

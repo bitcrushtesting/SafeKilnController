@@ -146,13 +146,13 @@ to end against a plant that responds, the state machine, the window and
 current-gating timing, every fault injection, all on the target's own compiler,
 scheduler and single-precision FPU.
 
-**Storage is not simulated.** QEMU emulates the flash, so NVS and the `kilnlog`
-partition are real: the configuration persists, the sample log is a real ring on
-real sectors, and `SR-17`'s latched fault survives a restart. Press `R` to list
-stored run records and `l` to erase the log and watch the ring start over. The one
-exception is the program and run-record file store, which is still RAM, the
-LittleFS adapter does not exist yet, because LittleFS is not in the ESP-IDF tree
-and `CON-04` forbids pulling it at build time, so it has to be vendored first.
+**Storage is not simulated.** QEMU emulates the flash, so NVS, the `kilnlog`
+partition and the `kilnfs` file store are all real: the configuration persists,
+the sample log is a real ring on real sectors, programs and run records survive a
+reboot, and `SR-17`'s latched fault survives a restart. Press `R` to list stored
+run records and `l` to erase the log and watch the ring start over. The simulated
+firmware runs exactly the store the board runs ([`AD-21`](architecture.md#3-key-decisions)),
+so a program saved under QEMU is still there after a reset.
 
 **Not exercised:** the device drivers; the charge-pump release of
 [`AD-05`](architecture.md#3-key-decisions), which is the central safety property

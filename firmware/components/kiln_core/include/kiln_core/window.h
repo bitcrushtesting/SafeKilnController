@@ -13,11 +13,11 @@
 #include "kiln/err.h"
 #include "kiln/types.h"
 
-#define KILN_WINDOW_MS_MIN     500u      /* FR-CTL-07 */
-#define KILN_WINDOW_MS_MAX   30000u
-#define KILN_WINDOW_MS_DEFAULT 2000u
-#define KILN_TICK_MS_DEFAULT     10u     /* AD-07 */
-#define KILN_MIN_ON_MS_MAX     2000u
+constexpr uint32_t KILN_WINDOW_MS_MIN     = 500u;  /* FR-CTL-07 */
+constexpr uint32_t KILN_WINDOW_MS_MAX     = 30000u;
+constexpr uint32_t KILN_WINDOW_MS_DEFAULT = 2000u;
+constexpr uint32_t KILN_TICK_MS_DEFAULT   = 10u;   /* AD-07 */
+constexpr uint32_t KILN_MIN_ON_MS_MAX     = 2000u;
 
 typedef struct {
     uint32_t window_ms;    /* 500 .. 30000, default 2000; multiple of tick_ms */

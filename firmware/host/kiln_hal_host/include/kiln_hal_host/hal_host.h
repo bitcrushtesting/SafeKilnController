@@ -29,7 +29,7 @@
 
 /* --- flash ------------------------------------------------------------- */
 
-#define KILN_HOST_FLASH_MAX_BYTES (2u * 1024u * 1024u)
+constexpr uint32_t KILN_HOST_FLASH_MAX_BYTES = 2u * 1024u * 1024u;
 
 typedef struct {
     uint8_t  *data;              /* caller-provided, so the size is the test's choice */
@@ -64,10 +64,10 @@ void kiln_host_flash_power_on(kiln_host_flash_t *f);
 
 /* --- key/value store --------------------------------------------------- */
 
-#define KILN_HOST_KV_ENTRIES   16
-#define KILN_HOST_KV_NS_LEN    16
-#define KILN_HOST_KV_KEY_LEN   24
-#define KILN_HOST_KV_VALUE_MAX 1024
+constexpr size_t KILN_HOST_KV_ENTRIES   = 16;
+constexpr size_t KILN_HOST_KV_NS_LEN    = 16;
+constexpr size_t KILN_HOST_KV_KEY_LEN   = 24;
+constexpr size_t KILN_HOST_KV_VALUE_MAX = 1024;
 
 typedef struct {
     char     ns[KILN_HOST_KV_NS_LEN];
@@ -89,8 +89,8 @@ void kiln_host_kv_bind(kiln_host_kv_t *kv, kiln_port_kvstore_t *out);
 
 /* --- file store -------------------------------------------------------- */
 
-#define KILN_HOST_FS_FILES     32
-#define KILN_HOST_FS_FILE_MAX  2048
+constexpr size_t KILN_HOST_FS_FILES    = 32;
+constexpr size_t KILN_HOST_FS_FILE_MAX = 2048;
 
 typedef struct {
     char    path[KILN_PATH_MAX];

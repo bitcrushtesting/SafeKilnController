@@ -21,18 +21,24 @@
 #include "kiln_hal/board_pins.h"
 #include "kiln_hal/hal_esp32s3.h"
 
-static const char *TAG = "hal_input";
+namespace {
+
+const char *TAG = "hal_input";
+
+} // namespace
 
 /* A detent of these encoders is one full quadrature cycle, which 4x decoding
  * counts as four edges.  Dividing by four means one click of the knob is one
  * event, which is what the operator means by one click. */
-#define ENC_COUNTS_PER_DETENT   4
+constexpr int ENC_COUNTS_PER_DETENT = 4;
 
 /* FR-HMI-09 and port_input.h: a long press is 400 ms. */
-#define BTN_LONG_PRESS_US       (400 * 1000)
+constexpr int64_t BTN_LONG_PRESS_US = (400 * 1000);
 /* Contact bounce on a panel encoder is a few milliseconds; 20 ms is generous
  * and still far below the shortest press a person can make. */
-#define BTN_DEBOUNCE_US         (20 * 1000)
+constexpr int64_t BTN_DEBOUNCE_US = (20 * 1000);
+
+namespace {
 
 typedef struct {
     pcnt_unit_handle_t unit;
@@ -46,9 +52,9 @@ typedef struct {
     bool     long_sent;        /* the long press has already been reported */
 } input_t;
 
-static input_t s_in;
+input_t s_in;
 
-static kiln_input_event_t poll_rotation(input_t *in)
+kiln_input_event_t poll_rotation(input_t *in)
 {
     int count = 0;
     if (pcnt_unit_get_count(in->unit, &count) != ESP_OK) {
@@ -70,7 +76,7 @@ static kiln_input_event_t poll_rotation(input_t *in)
     return KILN_INPUT_NONE;
 }
 
-static kiln_input_event_t poll_button(input_t *in)
+kiln_input_event_t poll_button(input_t *in)
 {
     /* Active low: the button pulls to ground against the internal pull-up. */
     const bool    raw = gpio_get_level((gpio_num_t)KILN_PIN_ENC_BTN) == 0;
@@ -110,9 +116,9 @@ static kiln_input_event_t poll_button(input_t *in)
     return KILN_INPUT_NONE;
 }
 
-static kiln_input_event_t input_poll(void *ctx)
+kiln_input_event_t input_poll(void *ctx)
 {
-    input_t *in = (input_t *)ctx;
+    input_t *in = static_cast<input_t *>(ctx);
     if (in == nullptr) {
         return KILN_INPUT_NONE;
     }
@@ -124,6 +130,8 @@ static kiln_input_event_t input_poll(void *ctx)
     }
     return poll_button(in);
 }
+
+} // namespace
 
 kiln_err_t kiln_hal_input_init(kiln_port_input_t *out)
 {
@@ -188,7 +196,7 @@ kiln_err_t kiln_hal_input_init(kiln_port_input_t *out)
     }
 
     gpio_config_t btn = {};
-    btn.pin_bit_mask = 1ULL << KILN_PIN_ENC_BTN;
+    btn.pin_bit_mask = 1ULL << (unsigned)KILN_PIN_ENC_BTN;
     btn.mode         = GPIO_MODE_INPUT;
     btn.pull_up_en   = GPIO_PULLUP_ENABLE;      /* active low */
     btn.pull_down_en = GPIO_PULLDOWN_DISABLE;

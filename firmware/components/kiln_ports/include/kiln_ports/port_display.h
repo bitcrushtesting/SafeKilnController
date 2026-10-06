@@ -11,10 +11,10 @@
 #include "kiln/err.h"
 #include "kiln/types.h"
 
-#define KILN_DISPLAY_W       128
-#define KILN_DISPLAY_H       64
-#define KILN_DISPLAY_PAGES   (KILN_DISPLAY_H / 8)
-#define KILN_DISPLAY_BYTES   (KILN_DISPLAY_W * KILN_DISPLAY_PAGES)
+constexpr int KILN_DISPLAY_W     = 128;
+constexpr int KILN_DISPLAY_H     = 64;
+constexpr int KILN_DISPLAY_PAGES = KILN_DISPLAY_H / 8;
+constexpr int KILN_DISPLAY_BYTES = KILN_DISPLAY_W * KILN_DISPLAY_PAGES;
 
 typedef struct kiln_port_display {
     void *ctx;

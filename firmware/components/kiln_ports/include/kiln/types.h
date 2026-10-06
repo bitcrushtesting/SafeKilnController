@@ -14,30 +14,31 @@
 
 #include <math.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 /* --- hard limits ------------------------------------------------------- */
 
 /* SR-23: compile-time ceiling.  No configuration, program target or tuning
  * setpoint may exceed this, whatever the operator types. */
-#define KILN_TEMP_CEILING_C      1350.0f
-#define KILN_TEMP_FLOOR_C        (-20.0f)
+constexpr float KILN_TEMP_CEILING_C = 1350.0f;
+constexpr float KILN_TEMP_FLOOR_C   = -20.0f;
 
-#define KILN_MAX_SEGMENTS        32      /* FR-PRG-01 */
-#define KILN_PROGRAM_NAME_LEN    32
-#define KILN_PROGRAM_DESC_LEN    96
-#define KILN_MAX_PROGRAMS        20      /* FR-PRG-04 */
-#define KILN_MAX_RUN_RECORDS     20      /* FR-LOG-09 */
-#define KILN_MAX_GAIN_SETS       4       /* FR-TUN-13 */
+constexpr size_t KILN_MAX_SEGMENTS     = 32;  /* FR-PRG-01 */
+constexpr size_t KILN_PROGRAM_NAME_LEN = 32;
+constexpr size_t KILN_PROGRAM_DESC_LEN = 96;
+constexpr size_t KILN_MAX_PROGRAMS     = 20;  /* FR-PRG-04 */
+constexpr size_t KILN_MAX_RUN_RECORDS  = 20;  /* FR-LOG-09 */
+constexpr size_t KILN_MAX_GAIN_SETS    = 4;   /* FR-TUN-13 */
 
-#define KILN_DUTY_MAX            1000u   /* per mille */
+constexpr uint16_t KILN_DUTY_MAX = 1000u;  /* per mille */
 
 /* HR-12: SSR1 and SSR2.  A single-zone kiln (ASM-02) drives both with the same
  * duty; the array dimension exists so independently switched element groups do
  * not need a second implementation. */
-#define KILN_HEAT_CHANNELS       2
+constexpr size_t KILN_HEAT_CHANNELS = 2;
 
-#define KILN_SEG_NONE            0xFFu
+constexpr uint8_t KILN_SEG_NONE = 0xFFu;
 
 /* --- operating state (requirements section 2.2) ------------------------ */
 
@@ -66,15 +67,21 @@ typedef enum {
     KILN_TC_TYPE_COUNT,
 } kiln_tc_type_t;
 
-/* FR-ACQ-10: the fault detail the front end must expose. */
-#define KILN_TC_FAULT_OPEN       (1u << 0)  /* open circuit                   */
-#define KILN_TC_FAULT_SHORT_VCC  (1u << 1)  /* short to supply                */
-#define KILN_TC_FAULT_SHORT_GND  (1u << 2)  /* short to ground                */
-#define KILN_TC_FAULT_CJ_RANGE   (1u << 3)  /* cold junction out of range     */
-#define KILN_TC_FAULT_TC_RANGE   (1u << 4)  /* thermocouple out of range      */
-#define KILN_TC_FAULT_OVUV       (1u << 5)  /* over/under voltage             */
-#define KILN_TC_FAULT_COMMS      (1u << 6)  /* front end did not answer       */
-#define KILN_TC_FAULT_ANY        0x7Fu
+/* FR-ACQ-10: the fault detail the front end must expose.
+ *
+ * uint32_t, not the uint16_t field these are stored in: a narrower constant
+ * promotes to *int* before a bitwise operator, so KILN_A | KILN_B would be a
+ * signed operation (bugprone-signed-bitwise) at every site that composes a
+ * mask.  The field's own width still bounds what can be stored.  The same
+ * reasoning applies to every KILN_*_FLAG_* and KILN_CURF_* mask below. */
+constexpr uint32_t KILN_TC_FAULT_OPEN      = 1u << 0u;  /* open circuit                   */
+constexpr uint32_t KILN_TC_FAULT_SHORT_VCC = 1u << 1u;  /* short to supply                */
+constexpr uint32_t KILN_TC_FAULT_SHORT_GND = 1u << 2u;  /* short to ground                */
+constexpr uint32_t KILN_TC_FAULT_CJ_RANGE  = 1u << 3u;  /* cold junction out of range     */
+constexpr uint32_t KILN_TC_FAULT_TC_RANGE  = 1u << 4u;  /* thermocouple out of range      */
+constexpr uint32_t KILN_TC_FAULT_OVUV      = 1u << 5u;  /* over/under voltage             */
+constexpr uint32_t KILN_TC_FAULT_COMMS     = 1u << 6u;  /* front end did not answer       */
+constexpr uint32_t KILN_TC_FAULT_ANY       = 0x7Fu;
 
 /* --- operator language (NFR-23) ----------------------------------------
  *
@@ -145,12 +152,12 @@ typedef enum {
     KILN_WARN_COUNT           = 13,
 } kiln_warn_bit_t;
 
-#define KILN_WARN_CODE_BASE  101
+constexpr uint16_t KILN_WARN_CODE_BASE = 101;
 #define KILN_WARN_BIT(b)     (1u << (b))
 
 /* --- program ----------------------------------------------------------- */
 
-#define KILN_SEG_FLAG_REQUIRE_ACK  (1u << 0)   /* FR-PRG-03 */
+constexpr uint32_t KILN_SEG_FLAG_REQUIRE_ACK = 1u << 0u;  /* FR-PRG-03 */
 
 typedef struct {
     uint16_t target_c;          /* 0 .. KILN_TEMP_CEILING_C                  */
@@ -160,7 +167,7 @@ typedef struct {
     uint8_t  reserved;
 } kiln_segment_t;
 
-#define KILN_PROG_FLAG_READONLY  (1u << 0)     /* FR-PRG-09 examples */
+constexpr uint32_t KILN_PROG_FLAG_READONLY = 1u << 0u;  /* FR-PRG-09 examples */
 
 typedef struct {
     char           name[KILN_PROGRAM_NAME_LEN];
@@ -171,7 +178,7 @@ typedef struct {
     kiln_segment_t segments[KILN_MAX_SEGMENTS];
 } kiln_program_t;
 
-#define KILN_PROGRAM_SCHEMA_VERSION 1
+constexpr uint16_t KILN_PROGRAM_SCHEMA_VERSION = 1;
 
 /* --- per-cycle plant snapshot (AD-13: passed by value, never shared) ---- */
 
@@ -204,11 +211,11 @@ typedef struct {
 /* What a current sample actually represents.  FR-CUR-04/05: without this a
  * reader cannot tell 0.0 A "the relay is correctly off" from 0.0 A "the window
  * was too short to measure". */
-#define KILN_CURF_CONDUCTION  (1u << 0)   /* measured inside a commanded-on window  */
-#define KILN_CURF_LEAKAGE     (1u << 1)   /* measured inside a commanded-off window */
-#define KILN_CURF_SKIPPED     (1u << 2)   /* window too short to measure            */
-#define KILN_CURF_STALE       (1u << 3)   /* carried over from an earlier window    */
-#define KILN_CURF_CT_FAULT    (1u << 4)   /* transformer absent or shorted          */
+constexpr uint32_t KILN_CURF_CONDUCTION = 1u << 0u;  /* measured inside a commanded-on window  */
+constexpr uint32_t KILN_CURF_LEAKAGE    = 1u << 1u;  /* measured inside a commanded-off window */
+constexpr uint32_t KILN_CURF_SKIPPED    = 1u << 2u;  /* window too short to measure            */
+constexpr uint32_t KILN_CURF_STALE      = 1u << 3u;  /* carried over from an earlier window    */
+constexpr uint32_t KILN_CURF_CT_FAULT   = 1u << 4u;  /* transformer absent or shorted          */
 
 /* --- small helpers ----------------------------------------------------- */
 
@@ -242,6 +249,40 @@ static inline float kiln_clampf(float v, float lo, float hi)
         return lo;
     }
     return v < lo ? lo : (v > hi ? hi : v);
+}
+
+/* Byte view of an object.  The fileslots CRC and the JSON escaper both have to
+ * read an object's representation one byte at a time, which the standard
+ * permits through unsigned char.  Named, and routed through void *, rather than
+ * a reinterpret_cast at each site: the intent is "read these bytes", not "this
+ * is secretly another type", and void * is already the currency the port layer
+ * passes buffers in (AD-01).  cppcoreguidelines-pro-type-reinterpret-cast
+ * therefore stays switched on -- see configmodel.cpp for the two sites that
+ * genuinely need the stronger cast and say so. */
+static inline const uint8_t *kiln_bytes_of(const void *p)
+{
+    return static_cast<const uint8_t *>(p);
+}
+
+/* Clamp in place, and report whether the value actually had to move.
+ *
+ * NFR-17 requires the clamp_cfg() functions in safety and current to tell the
+ * caller that a configured threshold was corrected rather than silently fixing
+ * it.  They cannot get that answer by memcmp-ing a before-and-after copy of the
+ * config struct: both structs carry padding, and the standard does not
+ * guarantee padding bytes propagate through a struct copy, so an unchanged
+ * configuration could still compare unequal and report a spurious correction
+ * (bugprone-suspicious-memory-comparison).  In safety code a false "clamped"
+ * is a wrong answer, so each field reports for itself instead.
+ *
+ * A non-finite input always reports moved: kiln_clampf() maps it to lo, and
+ * the NaN comparison is unequal, which is the honest answer. */
+static inline bool kiln_clampf_moved(float *v, float lo, float hi)
+{
+    const float out   = kiln_clampf(*v, lo, hi);
+    const bool  moved = out != *v;
+    *v = out;
+    return moved;
 }
 
 static inline uint16_t kiln_clampu16(int32_t v, uint16_t lo, uint16_t hi)

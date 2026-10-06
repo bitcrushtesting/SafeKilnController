@@ -17,10 +17,10 @@
  * Deriving the point count from both keeps the two units apart: they happen to
  * be numerically equal at 1 Hz, which is exactly the kind of coincidence that
  * turns into a bug the first time the decimation rate changes. */
-#define KILN_RATE_WINDOW_MAX_S  300      /* FR-ACQ-11 maximum */
-#define KILN_RATE_WINDOW_MIN_S  10       /* FR-ACQ-11 minimum */
-#define KILN_DECIM_HZ           1
-#define KILN_RATE_MAX_POINTS    (KILN_RATE_WINDOW_MAX_S * KILN_DECIM_HZ)
+constexpr uint16_t KILN_RATE_WINDOW_MAX_S = 300;  /* FR-ACQ-11 maximum */
+constexpr uint16_t KILN_RATE_WINDOW_MIN_S = 10;   /* FR-ACQ-11 minimum */
+constexpr uint16_t KILN_DECIM_HZ          = 1;
+constexpr uint16_t KILN_RATE_MAX_POINTS   = KILN_RATE_WINDOW_MAX_S * KILN_DECIM_HZ;
 
 typedef struct {
     float    offset_c;        /* FR-ACQ-08: -50 .. +50   */

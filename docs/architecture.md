@@ -57,7 +57,7 @@ as a decision in [§3](#3-key-decisions).
 | **AD-18** | **The log record grows from 16 to 20 bytes** to carry current and its validity flags. | `FR-CUR-09`. Current without a flag saying whether the sample was a conduction, leakage or skipped measurement is uninterpretable. | 204 records per sector instead of 255; capacity falls from 362 h to **290 h** at the default interval, still well above the 150 h of `FR-LOG-07`. Recomputed in [§10.4](#104-flash-endurance-analysis). |
 | **AD-08** | **Sample logs live in a dedicated raw flash partition as a circular array of fixed 16-byte records**, not in a filesystem. | `FR-LOG-05`–`FR-LOG-08`, `CON-03`. A filesystem adds metadata writes, fragmentation, and a torn-write failure mode across structures we do not control. A ring of fixed records has a trivially provable wear pattern ([§10.4](#104-flash-endurance-analysis)) and a reader that cannot be confused by a power cut. | A bespoke store to implement and test; no `ls` over logs. Mitigated by `tools/logdump`. |
 | **AD-09** | **The log is also the power-loss journal.** Recovery state is reconstructed from the log tail rather than from a separate periodic write. | `FR-RUN-08`, `FR-RUN-09`, `NFR-14`. Removes a 60 000-write-per-run NVS hot spot; the data was already being written. | Recovery granularity equals the log sample interval (default 10 s), which is well inside the `FR-RUN-08` tolerance. |
-| **AD-10** | **Configuration in NVS; programs and run records in LittleFS.** | Config is small, typed, and benefits from NVS wear levelling. Programs are user files that want names, import/export and atomic replace. | Two storage mechanisms to initialise; acceptable, both are ESP-IDF-supported. |
+| **AD-10** | **Configuration in NVS; programs and run records in a raw partition of fixed slots.** Originally LittleFS, revised by `AD-21`. | Config is small, typed, and benefits from NVS wear levelling. Programs and run records want names and atomic replace, which is what the slot store provides; they do not want a directory, because nothing addresses them by anything but a slot number. | Two storage mechanisms to initialise. No general filesystem on the device, so there is no path for a file that is not a program or a run record. |
 | **AD-11** | **Web assets are gzipped and embedded in the application image**, not stored in a filesystem. | `FR-WEB-02`, `FR-UPD-05`. Assets and firmware version can never disagree, and an OTA update is atomic across both. | Asset size counts against the 2 MB OTA partition; budget in [§12.4](#124-asset-budget). |
 | **AD-12** | **Live updates by Server-Sent Events**, not WebSocket. | `FR-WEB-05`. Telemetry is one-directional; SSE is plain HTTP, needs no framing layer, reconnects by itself, and costs one socket. Commands go over ordinary `POST`. | No client→server push channel; not needed, since no command is latency-critical. |
 | **AD-13** | **Tasks communicate by queues and immutable snapshots**, with no mutex on the control path. | `NFR-01`, `NFR-02`. Removes priority inversion and unbounded blocking as a class of failure. | Snapshot copying each cycle; at ~64 bytes per snapshot this is negligible. |
@@ -65,6 +65,7 @@ as a decision in [§3](#3-key-decisions).
 | **AD-15** | **Core affinity split**: connectivity and UI on core 0, control and safety on core 1. | `NFR-01`, `NFR-02`. WiFi (priority 23) and lwIP cannot preempt the control or safety task at all, so their deadlines do not depend on radio behaviour. | The core is tied to a dual-core target; `CON-02` fixes ESP32-S3, which is dual-core. |
 | **AD-19** | **The log ring is `kiln_core/logring` over a `port_flash`**, not logic inside the log-store adapter. | Everything interesting about the ring is a decision with a failure mode `FR-LOG-06` and `FR-LOG-08` name explicitly: head discovery across 512 sector headers, erase-immediately-before-write ordering so a power cut cannot destroy data the index still claims, and terminating a sector scan at a torn record. Behind `esp_partition` none of it is testable; in the core it is driven by a fake that can cut power mid-write. Revises [§5.2](#52-ports)'s original placement. | One more port, and the core now provides an implementation of `port_logstore` rather than only consuming ports. The adapter in exchange has no logic left to get wrong, three calls that pass straight through. |
 | **AD-20** | **The firmware is C++20, analysed by `clang-tidy` as a high-integrity profile.** Not MISRA: `clang-tidy` implements no MISRA checks, and the `hicpp-*` module that approximated High Integrity C++ has been removed from LLVM. The equivalent content is enabled under its current names (`cppcoreguidelines-*`, `bugprone-*`, `cert-*`, `clang-analyzer-*`). | `CON-05` permits C or C++; `NFR-25` requires a static analysis configuration and `TR-24` requires CI to run it, and the C toolchain offered no comparable check set. The migration cost was 9 compile errors across 22 597 lines, because the code already had no heap, no VLAs and explicit context structs. C++20 rather than C++17 because the 152 designated initialisers that name every safety default are a C99 feature C++ regained only in C++20. | A `-std=gnu++20` floor on both build halves. Genuine MISRA C++ compliance is now a *commercial tooling* decision rather than a language one, and nothing in the repository may claim it. Three check groups are deferred rather than clean, `tasklist.md` section F. |
+| **AD-21** | **`port_filestore` is `kiln_core/fileslots` over a `port_flash`, a fixed array of two-sector regions, not a filesystem.** Revises `AD-10`. | Two reasons, and either alone would be enough. The first is `CON-04`: LittleFS is not in the ESP-IDF tree, so it arrives either as a managed dependency, which `CON-04` forbids at build time, or as several thousand vendored lines to be maintained and licence-audited. The second is that nothing above it wants a filesystem. `program_store` and `run_index` address `/p/00` to `/p/19` and `/r/00` upward, and between them call read, write_atomic, remove and usage; `list` and `exists` have no caller at all. That is an array. `AD-08` already refused a filesystem for the log, on the grounds that it adds metadata writes, fragmentation and a torn-write mode across structures we do not control, and the same reasoning survives being applied to a second fixed-size store. The in-tree alternatives were considered and rejected: SPIFFS and FAT are both reachable without a fetch and neither is power-fail safe, which is the one property this store is required to have. | One file occupies one region of two erase sectors and alternates between them, so the copy being replaced is never the copy being erased. A name maps to a region through an index built at mount, 64 entries of 72 bytes. The cost is capacity: 40 files in 512 kB where a filesystem would hold hundreds of small ones, which is irrelevant at a fixed 20 programs and 20 run records and would not be if that ever stopped being fixed. See [§10.6](#106-the-file-store). |
 | **AD-16** | **The web UI is served only through the public REST API** it documents. | `FR-WEB-19`. The API is exercised by the UI on every use, so it cannot rot; and the UI is replaceable. | No shortcuts for the UI; occasionally a slightly chattier interaction. |
 
 ## 4. Layering and dependency rules
@@ -92,7 +93,7 @@ flowchart TD
         PORTS["kiln_ports"]
     end
     subgraph L0["Adapters"]
-        HAL["kiln_hal_esp32s3<br/>MAX31856, SSD1306, encoder,<br/>outputs, flash log, NVS, LittleFS, clock"]
+        HAL["kiln_hal_esp32s3<br/>MAX31856, SSD1306, encoder,<br/>outputs, flash log, NVS, clock"]
         SIM["kiln_sim<br/>plant model + fault injection"]
     end
 
@@ -160,7 +161,7 @@ double is a compile-time-checked substitution.
 | `port_system` | `reset_cause()`, `fw_info()`, `stats()`, `wdt_subscribe/feed()` | `esp_system` + task WDT; stub |
 | `port_update` | `begin/write/finish()`, `confirm_running()`, `rollback()` | `esp_ota_ops`; stub |
 | `port_kvstore` | `get/set/erase(namespace, key, blob)` | NVS; in-memory fake |
-| `port_filestore` | `list/read/write/delete(path)` | LittleFS; temp-directory fake on host |
+| `port_filestore` | `list/read/write/delete(path)` | `kiln_core/fileslots` over `port_flash` (`AD-21`); RAM fake on host |
 | `port_net` | `state()`, `connect()`, `start_ap()`, `stats()` | WiFi + mDNS + SNTP; stub |
 
 ### 5.3 Application (`kiln_app`)
@@ -285,7 +286,7 @@ flowchart TD
     A["Reset"] --> B["Outputs to safe state<br/>(pull-downs + first instruction)"]
     B --> C["Read reset cause, record if abnormal (NFR-15)"]
     C --> D["Init NVS, load + migrate config (FR-CFG-05)"]
-    D --> E["Init LittleFS, log store; scan ring head"]
+    D --> E["Mount file store, log store; scan ring head"]
     E --> F["Bind ports to adapters (composition)"]
     F --> G["Start acquire + safety tasks"]
     G --> H{"Latched fault<br/>in storage?"}
@@ -593,7 +594,7 @@ For an 8 MB device (`NFR-13`); a 16 MB device enlarges only the log partition.
 | `phy_init` | data/phy | 4 kB | RF calibration |
 | `ota_0` | app | 2 MB | Application slot A (`FR-UPD-02`) |
 | `ota_1` | app | 2 MB | Application slot B |
-| `storage` | data/littlefs | 512 kB | Programs, run index, run records |
+| `kilnfs` | data (custom) | 512 kB | Programs and run records (`AD-21`) |
 | `kilnlog` | data (custom) | 2 MB | Circular sample log (`AD-08`) |
 | *(unallocated)* |, | ≈ 1.4 MB | Headroom |
 
@@ -663,6 +664,51 @@ the **minimum and maximum** of each series (`FR-LOG-11`), so a brief excursion
 survives downsampling instead of being averaged away. Decimation is in `logrec`
 and is therefore host-tested, including the property that the extrema of the
 decimated series equal the extrema of the full series.
+
+### 10.6 The file store
+
+`kilnfs` holds programs and run records as a fixed array rather than a
+filesystem (`AD-21`). The partition divides into equal **regions of two erase
+sectors**, 64 regions in 512 kB. One file occupies one region and alternates
+between its two sectors, so the copy being replaced is never the copy being
+erased.
+
+Within a sector:
+
+| Offset | Size | Field | Written |
+|---|---|---|---|
+| 0 | 4 | magic `KFS1` | second |
+| 4 | 4 | sequence number, higher wins | second |
+| 8 | 2 | payload length | second |
+| 10 | 2 | CRC-16 over the name field and the payload | second |
+| 12 | 64 | name, NUL padded | first |
+| 76 | up to 4020 | payload | first |
+
+The two-stage write is the whole design. The name and payload go down in one
+write and the twelve byte commit header in a second. A power cut before the
+commit leaves the magic erased, so the half-written copy is not a copy at all
+and the previous one still carries the highest sequence number. A power cut
+*inside* the commit header is caught by the sequence number when it is torn
+early and by the CRC when only the CRC is missing. There is no instant at which
+a reader can see a torn file, which is what `FR-RUN-08` needs.
+
+On mount the store reads both copies of every region, validates each against its
+CRC, and takes the higher sequence number. There is no separate metadata, so
+nothing can disagree with the data. The loser is left in place rather than
+erased, because it is the next write's target and erasing it at boot would spend
+an erase cycle on every power-up.
+
+Capacity is 40 of 64 regions for the 20 programs of `FR-PRG-04` and the 20 run
+records of `FR-LOG-09`. Endurance is generous for the same reason the log's is:
+a program is written when a user saves it and a run record once per firing, so a
+region sees single-digit erases per year against a 100 000 cycle rating.
+
+Three properties carry the weight and each is a host test, driven through a
+flash fake that enforces NOR semantics and can cut power part-way through a
+write: a file survives a remount, a cut before the commit leaves the previous
+copy, and a cut inside the commit header leaves the previous copy. The same
+fake drives `program_store` and `run_index` over the real store in
+`test_stores_on_flash`, which is the combination that runs on the board.
 
 ## 11. Configuration
 
@@ -842,7 +888,7 @@ kilncontrol/
 │   │   ├── kiln_core/           pure logic (AD-01), no IDF headers
 │   │   ├── kiln_ports/          interface headers only
 │   │   ├── kiln_hal_esp32s3/    adapters: max31856, ssd1306, encoder,
-│   │   │                        heat output, logstore, nvs, littlefs, clock
+│   │   │                        heat output, logstore, nvs, clock
 │   │   ├── kiln_app/            tasks, run controller, event bus, settings
 │   │   ├── kiln_web/            httpd, handlers, embedded gzipped assets
 │   │   └── kiln_sim/            plant simulator (TR-11)

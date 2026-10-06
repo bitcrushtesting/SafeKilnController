@@ -8,6 +8,22 @@
 #                            ESP_LOGE/ESP_LOGI expanding to IDF's internal
 #                            __esp_log_config.data union.  There is no union
 #                            in this component's own code.
+#   signed-bitwise ......... 24 findings, every one of them inside an ESP-IDF
+#                            macro: ESP_LOGW/I/E (21), WIFI_INIT_CONFIG_DEFAULT
+#                            and MALLOC_CAP_INTERNAL, which is IDF's own
+#                            (1 << 11).  None is reachable from this side -- a
+#                            cast around the macro does not touch the shift
+#                            inside it -- and NOLINT-ing them would mean a
+#                            NOLINT on every future log line.
+#
+#                            This component's OWN bitwise code was audited by
+#                            hand under the check before it was switched off,
+#                            which is what turned up the MAX31856 decode in
+#                            hal_tc.cpp: r[2] << 24 on a signed int32_t
+#                            overflows for exactly the byte that means "below
+#                            zero".  The check stays on everywhere else, so
+#                            kiln_core and friends are still gated by it.
 InheritParentConfig: true
 Checks: >
-  -cppcoreguidelines-pro-type-union-access
+  -cppcoreguidelines-pro-type-union-access,
+  -bugprone-signed-bitwise

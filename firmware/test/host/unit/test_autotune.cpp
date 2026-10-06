@@ -188,7 +188,7 @@ static bool run_identification_noisy(kiln_autotune_t *at, float amp_c, float per
     for (int i = 0; i < 400000 && !kiln_autotune_done(at); i++) {
         seed = seed * 1103515245u + 12345u;
         const float n = noise_c *
-            (((float)((seed >> 16) & 0xFFFFu) / 32767.5f) - 1.0f);
+            (((float)((seed >> 16u) & 0xFFFFu) / 32767.5f) - 1.0f);
         const float pv = 600.0f + amp_c * sinf(2.0f * (float)PI * t / period_s) + n;
         (void)kiln_autotune_tick(at, pv, 0.0f, dt);
         t += dt;

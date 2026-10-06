@@ -1,7 +1,12 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
- * Named files (LittleFS on target): programs and run records.  Writes must be
- * atomic-by-rename so a power cut cannot leave a half-written program.
+ * Named blobs: programs and run records.  A write must be atomic, so that a
+ * power cut cannot leave a half-written program.
+ *
+ * Provided by kiln_core/fileslots over a raw flash partition (AD-21), which
+ * gets the atomicity from alternating between two copies rather than from a
+ * rename.  There is no filesystem behind this on the target, and nothing above
+ * it needs one: both callers address a fixed set of numbered slots.
  */
 #ifndef KILN_PORT_FILESTORE_H
 #define KILN_PORT_FILESTORE_H
@@ -10,7 +15,7 @@
 #include "kiln/err.h"
 #include "kiln/types.h"
 
-#define KILN_PATH_MAX 64
+constexpr size_t KILN_PATH_MAX = 64;
 
 typedef struct kiln_port_filestore {
     void *ctx;

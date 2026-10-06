@@ -28,7 +28,9 @@ void kiln_runstate_recovery_defaults(kiln_recovery_cfg_t *cfg)
 
 /* --- FR-RUN-08 ---------------------------------------------------------- */
 
-static kiln_recovery_decision_t decision(kiln_recover_action_t action,
+namespace {
+
+kiln_recovery_decision_t decision(kiln_recover_action_t action,
                                          kiln_fault_t fault,
                                          const char *reason)
 {
@@ -38,6 +40,8 @@ static kiln_recovery_decision_t decision(kiln_recover_action_t action,
     d.reason = reason;
     return d;
 }
+
+} // namespace
 
 kiln_recovery_decision_t kiln_runstate_decide(const kiln_recovery_cfg_t *cfg,
                                               const kiln_log_sample_t *tail,
@@ -126,7 +130,9 @@ kiln_recovery_decision_t kiln_runstate_decide(const kiln_recovery_cfg_t *cfg,
 
 /* --- SR-12 baseline ----------------------------------------------------- */
 
-static uint32_t median_u32(uint32_t *v, uint8_t n)
+namespace {
+
+uint32_t median_u32(uint32_t *v, uint8_t n)
 {
     /* Insertion sort: n is at most KILN_MAX_RUN_RECORDS (20). */
     for (uint8_t i = 1; i < n; i++) {
@@ -137,6 +143,8 @@ static uint32_t median_u32(uint32_t *v, uint8_t n)
     }
     return ((n & 1u) != 0u) ? v[n / 2] : (uint32_t)(((uint64_t)v[n / 2 - 1] + v[n / 2]) / 2u);
 }
+
+} // namespace
 
 kiln_err_t kiln_runstate_baseline(const kiln_run_record_t *records, uint8_t count,
                                   uint8_t min_runs,

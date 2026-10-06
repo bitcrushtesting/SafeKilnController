@@ -19,16 +19,18 @@
 /* A wall-clock reading is only meaningful once something has set it.  The epoch
  * cutoff is crude but sufficient: SNTP sets a plausible date, and the boot
  * default is 1970. */
-#define WALL_PLAUSIBLE_AFTER 1700000000ull   /* 2023-11-14 */
+constexpr uint64_t WALL_PLAUSIBLE_AFTER = 1700000000ull; /* 2023-11-14 */
 
-static uint64_t clk_mono_us(void *ctx)
+namespace {
+
+uint64_t clk_mono_us(void *ctx)
 {
     (void)ctx;
     /* Monotonic since boot, 64-bit, never stepped (FR-NET-08). */
     return (uint64_t)esp_timer_get_time();
 }
 
-static uint64_t clk_wall_s(void *ctx)
+uint64_t clk_wall_s(void *ctx)
 {
     (void)ctx;
     struct timeval tv;
@@ -38,12 +40,14 @@ static uint64_t clk_wall_s(void *ctx)
     return (uint64_t)tv.tv_sec;
 }
 
-static bool clk_wall_valid(void *ctx)
+bool clk_wall_valid(void *ctx)
 {
     /* FR-LOG-12: records logged before time sync are marked as such, so this has
      * to answer honestly rather than returning a number that looks like a date. */
     return clk_wall_s(ctx) >= WALL_PLAUSIBLE_AFTER;
 }
+
+} // namespace
 
 void kiln_hal_clock_init(kiln_port_clock_t *out)
 {

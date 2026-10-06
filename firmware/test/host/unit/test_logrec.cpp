@@ -106,7 +106,7 @@ KILN_TEST(every_single_bit_flip_is_caught_by_the_record_crc)
         for (int bit = 0; bit < 8; bit++) {
             uint8_t rec[KILN_LOG_RECORD_BYTES];
             memcpy(rec, good, sizeof(rec));
-            rec[byte] = (uint8_t)(rec[byte] ^ (1u << bit));
+            rec[byte] = (uint8_t)(rec[byte] ^ (1u << (unsigned)bit));
             if (kiln_logrec_is_erased(rec)) {
                 continue;
             }

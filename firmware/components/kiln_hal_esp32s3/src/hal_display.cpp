@@ -22,7 +22,11 @@
 #include "kiln_hal/board_pins.h"
 #include "kiln_hal/hal_esp32s3.h"
 
-static const char *TAG = "hal_display";
+namespace {
+
+const char *TAG = "hal_display";
+
+} // namespace
 
 /* SSD1306 commands, named rather than spelled as magic bytes at the call. */
 enum : uint8_t {
@@ -46,6 +50,8 @@ enum : uint8_t {
     SSD_CHARGE_PUMP      = 0x8D,
 };
 
+namespace {
+
 typedef struct {
     i2c_master_bus_handle_t bus;
     i2c_master_dev_handle_t dev;
@@ -53,10 +59,10 @@ typedef struct {
     uint32_t                failures;
 } disp_t;
 
-static disp_t s_disp;
+disp_t s_disp;
 
 /* A command stream is a 0x00 control byte then the bytes themselves. */
-static bool send_cmds(disp_t *d, const uint8_t *cmds, size_t n)
+bool send_cmds(disp_t *d, const uint8_t *cmds, size_t n)
 {
     uint8_t buf[24];
     if (n + 1u > sizeof(buf)) {
@@ -67,9 +73,9 @@ static bool send_cmds(disp_t *d, const uint8_t *cmds, size_t n)
     return i2c_master_transmit(d->dev, buf, n + 1u, 50) == ESP_OK;
 }
 
-static kiln_err_t disp_present(void *ctx, const uint8_t *fb, size_t len)
+kiln_err_t disp_present(void *ctx, const uint8_t *fb, size_t len)
 {
-    disp_t *d = (disp_t *)ctx;
+    disp_t *d = static_cast<disp_t *>(ctx);
     if ((d == nullptr) || (fb == nullptr) || (d->dev == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -108,9 +114,9 @@ static kiln_err_t disp_present(void *ctx, const uint8_t *fb, size_t len)
     return KILN_OK;
 }
 
-static kiln_err_t disp_set_contrast(void *ctx, uint8_t contrast)
+kiln_err_t disp_set_contrast(void *ctx, uint8_t contrast)
 {
-    disp_t *d = (disp_t *)ctx;
+    disp_t *d = static_cast<disp_t *>(ctx);
     if ((d == nullptr) || (d->dev == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -119,11 +125,13 @@ static kiln_err_t disp_set_contrast(void *ctx, uint8_t contrast)
     return send_cmds(d, cmds, sizeof(cmds)) ? KILN_OK : KILN_ERR_IO;
 }
 
-static bool disp_available(void *ctx)
+bool disp_available(void *ctx)
 {
-    const disp_t *d = (const disp_t *)ctx;
+    const disp_t *d = static_cast<const disp_t *>(ctx);
     return (d != nullptr) && d->ok;
 }
+
+} // namespace
 
 kiln_err_t kiln_hal_display_init(kiln_port_display_t *out)
 {

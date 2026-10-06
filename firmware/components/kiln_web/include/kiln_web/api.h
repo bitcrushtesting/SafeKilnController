@@ -38,9 +38,9 @@
 #include "kiln_ports/port_update.h"
 
 /* 12.2: a declared maximum body size per handler, enforced before parsing. */
-#define KILN_API_MAX_BODY      2048
-#define KILN_API_MAX_TOKENS    192
-#define KILN_API_MAX_POINTS    2000     /* FR-LOG-10's caller budget, bounded */
+constexpr size_t KILN_API_MAX_BODY   = 2048;
+constexpr size_t KILN_API_MAX_TOKENS = 192;
+constexpr size_t KILN_API_MAX_POINTS = 2000;  /* FR-LOG-10's caller budget, bounded */
 
 typedef enum {
     KILN_HTTP_GET = 0,

@@ -1,12 +1,17 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <math.h>
 #include "kiln_core/pid.h"
 
-static float duty_max_pct(const kiln_pid_t *pid)
+namespace {
+
+float duty_max_pct(const kiln_pid_t *pid)
 {
     return (float)pid->cfg.duty_max_permille / 10.0f;
 }
+
+} // namespace
 
 void kiln_pid_init(kiln_pid_t *pid, const kiln_pid_cfg_t *cfg)
 {
@@ -132,5 +137,8 @@ uint16_t kiln_pid_update(kiln_pid_t *pid, float sp_c, float pv_c, float dt_s)
     pid->pv_prev_c = pv_c;
     pid->primed    = true;
 
-    return (uint16_t)(u * 10.0f + 0.5f);
+    /* u is kiln_clampf()ed to [0, u_max] above, so this can never see a
+     * negative; lroundf() states that rather than leaving the reader to check
+     * (bugprone-incorrect-roundings). */
+    return (uint16_t)lroundf(u * 10.0f);
 }

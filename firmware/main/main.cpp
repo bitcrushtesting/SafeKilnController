@@ -23,6 +23,7 @@
 #include "kiln_app/app.h"
 #include "kiln_app/run_index.h"
 #include "kiln_core/faults.h"
+#include "kiln_core/fileslots.h"
 #include "kiln_core/logring.h"
 #include "kiln_core/profile.h"
 #include "kiln_hal/hal_esp32s3.h"
@@ -37,7 +38,11 @@
 #include "driver/uart.h"
 #endif
 
-static const char *TAG = "kiln";
+namespace {
+
+const char *TAG = "kiln";
+
+} // namespace
 
 /* Periods, from the task table of architecture section 6.1. */
 #define WINDOW_PERIOD_MS   10
@@ -51,42 +56,59 @@ static const char *TAG = "kiln";
 #define TIME_ACCEL 1.0f
 #endif
 
-static kiln_app_t s_app;
+namespace {
 
-/* Persistence is real even in the simulated build: NVS and the log partition are
- * flash, and QEMU emulates flash.  Only the plant is simulated. */
-static kiln_port_flash_t    s_flash;
-static kiln_port_kvstore_t  s_kv;
-static kiln_port_clock_t    s_clock;
-static kiln_port_system_t   s_system;
-static kiln_logring_t       s_ring;
-static kiln_port_logstore_t s_logstore;
+kiln_app_t s_app;
+
+/* Persistence is real even in the simulated build: NVS, the log partition and
+ * the file store are flash, and QEMU emulates flash.  Only the plant is
+ * simulated. */
+kiln_port_flash_t    s_flash;
+kiln_port_flash_t    s_fs_flash;
+kiln_fileslots_t     s_fileslots;
+kiln_port_kvstore_t  s_kv;
+kiln_port_clock_t    s_clock;
+kiln_port_system_t   s_system;
+kiln_logring_t       s_ring;
+kiln_port_logstore_t s_logstore;
+kiln_port_filestore_t s_fs;
+
+} // namespace
 
 #ifdef CONFIG_KILN_PLANT_SIM
-static kiln_sim_t             s_sim;
-static kiln_sim_ports_t       s_sim_ports;
-static kiln_sim_fs_t          s_sim_fs;      /* until the LittleFS adapter exists */
-static kiln_port_filestore_t  s_fs;
+namespace {
+
+kiln_sim_t             s_sim;
+kiln_sim_ports_t       s_sim_ports;
+kiln_sim_fs_t          s_sim_fs;      /* only if the flash store fails */
+
+} // namespace
 #else
+namespace {
+
 /* The real-hardware port instances.  Static, because the composition root owns
  * them for the lifetime of the image and kiln_app holds pointers to them. */
-static kiln_port_tc_t         s_tc_port;
-static kiln_port_tc_t         s_case_tc_port;
-static kiln_port_heat_t       s_heat_port;
-static kiln_port_current_t    s_current_port;
-static kiln_port_counters_t   s_counters_port;
-static kiln_port_door_t       s_door_port;
-static kiln_port_alarm_t      s_alarm_hw_port;
-static kiln_port_display_t    s_display_port;
-static kiln_port_input_t      s_input_port;
-static kiln_port_net_t        s_net_port;
+kiln_port_tc_t         s_tc_port;
+kiln_port_tc_t         s_case_tc_port;
+kiln_port_heat_t       s_heat_port;
+kiln_port_current_t    s_current_port;
+kiln_port_counters_t   s_counters_port;
+kiln_port_door_t       s_door_port;
+kiln_port_alarm_t      s_alarm_hw_port;
+kiln_port_display_t    s_display_port;
+kiln_port_input_t      s_input_port;
+kiln_port_net_t        s_net_port;
+
+} // namespace
 #endif
 
 /* --- port_alarm: a stub, until the buzzer adapter exists ---------------- */
 
-static kiln_alarm_pattern_t s_alarm = KILN_ALARM_OFF;
+namespace {
 
-static void alarm_set(void *ctx, kiln_alarm_pattern_t pattern)
+kiln_alarm_pattern_t s_alarm = KILN_ALARM_OFF;
+
+void alarm_set(void *ctx, kiln_alarm_pattern_t pattern)
 {
     (void)ctx;
     if (pattern != s_alarm) {
@@ -97,13 +119,13 @@ static void alarm_set(void *ctx, kiln_alarm_pattern_t pattern)
     }
 }
 
-static const kiln_port_alarm_t s_alarm_port = { .ctx = NULL, .set = alarm_set };
+const kiln_port_alarm_t s_alarm_port = { .ctx = NULL, .set = alarm_set };
 
 /* --- the 10 ms output window (AD-07) ------------------------------------ */
 
 /* Runs in esp_timer context: allocation-free, lock-free and short, which is
  * exactly what kiln_app_window_tick is written to be. */
-static void window_timer_cb(void *arg)
+void window_timer_cb(void *arg)
 {
     (void)arg;
     kiln_app_window_tick(&s_app, WINDOW_PERIOD_MS);
@@ -113,7 +135,7 @@ static void window_timer_cb(void *arg)
 
 /* The safety task is the only writer of heat authority (AD-04) and the highest
  * priority task in the system (SR-13, NFR-03). */
-static void safety_task(void *arg)
+void safety_task(void *arg)
 {
     (void)arg;
     TickType_t next = xTaskGetTickCount();
@@ -128,7 +150,7 @@ static void safety_task(void *arg)
     }
 }
 
-static void acquire_task(void *arg)
+void acquire_task(void *arg)
 {
     (void)arg;
     TickType_t next = xTaskGetTickCount();
@@ -140,7 +162,7 @@ static void acquire_task(void *arg)
     }
 }
 
-static void control_task(void *arg)
+void control_task(void *arg)
 {
     (void)arg;
     TickType_t next = xTaskGetTickCount();
@@ -157,7 +179,7 @@ static void control_task(void *arg)
 
 /* The only task that touches flash (FR-LOG-14, architecture 6.1).  Core 0, so an
  * erase -- tens of milliseconds -- cannot delay control or safety on core 1. */
-static void logger_task(void *arg)
+void logger_task(void *arg)
 {
     (void)arg;
     for (;;) {
@@ -171,11 +193,15 @@ static void logger_task(void *arg)
     }
 }
 
+} // namespace
+
 #ifdef CONFIG_KILN_PLANT_SIM
+
+namespace {
 
 /* The plant is "hardware", so it advances on its own clock rather than being
  * stepped by the firmware.  Core 0, so it cannot delay anything on core 1. */
-static void plant_task(void *arg)
+void plant_task(void *arg)
 {
     (void)arg;
     TickType_t next = xTaskGetTickCount();
@@ -189,7 +215,7 @@ static void plant_task(void *arg)
 
 /* --- console: watch the firing, and inject the faults ------------------- */
 
-static void print_help(void)
+void print_help(void)
 {
     printf("\n"
            "  s  start the example program      a  abort\n"
@@ -206,7 +232,7 @@ static void print_help(void)
            "   x  clear all injections          h  this help\n\n");
 }
 
-static void start_example(void)
+void start_example(void)
 {
     kiln_program_t prog;
     const uint8_t which = (uint8_t)CONFIG_KILN_SIM_AUTOSTART_PROGRAM;
@@ -224,7 +250,7 @@ static void start_example(void)
     }
 }
 
-static void toggle_inject(uint32_t bit, const char *name)
+void toggle_inject(uint32_t bit, const char *name)
 {
     if (s_sim.inject & bit) {
         kiln_sim_clear(&s_sim, bit);
@@ -235,7 +261,7 @@ static void toggle_inject(uint32_t bit, const char *name)
     }
 }
 
-static void handle_key(int ch)
+void handle_key(int ch)
 {
     switch (ch) {
     case 's': start_example(); break;
@@ -286,7 +312,7 @@ static void handle_key(int ch)
     }
 }
 
-static void report(void)
+void report(void)
 {
     kiln_snapshot_t s;
     kiln_app_snapshot(&s_app, &s);
@@ -332,7 +358,7 @@ static void report(void)
     }
 }
 
-static void console_task(void *arg)
+void console_task(void *arg)
 {
     (void)arg;
 
@@ -363,9 +389,13 @@ static void console_task(void *arg)
     }
 }
 
+} // namespace
+
 #endif /* CONFIG_KILN_PLANT_SIM */
 
 #ifndef CONFIG_KILN_PLANT_SIM
+namespace {
+
 /* --- the local interface (FR-HMI, architecture 5.4) --------------------
  *
  * On core 0 with the rest of the UI (AD-15), so a slow I2C frame cannot
@@ -379,9 +409,9 @@ static void console_task(void *arg)
  * stale".  Redrawing only when the HMI says it is dirty keeps the bus quiet
  * when nothing is moving.
  */
-static kiln_hmi_t s_hmi;
+kiln_hmi_t s_hmi;
 
-static void hmi_apply(const kiln_hmi_action_t *a)
+void hmi_apply(const kiln_hmi_action_t *a)
 {
     /* The HMI asks; kiln_app decides.  Every one of these can be refused --
      * SR-18 will not clear a live fault, FR-CUR-12 will not start a run
@@ -413,7 +443,7 @@ static void hmi_apply(const kiln_hmi_action_t *a)
     }
 }
 
-static void hmi_build_view(kiln_hmi_view_t *v)
+void hmi_build_view(kiln_hmi_view_t *v)
 {
     memset(v, 0, sizeof(*v));
     kiln_app_snapshot(&s_app, &v->snap);
@@ -452,7 +482,7 @@ static void hmi_build_view(kiln_hmi_view_t *v)
     }
 }
 
-static void hmi_task(void *arg)
+void hmi_task(void *arg)
 {
     (void)arg;
     kiln_hmi_init(&s_hmi, s_app.cfg.dim_timeout_s);
@@ -489,6 +519,8 @@ static void hmi_task(void *arg)
         vTaskDelayUntil(&last, period);
     }
 }
+
+} // namespace
 #endif /* !CONFIG_KILN_PLANT_SIM */
 
 extern "C" void app_main(void)
@@ -544,6 +576,24 @@ extern "C" void app_main(void)
         }
     }
 
+    /* Programs and run records (AD-10).  Raw flash on every build: QEMU
+     * emulates flash, so the simulated firmware exercises the same store and
+     * keeps its programs across a reboot rather than pretending to. */
+    if (kiln_hal_flash_init(KILN_HAL_FS_PARTITION, &s_fs_flash) == KILN_OK) {
+        const kiln_err_t fe = kiln_fileslots_mount(&s_fileslots, &s_fs_flash);
+        if (fe == KILN_OK) {
+            kiln_fileslots_bind(&s_fileslots, &s_fs);
+            ports.filestore = &s_fs;
+            ESP_LOGI(TAG, "file store: %u of %u regions used",
+                     (unsigned)kiln_fileslots_used_regions(&s_fileslots),
+                     (unsigned)s_fileslots.region_count);
+        } else {
+            /* As with the log: a kiln that cannot store programs is still a
+             * kiln that can be watched, so this warns rather than halting. */
+            ESP_LOGE(TAG, "file store unusable: %s", kiln_err_str(fe));
+        }
+    }
+
 #ifdef CONFIG_KILN_PLANT_SIM
     kiln_sim_cfg_t sc;
     kiln_sim_cfg_defaults(&sc);
@@ -569,11 +619,14 @@ extern "C" void app_main(void)
     ports.counters = &s_sim_ports.counters;
     ports.door     = &s_sim_ports.door;        /* SR-31 */
 
-    /* Programs and run records.  RAM, until LittleFS is vendored -- see the note
-     * on kiln_sim_fs_t. */
-    kiln_sim_fs_init(&s_sim_fs);
-    kiln_sim_fs_bind(&s_sim_fs, &s_fs);
-    ports.filestore = &s_fs;
+    /* Only if the flash-backed store above did not come up: a simulated kiln
+     * with programs that vanish at reset is still more useful than none. */
+    if (ports.filestore == nullptr) {
+        kiln_sim_fs_init(&s_sim_fs);
+        kiln_sim_fs_bind(&s_sim_fs, &s_fs);
+        ports.filestore = &s_fs;
+        ESP_LOGW(TAG, "file store in RAM: programs will not survive a reset");
+    }
 
     ESP_LOGW(TAG, "SIMULATED PLANT: no hardware output is driven. "
                   "time acceleration %gx", (double)TIME_ACCEL);
@@ -633,12 +686,6 @@ extern "C" void app_main(void)
      * is how warning 104 gets raised rather than inferred. */
     (void)kiln_hal_display_init(&s_display_port);
     (void)kiln_hal_input_init(&s_input_port);
-
-    /* Programs and run records have nowhere to go until LittleFS is vendored
-     * (tasklist E7), so they are absent rather than wrong: kiln_app treats a
-     * missing filestore as "no stored programs", which is true. */
-    ESP_LOGW(TAG, "no file store: programs and run records will not persist "
-                  "until LittleFS is vendored (E7)");
 
     ESP_LOGW(TAG, "REAL HARDWARE: outputs are live. Fit the independent "
                   "over-temperature cutout (HR-13) before firing.");

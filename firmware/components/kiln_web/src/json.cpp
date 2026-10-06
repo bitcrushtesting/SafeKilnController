@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "kiln/types.h"      /* kiln_bytes_of */
 #include "kiln_web/json.h"
 
 /* --- writing ----------------------------------------------------------- */
@@ -25,9 +26,11 @@ void kiln_json_init(kiln_json_t *j, char *buf, size_t cap)
     }
 }
 
+namespace {
+
 /* Every write goes through here, so the bound is enforced in one place and the
  * overflow flag cannot be bypassed. */
-static void put(kiln_json_t *j, const char *s, size_t n)
+void put(kiln_json_t *j, const char *s, size_t n)
 {
     if ((j == nullptr) || j->overflow) {
         return;
@@ -38,10 +41,10 @@ static void put(kiln_json_t *j, const char *s, size_t n)
     j->buf[j->len] = '\0';
 }
 
-static void putc_(kiln_json_t *j, char c) { put(j, &c, 1); }
+void putc_(kiln_json_t *j, char c) { put(j, &c, 1); }
 
 /* A comma before anything but the first item at this depth. */
-static void separate(kiln_json_t *j)
+void separate(kiln_json_t *j)
 {
     if ((j == nullptr) || j->overflow) {
         return;
@@ -54,7 +57,7 @@ static void separate(kiln_json_t *j)
     }
 }
 
-static void open_container(kiln_json_t *j, char c)
+void open_container(kiln_json_t *j, char c)
 {
     if ((j == nullptr) || j->overflow) {
         return;
@@ -66,7 +69,7 @@ static void open_container(kiln_json_t *j, char c)
     j->had_item[j->depth] = false;
 }
 
-static void close_container(kiln_json_t *j, char c)
+void close_container(kiln_json_t *j, char c)
 {
     if ((j == nullptr) || j->overflow) {
         return;
@@ -76,18 +79,25 @@ static void close_container(kiln_json_t *j, char c)
     putc_(j, c);
 }
 
+} // namespace
+
 void kiln_json_obj_open(kiln_json_t *j)  { open_container(j, '{'); }
 void kiln_json_obj_close(kiln_json_t *j) { close_container(j, '}'); }
 void kiln_json_arr_open(kiln_json_t *j)  { open_container(j, '['); }
 void kiln_json_arr_close(kiln_json_t *j) { close_container(j, ']'); }
 
+namespace {
+
 /* Escape per RFC 8259.  Control characters below 0x20 must be escaped or the
  * document is invalid -- and a program name arrives from the network, so this is
  * not a theoretical case (NFR-19). */
-static void put_escaped(kiln_json_t *j, const char *s)
+void put_escaped(kiln_json_t *j, const char *s)
 {
     putc_(j, '"');
-    for (const unsigned char *p = (const unsigned char *)s; (*p) != 0u; p++) {
+    /* Scanned as bytes: the switch below compares against values under 0x20 and
+     * `char` is signed on both toolchains, so a byte above 0x7F would compare
+     * negative if this walked char. */
+    for (const uint8_t *p = kiln_bytes_of(s); (*p) != 0u; p++) {
         switch (*p) {
         case '"':  put(j, "\\\"", 2); break;
         case '\\': put(j, "\\\\", 2); break;
@@ -99,7 +109,9 @@ static void put_escaped(kiln_json_t *j, const char *s)
         default:
             if (*p < 0x20u) {
                 char u[7];
-                snprintf(u, sizeof(u), "\\u%04x", (unsigned)*p);
+                /* *p < 0x20, so "\\u00xx" is exactly 6 characters plus the NUL:
+                 * u is sized to the one output this can produce. */
+                (void)snprintf(u, sizeof(u), "\\u%04x", (unsigned)*p);
                 put(j, u, 6);
             } else {
                 putc_(j, (char)*p);
@@ -109,6 +121,8 @@ static void put_escaped(kiln_json_t *j, const char *s)
     }
     putc_(j, '"');
 }
+
+} // namespace
 
 void kiln_json_key(kiln_json_t *j, const char *key)
 {
@@ -124,14 +138,18 @@ void kiln_json_key(kiln_json_t *j, const char *key)
     }
 }
 
+namespace {
+
 /* A key resets had_item so the value is not comma-separated from its own key;
  * after the value, the member is complete. */
-static void value_written(kiln_json_t *j)
+void value_written(kiln_json_t *j)
 {
     if ((j != nullptr) && j->depth < KILN_JSON_MAX_DEPTH) {
         j->had_item[j->depth] = true;
     }
 }
+
+} // namespace
 
 void kiln_json_str(kiln_json_t *j, const char *v)
 {
@@ -264,6 +282,8 @@ void kiln_json_kv_num(kiln_json_t *j, const char *key, double v, int decimals)
 
 /* --- reading ----------------------------------------------------------- */
 
+namespace {
+
 typedef struct {
     const char      *js;
     size_t           len;
@@ -274,7 +294,7 @@ typedef struct {
     int              parent;
 } parser_t;
 
-static kiln_json_tok_t *alloc_tok(parser_t *p)
+kiln_json_tok_t *alloc_tok(parser_t *p)
 {
     if (p->count >= p->max) {
         return NULL;
@@ -291,7 +311,7 @@ static kiln_json_tok_t *alloc_tok(parser_t *p)
 /* A bare number, true, false or null.  Terminated by whitespace or structure;
  * anything else is malformed, which matters because the alternative is silently
  * accepting `12abc` as 12. */
-static int parse_primitive(parser_t *p)
+int parse_primitive(parser_t *p)
 {
     const size_t start = p->pos;
 
@@ -321,7 +341,7 @@ static int parse_primitive(parser_t *p)
     return 0;
 }
 
-static int parse_string(parser_t *p)
+int parse_string(parser_t *p)
 {
     p->pos++;                      /* opening quote */
     const size_t start = p->pos;
@@ -368,7 +388,9 @@ static int parse_string(parser_t *p)
 }
 
 /* Defined below; needed by the pairing check at the end of the parse. */
-static int skip(const kiln_json_tok_t *toks, int ntok, int idx);
+int skip(const kiln_json_tok_t *toks, int ntok, int idx);
+
+} // namespace
 
 int kiln_json_parse(const char *js, size_t len, kiln_json_tok_t *toks, int max_toks)
 {
@@ -488,8 +510,10 @@ int kiln_json_parse(const char *js, size_t len, kiln_json_tok_t *toks, int max_t
     return p.count;
 }
 
+namespace {
+
 /* Skip the whole subtree rooted at `idx`, returning the next sibling index. */
-static int skip(const kiln_json_tok_t *toks, int ntok, int idx)
+int skip(const kiln_json_tok_t *toks, int ntok, int idx)
 {
     if (idx < 0 || idx >= ntok) {
         return ntok;
@@ -502,6 +526,8 @@ static int skip(const kiln_json_tok_t *toks, int ntok, int idx)
     }
     return i;
 }
+
+} // namespace
 
 int kiln_json_find(const char *js, const kiln_json_tok_t *toks, int ntok,
                    int obj, const char *key)
@@ -538,6 +564,8 @@ int kiln_json_find(const char *js, const kiln_json_tok_t *toks, int ntok,
     return -1;
 }
 
+namespace {
+
 /* RFC 8259's number grammar:
  *
  *   -? (0 | [1-9][0-9]*) (\.[0-9]+)? ([eE][+-]?[0-9]+)?
@@ -547,7 +575,7 @@ int kiln_json_find(const char *js, const kiln_json_tok_t *toks, int ntok,
  * `infinity` and `nan`; and it accepts a leading `+`.  None of those is a JSON
  * number, and quietly converting one is how a malformed body becomes a plausible
  * configuration value. */
-static bool is_json_number(const char *s, size_t n)
+bool is_json_number(const char *s, size_t n)
 {
     size_t i = 0;
     if (i < n && s[i] == '-') {
@@ -594,6 +622,8 @@ static bool is_json_number(const char *s, size_t n)
     }
     return i == n;
 }
+
+} // namespace
 
 bool kiln_json_num_at(const char *js, const kiln_json_tok_t *toks, int idx, double *out)
 {
@@ -645,7 +675,9 @@ bool kiln_json_bool_at(const char *js, const kiln_json_tok_t *toks, int idx, boo
     return false;
 }
 
-static int hexval(char c)
+namespace {
+
+int hexval(char c)
 {
     if (c >= '0' && c <= '9') {
         return c - '0';
@@ -658,6 +690,8 @@ static int hexval(char c)
     }
     return -1;
 }
+
+} // namespace
 
 bool kiln_json_str_at(const char *js, const kiln_json_tok_t *toks, int idx,
                       char *out, size_t cap)
@@ -678,7 +712,7 @@ bool kiln_json_str_at(const char *js, const kiln_json_tok_t *toks, int idx,
             return false;
         }
 
-        char c = js[i];
+        char const c = js[i];
         if (c != '\\') { out[o++] = c; continue; }
 
         if (++i >= toks[idx].end) {
@@ -697,13 +731,13 @@ bool kiln_json_str_at(const char *js, const kiln_json_tok_t *toks, int idx,
             if (i + 4 >= toks[idx].end) {
                 return false;
             }
-            int v = 0;
+            unsigned v = 0;
             for (int k = 1; k <= 4; k++) {
                 const int h = hexval(js[i + k]);
                 if (h < 0) {
                     return false;
                 }
-                v = (v << 4) | h;
+                v = (v << 4u) | (unsigned)h;
             }
             i += 4;
             /* Only the ASCII range is reproduced.  Everything this API carries
@@ -711,7 +745,7 @@ bool kiln_json_str_at(const char *js, const kiln_json_tok_t *toks, int idx,
              * byte arrays elsewhere, and inventing a UTF-8 encoder here would be
              * more surface than the feature is worth.  A higher code point is
              * refused rather than mangled. */
-            if (v == 0 || v > 0x7F) {
+            if (v == 0u || v > 0x7Fu) {
                 return false;
             }
             out[o++] = (char)v;

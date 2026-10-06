@@ -104,8 +104,10 @@ kiln_gains_t kiln_autotune_gains_from(float ku, float tu, kiln_tune_rule_t rule)
     return g;
 }
 
+namespace {
+
 /* Record a completed cycle, measured peak to peak. */
-static void push_cycle(kiln_autotune_t *at, float period_s, float amplitude_c)
+void push_cycle(kiln_autotune_t *at, float period_s, float amplitude_c)
 {
     if (at->cycle_count < KILN_TUNE_MAX_CYCLES) {
         at->cycles[at->cycle_count].period_s    = period_s;
@@ -115,7 +117,7 @@ static void push_cycle(kiln_autotune_t *at, float period_s, float amplitude_c)
 }
 
 /* FR-TUN-05: discard the first cycle, then require the rest to agree. */
-static bool qualify(const kiln_autotune_t *at, float *ku_out, float *tu_out)
+bool qualify(const kiln_autotune_t *at, float *ku_out, float *tu_out)
 {
     if (at->cycle_count < (uint8_t)(at->cfg.required_cycles + 1u)) {
         return false;
@@ -169,7 +171,7 @@ static bool qualify(const kiln_autotune_t *at, float *ku_out, float *tu_out)
 }
 
 /* Relay with hysteresis about the tuning setpoint. */
-static void relay_update(kiln_autotune_t *at, float pv_c)
+void relay_update(kiln_autotune_t *at, float pv_c)
 {
     const float sp = at->cfg.setpoint_c;
     const float h  = at->cfg.hysteresis_c;
@@ -185,7 +187,7 @@ static void relay_update(kiln_autotune_t *at, float pv_c)
 
 /* Peak and trough detection, hysteresis-gated so noise cannot manufacture
  * extrema. */
-static void track_extremes(kiln_autotune_t *at, float pv_c)
+void track_extremes(kiln_autotune_t *at, float pv_c)
 {
     /* Its own threshold, not the relay band -- see peak_threshold_c. */
     const float h = at->cfg.peak_threshold_c;
@@ -228,6 +230,8 @@ static void track_extremes(kiln_autotune_t *at, float pv_c)
         }
     }
 }
+
+} // namespace
 
 uint16_t kiln_autotune_tick(kiln_autotune_t *at, float pv_c,
                             float rate_c_per_h, float dt_s)

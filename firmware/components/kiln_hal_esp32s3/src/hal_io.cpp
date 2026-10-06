@@ -14,7 +14,9 @@
 #include "kiln_hal/board_pins.h"
 #include "kiln_hal/hal_esp32s3.h"
 
-static const char *TAG = "hal_io";
+namespace {
+
+const char *TAG = "hal_io";
 
 /* --- lid interlock (SR-31, HR-21) --------------------------------------- */
 /*
@@ -33,9 +35,9 @@ typedef struct {
     bool fitted;
 } door_t;
 
-static door_t s_door;
+door_t s_door;
 
-static bool door_is_open(void *ctx)
+bool door_is_open(void *ctx)
 {
     (void)ctx;
     /* port_door.h: an adapter that cannot read the pin reports open.  A pin
@@ -44,11 +46,13 @@ static bool door_is_open(void *ctx)
     return gpio_get_level((gpio_num_t)KILN_PIN_LID_SENSE) == 0;
 }
 
-static bool door_is_present(void *ctx)
+bool door_is_present(void *ctx)
 {
     (void)ctx;
-    return ((door_t *)ctx != nullptr) ? s_door.fitted : false;
+    return (static_cast<door_t *>(ctx) != nullptr) ? s_door.fitted : false;
 }
+
+} // namespace
 
 void kiln_hal_door_init(kiln_port_door_t *out, bool interlock_fitted)
 {
@@ -56,7 +60,7 @@ void kiln_hal_door_init(kiln_port_door_t *out, bool interlock_fitted)
         return;
     }
     gpio_config_t io = {};
-    io.pin_bit_mask = 1ULL << KILN_PIN_LID_SENSE;
+    io.pin_bit_mask = 1ULL << (unsigned)KILN_PIN_LID_SENSE;
     io.mode         = GPIO_MODE_INPUT;
     /* Pull-down, so an unfitted or broken sense line reads "open" and withholds
      * heat rather than reading "shut" and permitting it. */
@@ -73,6 +77,8 @@ void kiln_hal_door_init(kiln_port_door_t *out, bool interlock_fitted)
     ESP_LOGI(TAG, "lid sense on IO%d, interlock %s", KILN_PIN_LID_SENSE,
              interlock_fitted ? "fitted" : "NOT fitted (warning 113)");
 }
+
+namespace {
 
 /* --- buzzer (HR-09, SR-20) ---------------------------------------------- */
 /*
@@ -93,11 +99,11 @@ typedef struct {
     bool                 on;
 } alarm_t;
 
-static alarm_t s_alarm;
+alarm_t s_alarm;
 
-static void alarm_tick(void *arg)
+void alarm_tick(void *arg)
 {
-    alarm_t *a = (alarm_t *)arg;
+    alarm_t *a = static_cast<alarm_t *>(arg);
     if (a->pattern == KILN_ALARM_OFF) {
         a->on = false;
         gpio_set_level((gpio_num_t)KILN_PIN_ALARM, 0);
@@ -113,9 +119,9 @@ static void alarm_tick(void *arg)
     (void)esp_timer_start_once(a->timer, next_us);
 }
 
-static void alarm_set(void *ctx, kiln_alarm_pattern_t pattern)
+void alarm_set(void *ctx, kiln_alarm_pattern_t pattern)
 {
-    alarm_t *a = (alarm_t *)ctx;
+    alarm_t *a = static_cast<alarm_t *>(ctx);
     if (a == nullptr) {
         return;
     }
@@ -135,13 +141,15 @@ static void alarm_set(void *ctx, kiln_alarm_pattern_t pattern)
     alarm_tick(a);
 }
 
+} // namespace
+
 void kiln_hal_alarm_init(kiln_port_alarm_t *out)
 {
     if (out == nullptr) {
         return;
     }
     gpio_config_t io = {};
-    io.pin_bit_mask = 1ULL << KILN_PIN_ALARM;
+    io.pin_bit_mask = 1ULL << (unsigned)KILN_PIN_ALARM;
     io.mode         = GPIO_MODE_OUTPUT;
     io.pull_down_en = GPIO_PULLDOWN_ENABLE;
     io.pull_up_en   = GPIO_PULLUP_DISABLE;

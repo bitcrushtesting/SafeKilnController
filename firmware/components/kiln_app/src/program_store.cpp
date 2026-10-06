@@ -7,15 +7,20 @@
 #include "kiln_core/logrec.h"      /* kiln_crc16 */
 #include "kiln_core/profile.h"
 
-#define PROG_MAGIC       0x47525021U   /* "!PRG" */
+constexpr uint32_t PROG_MAGIC = 0x47525021U;  /* "!PRG" */
 #define PROG_BLOB_BYTES  (8u + sizeof(kiln_program_t) + 2u)
 
-static void slot_path(uint8_t slot, char out[KILN_PATH_MAX])
+namespace {
+
+void slot_path(uint8_t slot, char out[KILN_PATH_MAX])
 {
-    snprintf(out, KILN_PATH_MAX, "/p/%02u", (unsigned)slot);
+    /* slot is a uint8_t, so the longest result is "/p/255": 6 characters into
+     * KILN_PATH_MAX (64).  Truncation is unreachable, which is the handling
+     * NFR-17 asks for here -- stated rather than checked at runtime. */
+    (void)snprintf(out, KILN_PATH_MAX, "/p/%02u", (unsigned)slot);
 }
 
-static kiln_err_t encode(const kiln_program_t *p, uint8_t *out, size_t cap, size_t *len)
+kiln_err_t encode(const kiln_program_t *p, uint8_t *out, size_t cap, size_t *len)
 {
     if (cap < PROG_BLOB_BYTES) {
         return KILN_ERR_NO_SPACE;
@@ -23,37 +28,37 @@ static kiln_err_t encode(const kiln_program_t *p, uint8_t *out, size_t cap, size
 
     memset(out, 0, PROG_BLOB_BYTES);
     out[0] = (uint8_t)PROG_MAGIC;
-    out[1] = (uint8_t)(PROG_MAGIC >> 8);
-    out[2] = (uint8_t)(PROG_MAGIC >> 16);
-    out[3] = (uint8_t)(PROG_MAGIC >> 24);
+    out[1] = (uint8_t)(PROG_MAGIC >> 8u);
+    out[2] = (uint8_t)(PROG_MAGIC >> 16u);
+    out[3] = (uint8_t)(PROG_MAGIC >> 24u);
     out[4] = (uint8_t)KILN_PROGRAM_SCHEMA_VERSION;
     out[5] = (uint8_t)(sizeof(kiln_program_t));
-    out[6] = (uint8_t)(sizeof(kiln_program_t) >> 8);
+    out[6] = (uint8_t)(sizeof(kiln_program_t) >> 8u);
     out[7] = 0;
     memcpy(&out[8], p, sizeof(*p));
 
     const uint16_t crc = kiln_crc16(out, PROG_BLOB_BYTES - 2);
     out[PROG_BLOB_BYTES - 2] = (uint8_t)crc;
-    out[PROG_BLOB_BYTES - 1] = (uint8_t)(crc >> 8);
+    out[PROG_BLOB_BYTES - 1] = (uint8_t)(crc >> 8u);
 
     *len = PROG_BLOB_BYTES;
     return KILN_OK;
 }
 
-static kiln_err_t decode(const uint8_t *in, size_t len, kiln_program_t *out)
+kiln_err_t decode(const uint8_t *in, size_t len, kiln_program_t *out)
 {
     if (len != PROG_BLOB_BYTES) {
         return KILN_ERR_CORRUPT;
     }
 
-    const uint32_t magic = (uint32_t)in[0] | ((uint32_t)in[1] << 8) |
-                           ((uint32_t)in[2] << 16) | ((uint32_t)in[3] << 24);
+    const uint32_t magic = (uint32_t)in[0] | ((uint32_t)in[1] << 8u) |
+                           ((uint32_t)in[2] << 16u) | ((uint32_t)in[3] << 24u);
     if (magic != PROG_MAGIC) {
         return KILN_ERR_CORRUPT;
     }
 
-    const uint16_t crc = (uint16_t)(in[PROG_BLOB_BYTES - 2] |
-                                    ((uint16_t)in[PROG_BLOB_BYTES - 1] << 8));
+    const uint16_t crc = (uint16_t)((uint32_t)in[PROG_BLOB_BYTES - 2] |
+                                    ((uint32_t)in[PROG_BLOB_BYTES - 1] << 8u));
     if (kiln_crc16(in, PROG_BLOB_BYTES - 2) != crc) {
         return KILN_ERR_CORRUPT;
     }
@@ -66,7 +71,7 @@ static kiln_err_t decode(const uint8_t *in, size_t len, kiln_program_t *out)
     return KILN_OK;
 }
 
-static kiln_err_t read_slot(const kiln_port_filestore_t *fs, uint8_t slot,
+kiln_err_t read_slot(const kiln_port_filestore_t *fs, uint8_t slot,
                             kiln_program_t *out)
 {
     char path[KILN_PATH_MAX];
@@ -81,7 +86,7 @@ static kiln_err_t read_slot(const kiln_port_filestore_t *fs, uint8_t slot,
     return decode(blob, len, out);
 }
 
-static kiln_err_t write_slot(const kiln_port_filestore_t *fs, uint8_t slot,
+kiln_err_t write_slot(const kiln_port_filestore_t *fs, uint8_t slot,
                              const kiln_program_t *p)
 {
     uint8_t blob[PROG_BLOB_BYTES];
@@ -99,7 +104,7 @@ static kiln_err_t write_slot(const kiln_port_filestore_t *fs, uint8_t slot,
 }
 
 /* Slot holding `name`, or KILN_PROGRAM_SLOTS if there is none. */
-static uint8_t find_by_name(const kiln_port_filestore_t *fs, const char *name,
+uint8_t find_by_name(const kiln_port_filestore_t *fs, const char *name,
                             bool *readonly_out)
 {
     for (uint8_t slot = 0; slot < KILN_PROGRAM_SLOTS; slot++) {
@@ -117,7 +122,7 @@ static uint8_t find_by_name(const kiln_port_filestore_t *fs, const char *name,
     return KILN_PROGRAM_SLOTS;
 }
 
-static uint8_t first_free_slot(const kiln_port_filestore_t *fs)
+uint8_t first_free_slot(const kiln_port_filestore_t *fs)
 {
     for (uint8_t slot = 0; slot < KILN_PROGRAM_SLOTS; slot++) {
         kiln_program_t p;
@@ -127,6 +132,8 @@ static uint8_t first_free_slot(const kiln_port_filestore_t *fs)
     }
     return KILN_PROGRAM_SLOTS;
 }
+
+} // namespace
 
 kiln_err_t kiln_program_store_seed(const kiln_port_filestore_t *fs)
 {

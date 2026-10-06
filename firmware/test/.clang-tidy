@@ -17,8 +17,25 @@
 #                            hostile bytes.
 #   simplify-boolean-expr .. fires inside the check-macro expansion, not in
 #                            anything a person wrote.
+#   use-anonymous-namespace  890 findings, 796 of them the two static functions
+#   use-internal-linkage ... KILN_TEST() expands to -- so nine in ten are the
+#                            harness, not the suite.  They cannot be fixed at
+#                            the macro either: wrapping them would mean opening
+#                            a namespace the caller's `{ body }` has to close,
+#                            and the macro has no way to emit the closing
+#                            brace.  Nor can a NOLINT reach them, because the
+#                            diagnostic lands on the expansion site.
+#
+#                            The remaining 94 are hand-written fixtures, and
+#                            `static` at file scope is correct C++ for them --
+#                            the check prefers an anonymous namespace, which is
+#                            a style, not a defect.  firmware/components and
+#                            firmware/main are gated by both checks and carry
+#                            no `static` free functions at all.
 InheritParentConfig: true
 Checks: >
+  -misc-use-anonymous-namespace,
+  -misc-use-internal-linkage,
   -clang-analyzer-optin.core.EnumCastOutOfRange,
   -clang-analyzer-core.NullDereference,
   -clang-analyzer-security.insecureAPI.strcpy,

@@ -6,25 +6,27 @@
 
 /* --- layout ------------------------------------------------------------- */
 
-static uint32_t sector_offset(const kiln_logring_t *r, uint32_t sector)
+namespace {
+
+uint32_t sector_offset(const kiln_logring_t *r, uint32_t sector)
 {
     return sector * r->sector_bytes;
 }
 
-static uint32_t slot_offset(const kiln_logring_t *r, uint32_t sector, uint32_t slot)
+uint32_t slot_offset(const kiln_logring_t *r, uint32_t sector, uint32_t slot)
 {
     return sector_offset(r, sector) + KILN_LOG_HEADER_BYTES
          + slot * KILN_LOG_RECORD_BYTES;
 }
 
-static uint32_t next_sector(const kiln_logring_t *r, uint32_t sector)
+uint32_t next_sector(const kiln_logring_t *r, uint32_t sector)
 {
     return (sector + 1u) % r->sector_count;
 }
 
 /* --- header ------------------------------------------------------------- */
 
-static kiln_err_t read_hdr(kiln_logring_t *r, uint32_t sector,
+kiln_err_t read_hdr(kiln_logring_t *r, uint32_t sector,
                            kiln_log_sector_hdr_t *out)
 {
     uint8_t buf[KILN_LOG_HEADER_BYTES];
@@ -38,7 +40,7 @@ static kiln_err_t read_hdr(kiln_logring_t *r, uint32_t sector,
 
 /* Erase the sector, then stamp its header.  In that order and never ahead of
  * time: see the note on wrap ordering in logring.h. */
-static kiln_err_t claim_sector(kiln_logring_t *r, uint32_t sector, uint32_t seq,
+kiln_err_t claim_sector(kiln_logring_t *r, uint32_t sector, uint32_t seq,
                                uint32_t run_id)
 {
     kiln_err_t e = r->flash->erase(r->flash->ctx, sector_offset(r, sector),
@@ -63,7 +65,7 @@ static kiln_err_t claim_sector(kiln_logring_t *r, uint32_t sector, uint32_t seq,
 /* First erased slot in a sector, which is where appending resumes.  A torn or
  * corrupt record terminates the scan: everything beyond it in this sector is
  * unreachable anyway, because a reader stops there too (FR-LOG-08). */
-static kiln_err_t scan_sector_head(kiln_logring_t *r, uint32_t sector,
+kiln_err_t scan_sector_head(kiln_logring_t *r, uint32_t sector,
                                    uint32_t *slot_out, uint32_t *valid_out)
 {
     uint32_t valid = 0;
@@ -90,6 +92,8 @@ static kiln_err_t scan_sector_head(kiln_logring_t *r, uint32_t sector,
     *valid_out = valid;
     return KILN_OK;
 }
+
+} // namespace
 
 kiln_err_t kiln_logring_mount(kiln_logring_t *r, const kiln_port_flash_t *flash)
 {
@@ -287,9 +291,11 @@ kiln_err_t kiln_logring_append(kiln_logring_t *r,
 
 /* --- read -------------------------------------------------------------- */
 
+namespace {
+
 /* Visit every sector in sequence order, oldest first.  Order comes from seq, so
  * a reader is indifferent to where the head happens to sit. */
-static kiln_err_t for_each_sector(kiln_logring_t *r, uint32_t run_id,
+kiln_err_t for_each_sector(kiln_logring_t *r, uint32_t run_id,
                                   bool (*fn)(kiln_logring_t *, uint32_t sector,
                                              uint32_t run, void *user),
                                   void *user)
@@ -318,9 +324,9 @@ typedef struct {
     bool                   stopped;
 } visit_ctx_t;
 
-static bool visit_sector(kiln_logring_t *r, uint32_t sector, uint32_t run, void *user)
+bool visit_sector(kiln_logring_t *r, uint32_t sector, uint32_t run, void *user)
 {
-    visit_ctx_t *v = (visit_ctx_t *)user;
+    visit_ctx_t *v = static_cast<visit_ctx_t *>(user);
 
     for (uint32_t slot = 0; slot < r->recs_per_sector; slot++) {
         uint8_t rec[KILN_LOG_RECORD_BYTES];
@@ -339,6 +345,8 @@ static bool visit_sector(kiln_logring_t *r, uint32_t sector, uint32_t run, void 
     return true;
 }
 
+} // namespace
+
 kiln_err_t kiln_logring_iterate(kiln_logring_t *r, uint32_t run_id,
                                 kiln_logstore_visit_fn fn, void *user)
 {
@@ -353,19 +361,23 @@ kiln_err_t kiln_logring_iterate(kiln_logring_t *r, uint32_t run_id,
     return for_each_sector(r, run_id, visit_sector, &v);
 }
 
+namespace {
+
 typedef struct {
     uint8_t  rec[KILN_LOG_RECORD_BYTES];
     bool     found;
 } last_ctx_t;
 
-static bool keep_last(void *user, uint32_t run, const uint8_t rec[KILN_LOG_RECORD_BYTES])
+bool keep_last(void *user, uint32_t run, const uint8_t rec[KILN_LOG_RECORD_BYTES])
 {
     (void)run;
-    last_ctx_t *l = (last_ctx_t *)user;
+    last_ctx_t *l = static_cast<last_ctx_t *>(user);
     memcpy(l->rec, rec, KILN_LOG_RECORD_BYTES);
     l->found = true;
     return true;      /* keep going: the last one to arrive wins */
 }
+
+} // namespace
 
 kiln_err_t kiln_logring_last_record(kiln_logring_t *r, uint32_t run_id,
                                     uint8_t rec[KILN_LOG_RECORD_BYTES])
@@ -419,32 +431,36 @@ kiln_err_t kiln_logring_stats(kiln_logring_t *r, kiln_logstore_stats_t *out)
 
 /* --- port binding ------------------------------------------------------ */
 
-static kiln_err_t ls_begin_run(void *ctx, uint32_t run_id)
+namespace {
+
+kiln_err_t ls_begin_run(void *ctx, uint32_t run_id)
 {
-    return kiln_logring_begin_run((kiln_logring_t *)ctx, run_id);
+    return kiln_logring_begin_run(static_cast<kiln_logring_t *>(ctx), run_id);
 }
-static kiln_err_t ls_append(void *ctx, const uint8_t rec[KILN_LOG_RECORD_BYTES])
+kiln_err_t ls_append(void *ctx, const uint8_t rec[KILN_LOG_RECORD_BYTES])
 {
-    return kiln_logring_append((kiln_logring_t *)ctx, rec);
+    return kiln_logring_append(static_cast<kiln_logring_t *>(ctx), rec);
 }
-static kiln_err_t ls_iterate(void *ctx, uint32_t run_id,
+kiln_err_t ls_iterate(void *ctx, uint32_t run_id,
                              kiln_logstore_visit_fn fn, void *user)
 {
-    return kiln_logring_iterate((kiln_logring_t *)ctx, run_id, fn, user);
+    return kiln_logring_iterate(static_cast<kiln_logring_t *>(ctx), run_id, fn, user);
 }
-static kiln_err_t ls_last(void *ctx, uint32_t run_id,
+kiln_err_t ls_last(void *ctx, uint32_t run_id,
                           uint8_t rec[KILN_LOG_RECORD_BYTES])
 {
-    return kiln_logring_last_record((kiln_logring_t *)ctx, run_id, rec);
+    return kiln_logring_last_record(static_cast<kiln_logring_t *>(ctx), run_id, rec);
 }
-static kiln_err_t ls_stats(void *ctx, kiln_logstore_stats_t *out)
+kiln_err_t ls_stats(void *ctx, kiln_logstore_stats_t *out)
 {
-    return kiln_logring_stats((kiln_logring_t *)ctx, out);
+    return kiln_logring_stats(static_cast<kiln_logring_t *>(ctx), out);
 }
-static kiln_err_t ls_erase_all(void *ctx)
+kiln_err_t ls_erase_all(void *ctx)
 {
-    return kiln_logring_erase_all((kiln_logring_t *)ctx);
+    return kiln_logring_erase_all(static_cast<kiln_logring_t *>(ctx));
 }
+
+} // namespace
 
 void kiln_logring_bind(kiln_logring_t *r, kiln_port_logstore_t *out)
 {

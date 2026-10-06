@@ -9,7 +9,9 @@
 /* Upper bound on a predicted duration: a program is capped at 168 h by
  * FR-PRG-05, so 200 h cannot be exceeded by a valid program and bounds the
  * answer for an invalid one. */
-#define PREDICT_MAX_S   (200u * 3600u)
+constexpr uint32_t PREDICT_MAX_S = 200u * 3600u;
+
+namespace {
 
 /* The clamped target of a segment.  One helper, used by the executor, by
  * heat_allowed and by the duration prediction, because the three disagreeing is
@@ -17,12 +19,12 @@
  * heat_allowed report true while the executor was ramping the clamped setpoint
  * downward -- a cooling ramp that FR-CTL-13 should have made passive, driven at
  * full duty instead. */
-static float seg_target_c(const kiln_setpoint_t *st, uint8_t seg)
+float seg_target_c(const kiln_setpoint_t *st, uint8_t seg)
 {
     return kiln_clampf((float)st->prog.segments[seg].target_c, 0.0f, st->cfg.max_temp_c);
 }
 
-static float move_toward(float from, float to, float step)
+float move_toward(float from, float to, float step)
 {
     if (from < to) {
         from += step;
@@ -35,7 +37,7 @@ static float move_toward(float from, float to, float step)
     return to;
 }
 
-static void enter_segment(kiln_setpoint_t *st, uint8_t seg, float pv_c)
+void enter_segment(kiln_setpoint_t *st, uint8_t seg, float pv_c)
 {
     st->seg           = seg;
     st->phase         = KILN_SP_PHASE_RAMP;
@@ -43,7 +45,7 @@ static void enter_segment(kiln_setpoint_t *st, uint8_t seg, float pv_c)
     st->seg_elapsed_s = 0.0f;
 }
 
-static void advance_segment(kiln_setpoint_t *st)
+void advance_segment(kiln_setpoint_t *st)
 {
     if (st->seg + 1u < st->prog.segment_count) {
         /* The next segment ramps from where this one ended, which is the
@@ -55,6 +57,8 @@ static void advance_segment(kiln_setpoint_t *st)
         st->finished = true;
     }
 }
+
+} // namespace
 
 kiln_err_t kiln_setpoint_start(kiln_setpoint_t *st,
                                const kiln_setpoint_cfg_t *cfg,
@@ -231,11 +235,13 @@ bool kiln_setpoint_heat_allowed(const kiln_setpoint_t *st)
 
 /* --- time prediction ---------------------------------------------------- */
 
+namespace {
+
 /* Seconds a ramp occupies, matching the executor tick for tick.  The executor
  * steps the setpoint by rate/3600 each second and transitions on the step that
  * reaches the target, so the count is a ceiling -- and is at least one second,
  * because even a zero-span ramp costs the cycle that notices it has arrived. */
-static uint32_t ramp_s(float from_c, float to_c, uint16_t rate_c_per_h)
+uint32_t ramp_s(float from_c, float to_c, uint16_t rate_c_per_h)
 {
     if (rate_c_per_h == 0) {
         return 1u; /* FR-CTL-10: steps to target */
@@ -258,7 +264,7 @@ static uint32_t ramp_s(float from_c, float to_c, uint16_t rate_c_per_h)
 
 /* Seconds of dwell still to accrue.  Also at least one second: the executor adds
  * dt before testing, so a zero dwell still consumes the cycle that ends it. */
-static uint32_t dwell_s(uint16_t dwell_min, float already_s)
+uint32_t dwell_s(uint16_t dwell_min, float already_s)
 {
     const double rem = (double)dwell_min * 60.0 - (double)already_s;
     if (!(rem > 0.0)) {
@@ -276,7 +282,7 @@ static uint32_t dwell_s(uint16_t dwell_min, float already_s)
  * perfectly, which is the assumption FR-PRG-06 and FR-RUN-05 state.  Hold-back
  * and dwell tolerance therefore never trigger, which is what makes the
  * arithmetic closed. */
-static uint32_t predict_s(const kiln_setpoint_t *st, bool stop_at_segment_end)
+uint32_t predict_s(const kiln_setpoint_t *st, bool stop_at_segment_end)
 {
     if ((st == nullptr) || !st->started || st->finished) {
         return 0;
@@ -321,6 +327,8 @@ static uint32_t predict_s(const kiln_setpoint_t *st, bool stop_at_segment_end)
 
     return total > (uint64_t)PREDICT_MAX_S ? PREDICT_MAX_S : (uint32_t)total;
 }
+
+} // namespace
 
 uint32_t kiln_setpoint_remaining_s(const kiln_setpoint_t *st)
 {

@@ -13,19 +13,21 @@
 
 /* --- small helpers ------------------------------------------------------ */
 
-static float to_display_c(const kiln_hmi_view_t *v, float c)
+namespace {
+
+float to_display_c(const kiln_hmi_view_t *v, float c)
 {
     /* FR-HMI-13: degF is a display conversion and nothing else.  Every stored,
      * logged and transmitted value stays in degC. */
     return v->fahrenheit ? (c * 9.0f / 5.0f + 32.0f) : c;
 }
 
-static const char *unit_str(const kiln_hmi_view_t *v)
+const char *unit_str(const kiln_hmi_view_t *v)
 {
     return v->fahrenheit ? "F" : "C";
 }
 
-static void fmt_temp(char *buf, size_t n, const kiln_hmi_view_t *v, float c, bool valid)
+void fmt_temp(char *buf, size_t n, const kiln_hmi_view_t *v, float c, bool valid)
 {
     if (!valid) {
         /* FR-ACQ-12: inside the grace window there is no measurement, and
@@ -37,7 +39,7 @@ static void fmt_temp(char *buf, size_t n, const kiln_hmi_view_t *v, float c, boo
     (void)snprintf(buf, n, "%d", (int)(to_display_c(v, c) + (c < 0.0f ? -0.5f : 0.5f)));
 }
 
-static void fmt_hms(char *buf, size_t n, uint32_t s)
+void fmt_hms(char *buf, size_t n, uint32_t s)
 {
     const uint32_t h = s / 3600u;
     const uint32_t m = (s % 3600u) / 60u;
@@ -45,7 +47,7 @@ static void fmt_hms(char *buf, size_t n, uint32_t s)
     else        { (void)snprintf(buf, n, "%um%02u", (unsigned)m, (unsigned)(s % 60u)); }
 }
 
-static const char *state_text(const kiln_hmi_view_t *v)
+const char *state_text(const kiln_hmi_view_t *v)
 {
     /* NFR-23 / FR-HMI-15: the one table, in the configured language. */
     return kiln_state_label((kiln_state_t)v->snap.state);
@@ -53,7 +55,7 @@ static const char *state_text(const kiln_hmi_view_t *v)
 
 /* --- screens ------------------------------------------------------------ */
 
-static void draw_main(kiln_hmi_t *h, const kiln_hmi_view_t *v)
+void draw_main(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 {
     char buf[32];
 
@@ -120,7 +122,7 @@ static void draw_main(kiln_hmi_t *h, const kiln_hmi_view_t *v)
     }
 }
 
-static void draw_fault(kiln_hmi_t *h, const kiln_hmi_view_t *v)
+void draw_fault(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 {
     /* FR-HMI-06: takes precedence over everything and is not dismissible while
      * the condition holds.  Inverted, because a fault screen that looks like
@@ -159,7 +161,7 @@ static void draw_fault(kiln_hmi_t *h, const kiln_hmi_view_t *v)
     }
 }
 
-static const char *menu_label(uint8_t i, const kiln_hmi_view_t *v)
+const char *menu_label(uint8_t i, const kiln_hmi_view_t *v)
 {
     const bool running = (v->snap.state == (uint8_t)KILN_STATE_RUNNING);
     const bool paused  = (v->snap.state == (uint8_t)KILN_STATE_PAUSED);
@@ -173,9 +175,13 @@ static const char *menu_label(uint8_t i, const kiln_hmi_view_t *v)
     default: return "";
     }
 }
-#define MENU_ITEMS 6
 
-static void draw_list(kiln_hmi_t *h, const char *title, uint8_t count, uint8_t sel,
+} // namespace
+constexpr int MENU_ITEMS = 6;
+
+namespace {
+
+void draw_list(kiln_hmi_t *h, const char *title, uint8_t count, uint8_t sel,
                       uint8_t top, const char *(*label)(uint8_t, const kiln_hmi_view_t *),
                       const kiln_hmi_view_t *v)
 {
@@ -199,15 +205,15 @@ static void draw_list(kiln_hmi_t *h, const char *title, uint8_t count, uint8_t s
     }
 }
 
-static const kiln_hmi_view_t *s_prog_view;    /* for the label callback below */
+const kiln_hmi_view_t *s_prog_view;    /* for the label callback below */
 
-static const char *program_label(uint8_t i, const kiln_hmi_view_t *v)
+const char *program_label(uint8_t i, const kiln_hmi_view_t *v)
 {
     (void)v;
     return (i < s_prog_view->program_count) ? s_prog_view->program_name[i] : "";
 }
 
-static void draw_confirm(kiln_hmi_t *h, const kiln_hmi_view_t *v)
+void draw_confirm(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 {
     /* FR-HMI-11: starting and aborting both require this step. */
     const char *what = (h->pending == KILN_HMI_ACT_START) ? "Start firing?" : "Abort firing?";
@@ -227,7 +233,7 @@ static void draw_confirm(kiln_hmi_t *h, const kiln_hmi_view_t *v)
     kiln_fb_text(&h->fb, 0, 54, "turn to choose, press", 1, true);
 }
 
-static void draw_network(kiln_hmi_t *h, const kiln_hmi_view_t *v)
+void draw_network(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 {
     /* FR-HMI-07: where the web interface is, which is the question an operator
      * standing at the kiln actually has. */
@@ -239,7 +245,7 @@ static void draw_network(kiln_hmi_t *h, const kiln_hmi_view_t *v)
     kiln_fb_text(&h->fb, 0, 54, "display only", 1, true);
 }
 
-static void draw_diag(kiln_hmi_t *h, const kiln_hmi_view_t *v)
+void draw_diag(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 {
     char buf[32], t[12];
     kiln_fb_text(&h->fb, 0, 0, "DIAGNOSTICS", 1, true);
@@ -263,7 +269,7 @@ static void draw_diag(kiln_hmi_t *h, const kiln_hmi_view_t *v)
     kiln_fb_text(&h->fb, 0, 53, buf, 1, true);
 }
 
-static void draw_info(kiln_hmi_t *h, const kiln_hmi_view_t *v)
+void draw_info(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 {
     char buf[40], up[12];
     kiln_fb_text(&h->fb, 0, 0, "INFO", 1, true);
@@ -284,6 +290,8 @@ static void draw_info(kiln_hmi_t *h, const kiln_hmi_view_t *v)
     kiln_fb_text(&h->fb, 0, 53, v->gains_tuned ? "tuned" : "UNTUNED defaults", 1, true);
 }
 
+} // namespace
+
 /* --- state machine ------------------------------------------------------ */
 
 void kiln_hmi_init(kiln_hmi_t *h, uint16_t dim_timeout_s)
@@ -295,19 +303,23 @@ void kiln_hmi_init(kiln_hmi_t *h, uint16_t dim_timeout_s)
     h->dirty         = true;
 }
 
-static kiln_hmi_action_t none(void)
+namespace {
+
+kiln_hmi_action_t none(void)
 {
     kiln_hmi_action_t a = {};
     a.kind = KILN_HMI_ACT_NONE;
     return a;
 }
 
-static void step(uint8_t *sel, uint8_t count, bool forward)
+void step(uint8_t *sel, uint8_t count, bool forward)
 {
     if (count == 0u) { return; }
     if (forward) { *sel = (uint8_t)((*sel + 1u) % count); }
     else         { *sel = (uint8_t)((*sel == 0u) ? (count - 1u) : (*sel - 1u)); }
 }
+
+} // namespace
 
 kiln_hmi_action_t kiln_hmi_update(kiln_hmi_t *h, const kiln_hmi_view_t *view,
                                   kiln_input_event_t ev, uint32_t dt_ms)

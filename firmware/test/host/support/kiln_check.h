@@ -45,17 +45,22 @@ extern int               kiln_current_failures;
             kiln_tests[kiln_test_count].fn   = kiln_test_##test_name_;         \
             kiln_test_count++;                                                 \
         } else {                                                               \
-            fprintf(stderr, "KILN_MAX_TESTS exceeded\n");                      \
+            (void)fprintf(stderr, "KILN_MAX_TESTS exceeded\n");                \
             abort();                                                           \
         }                                                                      \
     }                                                                          \
     static void kiln_test_##test_name_(void)
 
+/* The (void) casts on every fprintf below are not decoration: NFR-17's rule is
+ * that no return value is silently dropped, and cert-err33-c enforces it with
+ * no baseline.  A diagnostic that cannot be written is genuinely nothing this
+ * harness can do anything about, so the cast is the handling -- stated once,
+ * here, rather than suppressed across 2 100 expansion sites in the suites. */
 #define KILN_FAIL(...)                                                         \
     do {                                                                       \
-        fprintf(stderr, "    %s:%d: ", __FILE__, __LINE__);                    \
-        fprintf(stderr, __VA_ARGS__);                                          \
-        fprintf(stderr, "\n");                                                 \
+        (void)fprintf(stderr, "    %s:%d: ", __FILE__, __LINE__);              \
+        (void)fprintf(stderr, __VA_ARGS__);                                    \
+        (void)fprintf(stderr, "\n");                                           \
         kiln_current_failures++;                                               \
     } while (0)
 

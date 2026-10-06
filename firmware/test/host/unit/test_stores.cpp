@@ -239,7 +239,7 @@ KILN_TEST(frprg04_the_store_holds_twenty_programs_and_then_says_no)
 
     char name[KILN_PROGRAM_NAME_LEN];
     for (unsigned i = 0; i < KILN_PROGRAM_SLOTS; i++) {
-        snprintf(name, sizeof(name), "program %u", i);
+        (void)snprintf(name, sizeof(name), "program %u", i);
         const kiln_program_t p = named(name, 900);
         CHECK_OK(kiln_program_store_save(&port, &p, 1280.0f));
     }
@@ -274,7 +274,7 @@ KILN_TEST(nfr19_a_stored_program_is_treated_as_untrusted_on_the_way_back_in)
     const size_t n = fs.files[0].len;
     const uint16_t crc = kiln_crc16(blob, n - 2);
     blob[n - 2] = (uint8_t)crc;
-    blob[n - 1] = (uint8_t)(crc >> 8);
+    blob[n - 1] = (uint8_t)(crc >> 8u);
 
     kiln_program_t out;
     CHECK_OK(kiln_program_store_get_slot(&port, 0, &out));

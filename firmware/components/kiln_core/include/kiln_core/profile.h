@@ -13,9 +13,9 @@
 #include "kiln/err.h"
 #include "kiln/types.h"
 
-#define KILN_DWELL_MIN_MAX       5999u    /* FR-PRG-02 */
-#define KILN_RATE_MAX_C_PER_H    9999u    /* FR-CTL-10 */
-#define KILN_PROGRAM_MAX_DURATION_S (168u * 3600u)  /* FR-PRG-05 */
+constexpr uint16_t KILN_DWELL_MIN_MAX          = 5999u;         /* FR-PRG-02 */
+constexpr uint16_t KILN_RATE_MAX_C_PER_H       = 9999u;         /* FR-CTL-10 */
+constexpr uint32_t KILN_PROGRAM_MAX_DURATION_S = 168u * 3600u;  /* FR-PRG-05 */
 
 typedef enum {
     KILN_PROG_OK = 0,

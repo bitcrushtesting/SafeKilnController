@@ -16,8 +16,10 @@ void kiln_window_cfg_defaults(kiln_window_cfg_t *cfg)
     *cfg = d;
 }
 
+namespace {
+
 /* Bound the configuration, and report whether anything had to move. */
-static bool validate(kiln_window_cfg_t *c)
+bool validate(kiln_window_cfg_t *c)
 {
     bool corrected = false;
 
@@ -56,13 +58,15 @@ static bool validate(kiln_window_cfg_t *c)
     return corrected;
 }
 
-static void recompute(kiln_window_t *w)
+void recompute(kiln_window_t *w)
 {
     w->ticks_per_window = w->cfg.window_ms / w->cfg.tick_ms;
     if (w->ticks_per_window == 0) {
         w->ticks_per_window = 1;
     }
 }
+
+} // namespace
 
 kiln_err_t kiln_window_init(kiln_window_t *w, const kiln_window_cfg_t *cfg)
 {
@@ -93,8 +97,10 @@ kiln_err_t kiln_window_reconfigure(kiln_window_t *w, const kiln_window_cfg_t *cf
     return corrected ? KILN_ERR_RANGE : KILN_OK;
 }
 
+namespace {
+
 /* The largest duty that still leaves min_measure_off_ms of off-time. */
-static uint16_t measurable_max_duty(const kiln_window_t *w)
+uint16_t measurable_max_duty(const kiln_window_t *w)
 {
     if (w->cfg.min_measure_off_ms >= w->cfg.window_ms) {
         return 0;
@@ -102,6 +108,8 @@ static uint16_t measurable_max_duty(const kiln_window_t *w)
     const uint32_t on_ms = w->cfg.window_ms - w->cfg.min_measure_off_ms;
     return (uint16_t)(on_ms * KILN_DUTY_MAX / w->cfg.window_ms);
 }
+
+} // namespace
 
 uint16_t kiln_window_quantise(const kiln_window_t *w, uint16_t duty_permille)
 {

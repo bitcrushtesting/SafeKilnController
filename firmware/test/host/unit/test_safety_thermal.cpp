@@ -479,7 +479,7 @@ KILN_TEST(eval_checked_separates_an_invalid_argument_from_a_missed_deadline)
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
     kiln_safety_init(&s, &c);
-    kiln_safety_input_t in = base();
+    const kiln_safety_input_t in = base();
 
     kiln_safety_verdict_t v;
     CHECK_ERR(kiln_safety_eval_checked(&s, &in, -1.0f, &v), KILN_ERR_INVALID_ARG);

@@ -38,9 +38,10 @@ that is the point: every remaining firmware task is a driver.
 Ordered by what unblocks the most. The first three are the whole of "can this
 thing fire a kiln".
 
-Rows 1 to 9 are done: the adapters in section L, `kiln_hmi` in M, WiFi in O
-and the HTTP transport in P. What remains is **row 8, LittleFS** (`E7`), row
-10's decision about `port_update`, and the asset embedding of `C9`.
+Rows 1 to 9 are done: the adapters in section L, `kiln_hmi` in M, WiFi in O,
+the HTTP transport in P and the file store in E. What remains is row 10's
+decision about `port_update` and the asset embedding of `C9`, which is what
+stands between a working REST API and a browser that can reach it.
 
 | | Port / component | Why it is where it is |
 |---|---|---|
@@ -51,7 +52,7 @@ and the HTTP transport in P. What remains is **row 8, LittleFS** (`E7`), row
 | **5** | ~~`port_alarm`, `port_counters`~~ **done** | Small. `port_counters` unblocks `SR-30`, which can never fire today because the counts restart at every boot (`E8`). |
 | **6** | ~~`kiln_hmi`, `port_display`, `port_input`~~ **done**, see section M | Now the **only** way to start a firing, because `FR-WEB-26` withdrew run control from the network. Until this exists the only control path is the simulator console. |
 | **7** | ~~HTTP transport over `esp_http_server`~~ **done**, see section P |
-| **8** | `port_filestore`, LittleFS | Programs and run records are RAM-only on target, so nothing survives a reboot (`E7`). |
+| **8** | ~~`port_filestore`, the file store~~ **done**, see `E7` | Was the last thing standing between the HMI and a program to run. A fixed-slot raw partition rather than LittleFS (`AD-21`). |
 | **9** | ~~`port_net`, WiFi~~ **done**, see section O |
 | **10** | `port_update` | **Probably delete it.** `FR-UPD-01` was inverted: no image is accepted over the network, so the port has no caller. Decide this rather than leaving a dead interface (`H2`, `OQ-08`). |
 
@@ -75,6 +76,7 @@ and the HTTP transport in P. What remains is **row 8, LittleFS** (`E7`), row
 | [N](#n-single-phase-only-2026-10-06) | Single-phase scope change |
 | [O](#o-wifi-fr-net-2026-10-06) | WiFi |
 | [P](#p-the-http-transport-and-a-fully-read-only-api-2026-10-06) | HTTP transport |
+| [Q](#q-the-file-store-ad-21-2026-10-06) | The file store |
 
 ---
 
@@ -587,7 +589,7 @@ build file in the repository.
 - [x] **C1. `firmware/CMakeLists.txt`, `sdkconfig.defaults`, `partitions.csv`,
   `main/`**: the ESP-IDF project root and composition root (CON-01, ESP-IDF
   5.x). Partition table must realise architecture §10.1: a 2 MB OTA pair
-  (NFR-13), the circular log partition, NVS and LittleFS.
+  (NFR-13), the circular log partition, the `kilnfs` file store and NVS.
 
 - [x] **C2. `kiln_core/CMakeLists.txt`.** `kiln_core` has ten source files and no
   build file at all, so nothing currently compiles. Needs the dual-target form of
@@ -739,20 +741,38 @@ endurance analysis confirmed by measurement".
 
 ### E.2 Still outstanding for M5's neighbours
 
-- [ ] **E7. Vendor LittleFS and write the file-store adapter.** `AD-10` puts
-  programs and run records in LittleFS, which is not in the ESP-IDF tree, and
-  `CON-04` forbids a build-time fetch, so it has to be vendored rather than
-  pulled as a managed component. Until then the simulated build uses a RAM file
-  store in `kiln_sim`, so the path is exercised but nothing survives a reboot.
+- [x] **E7. The file store.** Written 2026-10-06 as
+  `kiln_core/fileslots` over `port_flash`, **not LittleFS**. Recorded as
+  `AD-21`, which revises `AD-10`.
 
-- [ ] **E8. Persist `FR-CUR-13`'s switching counters.** They are accumulated and
-  exposed and feed `SR-30`, but the `port_counters` adapter does not exist, so
-  they restart at zero on every boot and the wear warning can never fire on a
-  real kiln.
+  Two things decided it. `CON-04` forbids a build-time fetch and LittleFS is
+  not in the ESP-IDF tree, so it was a choice between several thousand vendored
+  lines and the in-tree alternatives, and SPIFFS and FAT are neither of them
+  power-fail safe. And nothing above the port wanted a filesystem: the two
+  callers address `/p/00` to `/p/19` and `/r/00` upward, and between them use
+  read, write_atomic, remove and usage, while `list` and `exists` have no
+  caller at all. That is a fixed array, which is what `AD-08` already concluded
+  for the log.
 
-- [ ] **E9. The remaining M2/M4b adapters**: MAX31856, SSD1306, encoder, SSR
-  outputs and the CT front end. These are what stand between the current state
-  and a kiln that can actually be fired.
+  One file to a region of two erase sectors, alternating, with the twelve byte
+  commit header written after the payload so a cut before it leaves the
+  previous copy intact and a cut inside it fails the sequence check or the CRC.
+  64 regions in 512 kB against the 40 that `FR-PRG-04` and `FR-LOG-09` need.
+  Layout in architecture §10.6.
+
+  24 tests: 16 in `test_fileslots` for the store, 8 in `test_stores_on_flash`
+  driving the real `program_store` and `run_index` over it, including power cut
+  mid-save and mid-append. The partition is `kilnfs`, custom type 0x40 subtype
+  0x01, so the simulated build uses it too and a program saved under QEMU
+  survives a reset.
+
+- [x] **E8. Persist `FR-CUR-13`'s switching counters.** Done in section L: the
+  `port_counters` adapter keeps them in NVS, so `SR-30`'s wear warning can now
+  reach its threshold instead of restarting at zero every boot.
+
+- [x] **E9. The remaining M2/M4b adapters**: MAX31856, SSD1306, encoder, SSR
+  outputs and the CT front end. All written, see section L. None has been run
+  against a board yet, which is `L2`.
 
 
 ---
@@ -794,6 +814,18 @@ every remaining check is switched off in `.clang-tidy` with a written reason.
 The ones below are deferred work rather than permanent policy, each with the
 finding count measured on 2026-10-05.
 
+**Update 2026-10-06: F1b and F2 to F8 are done, and F10 is dropped.** Eight more
+checks now gate merge (`macro-to-enum`, `signed-bitwise`, `pro-type-cstyle-cast`,
+`const-correctness`, `use-anonymous-namespace`, `use-internal-linkage`,
+`incorrect-roundings`, `suspicious-memory-comparison`, `not-null-terminated-result`,
+`err33-c`), the target adapters and `host/webhost` are analysed in CI as well as
+locally, and the counts below were all measured against the host database only,
+which is why several of them were wrong. What the pass actually found is recorded
+per item. Verified at each step: 24 host suites green plain and under ASan/UBSan,
+`clang-tidy` clean on host, target and webhost under both LLVM 23 and the LLVM 20
+CI pins, `esp32s3` builds with zero warnings, and the image came out **288 bytes
+smaller** at 243 104 bytes.
+
 - [x] **F1. Analyse `kiln_hal_esp32s3`.** Done: `tools/tidy-target.sh` drives
   from the database `idf.py` emits, filtered into something a clang front end
   will accept (the xtensa flags and the `@response` file have to come out, and
@@ -804,62 +836,176 @@ finding count measured on 2026-10-05.
   (architecture 10.1). `pro-type-union-access` is disabled for this component
   only -- all five hits were inside `ESP_LOGx` expanding to IDF's own union.
 
-- [ ] **F1b. Run `tools/tidy-target.sh` in CI.** It is a local tool today. The
-  natural home is the `firmware` job, but that runs inside the Espressif
-  container, where the toolchain's picolibc path differs and `clang-tidy` is
-  not installed. Wiring it without checking that is a real risk of a **vacuous
-  pass** -- the script would find our files unparseable, report nothing and go
-  green -- so it wants doing against a real container run, not blind. The same
-  gap still covers `host/webhost`, which is its own CMake project.
+- [x] **F1b. Run `tools/tidy-target.sh` in CI, and cover `host/webhost`.**
+  Done, and the vacuous-pass risk this item was really about is now something
+  the script refuses to let happen. Before analysing anything it runs every
+  translation unit through a check that must fire on any file with a function
+  in it, and fails saying `VACUOUS PASS AVERTED` if clang-tidy built no AST for
+  one -- so "clean" now means "analysed and clean" rather than "reported
+  nothing". The missing picolibc path is fatal rather than ignored, and the
+  lookup goes through `IDF_TOOLS_PATH` so it resolves inside the Espressif
+  container (`/opt/esp`) as well as locally. A new `tidy-target` CI job builds
+  and analyses in that container, installing `clang-tidy` there at the same
+  pinned `LLVM_VERSION` the host job uses.
 
-- [ ] **F2. `cppcoreguidelines-macro-to-enum`: 585 findings.** The `#define`
-  constants in `kiln/types.h` and friends want to become `constexpr`, which is
-  a genuine improvement (typed, scoped, debuggable) and a genuine API change.
-  Worth doing deliberately, in its own commit, with the log record format
-  checked against it.
+  Three bugs turned up in the wiring, all of which would have shown as a green
+  build: `set -e` killed the script silently when the picolibc glob missed, the
+  `EXIT` trap tripped over `set -u` on a variable the canary path never
+  reached, and `host/webhost` -- its own CMake project, never analysed by
+  anything -- carried **28 findings** across exactly the checks this section
+  enabled. `tools/tidy.sh` now generates and analyses that database too.
 
-- [ ] **F3. `cppcoreguidelines-use-enum-class`: 90 findings.** Scoped enums
-  would break the C-compatible port enums the HAL boundary and the persisted
-  log record format rely on. Needs a decision about whether the port layer
-  stays C-callable (`AD-01`) before it can be actioned, possibly never.
+  Both scripts take `TIDY=` so CI's pinned version can be reproduced locally,
+  which is how the LLVM 20 / 23 difference below was caught.
 
-- [ ] **F4. `misc-use-anonymous-namespace`: 267 findings.** Translating
-  file-static functions to anonymous namespaces is the idiomatic C++ form and
-  purely mechanical, but it touches every source file and is better done when
-  it will not collide with other work in flight. `misc-use-internal-linkage`
-  (16) is the same question from the other side.
+- [x] **F2. `cppcoreguidelines-macro-to-enum`: 119 macros, not 585.** The 585
+  counted the same header once per translation unit. Converted to `constexpr`
+  rather than to the enums the check names, because an unscoped enum is signed
+  and that collides head-on with F5: every `KILN_A | KILN_B` would become a
+  signed bitwise operation. Each constant is typed deliberately -- bit masks
+  `uint32_t`, counts and lengths `size_t`, magics and versions at their
+  persisted width, the framebuffer geometry `int` because its coordinate space
+  is signed on purpose (`kiln_fb_pixel` clips on `x < 0` rather than faulting).
 
-- [ ] **F5. `bugprone-signed-bitwise`: 221 findings.** Mostly the flag and
-  fault-mask handling. Each site needs the operand made explicitly unsigned;
-  real value, and the single largest genuinely-defect-adjacent group.
+  Masks are deliberately *wider* than the fields they live in, which is noted
+  at the definitions: a `uint8_t` constant promotes to `int` before a bitwise
+  operator, so the narrow type would reintroduce the signed-mask problem at
+  every site that composes one. The field's own width still bounds what is
+  stored.
 
-- [ ] **F6. `cppcoreguidelines-pro-type-cstyle-cast`: 73 findings.** C casts
-  to `static_cast`/`reinterpret_cast`. Mechanical, but a `reinterpret_cast` in
-  the log codec deserves reading rather than rewriting blind.
+  The log record format is unchanged: `KILN_LOG_RECORD_BYTES` is still 20, the
+  magics and the CRC seed are the same values, and the persistence and fuzz
+  suites pass. What the conversion did surface is **eleven loosely-typed
+  loops** that `-Wsign-compare` could not see while the bounds were untyped
+  macros.
 
-- [ ] **F7. `misc-const-correctness`: 65 findings. Do not auto-apply.**
-  Applying it broke the build: it constifies the `void *ctx` parameters of
-  functions assigned into the port vtables, which is the ports-and-adapters
-  boundary `AD-01` rests on. It also rewrote two public signatures in
-  `logring.h`. Any pass over this must be done by hand, port boundary first.
+- [ ] **F3. `cppcoreguidelines-use-enum-class`: 31 enums, 223 enumerators,
+  2 530 references across 85 files.** Still deferred, and now with the blocking
+  question answered rather than open.
 
-- [ ] **F8. Real findings turned up by the analysis, worth their own fixes:**
-  - `safety.cpp:119` and `current.cpp:92`: `clamp_cfg()` reports "was anything
-    clamped?" with `memcmp` over a struct that has padding. It works today
-    because the snapshot is a struct copy, but padding propagation is not
-    guaranteed by the standard, so a false "clamped" is possible. Both are in
-    safety code. Replace with an explicit `changed` flag set as each field is
-    clamped. (`bugprone-suspicious-memory-comparison`)
-  - `configmodel.cpp:240`: `memcpy` result is not null-terminated.
-    (`bugprone-not-null-terminated-result`)
-  - `logrec.cpp:101`, `pid.cpp:135`, `profile.cpp:151`, `sim.cpp:322` , 
-    `(int)(x + 0.5)` rounds the wrong way for negative values. Check whether
-    each input can be negative; use `lroundf` where it can.
-    (`bugprone-incorrect-roundings`)
-  - `cert-err33-c`: 26 unchecked return values, against `NFR-17`'s rule that
-    no failure is silently dropped. Most are `snprintf` into a sized buffer,
-    but `NFR-17` says *every* error path is handled explicitly, so each wants
-    either a check or an explicit `(void)`.
+  **The C-callability half is settled: the port layer is not C-callable.**
+  There is no `extern "C"` anywhere in the firmware except `app_main`, which
+  ESP-IDF requires. So `AD-01`'s boundary is a C++ boundary already, and that
+  is no longer a reason not to do this.
+
+  What remains is not a technical blocker but a cost. The enumerator names are
+  the project's vocabulary: `KILN_FAULT_DOOR_OPEN` is greppable from `SR-31`
+  in the requirements, and `tools/trace` parses test names on the same
+  convention (`TR-22`, `TR-23`). Scoping renames all 223 of them. The
+  transform is compiler-verified -- every unconverted site is a hard error --
+  but the naming choice (`kiln_fault_t::DOOR_OPEN`, idiomatic but breaks the
+  greps, versus `kiln_fault_t::KILN_FAULT_DOOR_OPEN`, redundant but traceable)
+  is a decision about the project's vocabulary rather than about the code.
+
+  Two enums would also get worse: `kiln_warn_bit_t` and `kiln_inject_t` are bit
+  *positions*, and scoping them puts a `static_cast` at every mask site --
+  precisely the cast noise F5 and F6 just finished removing.
+
+- [x] **F4. `misc-use-anonymous-namespace`: 1 147 findings, not 267.** The 267
+  was production only. Production is done: every file-local `static` in
+  `firmware/components`, `firmware/main` and `firmware/host` is now in an
+  anonymous namespace, along with the file-local struct types
+  `misc-use-internal-linkage` wanted moved. 100 groups across 39 files, applied
+  in place with no reordering, so the diff is the namespace braces and the
+  dropped `static` keywords and nothing else.
+
+  The other 890 are in `firmware/test`, and **796 of them are the two functions
+  `KILN_TEST()` expands to**. Those cannot be fixed at the macro -- wrapping
+  them means opening a namespace the caller's `{ body }` would have to close,
+  and a macro has no way to emit the closing brace -- nor suppressed with a
+  `NOLINT`, because the diagnostic lands on the expansion site. Both checks are
+  therefore switched off for `firmware/test` only, with that reasoning written
+  into `firmware/test/.clang-tidy`. The remaining 94 are hand-written fixtures
+  where file-scope `static` is correct C++ and the check is expressing a style.
+
+- [x] **F5. `bugprone-signed-bitwise`: 283 findings, and one real defect.**
+  263 of them were one pattern: in `(1u << 3)` the *shift amount* is a signed
+  literal, so every flag definition in the tree tripped it. 125 shift amounts
+  are now unsigned, which cost nothing and removed the noise hiding the rest.
+
+  The remaining 20 were integer promotion -- `uint8_t` and `uint16_t` promote
+  to *int* before they are shifted -- in the CRC-8 and CRC-16 rounds, the
+  little-endian readers in five store and codec files, and the framebuffer.
+  Each now carries its accumulator in `uint32_t` and masks back, which produces
+  the identical value in defined arithmetic.
+
+  **The defect is in the MAX31856 decode** (`hal_tc.cpp`): the hot junction was
+  assembled as `((int32_t)r[2] << 24) | ...`, and `r[2] << 24` overflows
+  `int32_t` -- undefined behaviour -- for exactly the byte that means "below
+  zero". It is assembled in `uint32_t` and converted now. The two deliberate
+  *arithmetic* right shifts beside it are kept and carry a `NOLINT` each: they
+  sign-extend, and `SR-05` detects a reversed couple by the reading falling, so
+  a logical shift would read -1 degC as +524 287.
+
+  `kiln_inject_t` got an explicit `uint32_t` underlying type for the same
+  reason -- an unscoped enum whose values fit in `int` gets a *signed* one.
+  In `kiln_hal_esp32s3` the check is switched off and only there: 24 findings,
+  every one inside `ESP_LOGx`, `WIFI_INIT_CONFIG_DEFAULT` or IDF's own
+  `MALLOC_CAP_INTERNAL`, none reachable from this side. That component's own
+  bitwise code was audited by hand under the check before it was switched off,
+  which is what found the decode above.
+
+- [x] **F6. `cppcoreguidelines-pro-type-cstyle-cast`: 93 on the host, 36 more
+  on the target.** The check offers no fix-it, so the pointer casts were
+  rewritten mechanically and the compiler was left to arbitrate: a
+  `static_cast` between unrelated object pointers is a hard error, so the four
+  sites that genuinely needed `reinterpret_cast` identified themselves rather
+  than being guessed at.
+
+  `cppcoreguidelines-pro-type-reinterpret-cast` then fires on the replacements,
+  and it is left **on**. Byte-level reads go through a named `kiln_bytes_of()`
+  in `kiln/types.h` -- the intent is "read these bytes", not "this is secretly
+  another type" -- and the three sites that really do reinterpret (the
+  `offsetof` arithmetic in `configmodel.cpp`, IDF's `IP2STR`, and `bind()`'s
+  `struct sockaddr`) carry a `NOLINT` and a sentence saying why. So a new
+  `reinterpret_cast` still has to be argued for.
+
+  On the target this also replaced a DMA frame aliased through a struct pointer
+  with a `memcpy`: `adc_continuous_read` does not promise the alignment that
+  cast assumed.
+
+- [x] **F7. `misc-const-correctness`: 74 findings, and the port boundary is
+  configured out rather than worked around.** The reason applying this broke
+  the build is that it analyses *parameters*, so it demands `const void *ctx`
+  on every read-only port adapter -- and `void *ctx` is the one signature every
+  slot in a vtable shares, whether it mutates or not (`AD-01`). It also wants
+  `const char **argv` on `main()`, which is not a signature `main()` may have.
+
+  `misc-const-correctness.AnalyzeParameters: false` says exactly that:
+  signatures are the author's call, locals are the check's. All 46 remaining
+  findings are locals and all are fixed, pointees included. The auto-fix emits
+  east-const (`T const *`) against a tree written west-const, so 31 of those
+  were normalised afterwards.
+
+  One trap for whoever bumps `LLVM_VERSION`: that option does not exist before
+  LLVM 21, and neither does the pointee analysis it governs. Under the pinned
+  20 it is ignored and the check reports values only -- CI is a subset of a
+  newer local run, which is the safe direction but does mean local can be
+  stricter than the gate. Both scripts take `TIDY=` so the pinned version can
+  be reproduced.
+
+- [x] **F8. The real findings, all four fixed, all four checks now gating.**
+  - `clamp_cfg()` in `safety.cpp` and `current.cpp` no longer answers "was
+    anything clamped?" with a `memcmp` over a padded struct. Each field reports
+    for itself through a new `kiln_clampf_moved()`, so a false "clamped" in
+    safety code is no longer possible rather than merely unlikely.
+  - `configmodel.cpp` writes its NUL explicitly at the copy site. Redundant
+    against the `memset` three lines above, which is the point: the
+    termination is now provable where the copy happens.
+  - The four `(int)(x + 0.5f)` sites are `lroundf`/`llround`. Only `enc_temp`
+    could see a negative, and it was already handling it correctly by hand --
+    but reading it turned up something the check was not looking for: its
+    saturation was two naive comparisons, **both false for a NaN**, so a
+    non-finite reading reached a cast that is undefined for it. That is the
+    exact failure `kiln_clampf`'s comment in `types.h` warns about. Both the
+    temperature and the current paths in the log encoder go through the
+    sanctioned clamp now.
+  - `cert-err33-c`: 2 124 findings, not 26. The 26 was production only; the
+    rest were four `fprintf` calls in the `KILN_TEST` macros, fixed at the
+    macro rather than suppressed across 2 100 expansion sites. The 25
+    production sites each got a check or an explicit `(void)` with a sentence
+    saying why truncation is unreachable, which is the handling `NFR-17` asks
+    for.
 
 - [ ] **F9. `kiln_run_record_t` carries 9 padding bytes where 1 is optimal**
   (`clang-analyzer-optin.performance.Padding`, disabled). Reordering would
@@ -872,10 +1018,12 @@ finding count measured on 2026-10-05.
   actually logs. Worth noting as a reminder that an assertion nobody has seen
   pass is not evidence of anything.
 
-- [ ] **F10. cppcheck as a second opinion.** Not configured. Its value here
-  would be the MISRA C 2012 addon, which no longer applies now the firmware is
-  C++; its general analysis overlaps `clang-analyzer-*` heavily. Low priority,
-  and worth deciding against explicitly rather than leaving open.
+**F10, cppcheck as a second opinion: dropped 2026-10-06.** Decided against
+rather than left open, which is what the item itself asked for. Its value here
+would have been the MISRA C 2012 addon, and that does not apply to a C++
+firmware; the rest of its analysis overlaps `clang-analyzer-*` heavily, and
+that is now running over three compile databases rather than one (F1b). Not
+worth a second toolchain in CI for the overlap.
 
 ---
 
@@ -1218,11 +1366,13 @@ Three decisions worth keeping:
 
 - [x] **L4. The HTTP transport does not exist.** Written 2026-10-06, section P. `SRR-02` was settled by removing the password entirely.
 
-- [ ] **L5. `port_filestore` has no adapter.** LittleFS is `E7`. WiFi was
-  done in section O. `port_logstore` correctly has
-  none, being provided by `kiln_core/logring` over `port_flash` (`AD-19`), and
-  `port_update` probably wants deleting rather than implementing now that
-  `FR-UPD-01` accepts no network image.
+- [x] **L5. Every port now has an adapter, or deliberately has none.**
+  `port_filestore` was the last one, done in `E7`; WiFi was done in section O.
+  `port_logstore` and `port_filestore` are both provided by `kiln_core` over
+  `port_flash` rather than by an adapter (`AD-19`, `AD-21`), which is the right
+  place for logic a host test needs to cut power on. `port_update` is the one
+  genuinely open case and probably wants deleting rather than implementing, now
+  that `FR-UPD-01` accepts no network image.
 
 - [ ] **L6. The hardware build is not in CI.** CI builds the simulated
   configuration only. The hardware one is a second `idf.py` invocation with a
@@ -1272,16 +1422,16 @@ and says nothing about why; "the big number occupies the top left and is bigger
 than everything else" survives a nudge and still catches the regression that
 matters.
 
-- [ ] **M1. No program store on hardware, so nothing can be started yet.**
-  `FR-HMI-10` is implemented and tested, but `port_filestore` has no target
-  adapter (`E7`), so `program_count` is zero on a real board and the HMI
-  correctly offers an empty list. The local control path is complete except
-  for the thing it would control. LittleFS is now the blocker it was always
-  going to become.
+- [x] **M1. The HMI now has programs to offer.** Closed by `E7`: the file store
+  is real on target, `kiln_program_store_seed` puts the built-in examples in it
+  on first boot, and they survive a reboot. `FR-HMI-10` lists them and can
+  start one, so the local control path is complete end to end. It has still not
+  been run against a display and an encoder, which is `L2` and `M5`.
 
-- [ ] **M2. The network screen has nothing to show.** `port_net` has no
-  adapter (`L5`), so `FR-HMI-07`'s screen says "no wifi adapter" rather than an
-  address. Honest, and useless until WiFi lands.
+- [x] **M2. The network screen has something to show.** Closed by section O:
+  `port_net` has a WiFi adapter, so `FR-HMI-07`'s screen shows the address
+  instead of "no wifi adapter". That address is how the device is reached while
+  `FR-NET-04` is unmet (`O1`).
 
 - [ ] **M3. Nobody has looked at it.** Every screen is verified by pixel counts
   and state assertions on the host. No one has seen a glyph on a real SSD1306,
@@ -1424,11 +1574,12 @@ Two things the compiler caught that were worth fixing rather than silencing:
 
 - [ ] **O1. `FR-NET-04` (mDNS, `kiln.local`) is not implemented.** mDNS left
   the ESP-IDF tree for the component manager, and `CON-04` forbids a
-  build-time fetch from an unpinned source, which is the same constraint that
-  has LittleFS waiting to be vendored (`E7`). Adding a managed dependency for
-  a convenience feature would be the wrong trade against a constraint the
-  project applies everywhere else, so the device is reachable by IP until mDNS
-  is vendored deliberately. The address is on the HMI network screen, which is
+  build-time fetch from an unpinned source. `E7` met the same constraint over
+  the file store and resolved it by not needing the dependency at all; mDNS has
+  no such escape, since the protocol is the feature. Adding a managed
+  dependency for a convenience feature would be the wrong trade against a
+  constraint the project applies everywhere else, so the device is reachable by
+  IP until mDNS is vendored deliberately. The address is on the HMI network screen, which is
   where an operator would look anyway.
 
 - [ ] **O2. The image grew by 540 kB.** WiFi takes it from 292 kB to 831 kB,
@@ -1511,3 +1662,58 @@ Three decisions in the transport worth keeping:
   behaviour, so what is unverified is specifically the socket half: URI
   splitting, chunked streaming, the four-session limit, and whether a slow
   client can hold a buffer long enough to matter.
+
+---
+
+## Q. The file store (`AD-21`, 2026-10-06)
+
+`port_filestore` was the last port without an implementation and the last thing
+between the HMI and a program it could actually run. It is now
+`kiln_core/fileslots` over a `port_flash`, a fixed array of two-sector regions
+in a raw `kilnfs` partition, and **not** LittleFS as `AD-10` originally said.
+The reasoning and the layout are in `E7` and architecture §10.6.
+
+What this closed: `E7`, `E8`, `E9`, `L5`, `M1`, `M2`, and critical path rows 8
+and 9. `M1` is the one that mattered: the local control path now has programs
+at both ends of it.
+
+- [ ] **Q1. The store has never seen a worn sector.** Every test runs on a fake
+  that writes what it is told. A real NOR sector near the end of its life fails
+  a program or reads back something it was not given, and the store's answer to
+  that is the CRC, which rejects the copy and falls back to the other one. That
+  is the designed behaviour and it is tested, but it has been tested against
+  simulated corruption rather than against a worn part. There is no bad-region
+  retirement: a region whose both sectors have failed will keep being chosen
+  and keep failing, where a filesystem would have remapped it. At 40 regions of
+  two sectors each, written single-digit times a year against a 100 000 cycle
+  rating, that is a defensible trade rather than an oversight, but it is a trade
+  and this is where it is recorded.
+
+- [ ] **Q2. The index is built by reading every region at every boot.** 64
+  regions, two copies each, each validated by streaming its payload through the
+  CRC. That is up to 128 sector reads and about 320 kB of CRC at startup,
+  measured at nothing in particular because it has only ever run under QEMU and
+  on the host. If it turns out to cost real time on a board it can be made lazy,
+  since the only thing mount actually needs eagerly is which copy of each region
+  wins. Worth measuring before it is worth optimising.
+
+- [ ] **Q3. `exists` and `list` are implemented and have no caller.** They are
+  in the port contract, so the store provides them and the tests cover them, but
+  `program_store` and `run_index` use neither. They are the natural way a local
+  program editor would enumerate what is there, which is `P3`, so they are kept
+  rather than removed.
+
+- [ ] **Q4. A name longer than 63 bytes is refused rather than truncated.**
+  `KILN_PATH_MAX` is 64 including the terminator and the name field is exactly
+  that, so a longer path returns `KILN_ERR_INVALID_ARG`. Nothing generates one
+  today, since both callers produce five-character slot paths, and refusing is
+  the right answer rather than silently storing a different file than the caller
+  asked for. Noted because a future caller with user-supplied names will meet it.
+
+- [ ] **Q5. The run index rewrites more than it needs to.** `kiln_run_index_append`
+  reads every slot to find the oldest, then writes one. On this store that is 20
+  reads served from the in-RAM index plus one region write, which is cheap. But
+  `kiln_run_index_mark_truncated` and `kiln_run_index_baseline` both walk all 20
+  slots too, and the walk is now the only reason `run_index` reads at all. Not a
+  problem, just the place where the store being an array rather than a directory
+  would let the index get simpler if it were ever revisited.

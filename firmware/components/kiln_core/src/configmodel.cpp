@@ -7,12 +7,16 @@
 
 /* --- enum name tables -------------------------------------------------- */
 
-static const char *const k_recovery_names[] = { "abort", "resume" };
-static const char *const k_wifi_names[]     = { "sta", "ap", "sta_ap_fallback" };
-static const char *const k_units_names[]    = { "C", "F" };
-static const char *const k_lang_names[]     = { "en", "de" };
-static const char *const k_tc_names[]       = { "B", "E", "J", "K", "N", "R", "S", "T" };
-static const char *const k_rule_names[]     = { "ziegler-nichols", "tyreus-luyben" };
+namespace {
+
+const char *const k_recovery_names[] = { "abort", "resume" };
+const char *const k_wifi_names[]     = { "sta", "ap", "sta_ap_fallback" };
+const char *const k_units_names[]    = { "C", "F" };
+const char *const k_lang_names[]     = { "en", "de" };
+const char *const k_tc_names[]       = { "B", "E", "J", "K", "N", "R", "S", "T" };
+const char *const k_rule_names[]     = { "ziegler-nichols", "tyreus-luyben" };
+
+} // namespace
 
 /* --- the table (FR-CFG-01, FR-CFG-02) ---------------------------------- */
 
@@ -38,7 +42,9 @@ static const char *const k_rule_names[]     = { "ziegler-nichols", "tyreus-luybe
 #define BOOTR  KILN_CFG_F_REBOOT
 #define SECRET KILN_CFG_F_SECRET
 
-static const kiln_cfg_item_t k_items[] = {
+namespace {
+
+const kiln_cfg_item_t k_items[] = {
     /* safety -- every one of these is SAFE, so FR-CFG-08 refuses it mid-run */
     NUM("safety.max_temp_c",          "degC",  "SR-09,SR-23", KILN_CFG_T_FLOAT, max_temp_c,              0,    KILN_TEMP_CEILING_C, 1280, SAFE),
     NUM("safety.max_case_temp_c",     "degC",  "SR-11",       KILN_CFG_T_FLOAT, max_case_temp_c,        40,    90,       70,    SAFE),
@@ -128,6 +134,8 @@ static const kiln_cfg_item_t k_items[] = {
     /* security */
 };
 
+} // namespace
+
 uint16_t kiln_config_item_count(void)
 {
     return (uint16_t)(sizeof(k_items) / sizeof(k_items[0]));
@@ -153,14 +161,26 @@ const kiln_cfg_item_t *kiln_config_find(const char *key)
 
 /* --- typed access ------------------------------------------------------- */
 
-static void       *field_of(kiln_config_t *c, const kiln_cfg_item_t *it)
+namespace {
+
+/* The item table stores a byte offset (OFF(), via offsetof), so the field's
+ * address has to be walked as bytes.  reinterpret_cast rather than static_cast
+ * because char * and kiln_config_t * are unrelated object types -- this is the
+ * standard's own sanctioned form for offsetof arithmetic, which is why the
+ * narrower pointer casts elsewhere in this file are static_cast and these two
+ * are not.  The char * converts to void * implicitly on the way out. */
+void       *field_of(kiln_config_t *c, const kiln_cfg_item_t *it)
 {
-    return (void *)((char *)c + it->offset);
+    /* NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast) -- see above */
+    return reinterpret_cast<char *>(c) + it->offset;
 }
-static const void *cfield_of(const kiln_config_t *c, const kiln_cfg_item_t *it)
+const void *cfield_of(const kiln_config_t *c, const kiln_cfg_item_t *it)
 {
-    return (const void *)((const char *)c + it->offset);
+    /* NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast) -- see above */
+    return reinterpret_cast<const char *>(c) + it->offset;
 }
+
+} // namespace
 
 kiln_err_t kiln_config_get_num(const kiln_config_t *cfg, const kiln_cfg_item_t *it,
                                double *out)
@@ -171,11 +191,11 @@ kiln_err_t kiln_config_get_num(const kiln_config_t *cfg, const kiln_cfg_item_t *
 
     const void *f = cfield_of(cfg, it);
     switch (it->type) {
-    case KILN_CFG_T_BOOL:  *out = *(const bool *)f ? 1.0 : 0.0;       return KILN_OK;
-    case KILN_CFG_T_ENUM:  *out = (double)*(const uint8_t *)f;        return KILN_OK;
-    case KILN_CFG_T_U16:   *out = (double)*(const uint16_t *)f;       return KILN_OK;
-    case KILN_CFG_T_U32:   *out = (double)*(const uint32_t *)f;       return KILN_OK;
-    case KILN_CFG_T_FLOAT: *out = (double)*(const float *)f;          return KILN_OK;
+    case KILN_CFG_T_BOOL:  *out = *static_cast<const bool *>(f) ? 1.0 : 0.0;       return KILN_OK;
+    case KILN_CFG_T_ENUM:  *out = (double)*static_cast<const uint8_t *>(f);        return KILN_OK;
+    case KILN_CFG_T_U16:   *out = (double)*static_cast<const uint16_t *>(f);       return KILN_OK;
+    case KILN_CFG_T_U32:   *out = (double)*static_cast<const uint32_t *>(f);       return KILN_OK;
+    case KILN_CFG_T_FLOAT: *out = (double)*static_cast<const float *>(f);          return KILN_OK;
     case KILN_CFG_T_STRING:
     default:               return KILN_ERR_UNSUPPORTED;
     }
@@ -199,11 +219,11 @@ kiln_err_t kiln_config_set_num(kiln_config_t *cfg, const kiln_cfg_item_t *it,
 
     void *f = field_of(cfg, it);
     switch (it->type) {
-    case KILN_CFG_T_BOOL:  *(bool *)f     = (value != 0.0);           return KILN_OK;
-    case KILN_CFG_T_ENUM:  *(uint8_t *)f  = (uint8_t)value;           return KILN_OK;
-    case KILN_CFG_T_U16:   *(uint16_t *)f = (uint16_t)value;          return KILN_OK;
-    case KILN_CFG_T_U32:   *(uint32_t *)f = (uint32_t)value;          return KILN_OK;
-    case KILN_CFG_T_FLOAT: *(float *)f    = (float)value;             return KILN_OK;
+    case KILN_CFG_T_BOOL:  *static_cast<bool *>(f)     = (value != 0.0);           return KILN_OK;
+    case KILN_CFG_T_ENUM:  *static_cast<uint8_t *>(f)  = (uint8_t)value;           return KILN_OK;
+    case KILN_CFG_T_U16:   *static_cast<uint16_t *>(f) = (uint16_t)value;          return KILN_OK;
+    case KILN_CFG_T_U32:   *static_cast<uint32_t *>(f) = (uint32_t)value;          return KILN_OK;
+    case KILN_CFG_T_FLOAT: *static_cast<float *>(f)    = (float)value;             return KILN_OK;
     default:               return KILN_ERR_UNSUPPORTED;
     }
 }
@@ -217,7 +237,7 @@ kiln_err_t kiln_config_get_str(const kiln_config_t *cfg, const kiln_cfg_item_t *
     if (it->type != KILN_CFG_T_STRING) {
         return KILN_ERR_UNSUPPORTED;
     }
-    *out = (const char *)cfield_of(cfg, it);
+    *out = static_cast<const char *>(cfield_of(cfg, it));
     return KILN_OK;
 }
 
@@ -236,9 +256,13 @@ kiln_err_t kiln_config_set_str(kiln_config_t *cfg, const kiln_cfg_item_t *it,
         return KILN_ERR_RANGE; /* truncation is not an answer */
     }
 
-    char *f = (char *)field_of(cfg, it);
+    char *f = static_cast<char *>(field_of(cfg, it));
     memset(f, 0, it->str_cap);
     memcpy(f, value, n);
+    /* Redundant against the memset above, and written anyway: the termination
+     * is then provable at the copy site rather than three lines away, which is
+     * what bugprone-not-null-terminated-result is asking for. */
+    f[n] = '\0';
     return KILN_OK;
 }
 
@@ -282,7 +306,7 @@ kiln_err_t kiln_config_validate(const kiln_config_t *cfg, const kiln_cfg_item_t 
         if (it->type == KILN_CFG_T_STRING) {
             /* NFR-19: a fixed array that arrived over the network is only a
              * string if it contains a NUL. */
-            const char *s = (const char *)cfield_of(cfg, it);
+            const char *s = static_cast<const char *>(cfield_of(cfg, it));
             bool term = false;
             for (uint16_t k = 0; k < it->str_cap; k++) {
                 if (s[k] == '\0') { term = true; break; }
@@ -313,8 +337,10 @@ kiln_err_t kiln_config_validate(const kiln_config_t *cfg, const kiln_cfg_item_t 
     return KILN_OK;
 }
 
+namespace {
+
 /* Does this item differ between the two configurations? */
-static bool item_differs(const kiln_config_t *a, const kiln_config_t *b,
+bool item_differs(const kiln_config_t *a, const kiln_config_t *b,
                          const kiln_cfg_item_t *it)
 {
     if (it->type == KILN_CFG_T_STRING) {
@@ -325,6 +351,8 @@ static bool item_differs(const kiln_config_t *a, const kiln_config_t *b,
     (void)kiln_config_get_num(b, it, &vb);
     return va != vb;
 }
+
+} // namespace
 
 kiln_err_t kiln_config_apply(kiln_config_t *cfg, const kiln_config_t *incoming,
                              bool running, const kiln_cfg_item_t **bad)
@@ -382,6 +410,8 @@ bool kiln_config_reboot_required(const kiln_config_t *a, const kiln_config_t *b)
 
 /* --- persistence -------------------------------------------------------- */
 
+namespace {
+
 /* Fixed-layout blob: magic, schema version, payload size, payload, CRC-16.
  * Carrying the size means a migration from an older schema is a memcpy of what
  * the old struct had plus defaults for the rest, with no parsing involved. */
@@ -391,26 +421,32 @@ typedef struct {
     uint16_t payload_bytes;
 } cfg_blob_hdr_t;
 
-#define CFG_HDR_BYTES 8u
-#define CFG_CRC_BYTES 2u
+} // namespace
+
+constexpr size_t CFG_HDR_BYTES = 8u;
+constexpr size_t CFG_CRC_BYTES = 2u;
 
 size_t kiln_config_blob_size(void)
 {
     return CFG_HDR_BYTES + sizeof(kiln_config_t) + CFG_CRC_BYTES;
 }
 
-static void put_u16le(uint8_t *p, uint16_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); }
-static void put_u32le(uint8_t *p, uint32_t v)
+namespace {
+
+void put_u16le(uint8_t *p, uint16_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8u); }
+void put_u32le(uint8_t *p, uint32_t v)
 {
-    p[0] = (uint8_t)v;         p[1] = (uint8_t)(v >> 8);
-    p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24);
+    p[0] = (uint8_t)v;         p[1] = (uint8_t)(v >> 8u);
+    p[2] = (uint8_t)(v >> 16u); p[3] = (uint8_t)(v >> 24u);
 }
-static uint16_t get_u16le(const uint8_t *p) { return (uint16_t)(p[0] | ((uint16_t)p[1] << 8)); }
-static uint32_t get_u32le(const uint8_t *p)
+uint16_t get_u16le(const uint8_t *p) { return (uint16_t)((uint32_t)p[0] | ((uint32_t)p[1] << 8u)); }
+uint32_t get_u32le(const uint8_t *p)
 {
-    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
-           ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8u) |
+           ((uint32_t)p[2] << 16u) | ((uint32_t)p[3] << 24u);
 }
+
+} // namespace
 
 kiln_err_t kiln_config_encode(const kiln_config_t *cfg, void *out, size_t cap, size_t *len)
 {
@@ -421,7 +457,7 @@ kiln_err_t kiln_config_encode(const kiln_config_t *cfg, void *out, size_t cap, s
         return KILN_ERR_NO_SPACE;
     }
 
-    uint8_t *p = (uint8_t *)out;
+    uint8_t *p = static_cast<uint8_t *>(out);
     put_u32le(&p[0], KILN_CFG_BLOB_MAGIC);
     put_u16le(&p[4], KILN_CFG_SCHEMA_VERSION);
     put_u16le(&p[6], (uint16_t)sizeof(kiln_config_t));
@@ -450,7 +486,7 @@ kiln_err_t kiln_config_decode(const void *blob, size_t len, kiln_config_t *cfg)
         return KILN_ERR_CORRUPT;
     }
 
-    const uint8_t *p = (const uint8_t *)blob;
+    const uint8_t *p = static_cast<const uint8_t *>(blob);
     if (get_u32le(&p[0]) != KILN_CFG_BLOB_MAGIC) {
         return KILN_ERR_CORRUPT;
     }
@@ -487,7 +523,7 @@ kiln_err_t kiln_config_decode(const void *blob, size_t len, kiln_config_t *cfg)
     for (uint16_t i = 0; i < kiln_config_item_count(); i++) {
         const kiln_cfg_item_t *it = &k_items[i];
         if (it->type == KILN_CFG_T_STRING) {
-            char *s = (char *)field_of(cfg, it);
+            char *s = static_cast<char *>(field_of(cfg, it));
             s[it->str_cap - 1] = '\0';
             continue;
         }

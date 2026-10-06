@@ -39,9 +39,9 @@ typedef enum {
  * their samples have been overwritten by the ring, and such a run is *marked* --
  * otherwise a chart with no data in it is indistinguishable from a run that
  * never logged, and the operator is left wondering which. */
-#define KILN_RUN_FLAG_TRUNCATED  (1u << 0)
+constexpr uint32_t KILN_RUN_FLAG_TRUNCATED = 1u << 0u;
 /* The run was still open when the controller lost power or reset. */
-#define KILN_RUN_FLAG_INTERRUPTED (1u << 1)
+constexpr uint32_t KILN_RUN_FLAG_INTERRUPTED = 1u << 1u;
 
 /* FR-RUN-07 */
 typedef struct {

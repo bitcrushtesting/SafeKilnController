@@ -22,8 +22,8 @@
 #include "kiln_hal_host/hal_host.h"
 #include "kiln_sim/sim.h"
 
-#define LOG_SECTORS  32u
-#define SECTOR_BYTES 4096u
+constexpr size_t LOG_SECTORS  = 32u;
+constexpr size_t SECTOR_BYTES = 4096u;
 
 /* The storage survives a reboot; everything else does not. */
 typedef struct {
@@ -153,7 +153,7 @@ typedef struct {
 static bool tally_fn(void *user, uint32_t run, const uint8_t rec[KILN_LOG_RECORD_BYTES])
 {
     (void)run;
-    tally_t *t = (tally_t *)user;
+    tally_t *t = static_cast<tally_t *>(user);
     kiln_log_sample_t s;
     if (kiln_logrec_decode(rec, &s) != KILN_OK) {
         return true;

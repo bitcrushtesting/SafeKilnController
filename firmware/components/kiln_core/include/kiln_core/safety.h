@@ -25,7 +25,7 @@
 /* SR-12: duty-seconds needed to reach each 100 degC boundary, established from
  * previous comparable runs.  A rise above factor x baseline suggests failing
  * insulation or ageing elements. */
-#define KILN_INSUL_BANDS 13          /* 100, 200, ... 1300 degC */
+constexpr size_t KILN_INSUL_BANDS = 13;  /* 100, 200, ... 1300 degC */
 
 typedef struct {
     uint32_t duty_s[KILN_INSUL_BANDS];

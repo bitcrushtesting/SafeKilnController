@@ -10,6 +10,7 @@ set(KILN_CORE_SRCS
     src/configmodel.cpp
     src/current.cpp
     src/err.cpp
+    src/fileslots.cpp
     src/faults.cpp
     src/logrec.cpp
     src/logring.cpp

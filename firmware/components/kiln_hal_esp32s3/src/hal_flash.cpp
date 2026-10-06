@@ -12,13 +12,14 @@
 #include "spi_flash_mmap.h"   /* SPI_FLASH_SEC_SIZE */
 #include "kiln_hal/hal_esp32s3.h"
 
-static const char *TAG = "hal_flash";
+namespace {
+
+const char *TAG = "hal_flash";
 
 /* One partition, resolved once at init.  A pointer into the partition table is
  * stable for the life of the application. */
-static const esp_partition_t *s_part;
 
-static kiln_err_t map_err(esp_err_t e)
+kiln_err_t map_err(esp_err_t e)
 {
     switch (e) {
     case ESP_OK:                return KILN_OK;
@@ -29,9 +30,9 @@ static kiln_err_t map_err(esp_err_t e)
     }
 }
 
-static kiln_err_t hal_info(void *ctx, kiln_flash_info_t *out)
+kiln_err_t hal_info(void *ctx, kiln_flash_info_t *out)
 {
-    const esp_partition_t *p = (const esp_partition_t *)ctx;
+    const esp_partition_t *p = static_cast<const esp_partition_t *>(ctx);
     if ((p == nullptr) || (out == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
@@ -45,32 +46,34 @@ static kiln_err_t hal_info(void *ctx, kiln_flash_info_t *out)
     return KILN_OK;
 }
 
-static kiln_err_t hal_read(void *ctx, uint32_t offset, void *out, size_t len)
+kiln_err_t hal_read(void *ctx, uint32_t offset, void *out, size_t len)
 {
-    const esp_partition_t *p = (const esp_partition_t *)ctx;
+    const esp_partition_t *p = static_cast<const esp_partition_t *>(ctx);
     if ((p == nullptr) || (out == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
     return map_err(esp_partition_read(p, offset, out, len));
 }
 
-static kiln_err_t hal_write(void *ctx, uint32_t offset, const void *data, size_t len)
+kiln_err_t hal_write(void *ctx, uint32_t offset, const void *data, size_t len)
 {
-    const esp_partition_t *p = (const esp_partition_t *)ctx;
+    const esp_partition_t *p = static_cast<const esp_partition_t *>(ctx);
     if ((p == nullptr) || (data == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
     return map_err(esp_partition_write(p, offset, data, len));
 }
 
-static kiln_err_t hal_erase(void *ctx, uint32_t offset, size_t len)
+kiln_err_t hal_erase(void *ctx, uint32_t offset, size_t len)
 {
-    const esp_partition_t *p = (const esp_partition_t *)ctx;
+    const esp_partition_t *p = static_cast<const esp_partition_t *>(ctx);
     if (p == nullptr) {
         return KILN_ERR_INVALID_ARG;
     }
     return map_err(esp_partition_erase_range(p, offset, len));
 }
+
+} // namespace
 
 kiln_err_t kiln_hal_flash_init(const char *partition_label, kiln_port_flash_t *out)
 {
@@ -79,24 +82,26 @@ kiln_err_t kiln_hal_flash_init(const char *partition_label, kiln_port_flash_t *o
     }
     memset(out, 0, sizeof(*out));
 
-    /* The log partition is a custom data type (0x40) per architecture 10.1, not
-     * a filesystem, so it is found by label rather than by subtype. */
+    /* Both partitions this opens are a custom data type (0x40) per architecture
+     * 10.1, not filesystems, so they are found by label rather than subtype. */
     /* 0x40 is deliberately not a named esp_partition_type_t: ESP-IDF reserves
      * 0x40..0xFE for application-defined types, which is exactly what this is. */
+    /* Local, not static: the log and the file store are two instances of this
+     * adapter and each has to keep its own partition. */
     // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
-    s_part = esp_partition_find_first((esp_partition_type_t)0x40,
-                                      ESP_PARTITION_SUBTYPE_ANY,
-                                      partition_label);
-    if (s_part == nullptr) {
+    const esp_partition_t *part = esp_partition_find_first((esp_partition_type_t)0x40,
+                                                           ESP_PARTITION_SUBTYPE_ANY,
+                                                           partition_label);
+    if (part == nullptr) {
         ESP_LOGE(TAG, "no partition '%s' in the table", partition_label);
         return KILN_ERR_NOT_FOUND;
     }
 
-    ESP_LOGI(TAG, "log partition '%s': %u bytes at 0x%06x, %u byte sectors",
-             partition_label, (unsigned)s_part->size, (unsigned)s_part->address,
+    ESP_LOGI(TAG, "partition '%s': %u bytes at 0x%06x, %u byte sectors",
+             partition_label, (unsigned)part->size, (unsigned)part->address,
              (unsigned)SPI_FLASH_SEC_SIZE);
 
-    out->ctx   = (void *)s_part;
+    out->ctx   = (void *)part;
     out->info  = hal_info;
     out->read  = hal_read;
     out->write = hal_write;

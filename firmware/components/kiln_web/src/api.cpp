@@ -13,7 +13,9 @@
 
 /* --- small helpers ------------------------------------------------------ */
 
-static void resp_begin(kiln_api_resp_t *r, kiln_json_t *j)
+namespace {
+
+void resp_begin(kiln_api_resp_t *r, kiln_json_t *j)
 {
     r->status       = 200;
     r->content_type = "application/json";
@@ -22,7 +24,7 @@ static void resp_begin(kiln_api_resp_t *r, kiln_json_t *j)
     kiln_json_init(j, r->body, r->body_cap);
 }
 
-static kiln_err_t resp_end(kiln_api_resp_t *r, kiln_json_t *j)
+kiln_err_t resp_end(kiln_api_resp_t *r, kiln_json_t *j)
 {
     r->body_len  = kiln_json_len(j);
     r->truncated = !kiln_json_ok(j);
@@ -36,6 +38,8 @@ static kiln_err_t resp_end(kiln_api_resp_t *r, kiln_json_t *j)
     }
     return KILN_OK;
 }
+
+} // namespace
 
 void kiln_api_error(kiln_api_resp_t *resp, int status, const char *code,
                     const char *message)
@@ -63,9 +67,11 @@ void kiln_api_error(kiln_api_resp_t *resp, int status, const char *code,
     resp->truncated = !kiln_json_ok(&j);
 }
 
+namespace {
+
 /* Map a kiln_err_t from a command onto the status a client should see.  One
  * mapping, so two endpoints cannot disagree about what KILN_ERR_STATE means. */
-static void resp_from_err(kiln_api_resp_t *r, kiln_err_t e, const char *what)
+void resp_from_err(kiln_api_resp_t *r, kiln_err_t e, const char *what)
 {
     switch (e) {
     case KILN_OK:
@@ -92,13 +98,13 @@ static void resp_from_err(kiln_api_resp_t *r, kiln_err_t e, const char *what)
     }
 }
 
-static bool path_is(const char *path, const char *want)
+bool path_is(const char *path, const char *want)
 {
     return strcmp(path, want) == 0;
 }
 
 /* `/api/programs/7/preview` -> prefix "/api/programs/", id 7, tail "preview". */
-static bool path_split_id(const char *path, const char *prefix,
+bool path_split_id(const char *path, const char *prefix,
                           uint32_t *id_out, const char **tail_out)
 {
     const size_t plen = strlen(prefix);
@@ -129,7 +135,7 @@ static bool path_split_id(const char *path, const char *prefix,
     return true;
 }
 
-static int hexv(char c)
+int hexv(char c)
 {
     if (c >= '0' && c <= '9') {
         return c - '0';
@@ -142,6 +148,8 @@ static int hexv(char c)
     }
     return -1;
 }
+
+} // namespace
 
 bool kiln_api_query_get(const char *query, const char *key, char *out, size_t cap)
 {
@@ -167,7 +175,7 @@ bool kiln_api_query_get(const char *query, const char *key, char *out, size_t ca
                 if (*v == '%' && v + 2 < end) {
                     const int h = hexv(v[1]), l = hexv(v[2]);
                     if (h >= 0 && l >= 0) {
-                        out[o++] = (char)((h << 4) | l);
+                        out[o++] = (char)(((unsigned)h << 4u) | (unsigned)l);
                         v += 2;
                         continue;
                     }
@@ -222,6 +230,8 @@ bool kiln_api_needs_auth(const kiln_api_req_t *req)
 
 /* --- GET /api/status (FR-RUN-05) --------------------------------------- */
 
+namespace {
+
 /* FR-WEB-26: the web interface is an observation surface.  Nothing reachable
  * over the network may put heat into the kiln.
  *
@@ -235,17 +245,19 @@ bool kiln_api_needs_auth(const kiln_api_req_t *req)
  * cannot start a firing over HTTP because the code to do it is not in the
  * image, which is a stronger claim than a flag that could be flipped back.
  */
-static kiln_err_t reject_read_only(kiln_api_resp_t *resp, const char *what)
+kiln_err_t reject_read_only(kiln_api_resp_t *resp, const char *what)
 {
     char msg[200];
-    snprintf(msg, sizeof(msg),
-             "%s is not available over the network; use the controls on the kiln",
-             what);
+    /* Truncation would only shorten a diagnostic that is already advisory, and
+     * every caller passes a short literal; msg stays NUL-terminated either way. */
+    (void)snprintf(msg, sizeof(msg),
+                   "%s is not available over the network; use the controls on the kiln",
+                   what);
     kiln_api_error(resp, 403, "read_only", msg);
     return KILN_ERR_UNSUPPORTED;
 }
 
-static void write_warnings(kiln_json_t *j, uint32_t mask, kiln_lang_t lang)
+void write_warnings(kiln_json_t *j, uint32_t mask, kiln_lang_t lang)
 {
     kiln_json_key(j, "warnings");
     kiln_json_arr_open(j);
@@ -264,7 +276,7 @@ static void write_warnings(kiln_json_t *j, uint32_t mask, kiln_lang_t lang)
     kiln_json_arr_close(j);
 }
 
-static void write_status(kiln_api_ctx_t *ctx, kiln_json_t *j)
+void write_status(kiln_api_ctx_t *ctx, kiln_json_t *j)
 {
     const kiln_app_t *a = ctx->app;
     kiln_snapshot_t s;
@@ -334,7 +346,7 @@ static void write_status(kiln_api_ctx_t *ctx, kiln_json_t *j)
 
 /* --- GET /api/info (FR-UPD-06) ----------------------------------------- */
 
-static void write_info(kiln_api_ctx_t *ctx, kiln_json_t *j)
+void write_info(kiln_api_ctx_t *ctx, kiln_json_t *j)
 {
     kiln_json_obj_open(j);
 
@@ -380,7 +392,7 @@ static void write_info(kiln_api_ctx_t *ctx, kiln_json_t *j)
 
 /* The whole point of configmodel's table: the API projection is generated from
  * it, so an item cannot exist in the firmware and be missing from the UI. */
-static void write_config(kiln_api_ctx_t *ctx, kiln_json_t *j)
+void write_config(kiln_api_ctx_t *ctx, kiln_json_t *j)
 {
     kiln_json_obj_open(j);
     kiln_json_key(j, "items");
@@ -454,7 +466,7 @@ static void write_config(kiln_api_ctx_t *ctx, kiln_json_t *j)
 
 /* --- /api/programs (FR-PRG-07, FR-WEB-12, FR-WEB-13) ------------------- */
 
-static void write_program(kiln_json_t *j, const kiln_program_t *p, uint8_t id,
+void write_program(kiln_json_t *j, const kiln_program_t *p, uint8_t id,
                           float max_temp_c)
 {
     kiln_json_obj_open(j);
@@ -494,7 +506,7 @@ static void write_program(kiln_json_t *j, const kiln_program_t *p, uint8_t id,
 
 /* --- /api/run and friends ---------------------------------------------- */
 
-static kiln_err_t ok_response(kiln_api_resp_t *resp)
+kiln_err_t ok_response(kiln_api_resp_t *resp)
 {
     kiln_json_t j;
     resp_begin(resp, &j);
@@ -508,7 +520,7 @@ static kiln_err_t ok_response(kiln_api_resp_t *resp)
 /* --- /api/manual, /api/fault/ack, /api/tune ---------------------------- */
 
 
-static kiln_err_t handle_tune(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
+kiln_err_t handle_tune(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
                               const char *tail, kiln_api_resp_t *resp)
 {
     const kiln_autotune_t *at = &ctx->app->tune;
@@ -632,7 +644,7 @@ static kiln_err_t handle_tune(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
 /* --- /api/runs, /api/current, /api/storage, /api/net ------------------- */
 
 /* FR-PRG-07: the stored programs, read only. */
-static kiln_err_t handle_program_list(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
+kiln_err_t handle_program_list(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
 {
     if (ctx->filestore == nullptr) {
         kiln_api_error(resp, 503, "no_storage", "program storage is unavailable");
@@ -659,7 +671,7 @@ static kiln_err_t handle_program_list(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp
 /* One stored program by slot.  A missing slot is 404 and not an empty list:
  * a client asking for a program that is not there has made a different
  * mistake from one asking what programs exist. */
-static kiln_err_t handle_program_one(kiln_api_ctx_t *ctx, uint8_t id,
+kiln_err_t handle_program_one(kiln_api_ctx_t *ctx, uint8_t id,
                                      kiln_api_resp_t *resp)
 {
     if (ctx->filestore == nullptr) {
@@ -677,7 +689,7 @@ static kiln_err_t handle_program_one(kiln_api_ctx_t *ctx, uint8_t id,
     return resp_end(resp, &j);
 }
 
-static kiln_err_t handle_runs(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
+kiln_err_t handle_runs(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
 {
     if (ctx->filestore == nullptr) {
         kiln_api_error(resp, 503, "no_storage", "run history is unavailable");
@@ -731,7 +743,7 @@ static kiln_err_t handle_runs(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
     return resp_end(resp, &j);
 }
 
-static kiln_err_t handle_current(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
+kiln_err_t handle_current(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
                                  const char *tail, kiln_api_resp_t *resp)
 {
     const kiln_app_t     *app = ctx->app;
@@ -794,7 +806,7 @@ static kiln_err_t handle_current(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
     return KILN_ERR_NOT_FOUND;
 }
 
-static kiln_err_t handle_storage(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
+kiln_err_t handle_storage(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
 {
     kiln_json_t j;
     resp_begin(resp, &j);
@@ -842,7 +854,7 @@ static kiln_err_t handle_storage(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
     return resp_end(resp, &j);
 }
 
-static kiln_err_t handle_net(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
+kiln_err_t handle_net(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
 {
     kiln_json_t j;
     resp_begin(resp, &j);
@@ -875,6 +887,8 @@ static kiln_err_t handle_net(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
     kiln_json_obj_close(&j);
     return resp_end(resp, &j);
 }
+
+} // namespace
 
 /* --- telemetry (FR-WEB-05) --------------------------------------------- */
 

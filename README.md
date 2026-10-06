@@ -13,29 +13,31 @@ An open-source PID controller for electric ceramic and glass kilns, built on the
 - **PID with automatic tuning**: relay (Åström–Hägglund) autotune on the real kiln; no manual gain hunting.
 - **Safety first**: thermal runaway, thermocouple failure, shorted-SSR, over-temperature and door-interlock detection, with a safety supervisor that has sole authority over a heat-enable line that decays unless actively refreshed.
 - **Current monitoring**: a current transformer turns relay and element failures from slow thermal inferences into fast electrical facts, with the thermal rules retained as an independent backstop.
-- **Self-contained**: no SD card, no external database, no cloud. Logs live in a circular partition on internal flash; web assets are embedded in the firmware.
+- **Self-contained**: no SD card, no external database, no cloud, no filesystem. Logs live in a circular partition on internal flash and programs in a fixed-slot one, each built so a power cut cannot tear a record; web assets are embedded in the firmware.
 - **Designed for testability**: all decision logic is hardware-free C++ that runs on a development host against a simulated kiln.
 
 ## Status
 
-**In development.** The firmware is C++20. The control, safety and web logic is
-implemented and tested; the hardware adapters and the local display are not,
-and there is currently **no field update path** (see below).
+**In development.** The firmware is C++20. The control, safety, storage and web
+logic is implemented and tested, and the hardware adapters are written but have
+not yet been run against a board. The browser UI is not served yet, its assets
+are not embedded in the image, and there is currently **no field update path**
+(see below).
 
-347 host tests pass plain and under AddressSanitizer/UBSan, `clang-tidy` is
+398 host tests pass plain and under AddressSanitizer/UBSan, `clang-tidy` is
 clean on host and target, the `esp32s3` image builds with zero warnings at
-237 kB (89 % of the OTA slot free), and QEMU boots that image and fires it.
+866 kB (58 % of the OTA slot free), and QEMU boots that image and fires it.
 
 | Area | State |
 |---|---|
-| `kiln_core`: PID, setpoint generator, program model, safety supervisor (including the current-based relay rules), autotune, heater-current measurement, configuration model, run state, log codec | Implemented, host-tested |
+| `kiln_core`: PID, setpoint generator, program model, safety supervisor (including the current-based relay rules), autotune, heater-current measurement, configuration model, run state, log codec, log ring, file store | Implemented, host-tested |
 | `kiln_ports`: the interface headers everything hardware goes through | Complete for the above |
 | `kiln_sim`: plant simulator with heater current and electrical fault injection | Implemented |
 | `kiln_app`: task orchestration, mode state machine, heat authority, logging, persistence, power-loss recovery | Implemented, host-tested |
-| `kiln_hal_esp32s3`: log partition, NVS, clock, reset cause, watchdog | Implemented, builds for esp32s3 |
-| `kiln_hal_esp32s3`: MAX31856, SSD1306, encoder, SSR outputs, CT front end, LittleFS | **Not started** |
-| `kiln_web`: REST API, JSON, log streaming, read-only enforcement | Implemented, host-tested |
-| `kiln_hmi`: the local display and encoder | **Not started**, and now the only way to start a firing |
+| `kiln_hal_esp32s3`: log partition, file store, NVS, clock, reset cause, watchdog | Implemented, builds for esp32s3 |
+| `kiln_hal_esp32s3`: MAX31856, SSD1306, encoder, SSR outputs, CT front end, WiFi | Implemented, **not yet run against hardware** |
+| `kiln_web`: REST API, JSON, log streaming, read-only enforcement | Implemented, host-tested; HTTP transport on target, **browser assets not yet embedded** |
+| `kiln_hmi`: the local display and encoder | Implemented and host-tested, **not yet run against hardware**; the only way to start a firing |
 | Firmware update | **Removed from the network** (FR-UPD-01); no local path specified yet |
 
 You can watch a complete firing, and break it in a dozen ways, without any
@@ -109,9 +111,7 @@ Adrian Siemieniak, which showed that a low-cost ESP32 can run a real kiln well.
 KilnControl borrows its ideas, segment-based programs, dual local/web control,
 on-device storage, a redundant SSR + contactor output stage, and rebuilds them
 on ESP-IDF with a host-testable core and automatic PID tuning. No PIDKiln source
-code is used;
-[requirements §1.6](docs/requirements.md#16-relationship-to-pidkiln) records what
-was adopted and what deliberately differs.
+code is used
 
 ## Safety
 
@@ -119,18 +119,14 @@ KilnControl is **not** a safety-certified device. A kiln is a multi-kilowatt mai
 heater reaching temperatures at which its own wiring and the surrounding building
 are at risk.
 
-- An **independent hardware over-temperature cutout** is required in the safety chain, in addition to this controller.
-- Mains wiring must be carried out by a competent person in accordance with local regulation.
-- Do not fire unattended.
+Mains wiring must be carried out by a competent person in accordance with local regulation.
 
 The hazards, the layered protection concept and the risk that remains are
 set out in [`docs/safety.md`](docs/safety.md); the requirements it derives from
 are [requirements §5](docs/requirements.md#5-safety-requirements).
 
 KilnControl is designed for a **trusted local network** and must not be exposed
-to the internet: there is no transport encryption, and an attacker who can issue
-commands can start a multi-kilowatt heater. The threat model, the controls and
-what is still only specified are in [`docs/security.md`](docs/security.md).
+to the internet. The threat model, the controls and what is still only specified are in [`docs/security.md`](docs/security.md).
 
 ## License
 

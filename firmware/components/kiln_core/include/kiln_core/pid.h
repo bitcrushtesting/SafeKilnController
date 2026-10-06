@@ -15,11 +15,11 @@
 
 #include "kiln/types.h"
 
-#define KILN_PID_KP_MAX   100.0f
-#define KILN_PID_KI_MAX    10.0f
-#define KILN_PID_KD_MAX 10000.0f
+constexpr float KILN_PID_KP_MAX =   100.0f;
+constexpr float KILN_PID_KI_MAX =    10.0f;
+constexpr float KILN_PID_KD_MAX = 10000.0f;
 
-#define KILN_PID_DUTY_MAX_MIN  100u    /* FR-CTL-16 lower bound on the ceiling */
+constexpr uint16_t KILN_PID_DUTY_MAX_MIN = 100u;  /* FR-CTL-16 lower bound on the ceiling */
 
 typedef struct {
     float    kp, ki, kd;

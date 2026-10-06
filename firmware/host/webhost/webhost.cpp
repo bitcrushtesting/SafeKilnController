@@ -44,41 +44,43 @@
 
 /* --- the device ---------------------------------------------------------- */
 
-#define LOG_SECTORS  128u
-#define SECTOR_BYTES 4096u
-#define BODY_CAP     65536u
+constexpr size_t LOG_SECTORS  = 128u;
+constexpr size_t SECTOR_BYTES = 4096u;
+constexpr size_t BODY_CAP     = 65536u;
 
-static uint8_t               g_flash_storage[LOG_SECTORS * SECTOR_BYTES];
-static kiln_host_flash_t     g_flash;
-static kiln_port_flash_t     g_flash_port;
-static kiln_host_kv_t        g_kv;
-static kiln_port_kvstore_t   g_kv_port;
-static kiln_host_fs_t        g_fs;
-static kiln_port_filestore_t g_fs_port;
-static kiln_host_clock_t     g_clk;
-static kiln_port_clock_t     g_clk_port;
-static kiln_logring_t        g_ring;
-static kiln_port_logstore_t  g_log_port;
-static kiln_sim_t            g_sim;
-static kiln_sim_ports_t      g_sim_ports;
-static kiln_app_t            g_app;
-static kiln_api_ctx_t        g_api;
-static char                  g_body[BODY_CAP];
+namespace {
 
-static double g_accel   = 60.0;
-static char   g_web_dir[512] = "web";
-static volatile sig_atomic_t g_stop = 0;
+uint8_t               g_flash_storage[LOG_SECTORS * SECTOR_BYTES];
+kiln_host_flash_t     g_flash;
+kiln_port_flash_t     g_flash_port;
+kiln_host_kv_t        g_kv;
+kiln_port_kvstore_t   g_kv_port;
+kiln_host_fs_t        g_fs;
+kiln_port_filestore_t g_fs_port;
+kiln_host_clock_t     g_clk;
+kiln_port_clock_t     g_clk_port;
+kiln_logring_t        g_ring;
+kiln_port_logstore_t  g_log_port;
+kiln_sim_t            g_sim;
+kiln_sim_ports_t      g_sim_ports;
+kiln_app_t            g_app;
+kiln_api_ctx_t        g_api;
+char                  g_body[BODY_CAP];
 
-static void on_signal(int sig) { (void)sig; g_stop = 1; }
+double g_accel   = 60.0;
+char   g_web_dir[512] = "web";
+volatile sig_atomic_t g_stop = 0;
 
-static double now_s(void)
+void on_signal(int sig) { (void)sig; g_stop = 1; }
+
+double now_s(void)
 {
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return (double)tv.tv_sec + (double)tv.tv_usec / 1e6;
 }
 
-static void device_init(void)
+void device_init(void)
 {
     kiln_host_flash_init(&g_flash, g_flash_storage, sizeof(g_flash_storage),
                          SECTOR_BYTES);
@@ -119,7 +121,7 @@ static void device_init(void)
     cfg.log_interval_s = 5;
 
     if (kiln_app_init(&g_app, &ports, &cfg) != KILN_OK) {
-        fprintf(stderr, "kiln_app_init failed\n");
+        (void)fprintf(stderr, "kiln_app_init failed\n");
         exit(1);
     }
     (void)kiln_app_boot(&g_app, KILN_RESET_POWER_ON, -1.0f);
@@ -131,7 +133,7 @@ static void device_init(void)
 }
 
 /* Advance the device by `dt` seconds of wall time. */
-static void device_tick(double dt)
+void device_tick(double dt)
 {
     static double acc_window = 0, acc_safety = 0, acc_acquire = 0, acc_control = 0;
 
@@ -160,10 +162,14 @@ static void device_tick(double dt)
     (void)kiln_app_log_drain(&g_app, 16);
 }
 
+} // namespace
+
 /* --- tiny HTTP ---------------------------------------------------------- */
 
-#define MAX_CLIENTS 16
-#define REQ_CAP     (KILN_API_MAX_BODY + 4096)
+constexpr int MAX_CLIENTS = 16;
+constexpr size_t REQ_CAP     = KILN_API_MAX_BODY + 4096;
+
+namespace {
 
 typedef struct {
     int    fd;
@@ -173,9 +179,9 @@ typedef struct {
     bool   in_use;
 } client_t;
 
-static client_t g_clients[MAX_CLIENTS];
+client_t g_clients[MAX_CLIENTS];
 
-static bool send_all(int fd, const char *data, size_t len)
+bool send_all(int fd, const char *data, size_t len)
 {
     while (len > 0) {
         const ssize_t n = send(fd, data, len, 0);
@@ -191,9 +197,9 @@ static bool send_all(int fd, const char *data, size_t len)
     return true;
 }
 
-static bool send_str(int fd, const char *s) { return send_all(fd, s, strlen(s)); }
+bool send_str(int fd, const char *s) { return send_all(fd, s, strlen(s)); }
 
-static void send_headers(int fd, int status, const char *content_type,
+void send_headers(int fd, int status, const char *content_type,
                          long content_length, const char *extra)
 {
     const char *reason = status == 200 ? "OK"
@@ -223,7 +229,7 @@ static void send_headers(int fd, int status, const char *content_type,
     if (extra != nullptr) {
         n += snprintf(h + n, sizeof(h) - (size_t)n, "%s", extra);
     }
-    snprintf(h + n, sizeof(h) - (size_t)n, "\r\n");
+    (void)snprintf(h + n, sizeof(h) - (size_t)n, "\r\n");
     (void)send_str(fd, h);
 }
 
@@ -231,9 +237,9 @@ static void send_headers(int fd, int status, const char *content_type,
  * interface the device's transport does. */
 typedef struct { int fd; bool ok; } chunk_sink_t;
 
-static bool chunk_write(void *user, const char *data, size_t len)
+bool chunk_write(void *user, const char *data, size_t len)
 {
-    chunk_sink_t *c = (chunk_sink_t *)user;
+    chunk_sink_t *c = static_cast<chunk_sink_t *>(user);
     if (!c->ok || len == 0) {
         return c->ok;
     }
@@ -248,7 +254,7 @@ static bool chunk_write(void *user, const char *data, size_t len)
     return c->ok;
 }
 
-static const char *mime_for(const char *path)
+const char *mime_for(const char *path)
 {
     const char *dot = strrchr(path, '.');
     if (dot == nullptr) {
@@ -277,17 +283,19 @@ static const char *mime_for(const char *path)
 
 /* Serve a file from the web directory.  Rejects anything with a `..` in it: this
  * is a development tool, but a path traversal is a path traversal. */
-static bool serve_static(int fd, const char *path)
+bool serve_static(int fd, const char *path)
 {
     if (strstr(path, "..") != nullptr) {
         return false;
     }
 
     char full[1024];
+    /* Truncation would only fail to find a file that was never asked for, and
+     * the ".." check above is what keeps the path inside g_web_dir. */
     if (strcmp(path, "/") == 0) {
-        snprintf(full, sizeof(full), "%s/index.html", g_web_dir);
+        (void)snprintf(full, sizeof(full), "%s/index.html", g_web_dir);
     } else {
-        snprintf(full, sizeof(full), "%s%s", g_web_dir, path);
+        (void)snprintf(full, sizeof(full), "%s%s", g_web_dir, path);
     }
 
     FILE *f = fopen(full, "rb");
@@ -296,31 +304,42 @@ static bool serve_static(int fd, const char *path)
     }
 
     struct stat st;
-    if (stat(full, &st) != 0 || !S_ISREG(st.st_mode)) { fclose(f); return false; }
+    if (stat(full, &st) != 0 || !S_ISREG(st.st_mode)) {
+        (void)fclose(f);
+        return false;
+    }
 
     send_headers(fd, 200, mime_for(full), (long)st.st_size, NULL);
     char buf[8192];
-    size_t n;
-    while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
-        if (!send_all(fd, buf, n)) {
+    for (;;) {
+        const size_t n = fread(buf, 1, sizeof(buf), f);
+        if (n > 0 && !send_all(fd, buf, n)) {
+            break;
+        }
+        if (n < sizeof(buf)) {
+            /* A short read is either the end of the file or an error, and after
+             * an error the stream position is indeterminate -- so neither is a
+             * reason to go round again.  The loop this replaces kept calling
+             * fread() on a stream it had already read to EOF
+             * (clang-analyzer-unix.Stream). */
             break;
         }
     }
-    fclose(f);
+    (void)fclose(f);
     return true;
 }
 
-static kiln_http_method_t method_of(const char *m)
+kiln_http_method_t method_of(const char *m)
 {
-    if (strcmp(m, "GET") == 0)    return KILN_HTTP_GET;
-    if (strcmp(m, "POST") == 0)   return KILN_HTTP_POST;
-    if (strcmp(m, "PUT") == 0)    return KILN_HTTP_PUT;
-    if (strcmp(m, "PATCH") == 0)  return KILN_HTTP_PATCH;
-    if (strcmp(m, "DELETE") == 0) return KILN_HTTP_DELETE;
+    if (strcmp(m, "GET") == 0) { return KILN_HTTP_GET; }
+    if (strcmp(m, "POST") == 0) { return KILN_HTTP_POST; }
+    if (strcmp(m, "PUT") == 0) { return KILN_HTTP_PUT; }
+    if (strcmp(m, "PATCH") == 0) { return KILN_HTTP_PATCH; }
+    if (strcmp(m, "DELETE") == 0) { return KILN_HTTP_DELETE; }
     return KILN_HTTP_METHOD_COUNT;
 }
 
-static void handle_request(client_t *c)
+void handle_request(client_t *c)
 {
     /* Request line. */
     char method[8] = "", target[512] = "";
@@ -336,7 +355,8 @@ static void handle_request(client_t *c)
 
     char *query = strchr(target, '?');
     if (query != nullptr) {
-        *query++ = '\0';
+        *query = '\0';   /* terminate the path here ... */
+        query++;         /* ... and the query string starts after it */
     }
 
     /* Body, if any. */
@@ -411,7 +431,7 @@ static void handle_request(client_t *c)
     (void)send_str(c->fd, "not found\r\n");
 }
 
-static void push_sse(void)
+void push_sse(void)
 {
     static char ev[8192];
     const size_t n = kiln_api_telemetry_event(&g_api, ev, sizeof(ev));
@@ -436,6 +456,8 @@ static void push_sse(void)
     }
 }
 
+} // namespace
+
 int main(int argc, char **argv)
 {
     int port = 8080;
@@ -448,10 +470,10 @@ int main(int argc, char **argv)
             g_accel = atof(argv[++i]);
         }
         else if (strcmp(argv[i], "--web") == 0 && i + 1 < argc) {
-            snprintf(g_web_dir, sizeof(g_web_dir), "%s", argv[++i]);
+            (void)snprintf(g_web_dir, sizeof(g_web_dir), "%s", argv[++i]);
         }
         else {
-            fprintf(stderr,
+            (void)fprintf(stderr,
                 "KilnControl development harness -- real firmware logic, simulated kiln.\n"
                 "\n"
                 "  --port N    listen port (default 8080)\n"
@@ -466,8 +488,10 @@ int main(int argc, char **argv)
         g_accel = 1.0;
     }
 
-    signal(SIGINT, on_signal);
-    signal(SIGPIPE, SIG_IGN);
+    /* The previous handlers are of no interest -- this harness installs these
+     * once at startup and never restores them. */
+    (void)signal(SIGINT, on_signal);
+    (void)signal(SIGPIPE, SIG_IGN);
 
     device_init();
 
@@ -481,7 +505,11 @@ int main(int argc, char **argv)
     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);   /* localhost only */
     addr.sin_port        = htons((uint16_t)port);
 
-    if (bind(listener, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
+    /* reinterpret_cast: the sockets API takes the generic sockaddr and the
+     * caller supplies the family-specific one.  There is no other way to call
+     * bind(), which is why this is the one such cast in the file.
+     * NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast) */
+    if (bind(listener, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)) != 0) {
         perror("bind");
         return 1;
     }
@@ -518,7 +546,7 @@ int main(int argc, char **argv)
 
         if (t - last_sse >= 1.0) { push_sse(); last_sse = t; }
 
-        if ((pfd[0].revents & POLLIN) != 0) {
+        if (((unsigned)pfd[0].revents & (unsigned)POLLIN) != 0u) {
             const int fd = accept(listener, NULL, NULL);
             if (fd >= 0) {
                 int slot = -1;
@@ -539,7 +567,10 @@ int main(int argc, char **argv)
         }
 
         for (int k = 1; k < nfd; k++) {
-            if ((pfd[k].revents & (POLLIN | POLLHUP | POLLERR)) == 0) {
+            /* poll()'s revents is a short and the POLL* macros are signed
+             * ints, so the mask is composed in unsigned. */
+            if (((unsigned)pfd[k].revents &
+                 ((unsigned)POLLIN | (unsigned)POLLHUP | (unsigned)POLLERR)) == 0u) {
                 continue;
             }
             client_t *c = &g_clients[map[k - 1]];
