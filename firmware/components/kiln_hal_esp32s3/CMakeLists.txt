@@ -14,7 +14,18 @@ idf_component_register(
         "src/hal_kvstore.cpp"
         "src/hal_clock.cpp"
         "src/hal_system.cpp"
+        "src/hal_tc.cpp"
+        "src/hal_heat.cpp"
+        "src/hal_current.cpp"
+        "src/hal_io.cpp"
+        "src/hal_counters.cpp"
+        "src/hal_display.cpp"
+        "src/hal_input.cpp"
     INCLUDE_DIRS "include"
     REQUIRES kiln_ports esp_timer
+    # ESP-IDF 6.0 split the monolithic `driver` component per peripheral, so ask
+    # for the three that are used rather than dragging the rest in.
     PRIV_REQUIRES spi_flash nvs_flash esp_app_format esp_system esp_hal_wdt
+                  esp_driver_spi esp_driver_gpio esp_adc
+                  esp_driver_i2c esp_driver_pcnt
 )

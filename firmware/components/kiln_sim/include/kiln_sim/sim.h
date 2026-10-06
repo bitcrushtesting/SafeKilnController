@@ -26,7 +26,6 @@
 #include "kiln_ports/port_counters.h"
 #include "kiln_ports/port_current.h"
 #include "kiln_ports/port_door.h"
-#include "kiln_ports/port_phase.h"
 #include "kiln_ports/port_filestore.h"
 #include "kiln_ports/port_heat.h"
 #include "kiln_ports/port_tc.h"
@@ -145,19 +144,13 @@ typedef struct {
     uint32_t rng;
 
     /* port bookkeeping */
-    /* FR-CUR-15: one transformer per phase, so the burst state is per channel.
-     * The sample buffer is the big one -- 512 uint16 each -- but a simulator
-     * runs on a host, and sharing one buffer across channels would make the
-     * three measurements alias in exactly the way the real hardware does not. */
-    kiln_cur_window_t burst_window[KILN_CUR_CHANNELS];
-    uint16_t          burst_n[KILN_CUR_CHANNELS];
-    bool              burst_armed[KILN_CUR_CHANNELS];
-    double            burst_due_s[KILN_CUR_CHANNELS];
-    uint16_t          burst_buf[KILN_CUR_CHANNELS][KILN_CUR_BURST_MAX];
+    kiln_cur_window_t burst_window;
+    uint16_t          burst_n;
+    bool              burst_armed;
+    double            burst_due_s;
+    uint16_t          burst_buf[KILN_CUR_BURST_MAX];
     uint32_t          burst_rate_hz;
 
-    /* HR-22: the strap.  1 or 3; kiln_sim_set_phases() moves it. */
-    uint8_t           phases;
 
     kiln_switch_counters_t counters;
     uint32_t switch_count[KILN_HEAT_CHANNELS];
@@ -169,10 +162,6 @@ void kiln_sim_init(kiln_sim_t *s, const kiln_sim_cfg_t *cfg);
 /* Advance the plant by dt_s.  Call this from the test loop or from the task that
  * stands in for the kiln; everything else is a port read. */
 void kiln_sim_step(kiln_sim_t *s, float dt_s);
-
-/* HR-22 / FR-CUR-15: move the phase strap.  1 or 3; anything else is 1. */
-void kiln_sim_set_phases(kiln_sim_t *s, uint8_t phases);
-uint8_t kiln_sim_phases(const kiln_sim_t *s);
 
 void kiln_sim_inject(kiln_sim_t *s, uint32_t faults);
 void kiln_sim_clear(kiln_sim_t *s, uint32_t faults);
@@ -194,7 +183,6 @@ typedef struct {
     kiln_port_current_t  current;
     kiln_port_counters_t counters;
     kiln_port_door_t     door;
-    kiln_port_phase_t    phase;
 } kiln_sim_ports_t;
 
 /* --- a RAM file store ---------------------------------------------------- */

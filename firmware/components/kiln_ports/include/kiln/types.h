@@ -37,12 +37,6 @@
  * not need a second implementation. */
 #define KILN_HEAT_CHANNELS       2
 
-/* FR-CUR-15: one current transformer per phase.  Three, because a three-phase
- * kiln is the case ASM-10 used to wave at -- a fault confined to an unmonitored
- * phase was caught only by the thermal backstop, and slowly.  A single-phase
- * installation populates channel 0 and leaves the rest absent. */
-#define KILN_CUR_CHANNELS        3
-
 #define KILN_SEG_NONE            0xFFu
 
 /* --- operating state (requirements section 2.2) ------------------------ */
@@ -148,8 +142,7 @@ typedef enum {
     KILN_WARN_CURRENT_OFF     = 10,  /* 111  FR-CUR-12 */
     KILN_WARN_CURRENT_DEV     = 11,  /* 112  SR-28 */
     KILN_WARN_DOOR_OFF        = 12,  /* 113  SR-31 */
-    KILN_WARN_PHASE_MISMATCH  = 13,  /* 114  FR-CUR-15 */
-    KILN_WARN_COUNT           = 14,
+    KILN_WARN_COUNT           = 13,
 } kiln_warn_bit_t;
 
 #define KILN_WARN_CODE_BASE  101

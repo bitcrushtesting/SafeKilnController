@@ -11,16 +11,25 @@
  * component in the first place -- the logic belongs where a host test can reach
  * it (AD-01, AD-14).
  *
- * Not here yet: the MAX31856, SSD1306, encoder, heat output and CT front end
- * (milestones M2 and M4b's adapter half), and the LittleFS file store. LittleFS
- * is not in the IDF tree and CON-04 forbids a build-time fetch, so it has to be
- * vendored rather than pulled as a managed component.
+ * Not here yet: the LittleFS file store. LittleFS is not in the IDF tree and CON-04 forbids a
+ * build-time fetch, so it has to be vendored rather than pulled as a managed
+ * component.
+ *
+ * Pin assignments are in board_pins.h and nowhere else (HR-10).
  */
 #ifndef KILN_HAL_ESP32S3_H
 #define KILN_HAL_ESP32S3_H
 
 #include "kiln/err.h"
+#include "kiln_ports/port_alarm.h"
 #include "kiln_ports/port_clock.h"
+#include "kiln_ports/port_counters.h"
+#include "kiln_ports/port_current.h"
+#include "kiln_ports/port_display.h"
+#include "kiln_ports/port_door.h"
+#include "kiln_ports/port_heat.h"
+#include "kiln_ports/port_input.h"
+#include "kiln_ports/port_tc.h"
 #include "kiln_ports/port_flash.h"
 #include "kiln_ports/port_kvstore.h"
 #include "kiln_ports/port_system.h"
@@ -44,5 +53,43 @@ void kiln_hal_clock_init(kiln_port_clock_t *out);
 
 /* Reset cause, firmware identity and the task watchdog (NFR-15, SR-14). */
 void kiln_hal_system_init(kiln_port_system_t *out);
+
+/* --- M2 / M4b adapters -------------------------------------------------- */
+
+/* The shared thermocouple SPI bus (HR-02, HR-03).  Called once; kiln_hal_tc_init
+ * calls it for you if you have not. */
+kiln_err_t kiln_hal_tc_bus_init(void);
+
+/* One MAX31856: `which` is 0 for the chamber and 1 for the enclosure. */
+kiln_err_t kiln_hal_tc_init(uint8_t which, kiln_port_tc_t *out);
+
+/* SSR channels and the heat-enable charge pump.  Read the banner in
+ * hal_heat.cpp before touching enable_refresh: AD-05 and SR-02 rest on it. */
+void kiln_hal_heat_init(kiln_port_heat_t *out);
+
+/* SR-18: let an acknowledged fault re-arm the output without a power cycle. */
+void kiln_hal_heat_rearm(void);
+
+/* Current transformer on ADC1 (FR-CUR-01..FR-CUR-05).  Reports one channel;
+ * board_pins.h explains why HR-23's other two have nowhere to go yet. */
+kiln_err_t kiln_hal_current_init(kiln_port_current_t *out);
+
+/* Lid interlock sense (SR-31, HR-21).  `interlock_fitted` is an installation
+ * fact the board cannot read, so it is passed in; false raises warning 113. */
+void kiln_hal_door_init(kiln_port_door_t *out, bool interlock_fitted);
+
+/* Buzzer with the two patterns SR-20 requires (HR-09). */
+void kiln_hal_alarm_init(kiln_port_alarm_t *out);
+
+/* Switching-operation counters (FR-CUR-13, SR-30). */
+kiln_err_t kiln_hal_counters_init(kiln_port_counters_t *out);
+
+/* SSD1306 over I2C (HR-04).  Returns KILN_OK even when the panel does not
+ * answer: FR-HMI-14 keeps controlling the kiln without a display, and
+ * available() is how the application knows to raise warning 104. */
+kiln_err_t kiln_hal_display_init(kiln_port_display_t *out);
+
+/* Rotary encoder on the pulse counter unit, plus its button (HR-05). */
+kiln_err_t kiln_hal_input_init(kiln_port_input_t *out);
 
 #endif

@@ -988,18 +988,12 @@ static kiln_err_t handle_current(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
                                  const char *tail, kiln_api_resp_t *resp)
 {
     const kiln_app_t     *app = ctx->app;
-    const kiln_current_t *c   = &app->cur[0];
+    const kiln_current_t *c   = &app->cur;
 
     if (req->method == KILN_HTTP_GET && path_is(tail, "")) {
         kiln_json_t j;
         resp_begin(resp, &j);
         kiln_json_obj_open(&j);
-
-        /* HR-22 / FR-CUR-15: how the kiln is wired, and how much of it is
-         * actually measured.  A client that shows a power figure has to be able
-         * to say what it is the power *of*. */
-        kiln_json_kv_uint(&j, "phases", kiln_app_phases(app));
-        kiln_json_kv_uint(&j, "channels", app->cur_channels);
 
         kiln_json_kv_bool(&j, "enabled", c->cfg.enabled);
         kiln_json_kv_bool(&j, "available", kiln_current_available(c));
@@ -1009,37 +1003,13 @@ static kiln_err_t handle_current(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
         kiln_json_kv_bool(&j, "reference_rejected", c->ref_rejected);
         kiln_json_kv_uint(&j, "flags", kiln_current_flags(c));
 
-        /* FR-CUR-07, summed over the measured phases, with the assumption
-         * stated as the requirement demands.  mains_v is the *phase* voltage,
-         * so this is a plain sum and not a sqrt(3) line-voltage form. */
+        /* FR-CUR-07, with the assumption stated as the requirement demands. */
         kiln_json_kv_num(&j, "apparent_va", kiln_app_apparent_va(app), 0);
         kiln_json_kv_num(&j, "energy_wh", kiln_app_energy_wh(app), 1);
         kiln_json_kv_str(&j, "power_basis",
-            "apparent power, resistive load assumed, summed over measured phases");
+                         "apparent power, resistive load assumed");
         kiln_json_kv_uint(&j, "measurements", c->measurements);
         kiln_json_kv_uint(&j, "skipped", c->skipped);
-
-        /* FR-CUR-15: per phase, because losing one element group of three is a
-         * step change on one phase and barely visible in the total. */
-        kiln_json_key(&j, "per_phase");
-        kiln_json_arr_open(&j);
-        for (uint8_t ch = 0; ch < app->cur_channels && ch < KILN_CUR_CHANNELS; ch++) {
-            const kiln_current_t *pc = &app->cur[ch];
-            kiln_json_obj_open(&j);
-            kiln_json_kv_uint(&j, "channel", ch);
-            kiln_json_kv_bool(&j, "available", kiln_current_available(pc));
-            kiln_json_kv_num(&j, "current_a", kiln_current_amps(pc), 2);
-            kiln_json_kv_num(&j, "reference_a", kiln_current_ref(pc), 2);
-            kiln_json_kv_num(&j, "apparent_va", kiln_current_apparent_va(pc), 0);
-            kiln_json_kv_num(&j, "energy_wh", kiln_current_energy_wh(pc), 1);
-            kiln_json_kv_uint(&j, "flags", kiln_current_flags(pc));
-            float pdev = 0.0f;
-            kiln_json_key(&j, "deviation");
-            if (kiln_current_deviation(pc, &pdev)) { kiln_json_num(&j, pdev, 4); }
-            else                                   { kiln_json_null(&j); }
-            kiln_json_obj_close(&j);
-        }
-        kiln_json_arr_close(&j);
 
         float dev = 0.0f;
         kiln_json_key(&j, "deviation");

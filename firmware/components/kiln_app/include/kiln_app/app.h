@@ -45,7 +45,6 @@
 #include "kiln_core/window.h"
 #include "kiln_ports/port_alarm.h"
 #include "kiln_ports/port_door.h"
-#include "kiln_ports/port_phase.h"
 #include "kiln_ports/port_counters.h"
 #include "kiln_ports/port_current.h"
 #include "kiln_ports/port_clock.h"
@@ -65,7 +64,6 @@ typedef struct {
     const kiln_port_counters_t *counters;   /* optional */
     const kiln_port_alarm_t    *alarm;      /* optional */
     const kiln_port_door_t     *door;       /* optional: SR-31, warning 113 */
-    const kiln_port_phase_t    *phase;      /* optional: HR-22 strap, FR-CUR-15 */
 
     /* Persistence (M5).  All optional: FR-LOG-14 requires the firing to
      * continue with a warning when the log store is unavailable, and the same
@@ -92,14 +90,7 @@ typedef struct {
     kiln_setpoint_t sp;
     kiln_window_t   win;
     kiln_safety_t   safety;
-    /* FR-CUR-15: one per phase.  Channel 0 is always the monitored phase; a
-     * single-phase kiln leaves 1 and 2 absent.  Per channel and not one
-     * aggregate, because SR-28 compares each phase against its *own* reference
-     * -- losing one element group of three is a step change on one phase and
-     * barely visible in a total. */
-    kiln_current_t  cur[KILN_CUR_CHANNELS];
-    uint8_t         cur_channels;    /* how many the board actually populates */
-    uint8_t         phases;          /* HR-22 strap: 1 or 3                   */
+    kiln_current_t  cur;
     kiln_autotune_t tune;
 
     /* mode state machine, requirements section 2.2 */
@@ -121,7 +112,7 @@ typedef struct {
     /* current sampling (AD-17) */
     bool     cur_fresh;              /* a measurement landed since the last
                                       * safety evaluation                   */
-    bool     cur_burst_pending[KILN_CUR_CHANNELS];
+    bool     cur_burst_pending;
     float    cur_deviation;
     bool     cur_deviation_valid;
 
@@ -217,20 +208,11 @@ kiln_err_t kiln_app_idle(kiln_app_t *app);
 
 void kiln_app_snapshot(const kiln_app_t *app, kiln_snapshot_t *out);
 
-/* --- FR-CUR-07 / FR-CUR-15: power and energy, summed over the phases that are
- * actually measured.
- *
- * mains_v is the *phase* voltage -- line-to-neutral on a three-phase star --
- * so the total is a plain sum of per-phase VA and not a sqrt(3) line-voltage
- * form.  The two differ by 73 %, so which one this is gets said rather than
- * assumed.  A resistive load is assumed throughout (ASM-09), and every
- * presentation of these figures states it. */
+/* FR-CUR-07: apparent power and cumulative energy from the measured current
+ * and the configured mains voltage.  A resistive load is assumed (ASM-09),
+ * and every presentation of these figures states it. */
 double  kiln_app_apparent_va(const kiln_app_t *app);
 double  kiln_app_energy_wh(const kiln_app_t *app);
-
-/* HR-22's strap: 1 or 3.  Describes how the kiln is wired, not how many
- * transformers are fitted -- compare with kiln_app_t::cur_channels. */
-uint8_t kiln_app_phases(const kiln_app_t *app);
 
 static inline const kiln_run_record_t *kiln_app_record(const kiln_app_t *app)
 {

@@ -19,14 +19,41 @@ Priorities:
 | **P2** | Required for a release that claims the requirements are met. |
 | **P3** | Correctness polish, consistency, cleanup. |
 
-## State, 2026-10-05
+## State, 2026-10-06
 
 | | |
 |---|---|
-| **Firmware** | C++20. 347 host tests green plain and under ASan/UBSan; clang-tidy clean on host and target; `esp32s3` builds with zero warnings; QEMU boots the image and fires. |
-| **Schematic** | ERC clean apart from one known false positive. Does not yet carry the door interlock (`HR-21`), the phase strap (`HR-22`) or the second and third CT inputs (`HR-23`). |
-| **Not started** | `kiln_hmi` (the local display and encoder), the MAX31856/SSD1306/encoder/SSR/CT adapters, LittleFS. |
-| **Blocking release** | No field update path at all (`H2`, `SRR-11`). Local control is the only control and the HMI does not exist (`H3`). |
+| **Firmware logic** | Complete and tested. C++20, 360 host tests green plain and under ASan/UBSan, clang-tidy clean on host and target, `esp32s3` builds with zero warnings at 243 kB (88.4 % of the OTA slot free), QEMU boots the image and fires it. |
+| **Firmware on hardware** | **4 of 16 ports have a target adapter** (clock, flash, kvstore, system). The twelve missing ones include temperature, heat output and current, so the image cannot drive a real kiln at all. The target build is simulated-plant only. |
+| **Schematic** | ERC clean apart from one known `SDO` false positive. Carries the lid interlock and the thermocouple-fault interlock (section K). Does **not** carry the phase strap (`HR-22`) or the second and third CT inputs (`HR-23`). |
+| **PCB** | Not updated for section K. `update_pcb_from_schematic` has not been run. |
+| **Scope** | **Single-phase kilns only**, decided 2026-10-06 and now fully removed from the requirements and the code (section N). |
+| **Blocking release** | No field update path at all (`H2`, `SRR-11`). Local control is the only control and `kiln_hmi` does not exist (`H3`). |
+
+## Firmware critical path
+
+The logic is done; the adapters are not. Nothing below is about algorithms, and
+that is the point: every remaining firmware task is a driver.
+
+Ordered by what unblocks the most. The first three are the whole of "can this
+thing fire a kiln".
+
+Rows 1 to 6 are done: the adapters in section L, `kiln_hmi` in section M.
+What remains on this path is **row 7, the HTTP transport**, and then LittleFS
+and WiFi behind it.
+
+| | Port / component | Why it is where it is |
+|---|---|---|
+| **1** | ~~`port_tc`, MAX31856~~ **done** | No temperature, no anything. Every control and safety rule consumes it. `SR-04`'s fault decode and the `FR-ACQ-12` grace period both live in the adapter's interpretation of the fault register. |
+| **2** | ~~`port_heat`, SSR and charge pump~~ **done** | No output. And the charge pump is `AD-05`, the central safety property: the toggle must stay a software-generated square wave and must never be handed to a hardware PWM peripheral, or the property is silently gone. |
+| **3** | ~~`port_current`, CT front end~~ **done** | `FR-CUR-12` **refuses to start a run** when current monitoring is unavailable unless it is explicitly disabled, so without this adapter a kiln cannot be started at all except by switching off the electrical cover. |
+| **4** | ~~`port_door`, `port_phase`~~ **done** | Small, new, and the features that depend on them (`SR-31`, `FR-CUR-15`) are already written and tested. Cheap to finish. |
+| **5** | ~~`port_alarm`, `port_counters`~~ **done** | Small. `port_counters` unblocks `SR-30`, which can never fire today because the counts restart at every boot (`E8`). |
+| **6** | ~~`kiln_hmi`, `port_display`, `port_input`~~ **done**, see section M | Now the **only** way to start a firing, because `FR-WEB-26` withdrew run control from the network. Until this exists the only control path is the simulator console. |
+| **7** | HTTP transport over `esp_http_server` | `kiln_web` is complete and host-tested but **unreachable on the device**: nothing terminates TCP, parses headers, or checks a password. Most of `security.md` is a specification until this lands, and `SRR-02` must be settled first. |
+| **8** | `port_filestore`, LittleFS | Programs and run records are RAM-only on target, so nothing survives a reboot (`E7`). |
+| **9** | `port_net`, WiFi | Needed by 7, not before it. |
+| **10** | `port_update` | **Probably delete it.** `FR-UPD-01` was inverted: no image is accepted over the network, so the port has no caller. Decide this rather than leaving a dead interface (`H2`, `OQ-08`). |
 
 ### Where the open items are
 
@@ -43,6 +70,9 @@ Priorities:
 | [I](#i-three-phase-measurement-fr-cur-15-2026-10-05) | Three-phase measurement |
 | [J](#j-german-translation-nfr-23-2026-10-05) | German translation |
 | [K](#k-hardware-interlock-chain-in-the-coil-circuit-2026-10-06) | Coil interlock chain |
+| [L](#l-target-adapters-m2-and-m4b-2026-10-06) | Target adapters |
+| [M](#m-kiln_hmi-the-local-interface-2026-10-06) | Local interface |
+| [N](#n-single-phase-only-2026-10-06) | Single-phase scope change |
 
 ---
 
@@ -50,14 +80,14 @@ Priorities:
 
 ### A.1 Blocking electrical defects (P1)
 
-- [ ] **A1. Add pull-ups to the MAX31856 `~DRDY` and `~FAULT` outputs.** All four
+- [ ] **A1. Add pull-ups to the MAX31856 `~DRDY` outputs.** The `~FAULT` outputs got theirs in section K (`R28`, `R29`); `~DRDY` still has none, confirmed by query. Original note: All four
   are open-drain and have no pull-up anywhere in the netlist. `TC1_DRDY`
   (U3.7 → U1 IO14) and `TC2_DRDY` (U4.7 → U1 IO21) therefore float between
   assertions, so acquisition timing is undefined. Add 10 k to +3V3 on
   `TC1_DRDY`, `TC2_DRDY`, `TC1_FAULT`, `TC2_FAULT`. Affects FR-ACQ-03,
   FR-ACQ-10, SR-04.
 
-- [ ] **A2. Decide what `~FAULT` is for.** `TC1_FAULT` and `TC2_FAULT` currently
+- [x] **A2. Decide what `~FAULT` is for.** Decided 2026-10-06, section K: each `FAULT` output interrupts the contactor coil through its own series MOSFET (`HR-24`). Original note: `TC1_FAULT` and `TC2_FAULT` currently
   reach only test points TP13/TP14, the MCU cannot read them, so SR-04 depends
   entirely on polling the fault register over SPI. Either route both to spare
   GPIOs (IO35–IO41 are unconnected) for interrupt-driven fault detection, or
@@ -602,9 +632,19 @@ build file in the repository.
 
 ---
 
+- [ ] **C9. Vendor the web assets into the firmware.** `web/` is no longer empty:
+  it carries the UI, read-only and translated. What is missing is the build step
+  that gzips it into `kiln_web/assets` so `AD-11` holds and the assets ship
+  inside the image, within the budget of architecture §12.4.
+
+- [ ] **C10. Coverage gate.** 90 % lines on control, safety, setpoint, program and
+  autotune is enforced; 100 % of safety decision branches (`TR-19`) is not.
+  Branch coverage was around 83 % when last measured.
+
 ## D. Documentation and open questions
 
-- [ ] **D1. Resolve OQ-06 (one CT or three) before freezing the current
+- [x] **D1. Resolve OQ-06 (one CT or three).** Resolved 2026-10-05 in favour of
+  three, see section I. Original note: before freezing the current
   component.** It determines the ADC channel count, so it gates A4, A5 and A6 on
   the hardware side and B1's rule structure on the firmware side. Requirements
   §11 already says it "should be settled before the current component is
@@ -712,12 +752,6 @@ endurance analysis confirmed by measurement".
   outputs and the CT front end. These are what stand between the current state
   and a kiln that can actually be fired.
 
-
-- [ ] **C9. `web/`.** Empty. FR-WEB and CON-06 need UI sources with a build output
-  vendored into `kiln_web/assets`, inside the asset budget of architecture §12.4.
-
-- [ ] **C10. Coverage gate.** 90 % lines on control, safety, setpoint, program and
-  autotune; 100 % of safety decision branches (TR-19).
 
 ---
 
@@ -867,8 +901,7 @@ docs. Verified: 347 tests green plain and under ASan/UBSan, clang-tidy clean on
 host and target, esp32s3 builds with zero warnings at 236 640 bytes (+720 for
 the whole feature).
 
-- [ ] **G1. The interlock is only as good as its wiring, and `HR-21` is a
-  *should*.** The software rule is the weaker half by design: `HR-21` wants the
+- [x] **G1. The interlock is only as good as its wiring.** Done 2026-10-06, section K: the lid contacts are in series with the coil and `LID_SENSE` is sensed on IO38. `HR-21` remains a *should*, so `RR-10` still stands for a kiln with no switch fitted. Original note: The software rule is the weaker half by design: `HR-21` wants the
   same normally-closed switch in series with the contactor coil, so the heater
   drops whether or not this firmware is working, the argument `AD-05` makes for
   the charge pump, applied to a second input. The schematic does not yet have
@@ -924,7 +957,7 @@ reduced to editing a stored program. SEC-00 is the one control in that document
 that does not depend on the unwritten HTTP transport, because it is enforced in
 the API layer that *is* written.
 
-- [ ] **H1. The UI client still offers the controls.** `web/app.js` calls every
+- [x] **H1. The UI client still offers the controls.** Done 2026-10-05: the withdrawn routes are gone from `web/app.js`, the settings and tuning screens are displays, and power, energy and a language selector were added. Original note: `web/app.js` calls every
   withdrawn route. The API refuses them, so the buttons would simply error , 
   which is worse than not being there. The client needs the controls removed
   and the settings and tune screens turned into displays. Being done together
@@ -946,7 +979,13 @@ the API layer that *is* written.
 
 ---
 
-## I. Three-phase measurement, FR-CUR-15 (2026-10-05)
+## I. Three-phase measurement, FR-CUR-15 (2026-10-05, REVERSED 2026-10-06)
+
+> **Withdrawn and removed.** The project supports single-phase kilns only,
+> decided 2026-10-06. The code and requirements described below were taken out
+> the same day; section N records the removal. Kept as the record of a
+> decision that was made and then reversed, which is worth being able to read
+> back.
 
 A phase strap (`HR-22`) and three current transformers (`HR-23`), so every
 phase is measured and the power and energy figures cover the whole kiln.
@@ -972,12 +1011,12 @@ disagrees with the transformers fitted, per-phase and total reporting on
 `/api/current`, simulator support with per-phase element loss, console key `p`,
 and seven host tests.
 
-- [ ] **I1. The board has one CT input and no strap.** `HR-22` and `HR-23` are
+- [x] ~~**I1. The board has one CT input and no strap.**~~ Moot: one CT input is now the specification, not a shortfall. `HR-22` and `HR-23` are
   requirements with no schematic behind them yet. Three conditioned CT inputs
   (`HR-17`, `HR-18` each) and a non-strapping input for the phase select. Until
   the board exists this is verified in simulation only.
 
-- [ ] **I2. Delta-connected kilns are not addressed.** The power sum assumes a
+- [x] ~~**I2. Delta-connected kilns are not addressed.**~~ Moot with single phase. The power sum assumes a
   star connection with `mains_v` as the line-to-neutral voltage. A delta-wired
   kiln measures line current, and the arithmetic differs. Either detect it,
   configure it, or state the restriction in the commissioning documentation.
@@ -989,7 +1028,7 @@ and seven host tests.
   does not have and probably should not grow. Worth closing explicitly rather
   than leaving as an implied limitation.
 
-- [ ] **I4. Per-phase energy is not in the run record.** `kiln_run_record_t`
+- [x] ~~**I4. Per-phase energy is not in the run record.**~~ Moot with single phase. `kiln_run_record_t`
   carries one `energy_wh`, now the total across phases. Per-phase energy would
   show which phase is doing the work, but the record is a persisted layout
   (`F9`) and cannot grow without a format version bump.
@@ -1114,3 +1153,240 @@ positive. No new violations.
   means four tests: open the lid, pull each `FAULT` low, and halt the safety
   task. Each should drop the contactor on its own. This is the same class of
   claim as `G2` and cannot be settled in simulation.
+
+---
+
+## L. Target adapters, M2 and M4b (2026-10-06)
+
+The firmware can now be built for real hardware. Before this, the `esp32s3`
+image bound the simulator and `#error`ed without it; there is now a second
+configuration that binds the board, and both build with zero warnings.
+
+Twelve of sixteen ports have a target adapter, up from four:
+
+| File | Ports | Notes |
+|---|---|---|
+| `board_pins.h` | n/a | The single pin map `HR-10` requires, closing `A21`. Nothing else in the firmware names a GPIO. |
+| `hal_tc.cpp` | `port_tc` | Two MAX31856 on one SPI bus, separate chip selects (`HR-02`, `HR-03`). |
+| `hal_heat.cpp` | `port_heat` | Two SSR channels and the `AD-05` charge pump. |
+| `hal_current.cpp` | `port_current` | CT on ADC1 through the DMA continuous driver. |
+| `hal_io.cpp` | `port_door`, `port_phase`, `port_alarm` | Lid sense, phase strap, buzzer with the two `SR-20` patterns. |
+| `hal_counters.cpp` | `port_counters` | NVS-backed, RAM accumulate and coarse flush, so `SR-30` can finally fire. |
+| `hal_display.cpp` | `port_display` | SSD1306 over I2C. |
+| `hal_input.cpp` | `port_input` | Encoder on the pulse counter unit, as `HR-05` requires. |
+
+Three decisions worth keeping:
+
+- **The charge pump has a banner above it.** `enable_refresh()` toggles one
+  edge per call and must be called from the safety task. Three changes would
+  each leave the board working on the bench and `SR-02` silently gone: setting
+  a level instead of toggling, handing the toggle to LEDC or MCPWM, or calling
+  it from a timer callback. The third is the subtle one, since an `esp_timer`
+  callback runs from a task a hung safety task does not block, so the contactor
+  would stay closed while the supervisor was dead.
+- **Open-circuit detection is enabled explicitly, and the fault mask cleared.**
+  Both default the wrong way out of reset on the MAX31856: `OCFAULT` off and
+  `MASK` at `0xFF`. A build that omitted either would have a kiln that cannot
+  detect a disconnected probe **and** an `HR-24` interlock that never opens,
+  with nothing visibly wrong.
+- **The current adapter reports one channel, not three.** See `L1`.
+
+- [x] ~~**L1. `HR-23`'s second and third CT inputs have nowhere to go.**~~ Resolved 2026-10-06 by dropping `HR-23`: single phase needs one ADC channel and the board has exactly that. The constraint itself is real and still documented in `board_pins.h`, because it will bite anyone who later wants a second analogue input for anything at all. Original note: On the
+  ESP32-S3 the only ADC usable alongside WiFi is ADC1 (GPIO1 to GPIO10), and
+  every one of those pins on this board is taken: `CURR_SENSE`, `EXP_IO2`, a
+  strapping pin, `SSR1`, `SSR2`, `HEAT_EN`, `ALARM`, `I2C_SDA`, `TC2_CS`,
+  `TC1_CS`. ADC2 is GPIO11 to GPIO20 and is unusable while WiFi is active.
+  So three-phase current measurement, which the core and application already
+  support, **cannot reach real hardware** as the board stands. Three ways out,
+  none free: move `SSR1`, `SSR2`, `ALARM` or `I2C_SDA` above IO20 and free the
+  ADC1 channels; add an external SPI ADC on the existing thermocouple bus,
+  which also buys simultaneous sampling the internal ADC cannot give; or drop
+  `HR-23`. Written out in `board_pins.h` where whoever next touches the pins
+  will see it.
+
+- [ ] **L2. None of this has touched hardware.** Every adapter compiles and
+  passes analysis, and that is the whole of the evidence. QEMU does not
+  emulate SPI, I2C, PCNT or the ADC in any way that would exercise them, so
+  the MAX31856 register decode, the SSD1306 init sequence, the quadrature
+  decoding and the ADC scaling are all unverified against a real part. This is
+  the same class of claim as `G2` and `K5`, and it is the largest untested
+  surface in the project.
+
+- [x] **L3. `kiln_hmi` does not exist.** Written 2026-10-06, section M.
+
+- [ ] **L4. The HTTP transport does not exist.** `kiln_web` is complete and
+  host-tested but unreachable on the device. `SRR-02` (salted hash against the
+  stored plaintext password) has to be settled before it is written, not after.
+
+- [ ] **L5. `port_filestore` and `port_net` have no adapter.** LittleFS is
+  `E7`; WiFi is wanted by `L4` and not before it. `port_logstore` correctly has
+  none, being provided by `kiln_core/logring` over `port_flash` (`AD-19`), and
+  `port_update` probably wants deleting rather than implementing now that
+  `FR-UPD-01` accepts no network image.
+
+- [ ] **L6. The hardware build is not in CI.** CI builds the simulated
+  configuration only. The hardware one is a second `idf.py` invocation with a
+  different `SDKCONFIG_DEFAULTS`, and it is the configuration that matters for
+  a release.
+
+---
+
+## M. kiln_hmi, the local interface (2026-10-06)
+
+The screens, the menus and the confirmation flows (`FR-HMI-02` to
+`FR-HMI-15`). With this and section L, an operator standing at the kiln can
+select a stored program, start it, pause, resume, abort and acknowledge a
+fault, which is `FR-HMI-10` and is the whole reason this was urgent: `FR-WEB-26`
+withdrew all of that from the network, so until now a real board had no way to
+start a firing at all.
+
+**The component commands nothing.** `kiln_hmi_update()` takes a view and an
+encoder event, renders a frame, and returns an *action* for the caller to carry
+out. It never calls `kiln_app`. That is what lets all 21 tests run with no
+display, no application and no kiln, and it keeps the decision to start a
+firing in `kiln_app` where the state machine and its guards already are. The
+HMI asks; the application decides, and a refusal is logged rather than
+swallowed.
+
+One font, scaled. `FR-HMI-03` wants the chamber temperature legible at two
+metres, which is the 5x7 glyph set drawn at scale 3 rather than a second large
+font to get wrong: one table, one place to fix a glyph, about 300 bytes saved.
+
+Screens: default (`FR-HMI-02`, `FR-HMI-04`), fault with precedence
+(`FR-HMI-06`), menu, program selection, confirmation (`FR-HMI-11`), network
+(`FR-HMI-07`), diagnostics and info (`FR-HMI-08`).
+
+Three behaviours the tests pin down because they are easy to get wrong:
+
+- **The confirmation defaults to NO.** A confirmation is only worth having if
+  the lazy answer is the safe one, so pressing straight through the menu does
+  not start a kiln.
+- **A fault takes the screen mid-menu and cannot be dismissed** while the
+  condition holds (`FR-HMI-06`); it leaves on its own when the fault clears.
+- **The dim timeout is suspended while a fault is up** (`FR-HMI-12`). A kiln
+  that blanked its own fault screen would be worse than one with no screen.
+
+Rendering is checked by counting lit pixels in a region rather than by
+comparing golden images. A golden image fails on every deliberate layout change
+and says nothing about why; "the big number occupies the top left and is bigger
+than everything else" survives a nudge and still catches the regression that
+matters.
+
+- [ ] **M1. No program store on hardware, so nothing can be started yet.**
+  `FR-HMI-10` is implemented and tested, but `port_filestore` has no target
+  adapter (`E7`), so `program_count` is zero on a real board and the HMI
+  correctly offers an empty list. The local control path is complete except
+  for the thing it would control. LittleFS is now the blocker it was always
+  going to become.
+
+- [ ] **M2. The network screen has nothing to show.** `port_net` has no
+  adapter (`L5`), so `FR-HMI-07`'s screen says "no wifi adapter" rather than an
+  address. Honest, and useless until WiFi lands.
+
+- [ ] **M3. Nobody has looked at it.** Every screen is verified by pixel counts
+  and state assertions on the host. No one has seen a glyph on a real SSD1306,
+  and the init sequence, the page addressing and the 5x7 font are all
+  unverified against glass. Layout judgements -- whether 15x21 really is
+  legible at two metres, whether the fault cause wraps readably -- cannot be
+  made from a test. Same class as `L2`.
+
+- [ ] **M4. German text is not length-checked against the screen.** The fault
+  *labels* are held to 16 characters by a test (`J1`), but the long *causes*
+  that the fault screen wraps are not, and German runs roughly 15 per cent
+  longer than English. A cause that overflows the panel loses its last line,
+  which on a fault screen is where the instruction tends to be.
+
+- [ ] **M5. The encoder direction is a guess.** The quadrature channel actions
+  in `hal_input.cpp` assume one wiring of A and B. If the knob turns the menu
+  the wrong way on real hardware, swap the two `pcnt_channel_set_edge_action`
+  pairs; it is a one-line fix and not a design error, but it will be wrong half
+  the time until somebody turns a real knob.
+
+---
+
+## N. Single-phase only (2026-10-06)
+
+The project supports **single-phase kilns only**. This reverses the decision of
+section I, taken the previous day, and reopens `OQ-06` as closed the other way:
+one current transformer on one conductor, which is what `HR-11` always asked
+for and what the board actually has.
+
+Why it is a clean decision rather than a retreat: a three-phase kiln monitored
+on one phase is worse than not supporting three-phase at all. A fault confined
+to an unmonitored phase would be caught only by the thermal rules, slowly, and
+the power and energy figures would cover a third of the load while looking
+exactly like a whole-kiln number. Partial support here is the kind that gets
+trusted. The README now says so under **Scope**.
+
+The firmware for it is written, tested and working, so it has to come out
+deliberately rather than by deleting whatever mentions a phase. **Nothing below
+is done yet**; the tree still builds and passes as it stands, three-phase code
+and all.
+
+- [x] **N1. Remove the phase strap.** Done 2026-10-06. `port_phase.h`, the HAL init, the pin, the simulator strap and console key `P`, and `kiln_app_phases()` are all gone.
+
+  Original note: `port_phase.h`, `hal_io.cpp`'s
+  `kiln_hal_phase_init`, `KILN_PIN_PHASE_SEL` in `board_pins.h`, the
+  `kiln_sim` strap and its console key `P`, and `kiln_app_phases()`. The strap
+  was never on the schematic (`I1`), so nothing physical has to change.
+
+- [x] **N2. Collapse `KILN_CUR_CHANNELS` back to one.** Done 2026-10-06. The constant is removed entirely, `kiln_app_t::cur` is a single `kiln_current_t` again, the burst loop is single-channel, and the aggregation helpers are gone. The safety inputs were reconnected to `kiln_current_amps/ref/flags` directly and the suites re-run, which is the part that needed care.
+
+  Original note: The constant, the
+  `kiln_current_t cur[]` array in `kiln_app_t`, the per-channel burst loop in
+  `kiln_app_window_tick`, and the aggregation helpers `cur_worst_amps`,
+  `cur_ref_of_worst`, `cur_flags_any`. Take care here: the aggregation is what
+  currently feeds `SR-25` to `SR-30`, so the single-channel path has to be
+  reconnected to those inputs and the safety tests re-run, not just deleted
+  around.
+
+- [x] **N3. Remove warning 114 and its row.** Done 2026-10-06, both languages, and code 114 is out of appendix A. The compile-time index assertions passed, which is what they are for.
+
+  Original note: `KILN_WARN_PHASE_MISMATCH` in
+  `types.h`, the row in `faults.cpp` (both languages), the raise in
+  `app.cpp`, and code 114 in requirements appendix A. The compile-time index
+  assertions in `faults.cpp` will catch a half-done job, which is what they
+  are for.
+
+- [x] **N4. Revert the API payload.** Done 2026-10-06. `/api/current` no longer reports `phases`, `channels` or `per_phase`, and `power_basis` no longer claims to be summed over phases.
+
+  Original note: `/api/current` currently reports
+  `phases`, `channels` and a `per_phase` array, and `kiln_app_apparent_va` and
+  `kiln_app_energy_wh` sum across channels. Single phase makes all of that one
+  number again. The web UI reads `apparent_va` and `energy_wh` and will not
+  notice; the `power_basis` string should stop saying "summed over measured
+  phases".
+
+- [x] **N5. Retire the requirements.** Done 2026-10-06. `HR-22`, `HR-23`, `FR-CUR-15`, `FR-CUR-16` and `FR-CUR-17` are gone, `OQ-06` is resolved the other way, `ASM-10` is reinstated as "the kiln is single phase", and three-phase is named in requirements §12 as out of scope.
+
+  Original note: `HR-22` (strap), `HR-23` (three CT
+  inputs), `FR-CUR-15` (one CT per phase), `FR-CUR-16` (strap read at boot)
+  and `FR-CUR-17` (summed power). `FR-CUR-07` stays and reverts to a single
+  measurement. `OQ-06` is resolved the other way, and **`ASM-10` comes back**:
+  a three-phase kiln is out of scope, so the assumption is no longer that one
+  phase is representative but that the kiln has one.
+
+- [x] **N6. Revert the safety and architecture notes.** Done 2026-10-06. `RR-02` is reopened and now reads as what it is: a three-phase kiln cannot be fired safely with this controller, carried by the installer who must not fit it to one. The architecture risk row follows.
+
+  Original note: `safety.md`'s `RR-02`
+  was closed on the strength of per-phase monitoring and has to reopen in its
+  original form, and the architecture risk table entry with it. This matters
+  more than the code: `RR-02` is a statement about what the design does not
+  catch, and leaving it marked closed would be a false claim in the safety
+  concept.
+
+- [x] **N7. Delete `test_phases.cpp`.** Done 2026-10-06. Seven tests removed; 374 remain.
+
+  Original note: Seven tests, of which
+  `frcur15_an_element_lost_on_one_phase_is_seen_electrically` was the one that
+  justified the whole feature. Worth reading once before deleting, because the
+  rig it builds is a compact example of driving the app against the simulator
+  and may be worth keeping in another form.
+
+- [x] **N8. Decide what the simulator keeps.** Done 2026-10-06. `KILN_INJ_ELEMENT_PARTIAL` scales the whole heater again, so `SR-28`'s deviation test exercises something the hardware can actually produce.
+
+  Original note: `KILN_INJ_ELEMENT_PARTIAL`
+  applies the loss to phase 0 only, which was written for the three-phase
+  case. On a single-phase kiln it should go back to scaling the whole heater,
+  or `SR-28`'s deviation test is exercising something the hardware can no
+  longer produce.

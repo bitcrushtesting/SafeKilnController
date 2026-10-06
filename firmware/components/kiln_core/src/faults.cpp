@@ -242,11 +242,6 @@ static constexpr warn_entry_t k_warns[] = {
         { "No door interlock is fitted. Opening the door during a firing will not stop the heater.",
           "Es ist kein Türkontakt eingebaut. Ein Öffnen der Tür während eines Brandes schaltet die Heizung nicht ab." },
         "SR-31" },
-    { KILN_WARN_PHASE_MISMATCH,
-        { "PHASE?", "PHASE?" },
-        { "The phase strap says three-phase but fewer than three current transformers are fitted. Power and energy are under-reported, and a fault on an unmonitored phase is caught only by the thermal rules.",
-          "Die Phasenbrücke meldet Drehstrom, es sind aber weniger als drei Stromwandler eingebaut. Leistung und Energie werden zu niedrig angezeigt, und ein Fehler auf einer nicht gemessenen Phase wird nur von den Temperaturregeln erfasst." },
-        "FR-CUR-15" },
 };
 
 /* The two tables are indexed by their code, and that is proven here rather

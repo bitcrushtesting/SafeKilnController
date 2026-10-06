@@ -504,10 +504,6 @@ stateDiagram-v2
 | **NFR-24** | The system shall log internally at selectable verbosity, and production builds shall not emit debug output on the pins used by any peripheral. | M | I |
 | **NFR-25** | Code shall build warning-free with `-Wall -Wextra -Werror` and shall pass the project's static analysis configuration. | M | A |
 | **NFR-26** | Documentation shall cover: assembly and wiring, mains safety, commissioning, autotuning, program authoring, the REST API, the log record format, and current-transformer fitting and calibration. | M | I |
-| **FR-CUR-15** | The system shall support **one current transformer per phase**, up to three, and shall measure each independently. Each channel shall keep its own reference current ([FR-CUR-08](#312-heater-current-measurement-fr-cur)) and its own deviation band, because the loss of one element group is a step change on one phase and is barely visible in a total. The safety rules of [SR-25](#52-detection-requirements) to [SR-30](#52-detection-requirements) shall be evaluated against the worst phase: the highest reading for fail-on and over-current, the lowest conduction for fail-off, and the largest departure from its own reference for deviation. | M | T |
-| **FR-CUR-16** | The number of phases shall be read from a **hardware strap** ([HR-22](#6-hardware-interface-requirements)) once at boot, not from configuration: it describes how the kiln is wired rather than how the operator wants it run, so a controller moved between installations cannot carry a stale setting. Where the strap indicates three phases and fewer than three transformers are fitted, the system shall raise a warning and continue. | M | T |
-| **FR-CUR-17** | Apparent power and cumulative energy ([FR-CUR-07](#312-heater-current-measurement-fr-cur)) shall be **summed across the measured phases**, and the configured mains voltage shall be interpreted as the **phase** voltage (line to neutral on a three-phase star). The interface shall state the number of phases and the number of transformers fitted wherever it presents a power or energy figure, so that a reader can tell what the figure is of. | M | T |
-
 | **NFR-27** | Uncommanded heater current ([SR-25](#52-detection-requirements)) shall de-energise heating within **1 s** of the offending measurement window, and the weld discrimination of [SR-27](#52-detection-requirements) shall reach its verdict within a further **3 s**. | M | T |
 
 ---
@@ -604,8 +600,6 @@ stateDiagram-v2
 | **HR-12** | The design shall support an optional second SSR channel for a kiln with independently switched element groups. | C | I |
 | **HR-13** | The installation shall include a hardware over-temperature cutout in the safety chain that operates independently of this controller. | M | I |
 | **HR-24** | The thermocouple front ends' **`FAULT` outputs shall interrupt the contactor coil in hardware**, each through its own series switching element, so that a reported sensor fault removes the heater without the firmware taking part. Each `FAULT` net shall retain its own test point. The limits of this interlock shall be documented: the outputs are open-drain, so an **unpowered or absent** front end leaves the path closed, and the MAX31856 detects an open circuit only once its fault mask has been configured. The hardware interlock therefore covers faults the device actively reports, and [SR-04](#52-detection-requirements) in firmware remains the cover for a dead or unconfigured front end. | M | I,T |
-| **HR-22** | The board shall carry a **phase-selection strap**: an input that reads high through a pull-up for a three-phase heater and low for single-phase, sampled once at boot. It shall not be a strapping pin and shall not glitch during reset ([HR-08](#6-hardware-interface-requirements)). An input that cannot be read shall be treated as single-phase. | M | I,T |
-| **HR-23** | The design shall provide **three current-transformer inputs**, one per phase, each conditioned as [HR-17](#6-hardware-interface-requirements) requires and each meeting the isolation of [HR-18](#6-hardware-interface-requirements). A single-phase installation populates the first and leaves the others unfitted. | M | I |
 | **HR-21** | Where a door or lid interlock is fitted, its switch shall be **normally closed** and shall be wired **both** into a controller input ([SR-31](#52-detection-requirements)) **and** in series with the safety contactor coil, so that opening the door de-energises the heater through hardware whether or not the firmware is working. The controller input provides annunciation, latching and logging; it is not the interlock. | S | I,T |
 | **HR-25** | The contactor coil's freewheel diode shall be connected **across the coil itself**, on the kiln side of every series interrupting element of [HR-21](#6-hardware-interface-requirements) and [HR-24](#6-hardware-interface-requirements), so that opening any of them leaves the coil current a path to decay through. A freewheel path referenced to the raw supply instead would put the inductive transient across the opening contacts, eroding the lid switch and stressing the sense divider. | M | I |
 | **HR-14** | The controller electronics shall be supplied from a regulated source able to power the MCU, display and contactor coil simultaneously, and shall not rely on a USB host for operating power. | M | I |
@@ -689,7 +683,7 @@ stateDiagram-v2
 | **ASM-07** | Wall-clock time may be unavailable; all timing-critical behaviour uses the monotonic time base ([FR-NET-08](#310-connectivity-and-time-fr-net)). |
 | **ASM-08** | Internal flash endurance is at least 100 000 erase cycles per block. |
 | **ASM-09** | The heater load is resistive and switched as a single group, so the current in the monitored conductor is proportional to total heater power. |
-| ~~**ASM-10**~~ | **Superseded 2026-10-05 by [FR-CUR-15](#312-heater-current-measurement-fr-cur).** Every phase is monitored by its own transformer, so there is no longer an unmonitored phase for a fault to hide on. Retained here because [SR-07](#52-detection-requirements) and the thermal rules are still the backstop for a kiln whose transformers have failed or been left unfitted, and because warning 114 exists for exactly that case. |
+| **ASM-10** | The kiln is **single phase**. Three-phase kilns are out of scope ([§12](#12-out-of-scope), [OQ-06](#11-open-questions)), so there is no unmonitored phase for a fault to hide on: there is one phase and one current transformer on it ([HR-11](#6-hardware-interface-requirements)). |
 
 ---
 
@@ -713,7 +707,7 @@ stateDiagram-v2
 |---|---|
 | **OQ-01** | Should cone-based targets (Orton cone numbers with heatwork/rate correction) be offered in addition to plain temperature targets? |
 | ~~**OQ-02**~~ | **Resolved 2026-09-28: yes.** The current transformer is mandatory ([HR-11](#6-hardware-interface-requirements)) and drives [FR-CUR](#312-heater-current-measurement-fr-cur) and [SR-25](#52-detection-requirements)–[SR-30](#52-detection-requirements). The thermal detections are retained as an independent backstop. |
-| ~~**OQ-06**~~ | **Resolved 2026-10-05: per phase.** Three transformers are mandatory ([HR-23](#6-hardware-interface-requirements)) and the phase count comes from a strap ([HR-22](#6-hardware-interface-requirements)). [FR-CUR-15](#312-heater-current-measurement-fr-cur) evaluates the safety rules against the worst phase, so a fault confined to one phase is now caught electrically in seconds instead of waiting for the thermal backstop. This supersedes [ASM-10](#9-assumptions). |
+| ~~**OQ-06**~~ | **Resolved 2026-10-06: single phase only.** Three-phase kilns are out of scope ([§12](#12-out-of-scope)). A three-phase kiln monitored on one phase is worse than one not supported at all: a fault on an unmonitored phase would be caught only by the thermal rules, slowly, and the power and energy figures would cover a third of the load while looking like a whole-kiln number. This reverses the resolution of 2026-10-05 and reinstates [ASM-10](#9-assumptions) in a narrower form. |
 | **OQ-08** | What replaces the removed over-the-web firmware update ([FR-UPD-01](#311-firmware-update-fr-upd))? USB/serial via `esptool`, an image staged over the network but applied only after a physical confirmation at the kiln, or no field update at all? The device currently has **no update path**, so this blocks release rather than merely being open. |
 | **OQ-07** | Should the element positive temperature coefficient used to correct the [SR-28](#52-detection-requirements) baseline be measured automatically during the first firing, or entered by the installer from the element datasheet? |
 | **OQ-03** | Should the log store be sized for whole-life retention of run summaries in a separate, non-circular area? |
@@ -724,6 +718,7 @@ stateDiagram-v2
 
 - Phase-angle or PWM mains modulation; only zero-cross SSR switching.
 - Multi-zone control in v1.0 ([ASM-02](#9-assumptions)).
+- **Three-phase kilns.** Decided 2026-10-06 ([OQ-06](#11-open-questions)). Monitoring one phase of three would leave a fault on either of the others to the thermal rules alone, and would report a third of the load as though it were the whole, so partial support is worse than none.
 - Cloud connectivity, remote access outside the local network, mobile apps.
 - Safety certification, or replacement of the hardware over-temperature cutout.
 - Atmosphere, damper, oxygen or gas control; kiln venting hardware.
@@ -783,4 +778,3 @@ Warnings (non-latching, do not stop a firing):
 | 111 | Current monitoring disabled | FR-CUR-12 |
 | 112 | Heater current deviating from the run reference | SR-28 |
 | 113 | No door interlock fitted | SR-31 |
-| 114 | Phase strap and fitted transformers disagree | FR-CUR-16 |

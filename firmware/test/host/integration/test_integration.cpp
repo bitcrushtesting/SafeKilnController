@@ -199,13 +199,13 @@ KILN_TEST(frcur08_a_reference_current_is_learned_during_the_cold_climb)
     CHECK_OK(kiln_app_start(&r.app, &p));
     rig_run(&r, 120.0);
 
-    CHECK(kiln_current_ref_valid(&r.app.cur[0]));
+    CHECK(kiln_current_ref_valid(&r.app.cur));
     /* The simulator's nominal is 30 A at ambient. */
-    CHECK_NEAR(kiln_current_ref(&r.app.cur[0]), 30.0f, 2.5f);
-    CHECK_NEAR(r.app.record.current_ref_a, kiln_current_ref(&r.app.cur[0]), 0.001f);
+    CHECK_NEAR(kiln_current_ref(&r.app.cur), 30.0f, 2.5f);
+    CHECK_NEAR(r.app.record.current_ref_a, kiln_current_ref(&r.app.cur), 0.001f);
 
     /* FR-CUR-07: energy accumulated while it was heating. */
-    CHECK(kiln_app_energy_wh(&r.app) > 0.0);
+    CHECK(kiln_current_energy_wh(&r.app.cur) > 0.0);
 }
 
 KILN_TEST(frcur04_measurements_are_gated_to_the_commanded_window)
@@ -224,7 +224,7 @@ KILN_TEST(frcur04_measurements_are_gated_to_the_commanded_window)
     for (int i = 0; i < 100000; i++) {
         rig_step(&r);
         if (r.app.cur_fresh) {
-            const uint8_t f = kiln_current_flags(&r.app.cur[0]);
+            const uint8_t f = kiln_current_flags(&r.app.cur);
             if ((f & KILN_CURF_CONDUCTION) != 0u) {
                 conduction++;
             }
@@ -429,7 +429,7 @@ KILN_TEST(sr28_partial_element_failure_shows_up_in_the_current)
 
     /* Learn the reference first, cold and fully on. */
     rig_run(&r, 120.0);
-    CHECK(kiln_current_ref_valid(&r.app.cur[0]));
+    CHECK(kiln_current_ref_valid(&r.app.cur));
 
     /* Then lose one of three element groups: a step of a known fraction. */
     kiln_sim_inject(&r.sim, KILN_INJ_ELEMENT_PARTIAL);
@@ -801,5 +801,5 @@ KILN_TEST(a_multi_segment_firing_completes_without_a_spurious_fault)
               (unsigned)r.app.fault, kiln_fault_label(r.app.fault));
     CHECK_EQ_INT(r.app.state, KILN_STATE_COMPLETE);
     CHECK(r.app.record.peak_c > 750.0f);
-    CHECK(kiln_app_energy_wh(&r.app) > 0.0);
+    CHECK(kiln_current_energy_wh(&r.app.cur) > 0.0);
 }

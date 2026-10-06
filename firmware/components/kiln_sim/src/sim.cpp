@@ -290,33 +290,15 @@ void kiln_sim_step(kiln_sim_t *s, float dt_s)
         s->contactor_closed = s->heat_enable;
     }
 
-    /* Deliver a burst once its samples have had time to be taken, per channel.
-     *
-     * FR-CUR-15: the phases are balanced except where a fault says otherwise.
-     * KILN_INJ_ELEMENT_PARTIAL and KILN_INJ_ELEMENT_OPEN are applied to
-     * **phase 0 only**, because that is what losing one element group of three
-     * actually looks like -- and a simulator that dimmed all three equally
-     * would make SR-28's per-phase comparison untestable, which is the whole
-     * reason the extra transformers are there. */
-    for (uint8_t ch = 0; ch < KILN_CUR_CHANNELS; ch++) {
-        if (!s->burst_armed[ch] || s->t_s < s->burst_due_s[ch]) {
-            continue;
-        }
-        {
-        float i_rms = s->current_a;
-        if (ch > 0u) {
-            /* current_a already carries the element loss.  Divide it back out
-             * for the healthy phases, so the fault lands on phase 0 alone. */
-            const float healthy_frac = element_fraction(s);
-            i_rms = (healthy_frac > 0.01f) ? (s->current_a / healthy_frac)
-                                   : (s->cfg.nominal_a * (s->contactor_closed ? 1.0f : 0.0f));
-        }
+    /* Deliver a burst once its samples have had time to be taken. */
+    if (s->burst_armed && s->t_s >= s->burst_due_s) {
+        const float    i_rms = s->current_a;
         const float    amps_per_count = s->cfg.adc_v_per_count * s->cfg.ct_a_per_v;
         const float    peak_counts = (amps_per_count > 0.0f)
                                    ? i_rms * 1.41421356f / amps_per_count : 0.0f;
         const bool     ct_gone = (s->inject & KILN_INJ_CT_DISCONNECTED) != 0;
 
-        for (uint16_t i = 0; i < s->burst_n[ch] && i < KILN_CUR_BURST_MAX; i++) {
+        for (uint16_t i = 0; i < s->burst_n && i < KILN_CUR_BURST_MAX; i++) {
             float v;
             if (ct_gone) {
                 /* FR-CUR-11, and tasklist A6: an open input has no DC path, so it
@@ -337,11 +319,10 @@ void kiln_sim_step(kiln_sim_t *s, float dt_s)
             if (v > 4095.0f) {
                 v = 4095.0f;
             }
-            s->burst_buf[ch][i] = (uint16_t)(v + 0.5f);
+            s->burst_buf[i] = (uint16_t)(v + 0.5f);
         }
-        s->burst_armed[ch] = false;
-        s->burst_due_s[ch] = 0.0;
-    }
+        s->burst_armed = false;
+        s->burst_due_s = 0.0;
     }
 }
 
@@ -500,17 +481,12 @@ void kiln_sim_set_ssr(kiln_sim_t *s, uint8_t channel, bool on)
 
 /* --- port_current ------------------------------------------------------ */
 
-static uint8_t sim_cur_channels(void *ctx)
-{
-    const kiln_sim_t *s = (const kiln_sim_t *)ctx;
-    /* One transformer per phase: a single-phase kiln populates channel 0 only. */
-    return (s != nullptr && s->phases == 3u) ? 3u : 1u;
-}
+static uint8_t sim_cur_channels(void *ctx) { (void)ctx; return 1u; }
 
 static kiln_err_t sim_cur_configure(void *ctx, uint8_t channel, uint32_t rate_hz)
 {
     kiln_sim_t *s = (kiln_sim_t *)ctx;
-    if ((s == nullptr) || channel >= KILN_CUR_CHANNELS) {
+    if ((s == nullptr) || channel != 0) {
         return KILN_ERR_INVALID_ARG;
     }
     if (rate_hz < KILN_CUR_RATE_MIN_HZ) {
@@ -524,58 +500,58 @@ static kiln_err_t sim_cur_start(void *ctx, uint8_t channel,
                                 kiln_cur_window_t window, uint16_t n)
 {
     kiln_sim_t *s = (kiln_sim_t *)ctx;
-    if ((s == nullptr) || channel >= KILN_CUR_CHANNELS || n == 0) {
+    if ((s == nullptr) || channel != 0 || n == 0) {
         return KILN_ERR_INVALID_ARG;
     }
-    if (s->burst_armed[channel]) {
+    if (s->burst_armed) {
         return KILN_ERR_BUSY;
     }
 
-    s->burst_armed[channel]  = true;
-    s->burst_window[channel] = window;
-    s->burst_n[channel]      = n > KILN_CUR_BURST_MAX ? KILN_CUR_BURST_MAX : n;
-    s->burst_due_s[channel]  = s->t_s + (double)s->burst_n[channel] / (double)s->burst_rate_hz;
+    s->burst_armed  = true;
+    s->burst_window = window;
+    s->burst_n      = n > KILN_CUR_BURST_MAX ? KILN_CUR_BURST_MAX : n;
+    s->burst_due_s  = s->t_s + (double)s->burst_n / (double)s->burst_rate_hz;
     return KILN_OK;
 }
 
 static kiln_err_t sim_cur_read(void *ctx, uint8_t channel, kiln_cur_burst_t *out)
 {
     kiln_sim_t *s = (kiln_sim_t *)ctx;
-    if ((s == nullptr) || channel >= KILN_CUR_CHANNELS || (out == nullptr)) {
+    if ((s == nullptr) || channel != 0 || (out == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
-    if (s->burst_armed[channel]) {
+    if (s->burst_armed) {
         return KILN_ERR_BUSY; /* still being taken */
     }
-    if (s->burst_n[channel] == 0) {
+    if (s->burst_n == 0) {
         return KILN_ERR_NOT_FOUND;
     }
 
-    out->samples        = s->burst_buf[channel];
-    out->count          = s->burst_n[channel];
+    out->samples        = s->burst_buf;
+    out->count          = s->burst_n;
     out->sample_rate_hz = s->burst_rate_hz;
     out->t_start_us     = (uint64_t)(s->t_s * 1e6);
-    out->window         = s->burst_window[channel];
+    out->window         = s->burst_window;
     out->truncated      = false;
 
-    s->burst_n[channel] = 0;     /* consumed */
+    s->burst_n = 0;     /* consumed */
     return KILN_OK;
 }
 
 static void sim_cur_abort(void *ctx, uint8_t channel)
 {
     kiln_sim_t *s = (kiln_sim_t *)ctx;
-    if ((s == nullptr) || channel >= KILN_CUR_CHANNELS) {
+    if ((s == nullptr) || channel != 0) {
         return;
     }
-    s->burst_armed[channel] = false;
-    s->burst_n[channel]     = 0;
+    s->burst_armed = false;
+    s->burst_n     = 0;
 }
 
 static bool sim_cur_present(void *ctx, uint8_t channel)
 {
     kiln_sim_t *s = (kiln_sim_t *)ctx;
-    if ((s == nullptr) || channel >= sim_cur_channels(ctx)) {
+    if ((s == nullptr) || channel != 0) {
         return false;
     }
     return (s->inject & KILN_INJ_CT_DISCONNECTED) == 0u;
@@ -795,24 +771,6 @@ static bool sim_door_is_present(void *ctx)
     return (s->inject & KILN_INJ_DOOR_ABSENT) == 0u;
 }
 
-static uint8_t sim_phase_count(void *ctx)
-{
-    const kiln_sim_t *s = (const kiln_sim_t *)ctx;
-    return (s != nullptr && s->phases == 3u) ? 3u : 1u;
-}
-
-void kiln_sim_set_phases(kiln_sim_t *s, uint8_t phases)
-{
-    if (s != nullptr) {
-        s->phases = (phases == 3u) ? 3u : 1u;
-    }
-}
-
-uint8_t kiln_sim_phases(const kiln_sim_t *s)
-{
-    return (s != nullptr && s->phases == 3u) ? 3u : 1u;
-}
-
 void kiln_sim_bind(kiln_sim_t *s, kiln_sim_ports_t *out)
 {
     if ((s == nullptr) || (out == nullptr)) {
@@ -853,9 +811,6 @@ void kiln_sim_bind(kiln_sim_t *s, kiln_sim_ports_t *out)
     out->counters.add_ssr_ops       = sim_ctr_add_ssr;
     out->counters.flush             = sim_ctr_flush;
     out->counters.reset             = sim_ctr_reset;
-
-    out->phase.ctx   = s;
-    out->phase.count = sim_phase_count;
 
     out->door.ctx        = s;
     out->door.is_open    = sim_door_is_open;

@@ -38,6 +38,7 @@ add_subdirectory(${KILN_FW_ROOT}/components/kiln_sim   ${CMAKE_BINARY_DIR}/kiln_
 add_subdirectory(${KILN_FW_ROOT}/components/kiln_app   ${CMAKE_BINARY_DIR}/kiln_app)
 add_subdirectory(${KILN_FW_ROOT}/host/kiln_hal_host     ${CMAKE_BINARY_DIR}/kiln_hal_host)
 add_subdirectory(${KILN_FW_ROOT}/components/kiln_web   ${CMAKE_BINARY_DIR}/kiln_web)
+add_subdirectory(${KILN_FW_ROOT}/components/kiln_hmi   ${CMAKE_BINARY_DIR}/kiln_hmi)
 
 add_library(kiln_check STATIC support/kiln_check.cpp)
 target_include_directories(kiln_check PUBLIC support)
@@ -47,7 +48,7 @@ enable_testing()
 # One executable per suite; the name is also the ctest name.
 function(kiln_add_test name)
     add_executable(${name} ${ARGN})
-    target_link_libraries(${name} PRIVATE kiln_web kiln_app kiln_core kiln_sim kiln_hal_host kiln_check)
+    target_link_libraries(${name} PRIVATE kiln_web kiln_hmi kiln_app kiln_core kiln_sim kiln_hal_host kiln_check)
     add_test(NAME ${name} COMMAND ${name})
 endfunction()
 
@@ -68,7 +69,7 @@ kiln_add_test(test_json        unit/test_json.cpp)
 kiln_add_test(test_safety_thermal unit/test_safety_thermal.cpp)
 kiln_add_test(test_safety_current unit/test_safety_current.cpp)
 kiln_add_test(test_safety_door    unit/test_safety_door.cpp)
-kiln_add_test(test_phases         unit/test_phases.cpp)
+kiln_add_test(test_hmi            unit/test_hmi.cpp)
 
 kiln_add_test(test_integration integration/test_integration.cpp)
 kiln_add_test(test_persistence integration/test_persistence.cpp)

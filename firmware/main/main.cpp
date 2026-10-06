@@ -26,6 +26,7 @@
 #include "kiln_core/logring.h"
 #include "kiln_core/profile.h"
 #include "kiln_hal/hal_esp32s3.h"
+#include "kiln_hmi/hmi.h"
 #include "kiln_ports/port_system.h"
 
 #ifdef CONFIG_KILN_PLANT_SIM
@@ -63,6 +64,18 @@ static kiln_sim_t             s_sim;
 static kiln_sim_ports_t       s_sim_ports;
 static kiln_sim_fs_t          s_sim_fs;      /* until the LittleFS adapter exists */
 static kiln_port_filestore_t  s_fs;
+#else
+/* The real-hardware port instances.  Static, because the composition root owns
+ * them for the lifetime of the image and kiln_app holds pointers to them. */
+static kiln_port_tc_t         s_tc_port;
+static kiln_port_tc_t         s_case_tc_port;
+static kiln_port_heat_t       s_heat_port;
+static kiln_port_current_t    s_current_port;
+static kiln_port_counters_t   s_counters_port;
+static kiln_port_door_t       s_door_port;
+static kiln_port_alarm_t      s_alarm_hw_port;
+static kiln_port_display_t    s_display_port;
+static kiln_port_input_t      s_input_port;
 #endif
 
 /* --- port_alarm: a stub, until the buzzer adapter exists ---------------- */
@@ -181,7 +194,6 @@ static void print_help(void)
            "  i  idle\n"
            "  Fault injection (toggle):\n"
            "   d  door switch open (SR-31)     D  no interlock fitted (warn 113)\n"
-           "   P  toggle the 1/3-phase strap (HR-22)\n"
            "   1  relay fail-on (SR-25/SR-27)   2  relay fail-off (SR-26)\n"
            "   3  welded contactor (SR-27)      4  partial element loss (SR-28)\n"
            "   5  over-current (SR-29)          6  CT disconnected (FR-CUR-11)\n"
@@ -242,15 +254,6 @@ static void handle_key(int ch)
     case '0': toggle_inject(KILN_INJ_LID_OPEN,        "lid open (SR-07)"); break;
     case 'd': toggle_inject(KILN_INJ_DOOR_SWITCH_OPEN, "door switch open (SR-31)"); break;
     case 'D': toggle_inject(KILN_INJ_DOOR_ABSENT,      "no door interlock fitted (warning 113)"); break;
-    case 'P': {
-        /* HR-22: move the strap.  Takes effect on the next boot in hardware;
-         * here it is immediate, which is the one way the simulation is kinder
-         * than the board. */
-        const uint8_t now = (kiln_sim_phases(&s_sim) == 3u) ? 1u : 3u;
-        kiln_sim_set_phases(&s_sim, now);
-        ESP_LOGW(TAG, "phase strap: %u-phase (restart to re-read on hardware)", now);
-        break;
-    }
     case 'x': kiln_sim_clear(&s_sim, 0xFFFFFFFFu);
               ESP_LOGW(TAG, "all injections cleared"); break;
     case 'h': print_help(); break;
@@ -358,6 +361,120 @@ static void console_task(void *arg)
 
 #endif /* CONFIG_KILN_PLANT_SIM */
 
+#ifndef CONFIG_KILN_PLANT_SIM
+/* --- the local interface (FR-HMI, architecture 5.4) --------------------
+ *
+ * On core 0 with the rest of the UI (AD-15), so a slow I2C frame cannot
+ * contend with the control or safety tasks on core 1.  A whole 128x64 frame
+ * is about 25 ms at 400 kHz, which is inside NFR-02's 50 ms on its own but
+ * has no business sharing a core with the supervisor.
+ *
+ * The input is polled at 50 Hz because an encoder detent is a human gesture
+ * and 20 ms of latency is imperceptible; the display is redrawn at 4 Hz,
+ * comfortably inside FR-HMI-05's "twice per second and no more than 1 s
+ * stale".  Redrawing only when the HMI says it is dirty keeps the bus quiet
+ * when nothing is moving.
+ */
+static kiln_hmi_t s_hmi;
+
+static void hmi_apply(const kiln_hmi_action_t *a)
+{
+    /* The HMI asks; kiln_app decides.  Every one of these can be refused --
+     * SR-18 will not clear a live fault, FR-CUR-12 will not start a run
+     * without current monitoring -- and a refusal is logged rather than
+     * swallowed, because the operator pressed a button and deserves to know
+     * it did nothing. */
+    kiln_err_t e = KILN_OK;
+    switch (a->kind) {
+    case KILN_HMI_ACT_PAUSE:       e = kiln_app_pause(&s_app);       break;
+    case KILN_HMI_ACT_RESUME:      e = kiln_app_resume(&s_app);      break;
+    case KILN_HMI_ACT_ABORT:       e = kiln_app_abort(&s_app);       break;
+    case KILN_HMI_ACT_ACK_SEGMENT: e = kiln_app_ack_segment(&s_app); break;
+    case KILN_HMI_ACT_ACK_FAULT:
+        e = kiln_app_clear_fault(&s_app);
+        if (e == KILN_OK) {
+            kiln_hal_heat_rearm();      /* SR-18: let the output arm again */
+        }
+        break;
+    case KILN_HMI_ACT_START:
+        /* No program store on hardware yet (tasklist E7), so there is nothing
+         * to start.  The HMI already refuses to offer an empty list; this is
+         * the belt to that braces. */
+        e = KILN_ERR_NOT_FOUND;
+        break;
+    default: return;
+    }
+    if (e != KILN_OK) {
+        ESP_LOGW(TAG, "hmi action %d refused: %s", (int)a->kind, kiln_err_str(e));
+    }
+}
+
+static void hmi_build_view(kiln_hmi_view_t *v)
+{
+    memset(v, 0, sizeof(*v));
+    kiln_app_snapshot(&s_app, &v->snap);
+    v->fault      = s_app.fault;
+    v->warnings   = s_app.warnings;
+    v->language   = (kiln_lang_t)s_app.cfg.language;
+    v->fahrenheit = (s_app.cfg.units != 0u);
+    v->elapsed_s  = (uint32_t)s_app.run_elapsed_s;
+    v->power_w    = kiln_app_apparent_va(&s_app);
+    v->energy_wh  = kiln_app_energy_wh(&s_app);
+    v->kp = s_app.cfg.kp; v->ki = s_app.cfg.ki; v->kd = s_app.cfg.kd;
+
+    kiln_fw_info_t fw = {};
+    if (s_system.fw_info != NULL) {
+        (void)s_system.fw_info(s_system.ctx, &fw);
+    }
+    (void)snprintf(v->version, sizeof(v->version), "%s", fw.version);
+    v->uptime_s = (uint32_t)(esp_timer_get_time() / 1000000);
+
+    /* No net adapter yet (tasklist L5), so the screen says so rather than
+     * showing a plausible address that is not there. */
+    v->net_up = false;
+    (void)snprintf(v->hostname, sizeof(v->hostname), "%s", "no wifi adapter");
+    (void)snprintf(v->ip, sizeof(v->ip), "%s", "-");
+}
+
+static void hmi_task(void *arg)
+{
+    (void)arg;
+    kiln_hmi_init(&s_hmi, s_app.cfg.dim_timeout_s);
+
+    const TickType_t period = pdMS_TO_TICKS(20);     /* 50 Hz input poll */
+    TickType_t       last   = xTaskGetTickCount();
+    uint32_t         since_draw_ms = 0;
+
+    for (;;) {
+        const kiln_input_event_t ev =
+            (s_input_port.poll != NULL) ? s_input_port.poll(s_input_port.ctx)
+                                        : KILN_INPUT_NONE;
+
+        kiln_hmi_view_t view;
+        hmi_build_view(&view);
+
+        const kiln_hmi_action_t a = kiln_hmi_update(&s_hmi, &view, ev, 20);
+        if (a.kind != KILN_HMI_ACT_NONE) {
+            hmi_apply(&a);
+        }
+
+        since_draw_ms += 20u;
+        if (kiln_hmi_dirty(&s_hmi) || since_draw_ms >= 250u) {
+            since_draw_ms = 0;
+            if (s_display_port.present != NULL) {
+                /* FR-HMI-14: a display that stops acknowledging is a warning,
+                 * not a reason to stop controlling a kiln. */
+                (void)s_display_port.present(s_display_port.ctx,
+                                             kiln_hmi_frame(&s_hmi),
+                                             KILN_DISPLAY_BYTES);
+            }
+            kiln_hmi_clear_dirty(&s_hmi);
+        }
+        vTaskDelayUntil(&last, period);
+    }
+}
+#endif /* !CONFIG_KILN_PLANT_SIM */
+
 extern "C" void app_main(void)
 {
     /* NFR-15 / SR-14 / SR-15: the reset cause decides whether an interrupted
@@ -435,7 +552,6 @@ extern "C" void app_main(void)
     ports.current  = &s_sim_ports.current;
     ports.counters = &s_sim_ports.counters;
     ports.door     = &s_sim_ports.door;        /* SR-31 */
-    ports.phase    = &s_sim_ports.phase;       /* HR-22 */
 
     /* Programs and run records.  RAM, until LittleFS is vendored -- see the note
      * on kiln_sim_fs_t. */
@@ -446,7 +562,70 @@ extern "C" void app_main(void)
     ESP_LOGW(TAG, "SIMULATED PLANT: no hardware output is driven. "
                   "time acceleration %gx", (double)TIME_ACCEL);
 #else
-#error "No hardware adapters yet: build with CONFIG_KILN_PLANT_SIM (see sdkconfig.qemu)."
+    /* --- real hardware (M2 / M4b) --------------------------------------
+     *
+     * The composition root, and the only place that binds a port to a concrete
+     * adapter (architecture 5.3).  Pins come from board_pins.h and appear
+     * nowhere else (HR-10).
+     *
+     * Order matters once: the heat adapter puts every output in its safe state,
+     * so it is bound before anything can ask for heat (SR-21, NFR-09). */
+    kiln_hal_heat_init(&s_heat_port);
+    ports.heat = &s_heat_port;
+
+    /* Two MAX31856 on one bus with separate chip selects (HR-02).  The chamber
+     * is required; the enclosure is optional, and SR-11 stands down without it
+     * rather than refusing to run. */
+    if (kiln_hal_tc_init(0, &s_tc_port) == KILN_OK) {
+        ports.tc = &s_tc_port;
+    } else {
+        ESP_LOGE(TAG, "chamber thermocouple front end did not answer");
+    }
+    if (kiln_hal_tc_init(1, &s_case_tc_port) == KILN_OK) {
+        ports.case_tc = &s_case_tc_port;
+    } else {
+        ESP_LOGW(TAG, "no enclosure front end: SR-11 stands down");
+    }
+
+    /* FR-CUR-12 refuses to start a run when this is unavailable unless
+     * monitoring has been explicitly disabled, so a failure here is reported
+     * loudly rather than folded into a warning. */
+    if (kiln_hal_current_init(&s_current_port) == KILN_OK) {
+        ports.current = &s_current_port;
+    } else {
+        ESP_LOGE(TAG, "current front end unavailable: runs will be refused "
+                      "unless current monitoring is disabled (FR-CUR-12)");
+    }
+
+    if (kiln_hal_counters_init(&s_counters_port) == KILN_OK) {
+        ports.counters = &s_counters_port;
+    }
+
+    /* SR-31.  Whether a switch is actually fitted is an installation fact the
+     * board cannot read, so it is told: true here, and tasklist G4 moves it to
+     * a configuration item.  Passing true on a kiln with no switch fitted and
+     * J9 left open means the coil never closes, which is safe and extremely
+     * visible; passing false suppresses the rule and raises warning 113. */
+    kiln_hal_door_init(&s_door_port, true);
+    ports.door = &s_door_port;
+
+    kiln_hal_alarm_init(&s_alarm_hw_port);
+    ports.alarm = &s_alarm_hw_port;
+
+    /* HR-04 and HR-05.  The display is bound even when the panel did not
+     * answer: FR-HMI-14 keeps the kiln running without one, and available()
+     * is how warning 104 gets raised rather than inferred. */
+    (void)kiln_hal_display_init(&s_display_port);
+    (void)kiln_hal_input_init(&s_input_port);
+
+    /* Programs and run records have nowhere to go until LittleFS is vendored
+     * (tasklist E7), so they are absent rather than wrong: kiln_app treats a
+     * missing filestore as "no stored programs", which is true. */
+    ESP_LOGW(TAG, "no file store: programs and run records will not persist "
+                  "until LittleFS is vendored (E7)");
+
+    ESP_LOGW(TAG, "REAL HARDWARE: outputs are live. Fit the independent "
+                  "over-temperature cutout (HR-13) before firing.");
 #endif
 
     kiln_config_t cfg;
@@ -509,6 +688,13 @@ extern "C" void app_main(void)
     xTaskCreatePinnedToCore(safety_task,  "safety",  3072, NULL, 20, NULL, 1);
     xTaskCreatePinnedToCore(acquire_task, "acquire", 3072, NULL, 19, NULL, 1);
     xTaskCreatePinnedToCore(control_task, "control", 4096, NULL, 18, NULL, 1);
+
+#ifndef CONFIG_KILN_PLANT_SIM
+    /* AD-15: the UI lives on core 0, where it cannot contend with control or
+     * safety.  Low priority: FR-HMI-14 says the display is the least important
+     * thing in the box. */
+    xTaskCreatePinnedToCore(hmi_task, "hmi", 4096, NULL, 4, NULL, 0);
+#endif
 
     /* As uc above.  This one additionally had its designators out of
       * declaration order, which C99 permitted and C++20 does not. */

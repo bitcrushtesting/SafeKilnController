@@ -110,7 +110,6 @@ Fault injection, each toggling:
 | `0` | Lid opened mid-firing, the *thermal* model: heat loss, no switch | `SR-07` |
 | `d` | Door interlock switch reads open | `SR-31` |
 | `D` | No door interlock fitted | warning 113 |
-| `P` | Toggle the 1 / 3 phase strap | `HR-22`, warning 114 |
 | `x` | Clear every injection | |
 
 Try `3` then `7` together during a firing: the contactor is welded shut *and* the

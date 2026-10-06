@@ -10,9 +10,9 @@ An open-source PID controller for electric ceramic and glass kilns, built on the
 
 - **Simple local display**: a 128×64 OLED showing current and target temperature at a glance, plus state, segment progress and rate of rise.
 - **Web interface**: served by the device itself. Live dashboard, charts of the logged data, power and energy, and a firing-curve editor. **Observation only**: nothing reachable over the network can start a firing, heat the kiln or change its configuration. Those live on the device.
-- **Three-phase aware**: a strap selects 1 or 3 phase, with one current transformer per phase, so a failed element on any phase is caught electrically in seconds rather than inferred from temperature.
 - **PID with automatic tuning**: relay (Åström–Hägglund) autotune on the real kiln; no manual gain hunting.
 - **Safety first**: thermal runaway, thermocouple failure, shorted-SSR, over-temperature and door-interlock detection, with a safety supervisor that has sole authority over a heat-enable line that decays unless actively refreshed.
+- **Current monitoring**: a current transformer turns relay and element failures from slow thermal inferences into fast electrical facts, with the thermal rules retained as an independent backstop.
 - **Self-contained**: no SD card, no external database, no cloud. Logs live in a circular partition on internal flash; web assets are embedded in the firmware.
 - **Designed for testability**: all decision logic is hardware-free C++ that runs on a development host against a simulated kiln.
 
@@ -78,6 +78,14 @@ hardware/   schematic, PCB, pin map
 housing/    enclosure
 ```
 
+## Scope
+
+KilnControl supports **single-phase kilns only**. A three-phase kiln can be
+monitored on one representative phase, but a fault confined to one of the other
+two would be caught only by the thermal rules, slowly, and the power and energy
+figures would cover a third of the load. Neither is a safe basis for firing a
+three-phase kiln, so it is out of scope rather than partially supported.
+
 ## Hardware at a glance
 
 | Part | Choice |
@@ -87,7 +95,7 @@ housing/    enclosure
 | Display | 128×64 monochrome OLED, I²C |
 | Input | Rotary encoder with push button |
 | Output | Zero-cross SSR in series with a safety contactor |
-| Phases | Strap-selected 1 or 3 phase, one current transformer per phase |
+| Supply | **Single phase only.** One current transformer on the heater conductor |
 | Door interlock | Optional normally-closed switch, stops the heater immediately when the door opens |
 | Connectivity | WiFi station with access-point fallback, `kiln.local` via mDNS |
 

@@ -20,6 +20,7 @@ build-*/
 coverage/
 sdkconfig
 sdkconfig.old
+sdkconfig.hw
 managed_components/
 dependencies.lock
 *.o
