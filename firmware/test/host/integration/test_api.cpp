@@ -116,6 +116,61 @@ static void rig_run(rig_t *r, double seconds)
     }
 }
 
+/* FR-WEB-26: the web interface cannot start a firing, heat the kiln, change
+ * configuration or acknowledge a fault, so a test that needs any of those sets
+ * it up the way the local HMI does -- through kiln_app, not over HTTP.  That is
+ * not a workaround for the restriction; it is the restriction, expressed as the
+ * only remaining way to reach those commands.
+ */
+static void local_start(rig_t *r, uint8_t program_id)
+{
+    kiln_program_t prog;
+    CHECK_OK(kiln_program_store_get_slot(&r->fs_port, program_id, &prog));
+    CHECK_OK(kiln_app_start(&r->app, &prog));
+}
+
+static void local_tune(rig_t *r, float setpoint_c)
+{
+    CHECK_OK(kiln_app_autotune(&r->app, setpoint_c));
+}
+
+static void local_manual(rig_t *r, uint16_t permille)
+{
+    CHECK_OK(kiln_app_manual(&r->app, permille));
+}
+
+/* Apply one configuration change locally, by name, through the same model the
+ * API projection reads. */
+static kiln_err_t local_set_cfg_str(rig_t *r, const char *key, const char *value)
+{
+    kiln_config_t c = r->app.cfg;
+    const kiln_cfg_item_t *it = kiln_config_find(key);
+    if (it == NULL) {
+        return KILN_ERR_NOT_FOUND;
+    }
+    const kiln_err_t e = kiln_config_set_str(&c, it, value);
+    if (e != KILN_OK) {
+        return e;
+    }
+    const kiln_cfg_item_t *bad = NULL;
+    return kiln_app_apply_config(&r->app, &c, &bad);
+}
+
+static kiln_err_t local_set_cfg(rig_t *r, const char *key, double value)
+{
+    kiln_config_t c = r->app.cfg;
+    const kiln_cfg_item_t *it = kiln_config_find(key);
+    if (it == NULL) {
+        return KILN_ERR_NOT_FOUND;
+    }
+    const kiln_err_t e = kiln_config_set_num(&c, it, value);
+    if (e != KILN_OK) {
+        return e;
+    }
+    const kiln_cfg_item_t *bad = NULL;
+    return kiln_app_apply_config(&r->app, &c, &bad);
+}
+
 /* One request.  Always authenticated unless a test says otherwise, because
  * FR-WEB-23 is tested on its own and every other test is about the handler. */
 static kiln_api_resp_t call(rig_t *r, kiln_http_method_t m, const char *path,
@@ -135,6 +190,18 @@ static kiln_api_resp_t call(rig_t *r, kiln_http_method_t m, const char *path,
     (void)kiln_api_handle(&r->api, &req, &resp);
     return resp;
 }
+
+/* Every route the web interface may no longer reach, so the restriction is
+ * asserted in one place rather than re-derived per test. */
+static void expect_read_only(rig_t *r, kiln_http_method_t m, const char *path,
+                             const char *body)
+{
+    const kiln_api_resp_t resp = call(r, m, path, NULL, body);
+    CHECK_EQ_INT(resp.status, 403);
+    CHECK_MSG(strstr(resp.body, "read_only") != NULL,
+              "%s must be refused as read_only, got: %s", path, resp.body);
+}
+
 
 /* Parse the response and return the token array, so assertions read as JSON
  * rather than as substring searches.
@@ -302,8 +369,7 @@ KILN_TEST(frcfg07_a_secret_is_never_returned_only_whether_it_is_set)
     static rig_t r;
     rig_init(&r);
 
-    CHECK_EQ_INT(call(&r, KILN_HTTP_PUT, "/api/config", NULL,
-                      "{\"security.web_password\":\"hunter2\"}").status, 200);
+    CHECK_OK(local_set_cfg_str(&r, "security.web_password", "hunter2"));
 
     const kiln_api_resp_t resp = call(&r, KILN_HTTP_GET, "/api/config", NULL, NULL);
     /* The one assertion that matters: the password is not in the response at
@@ -334,60 +400,52 @@ KILN_TEST(frcfg07_a_secret_is_never_returned_only_whether_it_is_set)
     CHECK(found);
 }
 
-KILN_TEST(frcfg03_a_write_is_atomic_and_names_the_offending_item)
+KILN_TEST(frweb26_configuration_cannot_be_written_over_the_api)
 {
+    /* The configured maximum temperature and the safety thresholds live here,
+     * so this is "adjusting the temperature" by the most direct route there is.
+     * FR-CFG-03's atomicity and FR-CFG-08's locking are properties of the
+     * config model and are tested in test_configmodel; what is tested here is
+     * that neither is reachable from the network. */
     static rig_t r;
     rig_init(&r);
-    const float before_holdback = r.app.cfg.holdback_band_c;
+    const float before = r.app.cfg.max_temp_c;
 
-    /* One good change and one impossible one in the same body. */
-    const kiln_api_resp_t resp = call(&r, KILN_HTTP_PUT, "/api/config", NULL,
-        "{\"control.holdback_band_c\":40,\"safety.max_temp_c\":9000}");
-    expect_error(resp, 400, "out_of_range");
-    CHECK_MSG(strstr(resp.body, "safety.max_temp_c") != NULL,
-              "the message did not name the item: %.200s", resp.body);
+    expect_read_only(&r, KILN_HTTP_PUT, "/api/config",
+                     "{\"safety.max_temp_c\":1100}");
+    expect_read_only(&r, KILN_HTTP_POST, "/api/config/defaults", NULL);
+    CHECK_NEAR(r.app.cfg.max_temp_c, before, 0.01f);
 
-    /* Neither change landed, which is what atomic means. */
-    CHECK_NEAR(r.app.cfg.holdback_band_c, before_holdback, 0.001f);
-    CHECK_NEAR(r.app.cfg.max_temp_c, 1280.0f, 0.01f);
+    /* Still fully readable, which is what the settings screen needs. */
+    CHECK_EQ_INT(call(&r, KILN_HTTP_GET, "/api/config", NULL, NULL).status, 200);
 }
 
-KILN_TEST(frcfg08_a_safety_item_is_refused_while_running_and_says_which)
+KILN_TEST(frcfg08_a_safety_item_is_still_refused_while_running_locally)
 {
+    /* The restriction did not move with the interface: applying config at the
+     * kiln is bounded by FR-CFG-08 exactly as it was through the API. */
     static rig_t r;
     rig_init(&r);
     rig_run(&r, 2.0);
-    CHECK_EQ_INT(call(&r, KILN_HTTP_POST, "/api/run", NULL,
-                      "{\"program_id\":1}").status, 200);
+    local_start(&r, 1);
 
-    const kiln_api_resp_t resp = call(&r, KILN_HTTP_PUT, "/api/config", NULL,
-                                      "{\"safety.max_temp_c\":1100}");
-    expect_error(resp, 409, "locked_while_running");
-    CHECK(strstr(resp.body, "safety.max_temp_c") != NULL);
-
-    /* Something not safety-relevant still applies, or nothing would be editable
-     * during the many hours a firing takes. */
-    CHECK_EQ_INT(call(&r, KILN_HTTP_PUT, "/api/config", NULL,
-                      "{\"hmi.dim_timeout_s\":120}").status, 200);
+    CHECK_ERR(local_set_cfg(&r, "safety.max_temp_c", 1100.0), KILN_ERR_STATE);
+    CHECK_OK(local_set_cfg(&r, "hmi.dim_timeout_s", 120.0));
 }
 
-KILN_TEST(an_unknown_configuration_key_is_rejected_by_name)
+KILN_TEST(an_unknown_configuration_key_is_not_found)
 {
     static rig_t r;
     rig_init(&r);
-    const kiln_api_resp_t resp = call(&r, KILN_HTTP_PUT, "/api/config", NULL,
-                                      "{\"safety.make_it_hotter\":1}");
-    expect_error(resp, 400, "unknown_item");
-    CHECK(strstr(resp.body, "safety.make_it_hotter") != NULL);
+    CHECK_ERR(local_set_cfg(&r, "safety.make_it_hotter", 1.0), KILN_ERR_NOT_FOUND);
 }
 
-KILN_TEST(frcfg05_configuration_written_through_the_api_is_persisted)
+KILN_TEST(frcfg05_configuration_written_locally_is_persisted)
 {
     static rig_t r;
     rig_init(&r);
     const uint32_t sets = r.kv.sets;
-    CHECK_EQ_INT(call(&r, KILN_HTTP_PUT, "/api/config", NULL,
-                      "{\"log.interval_s\":42}").status, 200);
+    CHECK_OK(local_set_cfg(&r, "log.interval_s", 42.0));
     CHECK(r.kv.sets > sets);
 
     kiln_config_t stored;
@@ -541,35 +599,38 @@ KILN_TEST(a_malformed_program_body_is_rejected_with_a_useful_message)
 
 /* --- run control (FR-RUN) ---------------------------------------------- */
 
-KILN_TEST(frrun_the_whole_run_lifecycle_goes_through_the_api)
+KILN_TEST(frweb26_run_control_is_not_reachable_from_the_api)
 {
+    /* FR-WEB-26.  The lifecycle itself is unchanged and still tested -- at the
+     * app layer, in test_integration -- but no part of it is reachable over
+     * HTTP.  Start, pause, resume and abort happen at the kiln. */
     static rig_t r;
     rig_init(&r);
     rig_run(&r, 2.0);
 
-    CHECK_EQ_INT(call(&r, KILN_HTTP_POST, "/api/run", NULL,
-                      "{\"program_id\":1}").status, 200);
+    expect_read_only(&r, KILN_HTTP_POST, "/api/run", "{\"program_id\":1}");
+    CHECK_MSG(r.app.state == KILN_STATE_IDLE, "the refusal must not have started anything");
+
+    local_start(&r, 1);
     CHECK_EQ_INT(r.app.state, KILN_STATE_RUNNING);
     rig_run(&r, 5.0);
 
-    CHECK_EQ_INT(call(&r, KILN_HTTP_POST, "/api/run/pause", NULL, NULL).status, 200);
-    CHECK_EQ_INT(r.app.state, KILN_STATE_PAUSED);
-    CHECK_EQ_INT(call(&r, KILN_HTTP_POST, "/api/run/resume", NULL, NULL).status, 200);
-    CHECK_EQ_INT(r.app.state, KILN_STATE_RUNNING);
-    CHECK_EQ_INT(call(&r, KILN_HTTP_POST, "/api/run/abort", NULL, NULL).status, 200);
-    CHECK_EQ_INT(r.app.state, KILN_STATE_IDLE);
+    /* Running, and still unreachable. */
+    expect_read_only(&r, KILN_HTTP_POST, "/api/run/pause",  NULL);
+    expect_read_only(&r, KILN_HTTP_POST, "/api/run/resume", NULL);
+    expect_read_only(&r, KILN_HTTP_POST, "/api/run/abort",  NULL);
+    expect_read_only(&r, KILN_HTTP_PATCH, "/api/run/segments", "{\"segments\":[]}");
+    CHECK_MSG(r.app.state == KILN_STATE_RUNNING,
+              "a refused request must not have changed the run");
 
-    /* And the refusals carry a reason the operator can act on. */
-    expect_error(call(&r, KILN_HTTP_POST, "/api/run/pause", NULL, NULL),
-                 409, "not_allowed_now");
-    expect_error(call(&r, KILN_HTTP_POST, "/api/run", NULL, "{\"program_id\":99}"),
-                 404, "not_found");
-    expect_error(call(&r, KILN_HTTP_POST, "/api/run", NULL, "{}"),
-                 400, "invalid_request");
+    /* Reading the run is still exactly as available as it was. */
+    CHECK_EQ_INT(call(&r, KILN_HTTP_GET, "/api/status", NULL, NULL).status, 200);
 }
 
-KILN_TEST(frrun10_a_latched_fault_blocks_a_start_and_the_message_says_why)
+KILN_TEST(frweb26_a_latched_fault_cannot_be_acknowledged_over_the_api)
 {
+    /* SR-17 and FR-WEB-26 pull the same way: clearing a fault re-arms a kiln
+     * that has already failed, and the operator should be in front of it. */
     static rig_t r;
     rig_init(&r);
     rig_run(&r, 2.0);
@@ -579,20 +640,18 @@ KILN_TEST(frrun10_a_latched_fault_blocks_a_start_and_the_message_says_why)
     }
     CHECK(r.app.fault != KILN_FAULT_NONE);
 
-    const kiln_api_resp_t resp = call(&r, KILN_HTTP_POST, "/api/run", NULL,
-                                      "{\"program_id\":1}");
-    expect_error(resp, 409, "not_allowed_now");
-    CHECK_MSG(strstr(resp.body, "fault") != NULL,
-              "the message did not mention the fault: %.200s", resp.body);
+    expect_read_only(&r, KILN_HTTP_POST, "/api/fault/ack", NULL);
+    CHECK_MSG(r.app.fault != KILN_FAULT_NONE, "the fault must still be latched");
 
-    /* SR-18: the acknowledgement is refused while the condition holds, and says
-     * what the condition is. */
-    const kiln_api_resp_t ack = call(&r, KILN_HTTP_POST, "/api/fault/ack", NULL, NULL);
-    expect_error(ack, 409, "still_faulted");
+    /* The fault is still *readable*, which is what the FR-WEB-24 banner needs. */
+    const kiln_api_resp_t st = call(&r, KILN_HTTP_GET, "/api/status", NULL, NULL);
+    CHECK_EQ_INT(st.status, 200);
+    CHECK(strstr(st.body, "fault") != NULL);
 
+    /* And it clears locally, once the condition has gone (SR-18). */
     kiln_sim_clear(&r.sim, KILN_INJ_TC_OPEN);
     rig_run(&r, 1.0);
-    CHECK_EQ_INT(call(&r, KILN_HTTP_POST, "/api/fault/ack", NULL, NULL).status, 200);
+    CHECK_OK(kiln_app_clear_fault(&r.app));
     CHECK_EQ_INT(r.app.fault, KILN_FAULT_NONE);
 }
 
@@ -620,36 +679,40 @@ KILN_TEST(frweb24_the_banner_data_carries_the_operator_text)
     CHECK(strlen(msg) > 30);
 }
 
-KILN_TEST(frprg10_only_unstarted_segments_can_be_patched)
+KILN_TEST(frweb26_the_running_program_cannot_be_edited_from_the_api)
 {
+    /* FR-PRG-10 let the remaining segments of a running program be adjusted.
+     * That is "adjust the temperature" of a kiln that is already hot, so it is
+     * withdrawn from the web with the rest of run control. */
     static rig_t r;
     rig_init(&r);
     rig_run(&r, 2.0);
-    CHECK_EQ_INT(call(&r, KILN_HTTP_POST, "/api/run", NULL,
-                      "{\"program_id\":1}").status, 200);
+    local_start(&r, 1);
     rig_run(&r, 5.0);
 
-    /* Changing the running segment is refused. */
-    const kiln_api_resp_t bad = call(&r, KILN_HTTP_PATCH, "/api/run/segments", NULL,
+    expect_read_only(&r, KILN_HTTP_PATCH, "/api/run/segments",
         "{\"name\":\"Glaze cone 6\",\"segments\":[{\"target_c\":999,\"rate_c_per_h\":100}]}");
-    expect_error(bad, 409, "not_allowed_now");
+    CHECK_EQ_INT(r.app.state, KILN_STATE_RUNNING);
 }
 
-KILN_TEST(frctl14_manual_mode_is_bounded)
+KILN_TEST(frweb26_manual_heating_is_not_reachable_from_the_api)
 {
+    /* Manual mode puts duty straight into the elements; it is the most direct
+     * "make the kiln hot" there is.  The bounding of FR-CTL-14 is unchanged and
+     * tested at the app layer -- it is simply no longer reachable from here. */
     static rig_t r;
     rig_init(&r);
     rig_run(&r, 2.0);
 
-    CHECK_EQ_INT(call(&r, KILN_HTTP_POST, "/api/manual", NULL,
-                      "{\"duty_permille\":400}").status, 200);
+    expect_read_only(&r, KILN_HTTP_POST, "/api/manual", "{\"duty_permille\":400}");
+    CHECK_MSG(r.app.state == KILN_STATE_IDLE, "the refusal must not have started heating");
+    CHECK_EQ_UINT(r.app.duty_manual, 0u);
+
+    /* Locally it still works, and is still bounded. */
+    local_manual(&r, 400);
     CHECK_EQ_INT(r.app.state, KILN_STATE_MANUAL);
     CHECK_EQ_UINT(r.app.duty_manual, 400u);
-
-    expect_error(call(&r, KILN_HTTP_POST, "/api/manual", NULL,
-                       "{\"duty_permille\":5000}"), 400, "out_of_range");
-    expect_error(call(&r, KILN_HTTP_POST, "/api/manual", NULL, "{}"),
-                 400, "invalid_request");
+    CHECK_ERR(kiln_app_manual(&r.app, 5000u), KILN_ERR_RANGE);
 }
 
 /* --- tuning (FR-TUN-09, FR-TUN-10) ------------------------------------- */
@@ -660,9 +723,7 @@ KILN_TEST(frtun10_tuning_progress_and_candidates_are_exposed)
     rig_init(&r);
     rig_run(&r, 2.0);
 
-    const kiln_api_resp_t started = call(&r, KILN_HTTP_POST, "/api/tune", NULL,
-                                         "{\"setpoint_c\":600}");
-    CHECK_EQ_INT(started.status, 200);
+    local_tune(&r, 600.0f);
     CHECK_EQ_INT(r.app.state, KILN_STATE_AUTOTUNE);
 
     const kiln_api_resp_t resp = call(&r, KILN_HTTP_GET, "/api/tune", NULL, NULL);
@@ -676,29 +737,32 @@ KILN_TEST(frtun10_tuning_progress_and_candidates_are_exposed)
 
     /* FR-TUN-09: nothing is stored until a rule is accepted, so accepting with
      * no result is refused rather than writing zeros over the gains. */
-    expect_error(call(&r, KILN_HTTP_POST, "/api/tune/accept", NULL,
-                       "{\"rule\":\"tyreus-luyben\"}"), 409, "no_result");
-
-    CHECK_EQ_INT(call(&r, KILN_HTTP_POST, "/api/tune/cancel", NULL, NULL).status, 200);
+    /* Accepting a gain set and cancelling are both commands, so both are gone
+     * from the API even while the tune itself remains readable. */
+    expect_read_only(&r, KILN_HTTP_POST, "/api/tune/accept", "{\"rule\":\"tyreus-luyben\"}");
+    expect_read_only(&r, KILN_HTTP_POST, "/api/tune/cancel", NULL);
 }
 
-KILN_TEST(sr23_a_tuning_setpoint_above_the_maximum_is_clamped_and_says_so)
+KILN_TEST(frweb26_autotune_cannot_be_started_from_the_api)
 {
+    /* Autotune drives the kiln through relay oscillation at its setpoint: it is
+     * firing by another name, so it goes the same way as /api/run. */
     static rig_t r;
     rig_init(&r);
     rig_run(&r, 2.0);
 
-    const kiln_api_resp_t resp = call(&r, KILN_HTTP_POST, "/api/tune", NULL,
-                                      "{\"setpoint_c\":5000}");
-    CHECK_EQ_INT(resp.status, 200);
-    const int n = parse_resp(&resp);
+    expect_read_only(&r, KILN_HTTP_POST, "/api/tune", "{\"setpoint_c\":600}");
+    expect_read_only(&r, KILN_HTTP_POST, "/api/tune/accept", NULL);
+    expect_read_only(&r, KILN_HTTP_POST, "/api/tune/cancel", NULL);
+    CHECK_MSG(r.app.state == KILN_STATE_IDLE, "the refusal must not have started tuning");
 
-    /* Running, but not where it was asked to: silently tuning somewhere else
-     * would be worse than refusing. */
-    bool clamped = false;
-    CHECK(kiln_json_get_bool(resp.body, g_toks, n, 0, "clamped", &clamped));
-    CHECK(clamped);
-    CHECK_NEAR(num_of(&resp, n, "setpoint_c"), 1280.0, 0.5);
+    /* SR-23 is a property of the command, not of the transport, and still
+     * holds on the path that remains.  KILN_ERR_RANGE here means "running, but
+     * clamped below what was asked" -- the tune starts at the configured
+     * maximum and says so, rather than silently tuning somewhere else. */
+    CHECK_ERR(kiln_app_autotune(&r.app, 5000.0f), KILN_ERR_RANGE);
+    CHECK_EQ_INT(r.app.state, KILN_STATE_AUTOTUNE);
+    CHECK_NEAR(r.app.tune.cfg.setpoint_c, 1280.0f, 0.5f);
 }
 
 /* --- current, storage, runs -------------------------------------------- */
@@ -708,8 +772,7 @@ KILN_TEST(frcur_the_current_endpoint_reports_measurement_and_wear)
     static rig_t r;
     rig_init(&r);
     rig_run(&r, 2.0);
-    CHECK_EQ_INT(call(&r, KILN_HTTP_POST, "/api/run", NULL,
-                      "{\"program_id\":1}").status, 200);
+    local_start(&r, 1);
     rig_run(&r, 20.0);
 
     const kiln_api_resp_t resp = call(&r, KILN_HTTP_GET, "/api/current", NULL, NULL);
@@ -733,11 +796,9 @@ KILN_TEST(frcur_the_current_endpoint_reports_measurement_and_wear)
     CHECK(kiln_json_find(resp.body, g_toks, n, sw, "contactor_ops") > 0);
     CHECK(kiln_json_find(resp.body, g_toks, n, sw, "ssr_ops") > 0);
 
-    /* FR-CUR-06: calibration needs a real conduction measurement, and refusing
-     * says what is missing. */
-    const kiln_api_resp_t cal = call(&r, KILN_HTTP_POST, "/api/current/calibrate",
-                                     NULL, "{\"known_a\":0}");
-    CHECK_EQ_INT(cal.status, 400);
+    /* FR-WEB-26: the calibration reference feeds SR-28's deviation bands, so it
+     * is set at the kiln.  FR-CUR-06's own refusal is tested in test_current. */
+    expect_read_only(&r, KILN_HTTP_POST, "/api/current/calibrate", "{\"known_a\":0}");
 }
 
 KILN_TEST(frlog15_storage_health_is_reported)
@@ -745,8 +806,7 @@ KILN_TEST(frlog15_storage_health_is_reported)
     static rig_t r;
     rig_init(&r);
     rig_run(&r, 2.0);
-    CHECK_EQ_INT(call(&r, KILN_HTTP_POST, "/api/run", NULL,
-                      "{\"program_id\":1}").status, 200);
+    local_start(&r, 1);
     rig_run(&r, 20.0);
 
     const kiln_api_resp_t resp = call(&r, KILN_HTTP_GET, "/api/storage", NULL, NULL);
@@ -837,7 +897,7 @@ static kiln_api_resp_t stream_log(rig_t *r, const char *query)
 static uint32_t seed_a_run(rig_t *r)
 {
     rig_run(r, 2.0);
-    CHECK_EQ_INT(call(r, KILN_HTTP_POST, "/api/run", NULL, "{\"program_id\":1}").status, 200);
+    local_start(r, 1);
     const uint32_t run_id = r->app.record.run_id;
     rig_run(r, 400.0);
     return run_id;

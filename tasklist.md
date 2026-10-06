@@ -3,30 +3,52 @@ SPDX-FileCopyrightText: 2026 Bitcrush Testing
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-# KilnControl — Task List
+# KilnControl Task List
 
-Derived from a review of `hardware/kilncontrol.kicad_sch` (120 symbols, 58 nets)
-and `firmware/` as of 2026-10-01, against
-[`docs/requirements.md`](docs/requirements.md) and
-[`docs/architecture.md`](docs/architecture.md).
+Outstanding work against [`docs/requirements.md`](docs/requirements.md),
+[`docs/architecture.md`](docs/architecture.md), [`docs/safety.md`](docs/safety.md)
+and [`docs/security.md`](docs/security.md). Started from a review of
+`hardware/kilncontrol.kicad_sch` (120 symbols, 58 nets) on 2026-10-01 and kept
+current since.
 
 Priorities:
 
 | | Meaning |
 |---|---|
-| **P1** | Safety-relevant or blocking. Do before the next board revision / before any firing. |
+| **P1** | Safety-relevant or blocking. Do before the next board revision, and before any firing. |
 | **P2** | Required for a release that claims the requirements are met. |
 | **P3** | Correctness polish, consistency, cleanup. |
 
-Review state: schematic ERC clean apart from one known false positive; design
-review reports 1 error, 3 info. Firmware is `kiln_core` logic plus `kiln_ports`
-headers only — no build system, no tests, no HAL, no app, no web.
+## State, 2026-10-05
+
+| | |
+|---|---|
+| **Firmware** | C++20. 347 host tests green plain and under ASan/UBSan; clang-tidy clean on host and target; `esp32s3` builds with zero warnings; QEMU boots the image and fires. |
+| **Schematic** | ERC clean apart from one known false positive. Does not yet carry the door interlock (`HR-21`), the phase strap (`HR-22`) or the second and third CT inputs (`HR-23`). |
+| **Not started** | `kiln_hmi` (the local display and encoder), the MAX31856/SSD1306/encoder/SSR/CT adapters, LittleFS. |
+| **Blocking release** | No field update path at all (`H2`, `SRR-11`). Local control is the only control and the HMI does not exist (`H3`). |
+
+### Where the open items are
+
+| Section | Area |
+|---|---|
+| [A](#a-schematic) | Schematic and board |
+| [B](#b-firmware) | Firmware defects and gaps |
+| [C](#c-build-test-and-ci-infrastructure) | Build, test and CI |
+| [D](#d-documentation-and-open-questions) | Documentation and open questions |
+| [E](#e-milestone-m5-persist-done-2026-10-04) | Milestone M5, persistence |
+| [F](#f-c20-migration-and-static-analysis-2026-10-05) | C++20 and static analysis |
+| [G](#g-door-interlock-sr-31-2026-10-05) | Door interlock |
+| [H](#h-read-only-web-interface-fr-web-26-2026-10-05) | Read-only web interface |
+| [I](#i-three-phase-measurement-fr-cur-15-2026-10-05) | Three-phase measurement |
+| [J](#j-german-translation-nfr-23-2026-10-05) | German translation |
+| [K](#k-hardware-interlock-chain-in-the-coil-circuit-2026-10-06) | Coil interlock chain |
 
 ---
 
 ## A. Schematic
 
-### A.1 — P1 Blocking electrical defects
+### A.1 Blocking electrical defects (P1)
 
 - [ ] **A1. Add pull-ups to the MAX31856 `~DRDY` and `~FAULT` outputs.** All four
   are open-drain and have no pull-up anywhere in the netlist. `TC1_DRDY`
@@ -36,7 +58,7 @@ headers only — no build system, no tests, no HAL, no app, no web.
   FR-ACQ-10, SR-04.
 
 - [ ] **A2. Decide what `~FAULT` is for.** `TC1_FAULT` and `TC2_FAULT` currently
-  reach only test points TP13/TP14 — the MCU cannot read them, so SR-04 depends
+  reach only test points TP13/TP14, the MCU cannot read them, so SR-04 depends
   entirely on polling the fault register over SPI. Either route both to spare
   GPIOs (IO35–IO41 are unconnected) for interrupt-driven fault detection, or
   drop the test points and record in `hardware/` that fault detection is
@@ -49,14 +71,14 @@ headers only — no build system, no tests, no HAL, no app, no web.
 
 - [ ] **A4. Fix the CT anti-alias filter.** R26 (1 k) + C25 (220 nF) gives
   f<sub>c</sub> ≈ 723 Hz. FR-CUR-03 specifies sampling at ≥ 1 kHz, whose Nyquist
-  frequency is 500 Hz — the filter corner sits *above* Nyquist and does not
+  frequency is 500 Hz, the filter corner sits *above* Nyquist and does not
   anti-alias. Either raise the sample rate (4–8 kHz) and keep a corner near
   300 Hz, or lower the corner to ~200 Hz for a 1 kHz rate. Pick the sample rate
   first, then the filter. HR-17, FR-CUR-03.
 
 - [ ] **A5. Rescale the CT front end for the specified range.** J10 is annotated
   "CT 30A/1V" but FR-CUR-02 requires 0–60 A. At 60 A a 30 A/1 V CT delivers
-  2 V<sub>rms</sub> = ±2.83 V<sub>pk</sub> about the 1.65 V bias, which D9 clamps —
+  2 V<sub>rms</sub> = ±2.83 V<sub>pk</sub> about the 1.65 V bias, which D9 clamps , 
   the reading saturates across the whole upper half of the required range. Even
   at 30 A the swing is 0.24 V to 3.06 V, in the region where the ESP32-S3 ADC is
   least linear. Specify a CT ratio (or add an attenuator) that puts full-scale
@@ -64,7 +86,7 @@ headers only — no build system, no tests, no HAL, no app, no web.
   FR-CUR-02's 0.1 A resolution.
 
 - [ ] **A6. Define `CURR_SENSE` when the CT is absent.** With J10 open there is
-  no DC path to the node — it is held only by C25 and diode leakage, so it
+  no DC path to the node; it is held only by C25 and diode leakage, so it
   drifts. FR-CUR-11 requires distinguishing "CT disconnected" from "genuinely
   zero current", and FR-CUR-12 requires refusing to start a run when monitoring
   is unavailable. Add a defined bias (e.g. a high-value resistor to a level the
@@ -103,7 +125,7 @@ headers only — no build system, no tests, no HAL, no app, no web.
   change the interface to drive an intermediate relay / a higher coil voltage.
   HR-07, SR-03.
 
-### A.2 — P2 Required before fabrication
+### A.2 Required before fabrication (P2)
 
 - [ ] **A10. Add VBUS decoupling.** The design review flags `VBUS` as having no
   decoupling at all. Add 1 µF (USB spec caps bulk VBUS capacitance at 10 µF)
@@ -111,7 +133,7 @@ headers only — no build system, no tests, no HAL, no app, no web.
 
 - [ ] **A11. Record an ERC exclusion for the shared SPI `SDO`.** ERC reports one
   error: U3.11 and U4.11 (`SDO`, both Output) are connected. This is correct for
-  a shared SPI bus — the MAX31856 tri-states `SDO` when `~CS` is high — but the
+  a shared SPI bus, the MAX31856 tri-states `SDO` when `~CS` is high, but the
   project currently carries zero ERC exclusions, so the schematic cannot be
   gated on a clean ERC. Add the exclusion with a comment, and make a clean ERC a
   CI gate.
@@ -124,7 +146,7 @@ headers only — no build system, no tests, no HAL, no app, no web.
   *filtered and protected*. The filtering is there (R4/R5 100 R, C8 10 nF
   differential, C9/C10 100 pF common-mode; same for TC2) but there is no
   clamping. A thermocouple is a multi-metre unshielded pair routed beside a
-  switching multi-kilowatt load — add TVS or clamp diodes to the rails on all
+  switching multi-kilowatt load, add TVS or clamp diodes to the rails on all
   four TC terminals.
 
 - [ ] **A14. Pull up `TC1_CS` and `TC2_CS`.** Both float during reset and boot
@@ -138,7 +160,7 @@ headers only — no build system, no tests, no HAL, no app, no web.
 
 - [ ] **A16. Check the AMS1117's dropout and thermal margin.** Worst case the LDO
   sees USB VBUS at 4.75 V minus D2's forward drop ≈ 4.3 V, against a 1.1–1.3 V
-  dropout at ESP32-S3 WiFi peaks — close to falling out of regulation.
+  dropout at ESP32-S3 WiFi peaks, close to falling out of regulation.
   Dissipation is ~0.5–0.7 W in SOT-223, roughly +40 °C over ambient; with SR-11
   permitting a 70 °C enclosure, the junction has little headroom and the LDO sits
   on the same board as the cold-junction reference. Either move to a low-dropout
@@ -158,7 +180,7 @@ headers only — no build system, no tests, no HAL, no app, no web.
 - [ ] **A19. Put HR-16 on the schematic as a note.** The CT must be a
   voltage-output type with an integral burden resistor; a current-output CT whose
   burden can be disconnected develops dangerous voltages on an open secondary.
-  That is a hard BOM constraint and a safety one — it belongs on the sheet next
+  That is a hard BOM constraint and a safety one, it belongs on the sheet next
   to J10, not only in the requirements. Same for HR-18: state the required CT
   insulation rating, since the CT is the only galvanic isolation in the design.
 
@@ -172,7 +194,7 @@ headers only — no build system, no tests, no HAL, no app, no web.
   exist only as schematic net names; there is no `hardware/pinmap.*` and no
   firmware header. One file per board variant, referenced by both.
 
-### A.3 — P3 Cleanup and layout follow-up
+### A.3 Cleanup and layout follow-up (P3)
 
 - [ ] **A22. Close the J9 designator gap.** Connectors run J1–J8, J10, J11.
   Harmless, but re-annotate or note why.
@@ -195,35 +217,35 @@ Implemented today: `kiln_core` (`pid`, `window`, `tempfilt`, `setpoint`,
 `kiln_ports` interface headers. `kiln_app`, `kiln_hal_esp32s3`, `kiln_hmi`,
 `kiln_sim`, `kiln_web`, `main/` and `test/` are empty directories.
 
-### B.1 — P1 Safety gaps in existing code
+### B.1 Safety gaps in existing code (P1)
 
-- [x] **B1. Implement the current subsystem — SR-25 … SR-30 and FR-CUR are
+- [x] **B1. Implement the current subsystem, SR-25 … SR-30 and FR-CUR are
   entirely absent.** The fault codes (21–26) and warnings (109–112) exist in
   `kiln/types.h` and the operator text exists in `faults.c`, but there is no rule
   anywhere that can raise them. Specifically missing:
-  - `kiln_ports/include/kiln_ports/port_current.h` — gated RMS acquisition
+  - `kiln_ports/include/kiln_ports/port_current.h`: gated RMS acquisition
     (FR-CUR-03/04/05), CT fault status (FR-CUR-11).
-  - `kiln_core/current.{c,h}` — RMS over whole mains cycles, settle delay,
+  - `kiln_core/current.{c,h}`: RMS over whole mains cycles, settle delay,
     window gating, calibration (FR-CUR-02/06), reference current (FR-CUR-08),
     apparent power and energy (FR-CUR-07).
   - Current fields on `kiln_safety_input_t`: `current_a`, `current_ref_a`,
     `current_flags`, commanded on/off window state. The struct currently has
     none, so the rules cannot be written without changing it.
-  - Rules: SR-25 (fail-on), SR-26 (fail-off), SR-27 (weld discrimination — the
+  - Rules: SR-25 (fail-on), SR-26 (fail-off), SR-27 (weld discrimination, the
     de-assert / wait / re-measure sequence, NFR-27's 1 s + 3 s budget), SR-28
     (deviation vs. reference), SR-29 (over-current), SR-30 (wear and
     intermittent-mismatch warnings).
   - Switching-operation counters (FR-CUR-13), persisted.
 
   `kiln_core/include/kiln_core/safety.h` documents itself as covering
-  "SR-04..SR-13", so the omission is deliberate scoping — but requirements §5.2
+  "SR-04..SR-13", so the omission is deliberate scoping, but requirements §5.2
   makes the current rules the *primary* detection of relay and element failure,
   with the thermal rules as backstop. This is architecture milestone **M4b**.
 
 - [x] **B2. Invert the default in `kiln_safety_can_clear`.**
   `firmware/components/kiln_core/src/safety.c` ends its switch with
   `default: return true`, so any fault not explicitly listed is clearable.
-  `KILN_FAULT_CONTACTOR_WELDED` (code 22) falls into that default — the one fault
+  `KILN_FAULT_CONTACTOR_WELDED` (code 22) falls into that default, the one fault
   whose operator instruction is "isolate the kiln at its supply, the controller
   can no longer interrupt the current" (SR-27) is one acknowledgement away from
   being cleared. A fail-safe decision must not fail open. Make the default
@@ -251,14 +273,14 @@ Implemented today: `kiln_core` (`pid`, `window`, `tempfilt`, `setpoint`,
   test) and TR-24 (CI blocking) are all unmet, and the safety rules above are
   exactly the code that must not ship untested. See §C.
 
-### B.2 — P2 Correctness and timing
+### B.2 Correctness and timing (P2)
 
 - [x] **B6. Replace the forward-simulation time estimate.**
   `predict_s` in `setpoint.c` copies the whole `kiln_setpoint_t` (~440 bytes,
   including an embedded `kiln_program_t`) onto the caller's stack and then calls
   `kiln_setpoint_tick` up to `PREDICT_MAX_STEPS` = 720 000 times at 1 s steps.
   `kiln_setpoint_remaining_s` and `kiln_setpoint_segment_remaining_s` are
-  display/API calls (FR-PRG-06, FR-RUN-05) — on the HMI or web task this is a
+  display/API calls (FR-PRG-06, FR-RUN-05), on the HMI or web task this is a
   multi-millisecond-to-worse blocking loop and a large stack spike, against
   NFR-02's 50 ms ceiling for non-safety activity. The arithmetic is closed-form:
   compute it directly, or compute once per segment transition and cache. Keep the
@@ -266,7 +288,7 @@ Implemented today: `kiln_core` (`pid`, `window`, `tempfilt`, `setpoint`,
 
 - [x] **B7. Recompute the rate regression only when the history changes.**
   `kiln_tempfilt_push` calls `regress_rate_per_h` on every push (≥ 4 Hz per
-  FR-ACQ-03), which walks up to 300 samples in `double` arithmetic — software
+  FR-ACQ-03), which walks up to 300 samples in `double` arithmetic, software
   emulated on the ESP32-S3's single-precision FPU. The decimated history only
   changes at 1 Hz, so three of every four passes are pure waste. Move the call
   inside the decimation branch, and consider running sums or `float`. NFR-01,
@@ -285,7 +307,7 @@ Implemented today: `kiln_core` (`pid`, `window`, `tempfilt`, `setpoint`,
   cfg.max_temp_c)`, but `heat_allowed` compares the *unclamped* `s->target_c`
   against `seg_start_c`. With a segment target above the configured maximum, the
   setpoint ramps downward (a cooling ramp) while `heat_allowed` still reports
-  true, so FR-CTL-13's passive cooling does not happen. Clamp in both places —
+  true, so FR-CTL-13's passive cooling does not happen. Clamp in both places , 
   ideally via one shared helper.
 
 - [x] **B10. Validate string termination in `kiln_profile_validate`.**
@@ -298,20 +320,20 @@ Implemented today: `kiln_core` (`pid`, `window`, `tempfilt`, `setpoint`,
 - [x] **B11. Handle `dt_s > 1 s` in the decimation ring.** The
   `while (decim_accum_s >= 1.0f)` loop in `kiln_tempfilt_push` pushes the *same*
   `filt_c` value several times when a cycle overruns, inserting duplicate points
-  at distinct x-positions and flattening the regressed rate — which SR-07 then
+  at distinct x-positions and flattening the regressed rate, which SR-07 then
   reads as "not rising". Either interpolate, or push once and record the gap.
 
 - [x] **B12. Derive the autotune settle test from the filtered rate.**
   `kiln_autotune_tick` computes `rate_per_h` from a single-sample difference:
   `(pv_c - last_pv_c) / dt_s * 3600`. At a 0.25 s cycle, 0.5 °C of sensor noise
-  is 7200 °C/h — against a `settle_rate_c_per_h` threshold of 30. The rate test
+  is 7200 °C/h, against a `settle_rate_c_per_h` threshold of 30. The rate test
   can essentially never pass, so SETTLE always falls through on
   `settle_max_s` (30 min) instead. Feed in `kiln_tempfilt_rate()`, which exists
   for exactly this. FR-TUN.
 
 - [x] **B13. Decouple peak detection from the relay hysteresis.**
   `track_extremes` confirms an extreme only once the PV has reversed by
-  `cfg.hysteresis_c` — the same value that sets the relay band. The confirmed
+  `cfg.hysteresis_c`: the same value that sets the relay band. The confirmed
   extreme is therefore the true peak, but the measured half-amplitude is biased
   low by up to `h`, which biases `Ku = 4d/(πa)` **high** and the resulting gains
   with it. Give peak detection its own threshold, and quantify the residual bias
@@ -328,13 +350,13 @@ Implemented today: `kiln_core` (`pid`, `window`, `tempfilt`, `setpoint`,
   output on `dt_s <= 0`; `kiln_setpoint_tick` and `kiln_autotune_tick` return
   silently; `kiln_window_init`/`recompute` and `clamp_cfg` quietly rewrite
   invalid configuration. NFR-17 calls an unchecked failure in control or safety
-  code a defect. Decide the contract per function — assert, or return
-  `kiln_err_t` — and make the config-correcting paths report what they changed.
+  code a defect. Decide the contract per function, assert, or return
+  `kiln_err_t`: and make the config-correcting paths report what they changed.
 
 - [x] **B16. Finish decimation for an unbounded range.**
   `kiln_decimator_push`'s `bucket_ms == 0` path fills buckets sequentially and
   then silently drops everything once full, so an open-ended query returns the
-  *first* N samples rather than a downsampled view of the run — the comment in
+  *first* N samples rather than a downsampled view of the run, the comment in
   `logrec.c` admits this is out of scope. Either implement pair-folding or make
   an explicit range mandatory at the API boundary and reject the open form.
   FR-LOG-10, FR-LOG-11.
@@ -344,7 +366,7 @@ Implemented today: `kiln_core` (`pid`, `window`, `tempfilt`, `setpoint`,
 
 - [x] **B18. Add the missing ports.** Beyond `port_current.h` (B1):
   OTA / firmware update (FR-UPD), system and reset-cause reporting (NFR-15,
-  SR-14, SR-15), a second SSR channel on `port_heat` (HR-12 — the schematic
+  SR-14, SR-15), a second SSR channel on `port_heat` (HR-12, the schematic
   already wires `SSR2` to IO5 and J7, but `set_duty` is single-channel), and the
   relay switching counters of FR-CUR-13.
 
@@ -357,13 +379,13 @@ Implemented today: `kiln_core` (`pid`, `window`, `tempfilt`, `setpoint`,
   `k_examples` in `profile.c` are never run through `kiln_profile_validate`.
   "Glass fuse (full)" segment 3 uses `rate_c_per_h = 999` and segment 2 uses
   `rate = 0`; peak target across the examples is 1222 °C against a default
-  `max_temp_c` of 1280 °C. All appear valid — assert it, so an edit cannot ship a
+  `max_temp_c` of 1280 °C. All appear valid, assert it, so an edit cannot ship a
   built-in program the validator rejects. FR-PRG-09.
 
-### B.3 — P3 Polish
+### B.3 Polish (P3)
 
 - [x] **B21. Remove or implement `KILN_TUNE_IDENTIFY`.** The phase is declared,
-  has a label string, and is never entered — qualification happens inline in
+  has a label string, and is never entered, qualification happens inline in
   `KILN_TUNE_RELAY`.
 
 - [x] **B22. Document the limits of `kiln_pid_bumpless`.** It back-calculates
@@ -386,7 +408,7 @@ Implemented today: `kiln_core` (`pid`, `window`, `tempfilt`, `setpoint`,
 - [x] **B25. Align `kiln_logrec_decode` with its documentation.** The header says
   it "returns `KILN_ERR_CORRUPT` on a bad CRC or an all-0xFF (erased, or torn)
   slot"; the code returns `KILN_ERR_NOT_FOUND` for erased. The distinction is
-  useful — fix the comment, not the code.
+  useful, fix the comment, not the code.
 
 - [x] **B26. Fix the stale record size in `port_logstore.h`.** The file header
   says "fixed 16 byte records"; `KILN_LOG_RECORD_BYTES` is 20 (AD-18, after
@@ -412,7 +434,7 @@ Implemented today: `kiln_core` (`pid`, `window`, `tempfilt`, `setpoint`,
     `KILN_RATE_MAX_POINTS` (samples); they are equal only because decimation is
     1 Hz. Introduce a seconds constant.
 
-### B.4 — Implementation notes, 2026-10-04
+### B.4 Implementation notes (2026-10-04)
 
 All of §B is implemented. `kiln_core` gains `current`, `configmodel` and
 `runstate`; `kiln_ports` gains `port_current`, `port_counters`, `port_system` and
@@ -428,7 +450,7 @@ They are recorded here rather than silently absorbed.
 - **FR-CUR-08's reference was a hole straight through SR-26.** "The median
   conduction current measured while the elements are cold and fully on" is
   *exactly* the condition a kiln with a failed SSR, an open contactor or dead
-  elements is also in — so the reference learned the fault current, SR-26's
+  elements is also in, so the reference learned the fault current, SR-26's
   threshold of 20 % of it sat below the noise floor, and the rule compared no
   current against a reference of no current and concluded all was well. Measured
   in the integration rig: SR-26 never fired. `kiln_current` now rejects a median
@@ -440,7 +462,7 @@ They are recorded here rather than silently absorbed.
   *instantaneous* 5 °C fall from a running maximum while duty was above 50 %. A
   plant with transport lag and imperfect gains overshoots and then coasts down
   several degrees while the controller is already pushing duty back up, which the
-  rule read as a reversed probe — it aborted an otherwise clean firing in the
+  rule read as a reversed probe, it aborted an otherwise clean firing in the
   integration suite. Added `reversed_confirm_s` (default 30 s): the drop must
   persist. A genuinely reversed couple falls monotonically and does not come back,
   so the confirmation costs it nothing. **Worth reviewing against SR-05's intent.**
@@ -448,7 +470,7 @@ They are recorded here rather than silently absorbed.
 - **B13's stated rationale is backwards.** The tasklist says confirming an extreme
   on a reversal of `hysteresis_c` biases the half-amplitude low and therefore `Ku`
   high. Measured: the value recorded is the extreme itself, not the value that
-  confirmed it, so on a clean oscillation there is *no* bias at any threshold —
+  confirmed it, so on a clean oscillation there is *no* bias at any threshold , 
   `Ku` comes out exact. What the threshold actually buys is noise immunity, and it
   is not optional: at 0.5 °C of sensor noise a 0.25 °C threshold lets noise
   manufacture extrema and the procedure fails on its timeout having learned
@@ -466,11 +488,11 @@ They are recorded here rather than silently absorbed.
 
 Still open and deliberately not done here: `FR-CUR-13`'s counters are accumulated
 and exposed but not yet *persisted*, because that needs the `port_counters`
-adapter from §C; and `OQ-06` (one CT or three) is still open — `kiln_current_t` is
+adapter from §C; and `OQ-06` (one CT or three) is still open, `kiln_current_t` is
 one channel so a second and third are additive, per architecture §16, but D1
 should settle it before the component is frozen.
 
-### B.5 — Found while building the CI, 2026-10-04
+### B.5 Found while building the CI (2026-10-04)
 
 Driving the real image end to end (§C8) turned up two more defects, both now
 fixed, and one open question.
@@ -478,7 +500,7 @@ fixed, and one open question.
 - **The charge-pump decay must not be accelerated.** `AD-05`'s pump is hardware
   with a real 1 s time constant, but the simulator integrates in accelerated
   seconds, so under `CONFIG_KILN_SIM_TIME_ACCEL` it expired between two safety
-  refreshes 100 ms apart and dropped the contactor continuously — which then
+  refreshes 100 ms apart and dropped the contactor continuously, which then
   reads, entirely correctly, as no heater current and latches `SR-26` within
   seconds of starting a firing. `main.c` now scales it. The general rule, worth
   remembering for anything else added to the simulator: a time constant that
@@ -499,7 +521,7 @@ fixed, and one open question.
   as well as their elapsed window.** `SR-25` counts windows and is the more
   robust rule for it; a rule decided purely on a timer can be tipped over by one
   unrepresentative measurement that happens to be the last before the window
-  expires — the first on-window of a run, say, caught while the contactor is
+  expires, the first on-window of a run, say, caught while the contactor is
   still closing and reading near zero through no fault of the kiln. Three
   windows by default, which is a fraction of a second. This was *not* the cause
   of the failure above, which was the charge pump; it is a separate robustness
@@ -509,15 +531,15 @@ fixed, and one open question.
   which disarms `SR-28`.** The requirement says "the median conduction current
   measured while the elements are cold **and fully on**", implemented literally:
   duty at maximum, below `ref_cold_max_c`. But a program ramping from cold at a
-  modest rate never commands full duty — the cone 6 example settles around
-  10–25 % — so no reference is learned and `SR-28`, having nothing to compare
+  modest rate never commands full duty, the cone 6 example settles around
+  10–25 %, so no reference is learned and `SR-28`, having nothing to compare
   against, never arms. `SR-26` is unaffected: it falls back to the
   nominal-derived floor.
 
   There is a defensible broader reading. During *any* conduction window the
   elements are by definition fully on, and RMS conduction current does not depend
   on duty, so any valid cold conduction measurement is the same physical
-  quantity — and `FR-CUR-05` already discards windows too short to measure.
+  quantity, and `FR-CUR-05` already discards windows too short to measure.
   Adopting it would make `SR-28` work on every firing. That is a requirements
   interpretation rather than an implementation choice, so it has been left as it
   stands and flagged here: **decide this alongside OQ-07.**
@@ -531,13 +553,13 @@ Nothing in architecture §14 exists yet. `kiln_ports/CMakeLists.txt` is the only
 build file in the repository.
 
 - [x] **C1. `firmware/CMakeLists.txt`, `sdkconfig.defaults`, `partitions.csv`,
-  `main/`** — the ESP-IDF project root and composition root (CON-01, ESP-IDF
+  `main/`**: the ESP-IDF project root and composition root (CON-01, ESP-IDF
   5.x). Partition table must realise architecture §10.1: a 2 MB OTA pair
   (NFR-13), the circular log partition, NVS and LittleFS.
 
 - [x] **C2. `kiln_core/CMakeLists.txt`.** `kiln_core` has ten source files and no
   build file at all, so nothing currently compiles. Needs the dual-target form of
-  architecture §14.2 — `idf_component_register` under `ESP_PLATFORM`, plain
+  architecture §14.2, `idf_component_register` under `ESP_PLATFORM`, plain
   `add_library` otherwise.
 
 - [x] **C3. `firmware/test/host/` CMake project.** Plain CMake, no IDF, with
@@ -549,7 +571,7 @@ build file in the repository.
 - [x] **C4. `kiln_sim` plant simulator.** FOPDT per architecture §14.3 with
   configurable K, τ, dead time, ambient, high-temperature loss and
   seeded-deterministic noise (TR-11, TR-12), **plus the heater-current model and
-  the electrical fault injections of TR-27** — relay fail-on, fail-off, welded
+  the electrical fault injections of TR-27**: relay fail-on, fail-off, welded
   contactor, partial element failure, over-current, CT disconnected. B1's rules
   cannot be tested without it.
 
@@ -562,7 +584,7 @@ build file in the repository.
   nonexistent ID, and on any `SR-*` without an automated test
   (TR-22, TR-23, TR-26).
 
-- [ ] **C7. `tools/logdump`.** Decode a log partition dump to CSV — also the
+- [ ] **C7. `tools/logdump`.** Decode a log partition dump to CSV, also the
   cross-check for the `logrec` codec.
 
 - [x] **C8. `.github/workflows/`.** `ci.yml` runs five of the six jobs of
@@ -575,26 +597,64 @@ build file in the repository.
 
   Still outstanding: clang-tidy and cppcheck; web lint and the asset budget,
   which need `web/` (C9); the API suite, which needs `kiln_web`; TR-19's 100 %
-  safety-branch floor (C10 — branch coverage is ~83 %, reported but not gated);
+  safety-branch floor (C10, branch coverage is ~83 %, reported but not gated);
   and the KiCAD ERC gate of A11.
 
 ---
 
-## E. Milestone M5 — Persist (done 2026-10-04)
+## D. Documentation and open questions
+
+- [ ] **D1. Resolve OQ-06 (one CT or three) before freezing the current
+  component.** It determines the ADC channel count, so it gates A4, A5 and A6 on
+  the hardware side and B1's rule structure on the firmware side. Requirements
+  §11 already says it "should be settled before the current component is
+  frozen", and that point is now.
+
+- [x] **D2. Document `uncommanded_settle_s` in architecture §8.2.** The
+  implementation added a 60 s settle delay before SR-08 arms (so heat soaking
+  inward after a high-duty spell is not read as a shorted SSR). The rule table
+  lists only "+5 °C over 3 min at 0 % duty". The parameter also means SR-08 is
+  effectively inactive during normal firing, when duty is rarely zero for a full
+  minute, worth stating explicitly, since it is the reason SR-25 is the primary
+  detection.
+
+- [x] **D3. Update the README status table.** It says "no firmware has been
+  implemented yet"; `kiln_core` and `kiln_ports` are in place.
+
+- [x] **D4. Note the optimism in the remaining-time estimate.**
+  `kiln_profile_duration_s` charges a cooling segment at its stated rate, but
+  FR-CTL-13 makes cooling ramps passive, a real kiln cools as fast as it cools.
+  FR-PRG-06 / FR-RUN-05 estimates will run short through a cooling segment. Say
+  so in the API docs and the UI.
+
+- [ ] **D5. Write the documentation NFR-26 lists:** assembly and wiring, mains
+  safety, commissioning, autotuning, program authoring, the REST API, the log
+  record format, and current-transformer fitting and calibration. The CT
+  commissioning procedure is called out in architecture §16 as the mitigation for
+  a CT fitted to the wrong conductor.
+
+- [ ] **D6. Remaining open questions to close:** OQ-01 (cone-based targets),
+  OQ-03 (whole-life run-summary retention), OQ-05 (3-zone variant, affects
+  whether the control path is written for one zone or N), OQ-07 (element
+  temperature coefficient measured or entered).
+
+---
+
+## E. Milestone M5: Persist (done 2026-10-04)
 
 Architecture §17's M5: log ring, run index, programs, configuration,
 power-loss recovery. Exit criterion was "`FR-LOG`, `FR-CFG`, `FR-RUN-08` pass;
 endurance analysis confirmed by measurement".
 
 - [x] **E1. The circular log ring**, as `kiln_core/logring` over a new
-  `port_flash` rather than inside the adapter — recorded as **AD-19**, because it
+  `port_flash` rather than inside the adapter, recorded as **AD-19**, because it
   revises architecture §5.2. Head discovery, wrap and erase ordering, torn-record
   handling and run selection are all host-tested through a flash fake that
   enforces NOR semantics and can cut power mid-write.
 
 - [x] **E2. Endurance confirmed by measurement**, which was the part of the exit
   criterion that needed evidence rather than arithmetic: 150 h of logging costs
-  265 sector erases, one per 34 minutes of running, matching §10.4 — the figure
+  265 sector erases, one per 34 minutes of running, matching §10.4, the figure
   the whole ten-year `NFR-14` argument rests on. Capacity measures 104 448
   records, 290 h at the default interval against `FR-LOG-07`'s 150 h.
 
@@ -602,8 +662,8 @@ endurance analysis confirmed by measurement".
   still M8 work.
 
 - [x] **E3. `FR-LOG-04`'s out-of-band records**, using the byte AD-18's layout was
-  already carrying as reserved. The log now reads as a narrative — run start,
-  state change, fault, warning, configuration change, operator action — rather
+  already carrying as reserved. The log now reads as a narrative, run start,
+  state change, fault, warning, configuration change, operator action, rather
   than as a temperature series with unexplained steps in it.
 
 - [x] **E4. `app/settings`, `app/program_store`, `app/run_index`** (architecture
@@ -611,19 +671,19 @@ endurance analysis confirmed by measurement".
   a snapshot and committed before the alarm sounds.
 
 - [x] **E5. `FR-RUN-08` power-loss recovery** from the log tail (`AD-09`), with a
-  test that counts NVS writes across two minutes of firing and finds none — which
+  test that counts NVS writes across two minutes of firing and finds none, which
   is the whole point of the decision.
 
 - [x] **E6. The esp32s3 adapters that have no logic left in them**: log
   partition, NVS, clock, reset cause, watchdog. Verified by building: ESP-IDF
   6.0.1, 236 kB image, 89 % of the OTA slot free.
 
-### E.1 — Found while building M5
+### E.1 Found while building M5
 
 - **`kiln_app_boot` decided `FR-RUN-08`'s band test against an unmeasured
   temperature.** The rule compares the interrupted setpoint against the present
   temperature, and at boot nothing has been acquired, so `kiln_c` still held its
-  initialiser of 20 °C. Every kiln more than the band above ambient was refused —
+  initialiser of 20 °C. Every kiln more than the band above ambient was refused , 
   which is every kiln worth resuming. It now acquires once before deciding.
 
 - **A host-only component cannot live under `firmware/components/`.** ESP-IDF
@@ -635,11 +695,11 @@ endurance analysis confirmed by measurement".
   pin moved from the speculative `v5.3` to the `v6.0.1` the build is actually
   verified against.
 
-### E.2 — Still outstanding for M5's neighbours
+### E.2 Still outstanding for M5's neighbours
 
 - [ ] **E7. Vendor LittleFS and write the file-store adapter.** `AD-10` puts
   programs and run records in LittleFS, which is not in the ESP-IDF tree, and
-  `CON-04` forbids a build-time fetch — so it has to be vendored rather than
+  `CON-04` forbids a build-time fetch, so it has to be vendored rather than
   pulled as a managed component. Until then the simulated build uses a RAM file
   store in `kiln_sim`, so the path is exercised but nothing survives a reboot.
 
@@ -661,50 +721,12 @@ endurance analysis confirmed by measurement".
 
 ---
 
-## D. Documentation and open questions
-
-- [ ] **D1. Resolve OQ-06 (one CT or three) before freezing the current
-  component.** It determines the ADC channel count, so it gates A4, A5 and A6 on
-  the hardware side and B1's rule structure on the firmware side. Requirements
-  §11 already says it "should be settled before the current component is
-  frozen", and that point is now.
-
-- [x] **D2. Document `uncommanded_settle_s` in architecture §8.2.** The
-  implementation added a 60 s settle delay before SR-08 arms (so heat soaking
-  inward after a high-duty spell is not read as a shorted SSR). The rule table
-  lists only "+5 °C over 3 min at 0 % duty". The parameter also means SR-08 is
-  effectively inactive during normal firing, when duty is rarely zero for a full
-  minute — worth stating explicitly, since it is the reason SR-25 is the primary
-  detection.
-
-- [x] **D3. Update the README status table.** It says "no firmware has been
-  implemented yet"; `kiln_core` and `kiln_ports` are in place.
-
-- [x] **D4. Note the optimism in the remaining-time estimate.**
-  `kiln_profile_duration_s` charges a cooling segment at its stated rate, but
-  FR-CTL-13 makes cooling ramps passive — a real kiln cools as fast as it cools.
-  FR-PRG-06 / FR-RUN-05 estimates will run short through a cooling segment. Say
-  so in the API docs and the UI.
-
-- [ ] **D5. Write the documentation NFR-26 lists:** assembly and wiring, mains
-  safety, commissioning, autotuning, program authoring, the REST API, the log
-  record format, and current-transformer fitting and calibration. The CT
-  commissioning procedure is called out in architecture §16 as the mitigation for
-  a CT fitted to the wrong conductor.
-
-- [ ] **D6. Remaining open questions to close:** OQ-01 (cone-based targets),
-  OQ-03 (whole-life run-summary retention), OQ-05 (3-zone variant — affects
-  whether the control path is written for one zone or N), OQ-07 (element
-  temperature coefficient measured or entered).
-
----
-
 ## F. C++20 migration and static analysis (2026-10-05)
 
 The firmware moved from C99 to C++20 and `clang-tidy` now gates merge
 (`NFR-25`, `TR-24`, closing the static-analysis half of C8). The migration
-itself was small — 9 compile errors across 22 597 lines, all `= {0}` on a
-struct whose first member is an enum — because the codebase already had no
+itself was small, 9 compile errors across 22 597 lines, all `= {0}` on a
+struct whose first member is an enum, because the codebase already had no
 heap, no VLAs, no `restrict` and explicit context structs.
 
 **Not MISRA, and no part of this may be described as MISRA.** `clang-tidy`
@@ -754,51 +776,51 @@ finding count measured on 2026-10-05.
   green -- so it wants doing against a real container run, not blind. The same
   gap still covers `host/webhost`, which is its own CMake project.
 
-- [ ] **F2. `cppcoreguidelines-macro-to-enum` — 585 findings.** The `#define`
+- [ ] **F2. `cppcoreguidelines-macro-to-enum`: 585 findings.** The `#define`
   constants in `kiln/types.h` and friends want to become `constexpr`, which is
   a genuine improvement (typed, scoped, debuggable) and a genuine API change.
   Worth doing deliberately, in its own commit, with the log record format
   checked against it.
 
-- [ ] **F3. `cppcoreguidelines-use-enum-class` — 90 findings.** Scoped enums
+- [ ] **F3. `cppcoreguidelines-use-enum-class`: 90 findings.** Scoped enums
   would break the C-compatible port enums the HAL boundary and the persisted
   log record format rely on. Needs a decision about whether the port layer
-  stays C-callable (`AD-01`) before it can be actioned — possibly never.
+  stays C-callable (`AD-01`) before it can be actioned, possibly never.
 
-- [ ] **F4. `misc-use-anonymous-namespace` — 267 findings.** Translating
+- [ ] **F4. `misc-use-anonymous-namespace`: 267 findings.** Translating
   file-static functions to anonymous namespaces is the idiomatic C++ form and
   purely mechanical, but it touches every source file and is better done when
   it will not collide with other work in flight. `misc-use-internal-linkage`
   (16) is the same question from the other side.
 
-- [ ] **F5. `bugprone-signed-bitwise` — 221 findings.** Mostly the flag and
+- [ ] **F5. `bugprone-signed-bitwise`: 221 findings.** Mostly the flag and
   fault-mask handling. Each site needs the operand made explicitly unsigned;
   real value, and the single largest genuinely-defect-adjacent group.
 
-- [ ] **F6. `cppcoreguidelines-pro-type-cstyle-cast` — 73 findings.** C casts
+- [ ] **F6. `cppcoreguidelines-pro-type-cstyle-cast`: 73 findings.** C casts
   to `static_cast`/`reinterpret_cast`. Mechanical, but a `reinterpret_cast` in
   the log codec deserves reading rather than rewriting blind.
 
-- [ ] **F7. `misc-const-correctness` — 65 findings. Do not auto-apply.**
+- [ ] **F7. `misc-const-correctness`: 65 findings. Do not auto-apply.**
   Applying it broke the build: it constifies the `void *ctx` parameters of
   functions assigned into the port vtables, which is the ports-and-adapters
   boundary `AD-01` rests on. It also rewrote two public signatures in
   `logring.h`. Any pass over this must be done by hand, port boundary first.
 
 - [ ] **F8. Real findings turned up by the analysis, worth their own fixes:**
-  - `safety.cpp:119` and `current.cpp:92` — `clamp_cfg()` reports "was anything
+  - `safety.cpp:119` and `current.cpp:92`: `clamp_cfg()` reports "was anything
     clamped?" with `memcmp` over a struct that has padding. It works today
     because the snapshot is a struct copy, but padding propagation is not
     guaranteed by the standard, so a false "clamped" is possible. Both are in
     safety code. Replace with an explicit `changed` flag set as each field is
     clamped. (`bugprone-suspicious-memory-comparison`)
-  - `configmodel.cpp:240` — `memcpy` result is not null-terminated.
+  - `configmodel.cpp:240`: `memcpy` result is not null-terminated.
     (`bugprone-not-null-terminated-result`)
-  - `logrec.cpp:101`, `pid.cpp:135`, `profile.cpp:151`, `sim.cpp:322` —
+  - `logrec.cpp:101`, `pid.cpp:135`, `profile.cpp:151`, `sim.cpp:322` , 
     `(int)(x + 0.5)` rounds the wrong way for negative values. Check whether
     each input can be negative; use `lroundf` where it can.
     (`bugprone-incorrect-roundings`)
-  - `cert-err33-c` — 26 unchecked return values, against `NFR-17`'s rule that
+  - `cert-err33-c`: 26 unchecked return values, against `NFR-17`'s rule that
     no failure is silently dropped. Most are `snprintf` into a sized buffer,
     but `NFR-17` says *every* error path is handled explicitly, so each wants
     either a check or an explicit `(void)`.
@@ -806,7 +828,7 @@ finding count measured on 2026-10-05.
 - [ ] **F9. `kiln_run_record_t` carries 9 padding bytes where 1 is optimal**
   (`clang-analyzer-optin.performance.Padding`, disabled). Reordering would
   invalidate every run record already on a device, so it can only change
-  alongside a record-format version bump — if at all.
+  alongside a record-format version bump, if at all.
 
 - [x] **F11. CI's QEMU assertion was stale.** It asserted the firmware logs
   `KilnControl starting`; the firmware has never printed that, at HEAD or
@@ -818,3 +840,277 @@ finding count measured on 2026-10-05.
   would be the MISRA C 2012 addon, which no longer applies now the firmware is
   C++; its general analysis overlaps `clang-analyzer-*` heavily. Low priority,
   and worth deciding against explicitly rather than leaving open.
+
+---
+
+## G. Door interlock, SR-31 (2026-10-05)
+
+Added on request: a door safety switch input that stops the heater the moment
+the door opens. `SR-31` and `HR-21` are new; fault **27**, warning **113**.
+
+The rule has **two tiers**, which is the part worth not losing in a later
+refactor. Heat is withheld and the contactor dropped on the **first** open
+sample, with no timer at all; that is what "immediately" has to mean for a
+door. Only the *latch* waits for `door_confirm_s` (default 200 ms), so a single
+sample corrupted by the switching noise of a multi-kilowatt load costs a
+fraction of a second of duty instead of stopping a healthy firing (HZ-10). An
+implementation that waited 200 ms before dropping the heater would pass a
+latch-only test and miss the requirement, so the tiers are tested separately.
+
+It is evaluated **first**, ahead even of `SR-13`: a door that is open is a fact,
+where every other rule is an inference from a measurement.
+
+Done: `port_door`, the rule and its clamps, `SR-18` clearability, the fault and
+warning rows, `kiln_app` wiring, simulator injection (`d`, `D`) and console
+keys, 12 host tests, and the requirement, architecture, safety and simulation
+docs. Verified: 347 tests green plain and under ASan/UBSan, clang-tidy clean on
+host and target, esp32s3 builds with zero warnings at 236 640 bytes (+720 for
+the whole feature).
+
+- [ ] **G1. The interlock is only as good as its wiring, and `HR-21` is a
+  *should*.** The software rule is the weaker half by design: `HR-21` wants the
+  same normally-closed switch in series with the contactor coil, so the heater
+  drops whether or not this firmware is working, the argument `AD-05` makes for
+  the charge pump, applied to a second input. The schematic does not yet have
+  the input or the series contact. Until it does, SR-31 is software-only and
+  RR-10 stands.
+
+- [ ] **G2. HIL: confirm the series contact actually breaks the coil.** As with
+  the charge pump (M4), the claim that matters is a hardware one and cannot be
+  verified in simulation. Open the door on the bench jig with the safety task
+  halted, and observe the contactor.
+
+- [ ] **G3. Decide whether the interlock should be mandatory.** `HR-21` is a
+  *should* because many existing kilns have no door furniture to take a switch,
+  and making it a *shall* would make the controller unfittable to them. The
+  consequence is RR-10: a kiln without one has nothing at all against HZ-13.
+  Warning 113 makes the gap visible rather than silent, which is the compromise
+ , revisit if the first real installations suggest otherwise.
+
+- [ ] **G4. Expose the door state in the API and on the display.** The
+  supervisor knows; `/api/status` and the OLED do not yet say. Wanted for
+  FR-WEB-04 and the default screen, and it is the cheap half of making
+  warning 113 actually visible.
+
+---
+
+## H. Read-only web interface, FR-WEB-26 (2026-10-05)
+
+The web interface is now an observation surface. No route reachable over the
+network can put heat into the kiln, write configuration or clear a latched
+fault. Done in the API layer and its tests; the requirement, architecture,
+safety and security documents follow it.
+
+Withdrawn from the network: `/api/run*` (start, pause, resume, abort, segment
+edits), `/api/manual`, `/api/tune` writes (start, cancel, accept),
+`/api/config` writes and `/api/config/defaults`, `/api/fault/ack`, and
+`/api/current/calibrate`. Each returns **403 `read_only`** naming where the
+control actually is, not 405, which would imply a different verb might work.
+
+The handlers are **deleted, not disabled**. The firmware cannot start a firing
+over HTTP because the code to do it is not in the image, which is a stronger
+claim than a flag somebody could flip back.
+
+**Program authoring stays**, and that is a capability judgement rather than a
+read/write one: a stored curve cannot heat anything until somebody starts it at
+the kiln, and authoring a five-segment curve is the one task a rotary encoder
+and a 128×64 OLED are genuinely bad at. So the interface is *not* literally
+read-only, and the documents say so rather than overclaiming.
+
+Security effect, recorded in `security.md`: threats TH-01 (unauthenticated
+command execution), TH-02 (loosening the safety configuration), TH-03 (remote
+fault clear) and TH-04 (hostile firmware) are **closed**, and TH-05 (CSRF) is
+reduced to editing a stored program. SEC-00 is the one control in that document
+that does not depend on the unwritten HTTP transport, because it is enforced in
+the API layer that *is* written.
+
+- [ ] **H1. The UI client still offers the controls.** `web/app.js` calls every
+  withdrawn route. The API refuses them, so the buttons would simply error , 
+  which is worse than not being there. The client needs the controls removed
+  and the settings and tune screens turned into displays. Being done together
+  with the power/energy work (section I) so the UI is reshaped once.
+
+- [ ] **H2. There is no field update path at all.** `FR-UPD-01` was inverted:
+  no firmware image is accepted over the network. That closes TH-04 completely
+  and leaves no way to ship a fix without physical access, including a
+  security fix. `OQ-08` asks what replaces it (USB/serial via `esptool`, or an
+  image staged over the network but applied only after a physical confirmation
+  at the kiln). **This blocks release**, and is tracked as `SRR-11`.
+
+- [ ] **H3. Local control is now the only control, and the HMI is Not Started.**
+  Everything withdrawn from the web is reachable only through `kiln_hmi`, which
+  does not exist yet. Until it does, the simulated console is the only way to
+  start a firing. M2 and the default screen become blocking rather than merely
+  next.
+
+
+---
+
+## I. Three-phase measurement, FR-CUR-15 (2026-10-05)
+
+A phase strap (`HR-22`) and three current transformers (`HR-23`), so every
+phase is measured and the power and energy figures cover the whole kiln.
+Resolves `OQ-06` in favour of per-phase monitoring and supersedes `ASM-10`.
+
+The safety rules were **not** rewritten. `SR-25` to `SR-30` still take one set
+of numbers, now fed the worst phase: the highest reading for fail-on and
+over-current, the lowest conduction for fail-off, and the largest departure
+from its own reference for deviation. Rewriting eighteen tested safety rules to
+iterate phases would have been a large change to the most safety-critical code
+in the project for no gain, because the worst phase is what each rule actually
+wants. Each channel keeps its own reference, because losing one element group
+of three is a step change on one phase and barely visible in a total.
+
+`mains_v` is the **phase** voltage, line to neutral on a three-phase star, so
+the total is a plain sum of per-phase VA and not a sqrt(3) line-voltage form.
+The two differ by 73 per cent, so every place the figure appears says which it
+is.
+
+Done: `KILN_CUR_CHANNELS`, `port_phase`, per-phase state in `kiln_app`,
+aggregation helpers, the per-phase burst cycle, warning 114 for a strap that
+disagrees with the transformers fitted, per-phase and total reporting on
+`/api/current`, simulator support with per-phase element loss, console key `p`,
+and seven host tests.
+
+- [ ] **I1. The board has one CT input and no strap.** `HR-22` and `HR-23` are
+  requirements with no schematic behind them yet. Three conditioned CT inputs
+  (`HR-17`, `HR-18` each) and a non-strapping input for the phase select. Until
+  the board exists this is verified in simulation only.
+
+- [ ] **I2. Delta-connected kilns are not addressed.** The power sum assumes a
+  star connection with `mains_v` as the line-to-neutral voltage. A delta-wired
+  kiln measures line current, and the arithmetic differs. Either detect it,
+  configure it, or state the restriction in the commissioning documentation.
+  Currently it is stated only in `FR-CUR-17` and in the code comments.
+
+- [ ] **I3. Real power, not apparent.** `FR-CUR-07` says apparent power and
+  assumes a resistive load (`ASM-09`), which for a kiln element is very nearly
+  true. Measuring real power would need a voltage channel, which the design
+  does not have and probably should not grow. Worth closing explicitly rather
+  than leaving as an implied limitation.
+
+- [ ] **I4. Per-phase energy is not in the run record.** `kiln_run_record_t`
+  carries one `energy_wh`, now the total across phases. Per-phase energy would
+  show which phase is doing the work, but the record is a persisted layout
+  (`F9`) and cannot grow without a format version bump.
+
+---
+
+## J. German translation, NFR-23 (2026-10-05)
+
+English and German, selected by `hmi.language`. `NFR-23` always asked for
+operator text in a single resource location so it could be translated later;
+this is later, and the requirement is now a **M** rather than a **C**.
+
+The single resource location is `kiln_core/faults`: its tables are indexed by
+`kiln_lang_t`, and adding a language is a column there and nowhere else. The
+firmware serves text already translated rather than sending English for the
+browser to re-translate, because the device has to say the same thing on its
+own 128x64 display with no browser involved, and two copies of those sentences
+would drift. The web interface translates only its own chrome.
+
+Three deliberate splits:
+
+- **The unsuffixed `kiln_fault_label()` and friends stay English.** Diagnostics,
+  the event log and requirement identifiers read the same whoever filed the
+  report. `_in(code, lang)` is what talks to the operator.
+- **Short labels are ASCII transliterations** (`UEBERTEMP`, `TUER OFFEN`,
+  `GEHAEUSE HEISS`), because the OLED font is not guaranteed to carry umlauts.
+  The long causes use proper German, since those are read in the browser.
+  A test holds every German label to the 16-character display width.
+- **The browser can override the device.** A workshop with one German-speaking
+  potter and one English-speaking one needs that; the device setting is only
+  the default.
+
+Done: `kiln_lang_t`, bilingual fault, warning and state tables with the
+compile-time index assertions intact, `_in()` accessors with English fallback,
+the `hmi.language` config item, `language` on `/api/info`, localised fault and
+warning text in the API payloads, `data-i18n` chrome in the web UI with a
+language selector, and six host tests including a check that the German column
+is not a copy of the English one.
+
+- [ ] **J1. The OLED font and encoding are unverified.** The labels avoid
+  umlauts for that reason, but nobody has yet confirmed what the SSD1306 font
+  in `kiln_hmi` will carry. If it does handle Latin-1 or a UTF-8 subset, the
+  labels can use proper German and the test's 16-character bound should be
+  re-checked against the real glyph widths rather than character count.
+
+- [ ] **J2. The long causes are not shown on the display yet.** `kiln_hmi` does
+  not exist, so only the web renders them. When the fault screen lands it will
+  need to wrap German text, which runs roughly 15 per cent longer than English.
+
+- [ ] **J3. Config item names and units are still English.** `/api/config`
+  returns keys like `safety.max_temp_c` with English descriptions. The keys
+  are an API contract and should stay, but the human-readable descriptions
+  beside them in the settings screen are untranslated.
+
+- [ ] **J4. No German review by a native speaker.** The translations are
+  careful but unreviewed. `VERSCHWEISST` for a welded contactor and
+  `KEINE WAERME` for no heat are the two worth checking first, being the most
+  safety-critical messages a German-speaking operator would act on.
+
+---
+
+## K. Hardware interlock chain in the coil circuit (2026-10-06)
+
+The contactor coil is now a series chain of four independent interrupts, three
+of which need no firmware:
+
+```
++5V -[J9 lid, NC]- J8 [COIL] -COIL_DRV- Q3 -COIL_RTN1- Q6 -COIL_RTN2- Q5 - GND
+                                     charge pump    TC1 FAULT    TC2 FAULT
+```
+
+Added `Q5` and `Q6` (AO3400A) with gate pull-ups `R28`/`R29` (10k to +3V3), and
+inserted J9's lid contacts between +5V and the coil so they carry coil current
+directly. `LID_SENSE` brings the node back to IO38 through an `R30`/`R31`
+10k/18k divider (5 V to 3.21 V) so `SR-31` can still see the door.
+
+Each `FAULT` output drives **its own** MOSFET rather than being wire-ANDed onto
+one. Wire-ANDing would have merged `TC1_FAULT` and `TC2_FAULT` into a single
+net and cost the per-device test points; a MOSFET each keeps both names, both
+probe points, and gives two independent interrupts for the price of one part.
+
+Two things found while doing it, both worth knowing:
+
+- **The flyback diode was on the wrong side.** `D6`'s cathode went to raw `+5V`,
+  which the new lid contact bypasses, so opening the lid would have had no
+  freewheel path and the inductive kick would have arced across the switch
+  contacts. Moved to the `LID_SWITCH` node so the loop is across the coil.
+  Recorded as `HR-25` so it cannot be undone by accident.
+- **`Q4` already existed** at (76.2, 287.02). The first placement created a
+  duplicate reference, caught and removed by UUID. Worth remembering that
+  Konnect's `reference` override does not check for collisions.
+
+ERC is unchanged at one error, the known `U3` `SDO` output-output false
+positive. No new violations.
+
+- [ ] **K1. The hardware TC interlock is not firmware-independent, and the
+  documentation now says so.** The `FAULT` outputs are open-drain: an unpowered
+  or absent front end leaves the path closed. The MAX31856 also detects an open
+  circuit only once its fault mask is configured, so out of reset the interlock
+  does not act. It covers faults the device actively reports; `SR-04` in
+  firmware remains the cover for a dead or unconfigured front end. The lid
+  contact has no such caveat.
+
+- [ ] **K2. Should an enclosure thermocouple fault really stop the kiln?**
+  Both front ends are in the chain, because the request said fault pins. But
+  `SR-11` (enclosure over-temperature) is a backstop, and a failed enclosure
+  probe killing a firing mid-glaze is a nuisance trip, which `HZ-10` says is
+  how protections get disabled. Consider a fitted-by-default `0R` in `Q5`'s
+  drain so the enclosure branch can be depopulated without cutting a track.
+
+- [ ] **K3. `D7` is an unwired LED.** Pre-existing, not from this change: the
+  coil indicator's cathode is on `COIL_DRV` and its anode goes nowhere. It
+  needs a series resistor to the coil supply. Note that taking it from
+  `LID_SWITCH` rather than `+5V` makes it indicate "coil actually energised"
+  rather than "the MCU asked".
+
+- [ ] **K4. The PCB has not been updated.** This is a schematic-only change;
+  `update_pcb_from_schematic` has not been run, so the board still has neither
+  the two MOSFETs, the four resistors, nor the rerouted coil path.
+
+- [ ] **K5. HIL: verify each interrupt separately.** Four elements in series
+  means four tests: open the lid, pull each `FAULT` low, and halt the safety
+  task. Each should drop the contactor on its own. This is the same class of
+  claim as `G2` and cannot be settled in simulation.

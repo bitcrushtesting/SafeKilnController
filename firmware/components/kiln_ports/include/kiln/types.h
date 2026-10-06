@@ -37,6 +37,12 @@
  * not need a second implementation. */
 #define KILN_HEAT_CHANNELS       2
 
+/* FR-CUR-15: one current transformer per phase.  Three, because a three-phase
+ * kiln is the case ASM-10 used to wave at -- a fault confined to an unmonitored
+ * phase was caught only by the thermal backstop, and slowly.  A single-phase
+ * installation populates channel 0 and leaves the rest absent. */
+#define KILN_CUR_CHANNELS        3
+
 #define KILN_SEG_NONE            0xFFu
 
 /* --- operating state (requirements section 2.2) ------------------------ */
@@ -76,6 +82,22 @@ typedef enum {
 #define KILN_TC_FAULT_COMMS      (1u << 6)  /* front end did not answer       */
 #define KILN_TC_FAULT_ANY        0x7Fu
 
+/* --- operator language (NFR-23) ----------------------------------------
+ *
+ * NFR-23 asks for operator text in one resource location so it can be
+ * translated later.  This is "later": the fault, warning and state tables in
+ * kiln_core/faults are indexed by language, and nothing else in the firmware
+ * holds operator-facing prose.
+ *
+ * It is a presentation concern only.  Nothing in the control or safety path
+ * reads it, and a language the build does not carry falls back to English
+ * rather than showing an empty screen. */
+typedef enum {
+    KILN_LANG_EN = 0,
+    KILN_LANG_DE,
+    KILN_LANG_COUNT,
+} kiln_lang_t;
+
 /* --- fault codes (requirements appendix A; stable, never reused) -------- */
 
 typedef enum {
@@ -106,7 +128,8 @@ typedef enum {
     KILN_FAULT_CURRENT_DEVIATION   = 24,   /* SR-28 */
     KILN_FAULT_OVERCURRENT         = 25,   /* SR-29 */
     KILN_FAULT_CT_FAULT            = 26,   /* FR-CUR-11 */
-    KILN_FAULT_MAX                 = 27,
+    KILN_FAULT_DOOR_OPEN           = 27,   /* SR-31 */
+    KILN_FAULT_MAX                 = 28,
 } kiln_fault_t;
 
 /* Warnings do not stop a firing (requirements appendix A). Held as a bitmask,
@@ -124,7 +147,9 @@ typedef enum {
     KILN_WARN_RELAY_SUSPECT   = 9,   /* 110  SR-30 */
     KILN_WARN_CURRENT_OFF     = 10,  /* 111  FR-CUR-12 */
     KILN_WARN_CURRENT_DEV     = 11,  /* 112  SR-28 */
-    KILN_WARN_COUNT           = 12,
+    KILN_WARN_DOOR_OFF        = 12,  /* 113  SR-31 */
+    KILN_WARN_PHASE_MISMATCH  = 13,  /* 114  FR-CUR-15 */
+    KILN_WARN_COUNT           = 14,
 } kiln_warn_bit_t;
 
 #define KILN_WARN_CODE_BASE  101

@@ -7,6 +7,101 @@
 #include "kiln_app/run_index.h"
 #include "kiln_app/settings.h"
 
+/* --- per-phase aggregation (FR-CUR-15) ---------------------------------
+ *
+ * SR-25..SR-30 are evaluated against one set of numbers, and they stay that
+ * way.  Rewriting eighteen tested safety rules to iterate phases would be a
+ * large change to the most safety-critical code in the project for no gain,
+ * because what each rule actually wants is the *worst* phase:
+ *
+ *   fail-on / over-current   the highest reading -- any phase conducting when
+ *                            it should not is a fault, whichever one it is
+ *   fail-off                 the lowest conduction -- one dead phase is a
+ *                            fault even while the other two look healthy
+ *   deviation                the largest departure from that phase's own
+ *                            reference
+ *
+ * Aggregating this way is what closes ASM-10: a fault confined to one phase is
+ * now seen electrically, in seconds, instead of waiting for the thermal
+ * backstop.  Each channel keeps its own reference, because losing one element
+ * group of three is a step change on one phase and barely visible in a total.
+ */
+static uint8_t cur_active(const kiln_app_t *app)
+{
+    return (app->cur_channels > 0u) ? app->cur_channels : 1u;
+}
+
+static float cur_worst_amps(const kiln_app_t *app, bool want_max)
+{
+    float worst = want_max ? 0.0f : 1e9f;
+    bool  any   = false;
+    for (uint8_t i = 0; i < cur_active(app); i++) {
+        if (!kiln_current_available(&app->cur[i])) {
+            continue;
+        }
+        const float a = kiln_current_amps(&app->cur[i]);
+        worst = want_max ? (a > worst ? a : worst) : (a < worst ? a : worst);
+        any   = true;
+    }
+    return any ? worst : 0.0f;
+}
+
+/* The reference belonging to whichever phase is currently the worst, so that
+ * SR-26's "below a fraction of the reference" compares like with like. */
+static float cur_ref_of_worst(const kiln_app_t *app)
+{
+    float worst = 1e9f, ref = 0.0f;
+    for (uint8_t i = 0; i < cur_active(app); i++) {
+        if (!kiln_current_available(&app->cur[i])) {
+            continue;
+        }
+        const float a = kiln_current_amps(&app->cur[i]);
+        if (a < worst) { worst = a; ref = kiln_current_ref(&app->cur[i]); }
+    }
+    return ref;
+}
+
+static uint8_t cur_flags_any(const kiln_app_t *app)
+{
+    uint8_t f = 0;
+    for (uint8_t i = 0; i < cur_active(app); i++) {
+        f = (uint8_t)(f | kiln_current_flags(&app->cur[i]));
+    }
+    return f;
+}
+
+/* FR-CUR-07, summed across the phases that are actually measured.  mains_v is
+ * the phase voltage (line-to-neutral on a three-phase star), so the total is a
+ * plain sum and not a sqrt(3) line-voltage form -- stated here because the two
+ * differ by 73 % and a reader deserves to know which one this is. */
+double kiln_app_apparent_va(const kiln_app_t *app)
+{
+    if (app == nullptr) { return 0.0; }
+    double va = 0.0;
+    for (uint8_t i = 0; i < cur_active(app); i++) {
+        if (kiln_current_available(&app->cur[i])) {
+            va += kiln_current_apparent_va(&app->cur[i]);
+        }
+    }
+    return va;
+}
+
+double kiln_app_energy_wh(const kiln_app_t *app)
+{
+    if (app == nullptr) { return 0.0; }
+    double wh = 0.0;
+    for (uint8_t i = 0; i < cur_active(app); i++) {
+        wh += kiln_current_energy_wh(&app->cur[i]);
+    }
+    return wh;
+}
+
+uint8_t kiln_app_phases(const kiln_app_t *app)
+{
+    return (app != nullptr && app->phases == 3u) ? 3u : 1u;
+}
+
+
 /* --- configuration fan-out --------------------------------------------- */
 
 /* One configuration struct, several core components with their own.  Doing the
@@ -79,7 +174,9 @@ static void push_config(kiln_app_t *app)
     cc.mains_v          = c->mains_v;
     cc.nominal_a        = c->nominal_a;
     cc.element_tc_per_c = c->element_tc_per_c;
-    (void)kiln_current_reconfigure(&app->cur, &cc);
+    for (uint8_t i = 0; i < KILN_CUR_CHANNELS; i++) {
+        (void)kiln_current_reconfigure(&app->cur[i], &cc);
+    }
 }
 
 kiln_err_t kiln_app_init(kiln_app_t *app, const kiln_app_ports_t *ports,
@@ -123,7 +220,28 @@ kiln_err_t kiln_app_init(kiln_app_t *app, const kiln_app_ports_t *ports,
 
     kiln_current_cfg_t cc;
     kiln_current_cfg_defaults(&cc);
-    (void)kiln_current_init(&app->cur, &cc);
+    for (uint8_t i = 0; i < KILN_CUR_CHANNELS; i++) {
+        (void)kiln_current_init(&app->cur[i], &cc);
+    }
+
+    /* HR-22: the strap says how the kiln is wired; the port says how many
+     * transformers are actually fitted.  They are read separately and compared,
+     * because a three-phase strap with one CT is a real installation mistake
+     * and warning 114 is how it gets noticed. */
+    app->phases = (app->ports.phase != nullptr && app->ports.phase->count != nullptr)
+                      ? app->ports.phase->count(app->ports.phase->ctx) : 1u;
+    if (app->phases != 3u) {
+        app->phases = 1u;
+    }
+    app->cur_channels =
+        (app->ports.current != nullptr && app->ports.current->channel_count != nullptr)
+            ? app->ports.current->channel_count(app->ports.current->ctx) : 1u;
+    if (app->cur_channels > KILN_CUR_CHANNELS) {
+        app->cur_channels = KILN_CUR_CHANNELS;
+    }
+    if (app->cur_channels == 0u) {
+        app->cur_channels = 1u;
+    }
 
     push_config(app);
 
@@ -224,12 +342,12 @@ static void build_sample(const kiln_app_t *app, kiln_log_event_t event,
     out->kiln_filt_c   = app->kiln_c;
     out->setpoint_c    = kiln_setpoint_value(&app->sp);
     out->case_c        = app->case_c;
-    out->current_a     = kiln_current_amps(&app->cur);
+    out->current_a     = cur_worst_amps(app, true);
     out->duty_permille = app->duty_request;
     out->segment       = app->state == KILN_STATE_RUNNING
                        ? kiln_setpoint_segment(&app->sp) : KILN_SEG_NONE;
     out->state         = (uint8_t)app->state;
-    out->current_flags = kiln_current_flags(&app->cur);
+    out->current_flags = cur_flags_any(app);
     out->event         = (uint8_t)event;
 
     if (kiln_setpoint_holdback(&app->sp)) {
@@ -451,41 +569,59 @@ void kiln_app_window_tick(kiln_app_t *app, uint32_t dt_ms)
         return;
     }
 
-    /* Collect a burst that has run.  Polled, never waited on (FR-CUR-14). */
-    if (app->cur_burst_pending && (cp->read_burst != nullptr)) {
-        kiln_cur_burst_t b = {};
-        const kiln_err_t e = cp->read_burst(cp->ctx, 0, &b);
-        if (e == KILN_OK) {
-            app->cur_burst_pending = false;
-            if (kiln_current_push_burst(&app->cur, &b) == KILN_OK) {
-                app->cur_fresh = true;
-                app->cur_deviation_valid =
-                    kiln_current_deviation(&app->cur, &app->cur_deviation);
-            }
-        } else if (e != KILN_ERR_BUSY) {
-            app->cur_burst_pending = false;
-        }
-    }
-
+    /* Every phase runs the same gate, because there is one SSR and therefore
+     * one commanded window (AD-17); what differs per channel is only the state
+     * each keeps.  The deviation reported upward is the worst across phases --
+     * see the aggregation note above. */
+    const kiln_cur_window_t win_now = on ? KILN_CUR_WINDOW_ON : KILN_CUR_WINDOW_OFF;
     const uint32_t remaining = kiln_window_level_remaining_ms(&app->win, duty);
-    uint16_t n = 0;
-    const kiln_cur_action_t act =
-        kiln_current_tick(&app->cur,
-                          on ? KILN_CUR_WINDOW_ON : KILN_CUR_WINDOW_OFF,
-                          remaining, dt_ms, &n);
 
-    if (act == KILN_CUR_ACT_START_BURST && (cp->start_burst != nullptr) &&
-        !app->cur_burst_pending) {
-        if (cp->start_burst(cp->ctx, 0, on ? KILN_CUR_WINDOW_ON : KILN_CUR_WINDOW_OFF,
-                            n) == KILN_OK) {
-            app->cur_burst_pending = true;
+    float worst_dev = 0.0f;
+    bool  any_dev   = false;
+
+    for (uint8_t ch = 0; ch < cur_active(app); ch++) {
+        /* Collect a burst that has run.  Polled, never waited on (FR-CUR-14). */
+        if (app->cur_burst_pending[ch] && (cp->read_burst != nullptr)) {
+            kiln_cur_burst_t b = {};
+            const kiln_err_t e = cp->read_burst(cp->ctx, ch, &b);
+            if (e == KILN_OK) {
+                app->cur_burst_pending[ch] = false;
+                if (kiln_current_push_burst(&app->cur[ch], &b) == KILN_OK) {
+                    app->cur_fresh = true;
+                    float d = 0.0f;
+                    if (kiln_current_deviation(&app->cur[ch], &d)) {
+                        if (!any_dev || fabsf(d) > fabsf(worst_dev)) {
+                            worst_dev = d;
+                        }
+                        any_dev = true;
+                    }
+                }
+            } else if (e != KILN_ERR_BUSY) {
+                app->cur_burst_pending[ch] = false;
+            }
+        }
+
+        uint16_t n = 0;
+        const kiln_cur_action_t act =
+            kiln_current_tick(&app->cur[ch], win_now, remaining, dt_ms, &n);
+
+        if (act == KILN_CUR_ACT_START_BURST && (cp->start_burst != nullptr) &&
+            !app->cur_burst_pending[ch]) {
+            if (cp->start_burst(cp->ctx, ch, win_now, n) == KILN_OK) {
+                app->cur_burst_pending[ch] = true;
+            }
+        }
+        else if (act == KILN_CUR_ACT_ABORT) {
+            if (cp->abort_burst != nullptr) {
+                cp->abort_burst(cp->ctx, ch);
+            }
+            app->cur_burst_pending[ch] = false;
         }
     }
-    else if (act == KILN_CUR_ACT_ABORT) {
-        if (cp->abort_burst != nullptr) {
-            cp->abort_burst(cp->ctx, 0);
-        }
-        app->cur_burst_pending = false;
+
+    if (any_dev) {
+        app->cur_deviation       = worst_dev;
+        app->cur_deviation_valid = true;
     }
 }
 
@@ -500,7 +636,9 @@ void kiln_app_control_cycle(kiln_app_t *app, float dt_s)
         return;
     }
 
-    kiln_current_note_plant(&app->cur, app->kiln_c, app->duty_request, dt_s);
+    for (uint8_t i = 0; i < cur_active(app); i++) {
+        kiln_current_note_plant(&app->cur[i], app->kiln_c, app->duty_request, dt_s);
+    }
 
     switch (app->state) {
     case KILN_STATE_RUNNING: {
@@ -569,8 +707,8 @@ void kiln_app_control_cycle(kiln_app_t *app, float dt_s)
     if (app->kiln_c > app->record.peak_c) {
         app->record.peak_c = app->kiln_c;
     }
-    app->record.energy_wh    = (float)kiln_current_energy_wh(&app->cur);
-    app->record.current_ref_a = kiln_current_ref(&app->cur);
+    app->record.energy_wh    = (float)kiln_app_energy_wh(app);
+    app->record.current_ref_a = kiln_current_ref(&app->cur[0]);
 
     log_cycle(app, dt_s);
 }
@@ -599,6 +737,20 @@ static void build_safety_input(const kiln_app_t *app, kiln_safety_input_t *in)
     in->kiln_valid              = app->kiln_valid;
     in->case_valid              = app->case_valid;
 
+    /* SR-31.  An adapter that cannot read the pin reports open (port_door.h),
+     * and an absent port is an absent interlock -- warning 113, not a silently
+     * closed door.  Both failures therefore land on the safe side without the
+     * supervisor needing to know which happened. */
+    if (app->ports.door != nullptr && app->ports.door->is_open != nullptr) {
+        const kiln_port_door_t *d = app->ports.door;
+        in->door_monitoring = (d->is_present == nullptr) || d->is_present(d->ctx);
+        in->door_open       = d->is_open(d->ctx);
+    }
+    else {
+        in->door_monitoring = false;
+        in->door_open       = false;
+    }
+
     /* FR-CUR-11 against FR-CUR-12, and the distinction matters: monitoring is
      * *on* whenever it is configured on, even if the channel is not answering.
      *
@@ -612,9 +764,9 @@ static void build_safety_input(const kiln_app_t *app, kiln_safety_input_t *in)
                           app->ports.current->present(app->ports.current->ctx, 0));
     in->current_monitoring      = app->cfg.current_enabled;
     in->current_fresh           = app->cur_fresh;
-    in->current_a               = kiln_current_amps(&app->cur);
-    in->current_ref_a           = kiln_current_ref(&app->cur);
-    in->current_flags           = kiln_current_flags(&app->cur);
+    in->current_a               = cur_worst_amps(app, in->heating_active);
+    in->current_ref_a           = cur_ref_of_worst(app);
+    in->current_flags           = cur_flags_any(app);
     if (app->cfg.current_enabled && !port_ok) {
         in->current_flags = (uint8_t)(in->current_flags | KILN_CURF_CT_FAULT);
     }
@@ -646,7 +798,16 @@ void kiln_app_safety_cycle(kiln_app_t *app, float dt_s)
     /* The measurement has now been consumed by the rules that count windows. */
     app->cur_fresh = false;
     if (app->ports.current != nullptr) {
-        kiln_current_mark_stale(&app->cur);
+        for (uint8_t i = 0; i < cur_active(app); i++) {
+            kiln_current_mark_stale(&app->cur[i]);
+        }
+    }
+
+    /* FR-CUR-15: the strap and the fitted transformers disagree.  Standing,
+     * not episodic -- it is an installation fact, and it stays visible until
+     * somebody fits the missing transformers or moves the strap. */
+    if (kiln_app_phases(app) == 3u && app->cur_channels < 3u) {
+        app->warnings |= KILN_WARN_BIT(KILN_WARN_PHASE_MISMATCH);
     }
 
     app->warnings = (app->warnings & (KILN_WARN_BIT(KILN_WARN_HOLDBACK) |
@@ -654,7 +815,8 @@ void kiln_app_safety_cycle(kiln_app_t *app, float dt_s)
                                       KILN_WARN_BIT(KILN_WARN_LOG_UNAVAIL) |
                                       KILN_WARN_BIT(KILN_WARN_DISPLAY_UNAVAIL) |
                                       KILN_WARN_BIT(KILN_WARN_TIME_UNSYNCED) |
-                                      KILN_WARN_BIT(KILN_WARN_WIFI_DOWN)))
+                                      KILN_WARN_BIT(KILN_WARN_WIFI_DOWN) |
+                                      KILN_WARN_BIT(KILN_WARN_PHASE_MISMATCH)))
                   | v.warnings;
 
     const kiln_port_heat_t *h = app->ports.heat;
@@ -746,7 +908,7 @@ static void persist_fault(kiln_app_t *app, kiln_fault_t fault, uint32_t warnings
     f.kiln_c        = app->kiln_c;
     f.setpoint_c    = kiln_setpoint_value(&app->sp);
     f.case_c        = app->case_c;
-    f.current_a     = kiln_current_amps(&app->cur);
+    f.current_a     = cur_worst_amps(app, true);
     f.duty_permille = app->duty_request;
     f.warnings      = warnings;
 
@@ -989,7 +1151,9 @@ kiln_err_t kiln_app_start(kiln_app_t *app, const kiln_program_t *prog)
     kiln_pid_reset(&app->pid);
     kiln_safety_begin_run(&app->safety,
                           app->baseline_valid ? &app->baseline : NULL);
-    kiln_current_begin_run(&app->cur);
+    for (uint8_t i = 0; i < KILN_CUR_CHANNELS; i++) {
+        kiln_current_begin_run(&app->cur[i]);
+    }
 
     app->run_elapsed_s = 0.0;
     app->log_accum_s   = 0.0;
@@ -1142,7 +1306,9 @@ kiln_err_t kiln_app_manual(kiln_app_t *app, uint16_t duty_permille)
 
     if (app->state != KILN_STATE_MANUAL) {
         kiln_safety_begin_run(&app->safety, NULL);
-        kiln_current_begin_run(&app->cur);
+        for (uint8_t i = 0; i < KILN_CUR_CHANNELS; i++) {
+        kiln_current_begin_run(&app->cur[i]);
+    }
         kiln_runstate_record_init(&app->record, app->next_run_id++);
         app->run_elapsed_s = 0.0;
     }
@@ -1184,7 +1350,9 @@ kiln_err_t kiln_app_autotune(kiln_app_t *app, float setpoint_c)
     }
 
     kiln_safety_begin_run(&app->safety, NULL);
-    kiln_current_begin_run(&app->cur);
+    for (uint8_t i = 0; i < KILN_CUR_CHANNELS; i++) {
+        kiln_current_begin_run(&app->cur[i]);
+    }
     kiln_runstate_record_init(&app->record, app->next_run_id++);
     app->run_elapsed_s = 0.0;
     app->state         = KILN_STATE_AUTOTUNE;
@@ -1224,9 +1392,9 @@ void kiln_app_snapshot(const kiln_app_t *app, kiln_snapshot_t *out)
     out->rate_c_per_h   = app->rate_c_per_h;
     out->setpoint_c     = kiln_setpoint_value(&app->sp);
     out->duty_permille  = app->duty_request;
-    out->current_a      = kiln_current_amps(&app->cur);
-    out->current_ref_a  = kiln_current_ref(&app->cur);
-    out->current_flags  = kiln_current_flags(&app->cur);
+    out->current_a      = cur_worst_amps(app, true);
+    out->current_ref_a  = cur_ref_of_worst(app);
+    out->current_flags  = cur_flags_any(app);
     out->tc_fault_bits  = app->tc_fault_bits;
     out->case_fault_bits= app->case_fault_bits;
     out->state          = (uint8_t)app->state;

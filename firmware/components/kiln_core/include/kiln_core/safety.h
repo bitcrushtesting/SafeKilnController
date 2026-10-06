@@ -74,6 +74,15 @@ typedef struct {
     /* SR-10 setpoint excursion */
     float excursion_band_c;
     float excursion_window_s;
+    /* SR-31 door interlock.  Two tiers, for the same reason SR-09 has two:
+     * heat comes off the instant the switch reads open, with no timer at all,
+     * because that is what "immediately" has to mean for a door.  The *latch*
+     * waits for door_confirm_s so that a single sample corrupted by the
+     * switching noise of a multi-kilowatt load cannot stop a healthy firing --
+     * HZ-10 in safety.md, and the reason this is a confirm window and not a
+     * debounce on the inhibit. */
+    float door_confirm_s;
+
     /* SR-12 */
     float insulation_factor;
     /* FR-CTL-15 / warning 107 */
@@ -176,6 +185,16 @@ typedef struct {
     bool     current_deviation_valid;
     uint8_t  current_flags;            /* KILN_CURF_*                         */
 
+    /* --- door interlock, SR-31 ------------------------------------------ */
+
+    /* An interlock is fitted and enabled.  False stands the rule down and
+     * raises warning 113, as FR-CUR-12 does for a missing transformer: a
+     * floating input must not be read as a door that keeps opening. */
+    bool     door_monitoring;
+    /* True when the door is open.  With HR-21's normally-closed wiring this is
+     * also what a cut wire or a pulled connector reads as, which is the point. */
+    bool     door_open;
+
     /* SR-27: has the heat-enable line been de-asserted, so the contactor should
      * have opened?  The discrimination sequence is a statement about what the
      * current did after this went false. */
@@ -228,6 +247,7 @@ typedef struct {
     kiln_rule_state_t uncommanded;     /* SR-08 */
     kiln_rule_state_t excursion;       /* SR-10 */
     kiln_rule_state_t saturated;       /* warning 107 */
+    kiln_rule_state_t door;            /* SR-31 */
 
     /* SR-12 */
     kiln_insulation_baseline_t baseline;

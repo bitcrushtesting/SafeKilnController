@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<!--
+SPDX-FileCopyrightText: 2026 Bitcrush Testing
+SPDX-License-Identifier: GPL-3.0-or-later
+
+FR-WEB-02: every asset is served from the device.  No CDN, no external fonts, no
+telemetry, nothing that reaches off the box.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>KilnControl</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<header class="bar">
+  <div class="brand">
+    <span class="mark">KILN</span><span class="mark accent">CONTROL</span>
+  </div>
+  <div class="bar-right">
+    <span id="conn" class="conn" title="connection">
+      <i class="dot"></i><span id="conn-text">connecting</span>
+    </span>
+  </div>
+</header>
+
+<!-- FR-WEB-24: a persistent banner whenever a fault is latched or a warning is
+     active.  Lives above the views so it cannot be scrolled away from. -->
+<div id="banner" class="banner" hidden></div>
+
+<nav class="nav" role="tablist">
+  <button class="tab" data-view="dash"     aria-selected="true" data-i18n="dashboard">Dashboard</button>
+  <button class="tab" data-view="programs" data-i18n="programs">Programs</button>
+  <button class="tab" data-view="history" data-i18n="history">History</button>
+  <button class="tab" data-view="settings" data-i18n="settings">Settings</button>
+</nav>
+
+<main>
+  <!-- Dashboard -->
+  <section id="view-dash" class="view">
+    <div class="readouts">
+      <div class="readout big">
+        <span class="label" data-i18n="chamber">Chamber</span>
+        <span class="value" id="r-kiln">--<em>&deg;C</em></span>
+      </div>
+      <div class="readout">
+        <span class="label" data-i18n="target">Target</span>
+        <span class="value" id="r-sp">--<em>&deg;C</em></span>
+      </div>
+      <div class="readout">
+        <span class="label" data-i18n="rate">Rate</span>
+        <span class="value" id="r-rate">--<em>&deg;C/h</em></span>
+      </div>
+      <div class="readout">
+        <span class="label" data-i18n="duty">Duty</span>
+        <span class="value" id="r-duty">--<em>%</em></span>
+      </div>
+      <div class="readout">
+        <span class="label" data-i18n="current">Current</span>
+        <span class="value" id="r-current">--<em>A</em></span>
+      </div>
+      <div class="tile">
+        <span class="label" data-i18n="power">Power</span>
+        <span class="value" id="r-power">--<em>kW</em></span>
+      </div>
+      <div class="tile">
+        <span class="label" data-i18n="energy_run">Energy this run</span>
+        <span class="value" id="r-energy">--<em>kWh</em></span>
+      </div>
+    </div>
+
+    <div class="statusline">
+      <span id="s-state" class="pill">IDLE</span>
+      <span id="s-prog" class="muted"></span>
+      <span id="s-seg" class="muted"></span>
+      <span id="s-time" class="muted"></span>
+      <span id="s-heat" class="pill hot" hidden>HEAT</span>
+      <span id="s-hold" class="pill warn" hidden>HOLDBACK</span>
+    </div>
+
+    <div class="chart-wrap">
+      <canvas id="chart" height="320"></canvas>
+      <div class="chart-ctl">
+        <label><input type="checkbox" id="c-sp" checked> Setpoint</label>
+        <label><input type="checkbox" id="c-plan" checked> Planned</label>
+        <label><input type="checkbox" id="c-duty"> Duty</label>
+        <label><input type="checkbox" id="c-cur"> Current</label>
+        <label><input type="checkbox" id="c-case"> Enclosure</label>
+        <button id="c-reset" class="ghost" data-i18n="reset_zoom">Reset zoom</button>
+      </div>
+      <div class="hint">Drag to pan, scroll or pinch to zoom.</div>
+    </div>
+
+    <!-- FR-WEB-26: this interface observes; it does not command.  Starting,
+         pausing and aborting a firing, manual heating and acknowledging a
+         fault all happen at the kiln.  There are no buttons here because the
+         API would refuse them, and a button that always errors is worse than
+         no button. -->
+    <p id="power-basis" class="hint"></p>
+    <p class="readonly-note">
+      <strong>Display only.</strong> Starting, pausing and aborting a firing,
+      manual heating and acknowledging a fault are done at the kiln
+      &mdash; not over the network.
+    </p>
+  </section>
+
+  <!-- Programs -->
+  <section id="view-programs" class="view" hidden>
+    <div class="split">
+      <div class="col">
+        <h2 data-i18n="programs">Programs</h2>
+        <ul id="prog-list" class="list"></ul>
+        <button id="b-new" class="primary" data-i18n="new_program">New program</button>
+      </div>
+      <div class="col">
+        <h2 id="ed-title" data-i18n="editor">Editor</h2>
+        <div id="ed-ro" class="note" hidden>
+          A built-in example is read-only. Copy it to make changes.
+        </div>
+        <label class="field">Name <input id="ed-name" maxlength="31"></label>
+        <label class="field">Description <input id="ed-desc" maxlength="95"></label>
+        <table class="segs">
+          <thead><tr>
+            <th>#</th><th>Target &deg;C</th><th>Rate &deg;C/h</th>
+            <th>Dwell min</th><th>Ack</th><th></th>
+          </tr></thead>
+          <tbody id="ed-body"></tbody>
+        </table>
+        <div class="controls">
+          <button id="b-addseg" data-i18n="add_segment">Add segment</button>
+          <button id="b-save" class="primary" data-i18n="save">Save</button>
+          <button id="b-copy" data-i18n="copy">Copy</button>
+          <button id="b-del" class="danger" data-i18n="delete">Delete</button>
+        </div>
+        <div id="ed-msg" class="note" hidden></div>
+        <canvas id="ed-chart" height="200"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- History -->
+  <section id="view-history" class="view" hidden>
+    <h2 data-i18n="run_history">Run history</h2>
+    <ul id="run-list" class="list"></ul>
+    <div class="chart-wrap">
+      <canvas id="hist-chart" height="300"></canvas>
+      <div class="chart-ctl">
+        <a id="dl-csv" class="ghost" download data-i18n="dl_csv">Download CSV</a>
+        <a id="dl-json" class="ghost" download data-i18n="dl_json">Download JSON</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Settings -->
+  <section id="view-settings" class="view" hidden>
+    <h2 data-i18n="settings">Settings</h2>
+    <div id="cfg-groups"></div>
+    <p class="readonly-note">
+      <strong>Display only.</strong> Configuration holds the maximum temperature
+      and the safety thresholds, so it is changed at the kiln (FR-WEB-26).
+    </p>
+    <div id="cfg-msg" class="note" hidden></div>
+
+    <h2 data-i18n="tuning">Tuning</h2>
+    <p class="readonly-note">
+      <strong>Display only.</strong> A tuning run heats the kiln, so it is
+      started and accepted at the kiln. Progress is shown here.
+    </p>
+    <div id="tune-state" class="note" hidden></div>
+
+    <h2 data-i18n="diagnostics">Diagnostics</h2>
+    <pre id="diag" class="diag">loading</pre>
+
+  </section>
+</main>
+
+<footer class="foot">
+  <span id="foot-ver" class="muted"></span>
+</footer>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>

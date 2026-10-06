@@ -90,23 +90,32 @@ too.
 
 Fault injection, each toggling:
 
+> `0` and `d` are deliberately separate. `0` is the plant, an open lid losing
+> heat, which is what `SR-07` infers from duty and rate of rise. `d` is the
+> interlock *switch*. Keeping them apart is what lets you exercise a switch that
+> has failed open on a shut door, or a genuinely open door on a kiln with no
+> interlock. A realistic "operator opened the door" is both at once.
+
 | Key | Injection | Rule it exercises |
 |---|---|---|
-| `1` | Relay fail-on — current with heating commanded off | `SR-25`, then `SR-27` |
-| `2` | Relay fail-off — no current with heating commanded on | `SR-26` |
-| `3` | Welded contactor — current persists after the contactor opens | `SR-27` |
-| `4` | Partial element loss — one group of three | `SR-28` |
+| `1` | Relay fail-on, current with heating commanded off | `SR-25`, then `SR-27` |
+| `2` | Relay fail-off, no current with heating commanded on | `SR-26` |
+| `3` | Welded contactor, current persists after the contactor opens | `SR-27` |
+| `4` | Partial element loss, one group of three | `SR-28` |
 | `5` | Over-current | `SR-29` |
 | `6` | Current transformer disconnected | `FR-CUR-11`, `FR-CUR-12` |
 | `7` | SSR shorted | `SR-08` and `SR-25` together |
 | `8` | Thermocouple open | `SR-04` |
 | `9` | Thermocouple stuck | `SR-06` |
-| `0` | Lid opened mid-firing | `SR-07` |
+| `0` | Lid opened mid-firing, the *thermal* model: heat loss, no switch | `SR-07` |
+| `d` | Door interlock switch reads open | `SR-31` |
+| `D` | No door interlock fitted | warning 113 |
+| `P` | Toggle the 1 / 3 phase strap | `HR-22`, warning 114 |
 | `x` | Clear every injection | |
 
 Try `3` then `7` together during a firing: the contactor is welded shut *and* the
 SSR is passing current, so `SR-25` sees current in an off-window, withholds heat,
-opens the contactor — and the current does not stop. That is the discrimination
+opens the contactor, and the current does not stop. That is the discrimination
 sequence of `SR-27`, and it latches fault 22 with the instruction to isolate the
 kiln at its supply. Press `7` alone and the same symptom resolves to fault 21: the
 contactor opened, so it is only the SSR that has failed.
@@ -119,7 +128,7 @@ acquisition, control and safety cycles, keeping the two consistent. A four-hour
 schedule completes in about four minutes.
 
 The 10 ms output window and the current-measurement settle and burst timings are
-deliberately **not** accelerated — those are real hardware timings, and leaving
+deliberately **not** accelerated, those are real hardware timings, and leaving
 them real is what makes the gating of
 [`AD-17`](architecture.md#3-key-decisions) meaningful here.
 
@@ -128,21 +137,21 @@ them real is what makes the gating of
 ## 3. What QEMU does and does not prove
 
 QEMU's `esp32s3` model provides a CPU, memory, flash and a UART. It does not
-model a MAX31856 on SPI, an SSD1306 on I²C, the ADC, or PCNT — so there is
+model a MAX31856 on SPI, an SSD1306 on I²C, the ADC, or PCNT, so there is
 nothing for a thermocouple driver to talk to and nothing for the CT front end to
 sample. Substituting the plant at the port boundary is what makes the exercise
 possible at all.
 
 **Exercised:** the task structure and its periods, the real `kiln_core` logic end
 to end against a plant that responds, the state machine, the window and
-current-gating timing, every fault injection — all on the target's own compiler,
+current-gating timing, every fault injection, all on the target's own compiler,
 scheduler and single-precision FPU.
 
 **Storage is not simulated.** QEMU emulates the flash, so NVS and the `kilnlog`
 partition are real: the configuration persists, the sample log is a real ring on
 real sectors, and `SR-17`'s latched fault survives a restart. Press `R` to list
 stored run records and `l` to erase the log and watch the ring start over. The one
-exception is the program and run-record file store, which is still RAM — the
+exception is the program and run-record file store, which is still RAM, the
 LittleFS adapter does not exist yet, because LittleFS is not in the ESP-IDF tree
 and `CON-04` forbids pulling it at build time, so it has to be vendored first.
 
@@ -153,8 +162,8 @@ hardware (`TR-17`, `SR-02`); flash endurance; WiFi; and anything else that needs
 a pin. Those are target and HIL work.
 
 The simulator does model the charge pump as a *decay timeout*, so the firmware's
-side of the property — that nothing refreshes the pump when the safety task stops,
-and the contactor releases — is tested (`ad05_a_stopped_safety_cycle_releases_the_contactor`
+side of the property, that nothing refreshes the pump when the safety task stops,
+and the contactor releases, is tested (`ad05_a_stopped_safety_cycle_releases_the_contactor`
 in the integration suite). Whether the real circuit reaches the contactor's
 drop-out voltage inside [`NFR-04`](requirements.md#4-non-functional-requirements)'s
 one second is a question about resistors, and is open as tasklist item A7.

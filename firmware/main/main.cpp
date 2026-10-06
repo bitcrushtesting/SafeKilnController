@@ -180,6 +180,8 @@ static void print_help(void)
            "  c  clear the latched fault        m  manual 50%% duty\n"
            "  i  idle\n"
            "  Fault injection (toggle):\n"
+           "   d  door switch open (SR-31)     D  no interlock fitted (warn 113)\n"
+           "   P  toggle the 1/3-phase strap (HR-22)\n"
            "   1  relay fail-on (SR-25/SR-27)   2  relay fail-off (SR-26)\n"
            "   3  welded contactor (SR-27)      4  partial element loss (SR-28)\n"
            "   5  over-current (SR-29)          6  CT disconnected (FR-CUR-11)\n"
@@ -238,6 +240,17 @@ static void handle_key(int ch)
     case '8': toggle_inject(KILN_INJ_TC_OPEN,         "thermocouple open (SR-04)"); break;
     case '9': toggle_inject(KILN_INJ_TC_STUCK,        "thermocouple stuck (SR-06)"); break;
     case '0': toggle_inject(KILN_INJ_LID_OPEN,        "lid open (SR-07)"); break;
+    case 'd': toggle_inject(KILN_INJ_DOOR_SWITCH_OPEN, "door switch open (SR-31)"); break;
+    case 'D': toggle_inject(KILN_INJ_DOOR_ABSENT,      "no door interlock fitted (warning 113)"); break;
+    case 'P': {
+        /* HR-22: move the strap.  Takes effect on the next boot in hardware;
+         * here it is immediate, which is the one way the simulation is kinder
+         * than the board. */
+        const uint8_t now = (kiln_sim_phases(&s_sim) == 3u) ? 1u : 3u;
+        kiln_sim_set_phases(&s_sim, now);
+        ESP_LOGW(TAG, "phase strap: %u-phase (restart to re-read on hardware)", now);
+        break;
+    }
     case 'x': kiln_sim_clear(&s_sim, 0xFFFFFFFFu);
               ESP_LOGW(TAG, "all injections cleared"); break;
     case 'h': print_help(); break;
@@ -421,6 +434,8 @@ extern "C" void app_main(void)
     ports.heat     = &s_sim_ports.heat;
     ports.current  = &s_sim_ports.current;
     ports.counters = &s_sim_ports.counters;
+    ports.door     = &s_sim_ports.door;        /* SR-31 */
+    ports.phase    = &s_sim_ports.phase;       /* HR-22 */
 
     /* Programs and run records.  RAM, until LittleFS is vendored -- see the note
      * on kiln_sim_fs_t. */

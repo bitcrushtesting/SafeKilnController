@@ -1,0 +1,262 @@
+/* SPDX-FileCopyrightText: 2026 Bitcrush Testing
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * Visual language follows bitcrushtesting.com: a near-black ground (#0a0a0a),
+ * blaze orange as the single accent (#ff5f1f), angular rather than rounded, and
+ * heavy uppercase titles on tight tracking.
+ *
+ * The site uses Orbitron for titles and Inter for body text.  Neither is used
+ * here, because architecture 12.4 budgets *zero bytes* for fonts -- every asset
+ * is served from a device with a 2 MB application partition, and a variable Inter
+ * alone is several times the entire asset budget.  The brand is carried by the
+ * treatment instead: weight 900, uppercase, letter-spacing -0.01em on a system
+ * stack, which is what reads as Orbitron at a glance.
+ *
+ * FR-WEB-26: both schemes, following the browser.  Dark is the primary
+ * expression; light is a faithful inversion rather than an afterthought, because
+ * a workshop in daylight is a real place.
+ */
+
+:root {
+  --accent: #ff5f1f;
+  --ok:     #34d399;
+  --warn:   #fbbf24;
+  --bad:    #f87171;
+  --info:   #60a5fa;
+
+  /* Light, defined on bare :root so a browser with no preference gets a
+   * complete palette (never only inside a media query). */
+  --bg:      #f3f4f6;
+  --surface: #ffffff;
+  --raised:  #f9fafb;
+  --line:    #e5e7eb;
+  --text:    #0a0a0a;
+  --dim:     #6b7280;
+  --faint:   #9ca3af;
+
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --gap: 1rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:      #0a0a0a;
+    --surface: #121212;
+    --raised:  #1a1a1a;
+    --line:    #262626;
+    --text:    #f3f4f6;
+    --dim:     #9ca3af;
+    --faint:   #6b6860;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0a0a0a; --surface: #121212; --raised: #1a1a1a; --line: #262626;
+  --text: #f3f4f6; --dim: #9ca3af; --faint: #6b6860;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 var(--sans);
+  /* FR-WEB-03: never a horizontal scroll of the page body. */
+  overflow-x: hidden;
+}
+
+/* --- chrome ------------------------------------------------------------- */
+
+.bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--gap);
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.brand { font-weight: 900; letter-spacing: -0.01em; text-transform: uppercase; font-size: 1.05rem; }
+.mark.accent { color: var(--accent); }
+
+.conn { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.8rem; color: var(--dim); }
+.dot { width: 8px; height: 8px; background: var(--faint); display: inline-block; }
+.conn.live .dot { background: var(--ok); }
+.conn.stale .dot { background: var(--warn); }
+.conn.down .dot { background: var(--bad); }
+
+/* FR-WEB-24 */
+.banner {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--line);
+  border-left: 3px solid var(--bad);
+  background: color-mix(in srgb, var(--bad) 12%, var(--surface));
+  font-size: 0.9rem;
+}
+.banner.warn { border-left-color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, var(--surface)); }
+.banner b { text-transform: uppercase; letter-spacing: 0.02em; }
+.banner ul { margin: 0.35rem 0 0; padding-left: 1.1rem; }
+
+.nav { display: flex; gap: 0; border-bottom: 1px solid var(--line); background: var(--surface); overflow-x: auto; }
+.tab {
+  appearance: none; background: none; border: 0; border-bottom: 2px solid transparent;
+  color: var(--dim); font: inherit; font-size: 0.82rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 0.7rem 1rem; cursor: pointer; white-space: nowrap;
+}
+.tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+.tab:hover { color: var(--text); }
+
+main { padding: var(--gap); max-width: 1100px; margin: 0 auto; }
+.view > h2, .col > h2 {
+  font-size: 0.78rem; font-weight: 900; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--dim);
+  margin: 1.6rem 0 0.6rem; padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--line);
+}
+.view > h2:first-child, .col > h2:first-child { margin-top: 0; }
+.foot { padding: 1rem; border-top: 1px solid var(--line); font-size: 0.75rem; }
+.muted { color: var(--dim); }
+
+/* --- readouts ----------------------------------------------------------- */
+
+.readouts {
+  display: grid; gap: 1px; background: var(--line);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  border: 1px solid var(--line);
+}
+.readout { background: var(--surface); padding: 0.8rem 0.9rem; }
+.readout .label {
+  display: block; font-size: 0.68rem; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--dim); margin-bottom: 0.2rem;
+}
+.readout .value {
+  /* Tabular figures, or a live temperature jitters sideways as digits change --
+   * which on a readout you watch for hours is genuinely distracting. */
+  font-variant-numeric: tabular-nums;
+  font-weight: 700; font-size: 1.5rem; letter-spacing: -0.02em;
+  display: block; white-space: nowrap;
+}
+.readout.big { grid-column: span 2; }
+.readout.big .value { font-size: 2.6rem; color: var(--accent); }
+.readout .value em { font-style: normal; font-size: 0.5em; color: var(--dim); margin-left: 0.15em; }
+.readout.stale .value { opacity: 0.45; }
+
+.statusline { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0.9rem 0; font-size: 0.85rem; }
+.pill {
+  font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 0.2rem 0.5rem; border: 1px solid var(--line); color: var(--dim);
+}
+.pill.hot  { color: var(--accent); border-color: var(--accent); }
+.pill.warn { color: var(--warn);   border-color: var(--warn); }
+.pill.bad  { color: var(--bad);    border-color: var(--bad); }
+.pill.run  { color: var(--ok);     border-color: var(--ok); }
+
+/* --- chart -------------------------------------------------------------- */
+
+.chart-wrap { margin: 1rem 0; border: 1px solid var(--line); background: var(--surface); }
+canvas { display: block; width: 100%; touch-action: none; }
+.chart-ctl {
+  display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: center;
+  padding: 0.6rem 0.8rem; border-top: 1px solid var(--line);
+  font-size: 0.78rem; color: var(--dim);
+}
+.chart-ctl label { display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+.hint { padding: 0 0.8rem 0.6rem; font-size: 0.7rem; color: var(--faint); }
+
+/* --- controls ----------------------------------------------------------- */
+
+.controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.8rem 0; }
+button, .ghost, select, input {
+  font: inherit; font-size: 0.85rem;
+  background: var(--raised); color: var(--text);
+  border: 1px solid var(--line); border-radius: 2px;
+  padding: 0.45rem 0.8rem;
+}
+button, .ghost { cursor: pointer; font-weight: 700; letter-spacing: 0.02em; text-decoration: none; }
+button:hover:not(:disabled) { border-color: var(--faint); }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #0a0a0a; }
+button.danger  { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
+button.ghost, .ghost { background: none; color: var(--dim); }
+input[type="number"] { width: 5.5rem; font-variant-numeric: tabular-nums; }
+label.inline { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--dim); }
+.field { display: block; margin: 0.5rem 0; font-size: 0.78rem; color: var(--dim); }
+.field input { display: block; width: 100%; margin-top: 0.2rem; }
+
+/* --- lists, tables, notes ---------------------------------------------- */
+
+.split { display: grid; gap: 1.5rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
+.col { min-width: 0; }
+.list { list-style: none; margin: 0 0 0.8rem; padding: 0; border: 1px solid var(--line); }
+.list li {
+  padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--line);
+  background: var(--surface); cursor: pointer; font-size: 0.88rem;
+  display: flex; justify-content: space-between; gap: 0.6rem; align-items: baseline;
+}
+.list li:last-child { border-bottom: 0; }
+.list li:hover { background: var(--raised); }
+.list li[aria-selected="true"] { border-left: 3px solid var(--accent); padding-left: calc(0.8rem - 3px); }
+.list .sub { color: var(--dim); font-size: 0.76rem; font-variant-numeric: tabular-nums; }
+.list .ro { color: var(--faint); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; }
+
+.segs { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.segs th {
+  text-align: left; font-size: 0.66rem; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--dim); font-weight: 700;
+  padding: 0.3rem 0.35rem; border-bottom: 1px solid var(--line);
+}
+.segs td { padding: 0.2rem 0.35rem; border-bottom: 1px solid var(--line); }
+.segs input[type="number"] { width: 100%; padding: 0.3rem 0.4rem; }
+.segs .rowbtn { padding: 0.2rem 0.4rem; font-size: 0.75rem; }
+
+.note {
+  margin: 0.7rem 0; padding: 0.6rem 0.8rem; font-size: 0.82rem;
+  border-left: 3px solid var(--info); background: var(--raised); color: var(--dim);
+}
+.note.bad { border-left-color: var(--bad); color: var(--text); }
+.note.ok  { border-left-color: var(--ok); }
+.diag { font: 12px/1.5 var(--mono); background: var(--raised); border: 1px solid var(--line); padding: 0.8rem; overflow-x: auto; color: var(--dim); }
+
+.cfg-group { border: 1px solid var(--line); margin-bottom: 1rem; }
+.cfg-group > summary {
+  padding: 0.6rem 0.8rem; cursor: pointer; background: var(--surface);
+  font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+}
+.cfg-item {
+  display: grid; gap: 0.3rem 0.8rem; align-items: baseline;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 0.55rem 0.8rem; border-top: 1px solid var(--line);
+}
+.cfg-item .k { font-size: 0.82rem; }
+.cfg-item .meta { grid-column: 1 / -1; font-size: 0.7rem; color: var(--faint); font-variant-numeric: tabular-nums; }
+.cfg-item input, .cfg-item select { max-width: 11rem; }
+.cfg-item.locked input, .cfg-item.locked select { opacity: 0.5; }
+.tagline { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--warn); }
+
+/* FR-WEB-03: a 360 px phone, with the readouts stacking rather than squeezing. */
+@media (max-width: 720px) {
+  .split { grid-template-columns: 1fr; }
+  .readout.big { grid-column: 1 / -1; }
+  main { padding: 0.8rem; }
+  .readout.big .value { font-size: 2.1rem; }
+}
+
+/* FR-WEB-26: the interface observes.  Stated plainly where controls used to
+   be, so the absence reads as a decision rather than a missing feature. */
+.readonly-note {
+    margin: .75rem 0;
+    padding: .6rem .8rem;
+    border-left: 3px solid var(--accent, #888);
+    background: rgba(128, 128, 128, .08);
+    font-size: .9rem;
+}
+.readonly-note strong { font-weight: 600; }
+
+/* NFR-23: the language selector sits with the tabs, not buried in settings,
+   because somebody who cannot read the interface cannot navigate to settings. */
+.lang {
+    margin-left: auto;
+    align-self: center;
+    font: inherit;
+    padding: .2rem .4rem;
+}

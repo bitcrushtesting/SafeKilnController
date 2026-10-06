@@ -37,6 +37,8 @@ void kiln_safety_cfg_defaults(kiln_safety_cfg_t *cfg)
         .excursion_band_c         = 50.0f,   /* SR-10 */
         .excursion_window_s       = 120.0f,
 
+        .door_confirm_s           = 0.2f,    /* SR-31 */
+
         .insulation_factor        = 1.3f,    /* SR-12 */
         .saturated_warn_s         = 600.0f,  /* warning 107 */
 
@@ -105,6 +107,10 @@ static bool clamp_cfg(kiln_safety_cfg_t *c)
     if (c->overcurrent_windows == 0) {
         c->overcurrent_windows = 1;
     }
+    /* SR-22: bounded, and the lower bound is not zero-with-an-escape -- 0 s is
+     * a legitimate setting here (latch on the first open sample) and the upper
+     * bound keeps the latch inside NFR-04's 500 ms whatever is configured. */
+    c->door_confirm_s     = kiln_clampf(c->door_confirm_s, 0.0f, 0.5f);
     c->fail_off_fraction  = kiln_clampf(c->fail_off_fraction, 0.0f, 1.0f);
     c->weld_wait_s        = kiln_clampf(c->weld_wait_s, 0.1f, 10.0f);
     /* The verdict budget must leave room for at least one measurement after the
@@ -733,6 +739,48 @@ kiln_err_t kiln_safety_eval_checked(kiln_safety_t *s,
     return KILN_OK;
 }
 
+/* SR-31: door / lid interlock.
+ *
+ * The one rule in the table that needs no history, no timer and no trust in
+ * any other reading -- which is why kiln_safety_eval runs it first, ahead even
+ * of SR-13.  A door that is open is a fact; everything else here is an
+ * inference from a measurement.
+ *
+ * Two tiers, as SR-09 has:
+ *   - heat is withheld and the contactor dropped on the FIRST open sample, with
+ *     no delay, because that is the whole point of a door switch;
+ *   - the fault latches only once the door has read open for door_confirm_s,
+ *     so a single noise-corrupted sample costs a fraction of a second of duty
+ *     rather than stopping a healthy firing (HZ-10).
+ *
+ * It latches only while heating_active.  Opening the door of an idle kiln is
+ * what loading one looks like, and a controller that demanded an
+ * acknowledgement for it would teach its operator to clear faults reflexively.
+ */
+static kiln_fault_t rule_door(kiln_safety_t *s, const kiln_safety_input_t *in,
+                              kiln_safety_verdict_t *v, float dt_s)
+{
+    if (!in->door_monitoring) {
+        s->door.timer_s = 0.0f;
+        return KILN_FAULT_NONE;
+    }
+    if (!in->door_open) {
+        s->door.timer_s = 0.0f;
+        return KILN_FAULT_NONE;
+    }
+
+    /* Tier one, unconditional and immediate. */
+    v->heat_permitted = false;
+    v->drop_contactor = true;
+
+    /* Tier two. */
+    s->door.timer_s += dt_s;
+    if (in->heating_active && s->door.timer_s >= s->cfg.door_confirm_s) {
+        return KILN_FAULT_DOOR_OPEN;
+    }
+    return KILN_FAULT_NONE;
+}
+
 kiln_safety_verdict_t kiln_safety_eval(kiln_safety_t *s,
                                        const kiln_safety_input_t *in,
                                        float dt_s)
@@ -761,7 +809,21 @@ kiln_safety_verdict_t kiln_safety_eval(kiln_safety_t *s,
                          kiln_is_finite(in->rate_c_per_h);
     const bool case_ok = in->case_valid && kiln_is_finite(in->case_c);
 
-    /* SR-13 first: if the loop timing itself is broken, nothing downstream can
+    /* SR-31 before everything, including SR-13.  A door switch is a direct
+     * physical signal: it does not depend on the loop having met its deadline,
+     * on a reading being believable, or on any timer having run.  If the door
+     * is open the kiln must not be heating, whatever else is also wrong. */
+    {
+        const kiln_fault_t f = rule_door(s, in, &v, dt_s);
+        if (f != KILN_FAULT_NONE) { v.heat_permitted = false; v.fault = f; goto done; }
+    }
+    if (!in->door_monitoring) {
+        warnings |= KILN_WARN_BIT(KILN_WARN_DOOR_OFF);
+    }
+    /* Heat already withheld by tier one; keep evaluating so a door left open
+     * does not mask a fault that also wants latching. */
+
+    /* SR-13: if the loop timing itself is broken, nothing downstream can
      * be trusted. */
     if (in->safety_deadline_missed)  { v.heat_permitted = false; v.fault = KILN_FAULT_SAFETY_DEADLINE;  goto done; }
     if (in->control_deadline_missed) { v.heat_permitted = false; v.fault = KILN_FAULT_CONTROL_DEADLINE; goto done; }
@@ -918,6 +980,11 @@ bool kiln_safety_can_clear(const kiln_safety_cfg_t *cfg,
         return in->tc_fault_bits == 0;
     case KILN_FAULT_CASE_TC:
         return in->case_fault_bits == 0;
+
+    /* SR-31: clearable once the door is shut again, and not before.  Reuses the
+     * input the detector reads, so the two cannot disagree. */
+    case KILN_FAULT_DOOR_OPEN:
+        return !in->door_monitoring || !in->door_open;
 
     /* Temperature faults: clearable once the kiln is back inside its limit. */
     case KILN_FAULT_OVERTEMP:

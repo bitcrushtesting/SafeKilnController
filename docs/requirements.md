@@ -3,12 +3,12 @@ SPDX-FileCopyrightText: 2026 Bitcrush Testing
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-# KilnControl — Requirements Specification
+# KilnControl, Requirements Specification
 
 | | |
 |---|---|
 | **Document** | Requirements Specification |
-| **Project** | KilnControl — PID kiln controller |
+| **Project** | KilnControl, PID kiln controller |
 | **Version** | 0.1 (draft) |
 | **Date** | 2026-09-26 |
 | **Status** | For review |
@@ -121,13 +121,13 @@ Identifier prefixes:
 
 | Ref | Document |
 |---|---|
-| [R1] | [PIDKiln](https://github.com/Saur0o0n/PIDKiln) by Adrian Siemieniak — ESP32 kiln controller, the functional inspiration for this project (GPL-3.0). |
+| [R1] | [PIDKiln](https://github.com/Saur0o0n/PIDKiln) by Adrian Siemieniak, ESP32 kiln controller, the functional inspiration for this project (GPL-3.0). |
 | [R2] | Espressif, *ESP-IDF Programming Guide*, v5.x. |
 | [R3] | Analog Devices, *MAX31856 Precision Thermocouple to Digital Converter with Linearization*, datasheet. |
-| [R4] | IEC 60584-1, *Thermocouples — Part 1: EMF specifications and tolerances*. |
+| [R4] | IEC 60584-1, *Thermocouples, Part 1: EMF specifications and tolerances*. |
 | [R5] | K. J. Åström, T. Hägglund, *PID Controllers: Theory, Design and Tuning*, 2nd ed., 1995. |
 | [R6] | IEC 60519-1, *Safety in installations for electroheating and electromagnetic processing*. |
-| [R7] | GNU General Public License version 3 — [`../LICENSE`](../LICENSE). |
+| [R7] | GNU General Public License version 3, [`../LICENSE`](../LICENSE). |
 
 ### 1.6 Relationship to PIDKiln
 
@@ -293,7 +293,7 @@ stateDiagram-v2
 | **FR-TUN-03** | The operator shall specify the tuning setpoint; the system shall reject a setpoint above the configured maximum temperature or below ambient + 50 °C. | M | T |
 | **FR-TUN-04** | The relay output shall be bounded by a configurable output amplitude *d* (10–100 % duty, default 50 %) and a configurable hysteresis (0.1–20 °C, default 1 °C). | M | T |
 | **FR-TUN-05** | The system shall discard the first oscillation cycle and shall require at least **3** further cycles whose successive periods agree within 15 % and whose amplitudes agree within 20 % before accepting a result. | M | T |
-| **FR-TUN-06** | The system shall derive gains using selectable rules — **Ziegler–Nichols** (classic, aggressive) and **Tyreus–Luyben** (conservative, default) — and shall present both candidate gain sets to the operator. | M | T |
+| **FR-TUN-06** | The system shall derive gains using selectable rules, **Ziegler–Nichols** (classic, aggressive) and **Tyreus–Luyben** (conservative, default), and shall present both candidate gain sets to the operator. | M | T |
 | **FR-TUN-07** | The system shall abort tuning and enter Fault if any safety requirement in [§5](#5-safety-requirements) trips, if no valid oscillation is identified within a configurable timeout (10–480 min, default 120 min), or if the operator cancels. | M | T |
 | **FR-TUN-08** | Aborted tuning shall leave the previously stored gains unchanged. | M | T |
 | **FR-TUN-09** | The system shall not store tuning results automatically; the operator shall explicitly accept a result before it replaces the active gains. | M | D |
@@ -349,6 +349,7 @@ stateDiagram-v2
 | **FR-HMI-10** | The operator shall be able to, from the local input alone: select and start a stored program, pause/resume, abort a run, acknowledge a fault, and read the WiFi address. | M | D |
 | **FR-HMI-11** | Starting a program and aborting a run from the local input shall require a confirmation step. | M | D |
 | **FR-HMI-12** | The system shall support a configurable display dim/blank timeout (0 = never, 10–3600 s) which shall be suspended while a fault is active. | C | T |
+| **FR-HMI-15** | The local display shall render operator text in the language of `hmi.language` ([NFR-23](#4-non-functional-requirements)). Short labels shall fit the display in every language provided; a translation that does not fit is a defect in the translation, not a reason to truncate at runtime. | M | T |
 | **FR-HMI-13** | Temperature shall be displayed in °C or °F according to configuration; all internal computation, storage and API values shall remain in °C. | S | T |
 | **FR-HMI-14** | If the display fails to initialise or stops acknowledging on I²C, the system shall log the fault and continue controlling the kiln. | M | T |
 
@@ -369,17 +370,18 @@ stateDiagram-v2
 | **FR-WEB-11** | The interface shall render a chart of a **24 h run at 10 s resolution (≈8600 points)** within 2 s on a mid-range phone, decimating server-side as needed. | M | T |
 | **FR-WEB-12** | The interface shall provide a graphical/tabular program editor with add, insert, delete, reorder and duplicate of segments, and shall preview the resulting curve before saving. | M | D |
 | **FR-WEB-13** | The editor shall validate input client-side *and* the server shall re-validate on save; the server shall never rely on client-side validation. | M | T |
-| **FR-WEB-14** | The interface shall allow starting, pausing, resuming and aborting a run, and shall require confirmation for start and abort. | M | D |
-| **FR-WEB-15** | The interface shall allow setting the manual-mode target temperature and adjusting the remaining segments of a running program ([FR-PRG-10](#34-firing-programs-fr-prg)). | M | D |
-| **FR-WEB-16** | The interface shall allow starting, monitoring, cancelling and accepting an automatic PID tuning run. | M | D |
-| **FR-WEB-17** | The interface shall expose all configuration items of [FR-CFG-01](#39-configuration-fr-cfg) with their units, ranges and defaults shown. | M | D |
+| **FR-WEB-14** | The interface shall **not** provide any means of starting, pausing, resuming or aborting a run. Run control is available only at the kiln ([FR-WEB-26](#37-web-interface-fr-web)). Run *state* shall remain fully readable. | M | T |
+| **FR-WEB-15** | The interface shall **not** provide manual heating, nor adjustment of the remaining segments of a running program. Both are available only at the kiln ([FR-WEB-26](#37-web-interface-fr-web)). | M | T |
+| **FR-WEB-16** | The interface shall allow **monitoring** an automatic PID tuning run. It shall not start, cancel or accept one: a tuning run drives the kiln through relay oscillation and is a firing by another name ([FR-WEB-26](#37-web-interface-fr-web)). | M | T |
+| **FR-WEB-17** | The interface shall **display** all configuration items of [FR-CFG-01](#39-configuration-fr-cfg) with their units, ranges and defaults, and shall not write any of them. The configured maximum temperature and the safety thresholds live here ([FR-WEB-26](#37-web-interface-fr-web)). | M | T |
 | **FR-WEB-18** | The interface shall allow downloading a run's log as **CSV** and as **JSON**. | M | T |
 | **FR-WEB-19** | The system shall expose a documented JSON/REST API; the web UI shall use only that API, adding no privileged back channel. | M | I,T |
 | **FR-WEB-20** | The API shall return errors as a JSON object with a machine-readable code and a human-readable message, using conventional HTTP status codes. | M | T |
 | **FR-WEB-21** | The system shall serve at least **4** concurrent HTTP clients without the control loop missing a period ([NFR-02](#4-non-functional-requirements)). | M | T |
 | **FR-WEB-22** | Web assets shall be pre-compressed and served with `Content-Encoding: gzip`, and static assets shall carry cache headers keyed to the firmware version. | S | T |
-| **FR-WEB-23** | The interface shall support optional password protection; when enabled, all state-changing endpoints shall require authentication ([NFR-19](#4-non-functional-requirements)). | M | T |
+| **FR-WEB-23** | The interface shall support optional password protection; when enabled, every remaining state-changing endpoint, which after [FR-WEB-26](#37-web-interface-fr-web) means program authoring alone, shall require authentication ([NFR-19](#4-non-functional-requirements)). | M | T |
 | **FR-WEB-24** | The interface shall display a clear, persistent banner whenever a fault is latched or a warning is active. | M | D |
+| **FR-WEB-26** | **The web interface shall be an observation surface.** No endpoint reachable over the network shall be able to put heat into the kiln, change its configuration, or clear a latched fault. Specifically: starting, pausing, resuming or aborting a run; manual heating; starting, cancelling or accepting a tuning run; editing the segments of a running program; writing or resetting configuration; acknowledging a fault; and calibrating the current transformer shall all be unavailable over the network and available only at the kiln. Authoring and storing firing **programs** remains permitted, because a stored program cannot heat anything until it is started at the kiln. A refused request shall return `403` with the code `read_only` and shall name where the control actually is. | M | T |
 | **FR-WEB-25** | The interface shall remain functional with a lost connection, showing stale-data and reconnection state rather than silently displaying old values as current. | S | T |
 | **FR-WEB-26** | The interface shall be operable in light and dark colour schemes following the browser preference. | C | D |
 
@@ -408,7 +410,7 @@ stateDiagram-v2
 | ID | Requirement | Pri | Ver |
 |---|---|---|---|
 | **FR-CFG-01** | The system shall hold all tunable parameters in a single versioned configuration structure in non-volatile storage, each item having a type, unit, range and default. | M | T |
-| **FR-CFG-02** | The configuration shall include at minimum: **safety** — maximum chamber temperature, maximum enclosure temperature, runaway detection parameters, power-loss recovery policy; **control** — Kp, Ki, Kd, loop period, PWM window, minimum on/off time, maximum duty, hold-back band, dwell tolerance; **sensing** — TC types, line filter frequency, filter time constant, calibration offset and gain for both channels; **tuning** — amplitude, hysteresis, rule, timeout; **current** — CT ratio and output type, nominal heater current, mains voltage, fail-on and fail-off thresholds and settle times, deviation bands, over-current limit, relay life limits, monitoring enable; **logging** — sample interval; **HMI** — units, dim timeout, alarm duration; **network** — WiFi mode and credentials, hostname, AP SSID and passphrase, NTP server, timezone; **security** — web password. | M | I |
+| **FR-CFG-02** | The configuration shall include at minimum: **safety**: maximum chamber temperature, maximum enclosure temperature, runaway detection parameters, power-loss recovery policy; **control**: Kp, Ki, Kd, loop period, PWM window, minimum on/off time, maximum duty, hold-back band, dwell tolerance; **sensing**: TC types, line filter frequency, filter time constant, calibration offset and gain for both channels; **tuning**: amplitude, hysteresis, rule, timeout; **current**: CT ratio and output type, nominal heater current, mains voltage, fail-on and fail-off thresholds and settle times, deviation bands, over-current limit, relay life limits, monitoring enable; **logging**: sample interval; **HMI**: units, dim timeout, alarm duration; **network**: WiFi mode and credentials, hostname, AP SSID and passphrase, NTP server, timezone; **security**: web password. | M | I |
 | **FR-CFG-03** | The system shall validate every configuration write against its declared range and shall reject the whole write atomically if any item is invalid. | M | T |
 | **FR-CFG-04** | The system shall apply a configuration change without a reboot wherever physically possible, and shall clearly mark items that require a reboot. | S | T |
 | **FR-CFG-05** | On reading a configuration written by an older firmware version, the system shall migrate it, filling new items with defaults; on reading an unreadable or corrupt configuration it shall fall back to defaults and raise a warning. | M | T |
@@ -435,14 +437,14 @@ stateDiagram-v2
 
 | ID | Requirement | Pri | Ver |
 |---|---|---|---|
-| **FR-UPD-01** | The system shall support firmware update over WiFi through the web interface. | M | T |
+| **FR-UPD-01** | The system shall **not** accept a firmware image over the network ([FR-WEB-26](#37-web-interface-fr-web)): an update path is total and persistent control of the heater, and the web interface is an observation surface. A local update path (USB/serial, or an update initiated at the kiln) shall be specified before release, see [OQ-08](#11-open-questions). Until then the device has **no field update path**, which is a known and accepted gap. | M | I |
 | **FR-UPD-02** | The system shall use dual OTA application partitions and shall fall back to the previous firmware if the new image fails to confirm itself as bootable. | M | T |
 | **FR-UPD-03** | The system shall verify the integrity of an uploaded image before marking it bootable, and shall reject an image that is not a valid application for this target. | M | T |
 | **FR-UPD-04** | The system shall refuse a firmware update while a run or autotune is in progress. | M | T |
 | **FR-UPD-05** | A firmware update shall preserve configuration, stored programs and run records; loss of sample log data across an update is acceptable if the log partition layout changes, and shall be stated in release notes. | M | T |
 | **FR-UPD-06** | The system shall report the running firmware version, build time, git revision and target in the interface and via the API. | M | T |
 | **FR-UPD-07** | The system shall report update progress and a clear success or failure result. | S | D |
-| **FR-UPD-08** | An unauthenticated client shall not be able to initiate a firmware update when web authentication is enabled. | M | T |
+| **FR-UPD-08** | No client, authenticated or otherwise, shall be able to initiate a firmware update over the network ([FR-UPD-01](#311-firmware-update-fr-upd), [FR-WEB-26](#37-web-interface-fr-web)). | M | T |
 
 ### 3.12 Heater current measurement (FR-CUR)
 
@@ -498,10 +500,14 @@ stateDiagram-v2
 | **NFR-20** | The device is designed for a **trusted local network**. It shall not be exposed directly to the internet, and the documentation shall state this. | M | I |
 | **NFR-21** | The system shall not transmit any data to any third party. | M | I |
 | **NFR-22** | The system shall have no hardcoded credentials, no default-enabled remote access other than the documented local interface, and no undocumented service ports. | M | I |
-| **NFR-23** | Operator-facing text shall be English, held in a single resource location to permit later translation, with no text embedded at its point of use. | C | I |
+| **NFR-23** | Operator-facing text shall be held in a **single resource location**, indexed by language, with no text embedded at its point of use. **English and German** shall both be provided, selected by the `hmi.language` configuration item and offered on the local display and in the web interface. A language with no entry for a string shall fall back to English rather than showing nothing. Diagnostic output, the event log and requirement identifiers shall remain English regardless of the setting, so that a fault quoted in a report reads the same whoever filed it. | M | T |
 | **NFR-24** | The system shall log internally at selectable verbosity, and production builds shall not emit debug output on the pins used by any peripheral. | M | I |
 | **NFR-25** | Code shall build warning-free with `-Wall -Wextra -Werror` and shall pass the project's static analysis configuration. | M | A |
 | **NFR-26** | Documentation shall cover: assembly and wiring, mains safety, commissioning, autotuning, program authoring, the REST API, the log record format, and current-transformer fitting and calibration. | M | I |
+| **FR-CUR-15** | The system shall support **one current transformer per phase**, up to three, and shall measure each independently. Each channel shall keep its own reference current ([FR-CUR-08](#312-heater-current-measurement-fr-cur)) and its own deviation band, because the loss of one element group is a step change on one phase and is barely visible in a total. The safety rules of [SR-25](#52-detection-requirements) to [SR-30](#52-detection-requirements) shall be evaluated against the worst phase: the highest reading for fail-on and over-current, the lowest conduction for fail-off, and the largest departure from its own reference for deviation. | M | T |
+| **FR-CUR-16** | The number of phases shall be read from a **hardware strap** ([HR-22](#6-hardware-interface-requirements)) once at boot, not from configuration: it describes how the kiln is wired rather than how the operator wants it run, so a controller moved between installations cannot carry a stale setting. Where the strap indicates three phases and fewer than three transformers are fitted, the system shall raise a warning and continue. | M | T |
+| **FR-CUR-17** | Apparent power and cumulative energy ([FR-CUR-07](#312-heater-current-measurement-fr-cur)) shall be **summed across the measured phases**, and the configured mains voltage shall be interpreted as the **phase** voltage (line to neutral on a three-phase star). The interface shall state the number of phases and the number of transformers fitted wherever it presents a power or energy figure, so that a reader can tell what the figure is of. | M | T |
+
 | **NFR-27** | Uncommanded heater current ([SR-25](#52-detection-requirements)) shall de-energise heating within **1 s** of the offending measurement window, and the weld discrimination of [SR-27](#52-detection-requirements) shall reach its verdict within a further **3 s**. | M | T |
 
 ---
@@ -536,14 +542,14 @@ stateDiagram-v2
 | ID | Requirement | Ver |
 |---|---|---|
 | **SR-04** | **Thermocouple failure.** The system shall detect open circuit, short circuit, out-of-range reading, cold-junction fault, and front-end communication failure. A fault persisting beyond the grace period of [FR-ACQ-12](#31-temperature-acquisition-fr-acq) shall de-energise heating and latch a fault. | T |
-| **SR-05** | **Reversed thermocouple.** The system shall detect a thermocouple connected with reversed polarity — indicated by the reading falling while heating is commanded at high duty — and shall latch a fault. | T |
+| **SR-05** | **Reversed thermocouple.** The system shall detect a thermocouple connected with reversed polarity, indicated by the reading falling while heating is commanded at high duty, and shall latch a fault. | T |
 | **SR-06** | **Stuck sensor.** The system shall detect a reading that does not change by more than a configurable threshold (default 2 °C) while heating is commanded above a configurable duty (default 50 %) for a configurable period (default 10 min), and shall latch a fault. | T |
 | **SR-07** | **Thermal runaway / heating failure.** The system shall latch a fault if heating is commanded above a configurable duty (default 80 %) for longer than a configurable period (default 15 min) while the measured rate of rise remains below a configurable threshold (default 10 °C/h). This covers a failed element, an open contactor, an open safety chain and an open kiln lid. | T |
 | **SR-08** | **Shorted SSR / uncommanded heating.** The system shall latch a fault, open the contactor and alarm if the temperature rises by more than a configurable threshold (default 5 °C) over a configurable period (default 3 min) while commanded duty is zero. | T |
 | **SR-09** | **Over-temperature.** The system shall de-energise heating whenever the chamber temperature exceeds the configured maximum chamber temperature, and shall latch a fault if it exceeds it by a configurable margin (default 10 °C). | T |
 | **SR-10** | **Setpoint excursion.** The system shall latch a fault if PV exceeds SP by more than a configurable band (default 50 °C) for longer than a configurable period (default 2 min). | T |
 | **SR-11** | **Enclosure over-temperature.** The system shall latch a fault if the enclosure/electronics temperature exceeds the configured maximum (default 70 °C), protecting the controller and its wiring. | T |
-| **SR-12** | **Insulation degradation.** The system shall record, per firing, the heating energy (duty × time) required to reach reference temperatures, and shall raise a warning when it exceeds the established baseline by a configurable factor (default 1.3) — indicating failing insulation or ageing elements. | T |
+| **SR-12** | **Insulation degradation.** The system shall record, per firing, the heating energy (duty × time) required to reach reference temperatures, and shall raise a warning when it exceeds the established baseline by a configurable factor (default 1.3), indicating failing insulation or ageing elements. | T |
 | **SR-13** | **Loss of control.** The system shall latch a fault if the control loop fails to complete a cycle within twice its configured period, or if the safety supervisor fails to run within its deadline. | T |
 | **SR-14** | **Watchdog.** The system shall enable the hardware watchdog and a per-task watchdog covering the control and safety tasks; a watchdog expiry shall de-energise heating through the mechanism of [SR-02](#51-safety-principles) and reset the device. | T |
 | **SR-15** | **Brownout.** The system shall enable brownout detection, and a brownout reset shall leave heating de-energised. | T |
@@ -552,7 +558,9 @@ stateDiagram-v2
 | **SR-27** | **Weld discrimination.** On detecting uncommanded current ([SR-25](#52-detection-requirements)) the system shall de-assert heat enable so the contactor opens, wait a configurable interval (contactor drop-out time plus margin, default 2 s), and re-measure. If current has ceased it shall latch **SSR shorted**; if current persists it shall latch **contactor welded**, which is the more severe fault and whose operator instruction shall be to isolate the kiln at its supply, because the controller has no remaining means of interrupting the current. | T |
 | **SR-28** | **Partial element failure / current deviation.** The system shall compare conduction current against the reference current of [FR-CUR-08](#312-heater-current-measurement-fr-cur), corrected for the known positive temperature coefficient of the elements where configured, and shall raise a warning at a configurable deviation (default 10 %) and latch a fault at a configurable deviation (default 25 %). Losing one of several element groups is a step change of a known fraction and shall be detected as such. | T |
 | **SR-29** | **Over-current.** The system shall latch a fault when measured current exceeds a configurable maximum (default 120 % of nominal), indicating a shorted element, incorrect wiring or a failed SSR passing excessive current. | T |
-| **SR-30** | **Relay wear / incipient failure.** The system shall raise a warning when the switching-operation count of the contactor or an SSR reaches a configurable life limit, and shall additionally raise a warning when current mismatches of the kind described in [SR-25](#52-detection-requirements) or [SR-26](#52-detection-requirements) occur intermittently and self-clear — an early indication that a relay is becoming defective before it fails outright. | T |
+| **SR-30** | **Relay wear / incipient failure.** The system shall raise a warning when the switching-operation count of the contactor or an SSR reaches a configurable life limit, and shall additionally raise a warning when current mismatches of the kind described in [SR-25](#52-detection-requirements) or [SR-26](#52-detection-requirements) occur intermittently and self-clear, an early indication that a relay is becoming defective before it fails outright. | T |
+
+| **SR-31** | **Door / lid interlock.** Where a door interlock switch is fitted, the system shall de-energise heating and open the contactor **immediately**: within one safety cycle, with no confirmation delay, whenever the switch indicates the door is open, and shall latch a fault if it remains open for a configurable confirmation period (0–0.5 s, default 0.2 s) while a heating state is active. The switch shall be **normally closed**, so that an open circuit, a disconnected plug or a failed switch all read as "door open". Where no interlock is fitted the rule shall stand down and a warning shall be raised; it shall not be possible for an unread input to be interpreted as a closed door. | T |
 
 ### 5.3 Reaction and recovery requirements
 
@@ -595,6 +603,11 @@ stateDiagram-v2
 | **HR-18** | The CT provides the only galvanic isolation between the heater circuit and the controller electronics; its insulation rating and the creepage and clearance around its input shall be appropriate to the mains voltage in use. | M | I |
 | **HR-12** | The design shall support an optional second SSR channel for a kiln with independently switched element groups. | C | I |
 | **HR-13** | The installation shall include a hardware over-temperature cutout in the safety chain that operates independently of this controller. | M | I |
+| **HR-24** | The thermocouple front ends' **`FAULT` outputs shall interrupt the contactor coil in hardware**, each through its own series switching element, so that a reported sensor fault removes the heater without the firmware taking part. Each `FAULT` net shall retain its own test point. The limits of this interlock shall be documented: the outputs are open-drain, so an **unpowered or absent** front end leaves the path closed, and the MAX31856 detects an open circuit only once its fault mask has been configured. The hardware interlock therefore covers faults the device actively reports, and [SR-04](#52-detection-requirements) in firmware remains the cover for a dead or unconfigured front end. | M | I,T |
+| **HR-22** | The board shall carry a **phase-selection strap**: an input that reads high through a pull-up for a three-phase heater and low for single-phase, sampled once at boot. It shall not be a strapping pin and shall not glitch during reset ([HR-08](#6-hardware-interface-requirements)). An input that cannot be read shall be treated as single-phase. | M | I,T |
+| **HR-23** | The design shall provide **three current-transformer inputs**, one per phase, each conditioned as [HR-17](#6-hardware-interface-requirements) requires and each meeting the isolation of [HR-18](#6-hardware-interface-requirements). A single-phase installation populates the first and leaves the others unfitted. | M | I |
+| **HR-21** | Where a door or lid interlock is fitted, its switch shall be **normally closed** and shall be wired **both** into a controller input ([SR-31](#52-detection-requirements)) **and** in series with the safety contactor coil, so that opening the door de-energises the heater through hardware whether or not the firmware is working. The controller input provides annunciation, latching and logging; it is not the interlock. | S | I,T |
+| **HR-25** | The contactor coil's freewheel diode shall be connected **across the coil itself**, on the kiln side of every series interrupting element of [HR-21](#6-hardware-interface-requirements) and [HR-24](#6-hardware-interface-requirements), so that opening any of them leaves the coil current a path to decay through. A freewheel path referenced to the raw supply instead would put the inductive transient across the opening contacts, eroding the lid switch and stressing the sense divider. | M | I |
 | **HR-14** | The controller electronics shall be supplied from a regulated source able to power the MCU, display and contactor coil simultaneously, and shall not rely on a USB host for operating power. | M | I |
 | **HR-15** | Thermocouple inputs shall be filtered and protected at the hardware level against the electrical noise of a switching multi-kilowatt load. | M | I |
 
@@ -676,7 +689,7 @@ stateDiagram-v2
 | **ASM-07** | Wall-clock time may be unavailable; all timing-critical behaviour uses the monotonic time base ([FR-NET-08](#310-connectivity-and-time-fr-net)). |
 | **ASM-08** | Internal flash endurance is at least 100 000 erase cycles per block. |
 | **ASM-09** | The heater load is resistive and switched as a single group, so the current in the monitored conductor is proportional to total heater power. |
-| **ASM-10** | On a three-phase kiln a single current transformer monitors one representative phase. A fault confined to an unmonitored phase is therefore caught only by the thermal backstop ([SR-07](#52-detection-requirements)). Per-phase monitoring is [OQ-06](#11-open-questions). |
+| ~~**ASM-10**~~ | **Superseded 2026-10-05 by [FR-CUR-15](#312-heater-current-measurement-fr-cur).** Every phase is monitored by its own transformer, so there is no longer an unmonitored phase for a fault to hide on. Retained here because [SR-07](#52-detection-requirements) and the thermal rules are still the backstop for a kiln whose transformers have failed or been left unfitted, and because warning 114 exists for exactly that case. |
 
 ---
 
@@ -700,10 +713,11 @@ stateDiagram-v2
 |---|---|
 | **OQ-01** | Should cone-based targets (Orton cone numbers with heatwork/rate correction) be offered in addition to plain temperature targets? |
 | ~~**OQ-02**~~ | **Resolved 2026-09-28: yes.** The current transformer is mandatory ([HR-11](#6-hardware-interface-requirements)) and drives [FR-CUR](#312-heater-current-measurement-fr-cur) and [SR-25](#52-detection-requirements)–[SR-30](#52-detection-requirements). The thermal detections are retained as an independent backstop. |
-| **OQ-06** | Should a three-phase kiln be monitored per phase (three current transformers), or is one representative phase plus the thermal backstop sufficient? See [ASM-10](#9-assumptions). This affects the ADC channel count and the safety rule structure, so it should be settled before the current component is frozen. |
+| ~~**OQ-06**~~ | **Resolved 2026-10-05: per phase.** Three transformers are mandatory ([HR-23](#6-hardware-interface-requirements)) and the phase count comes from a strap ([HR-22](#6-hardware-interface-requirements)). [FR-CUR-15](#312-heater-current-measurement-fr-cur) evaluates the safety rules against the worst phase, so a fault confined to one phase is now caught electrically in seconds instead of waiting for the thermal backstop. This supersedes [ASM-10](#9-assumptions). |
+| **OQ-08** | What replaces the removed over-the-web firmware update ([FR-UPD-01](#311-firmware-update-fr-upd))? USB/serial via `esptool`, an image staged over the network but applied only after a physical confirmation at the kiln, or no field update at all? The device currently has **no update path**, so this blocks release rather than merely being open. |
 | **OQ-07** | Should the element positive temperature coefficient used to correct the [SR-28](#52-detection-requirements) baseline be measured automatically during the first firing, or entered by the installer from the element datasheet? |
 | **OQ-03** | Should the log store be sized for whole-life retention of run summaries in a separate, non-circular area? |
-| **OQ-04** | Which small charting approach for [FR-WEB-06](#37-web-interface-fr-web) — a vendored MIT-licensed micro-library, or hand-written canvas rendering? Decided in the architecture, revisit if asset budget is exceeded. |
+| **OQ-04** | Which small charting approach for [FR-WEB-06](#37-web-interface-fr-web), a vendored MIT-licensed micro-library, or hand-written canvas rendering? Decided in the architecture, revisit if asset budget is exceeded. |
 | **OQ-05** | Is a 3-zone variant ([ASM-02](#9-assumptions)) a v1.1 goal? It affects whether the control component is written for one zone or N from the start. |
 
 ## 12. Out of scope
@@ -718,7 +732,7 @@ stateDiagram-v2
 
 ---
 
-## Appendix A — Fault code allocation
+## Appendix A, Fault code allocation
 
 Codes are stable and shall not be reused. Detail in [§5.2](#52-detection-requirements).
 
@@ -745,11 +759,12 @@ Codes are stable and shall not be reused. Detail in [§5.2](#52-detection-requir
 | 19 | Power-loss recovery refused | FR-RUN-08 |
 | 20 | Configuration invalid / storage failure | FR-CFG-05 |
 | 21 | Uncommanded heater current (relay fail-on) | SR-25 |
-| 22 | Contactor welded — isolate at the supply | SR-27 |
+| 22 | Contactor welded, isolate at the supply | SR-27 |
 | 23 | No heater current when commanded (relay/element fail-off) | SR-26 |
 | 24 | Heater current deviation (partial element failure) | SR-28 |
 | 25 | Heater over-current | SR-29 |
 | 26 | Current transformer fault or disconnected | FR-CUR-11 |
+| 27 | Door opened during a firing | SR-31 |
 
 Warnings (non-latching, do not stop a firing):
 
@@ -764,6 +779,8 @@ Warnings (non-latching, do not stop a firing):
 | 107 | Duty saturated for extended period | FR-CTL-15 |
 | 108 | Gains are untuned defaults | FR-TUN-11 |
 | 109 | Relay switching-operation life limit reached | SR-30 |
-| 110 | Intermittent current mismatch — a relay may be failing | SR-30 |
+| 110 | Intermittent current mismatch, a relay may be failing | SR-30 |
 | 111 | Current monitoring disabled | FR-CUR-12 |
 | 112 | Heater current deviating from the run reference | SR-28 |
+| 113 | No door interlock fitted | SR-31 |
+| 114 | Phase strap and fitted transformers disagree | FR-CUR-16 |

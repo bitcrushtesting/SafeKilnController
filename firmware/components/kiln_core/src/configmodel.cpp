@@ -10,6 +10,7 @@
 static const char *const k_recovery_names[] = { "abort", "resume" };
 static const char *const k_wifi_names[]     = { "sta", "ap", "sta_ap_fallback" };
 static const char *const k_units_names[]    = { "C", "F" };
+static const char *const k_lang_names[]     = { "en", "de" };
 static const char *const k_tc_names[]       = { "B", "E", "J", "K", "N", "R", "S", "T" };
 static const char *const k_rule_names[]     = { "ziegler-nichols", "tyreus-luyben" };
 
@@ -110,6 +111,7 @@ static const kiln_cfg_item_t k_items[] = {
 
     /* HMI */
     ENUMI("hmi.units",                         "FR-HMI-13",   units, k_units_names, KILN_UNITS_COUNT, KILN_UNITS_C, 0),
+    ENUMI("hmi.language",                      "NFR-23",      language, k_lang_names, KILN_LANG_COUNT, KILN_LANG_EN, 0),
     NUM("hmi.dim_timeout_s",          "s",     "FR-HMI-12",   KILN_CFG_T_U16,   dim_timeout_s,           0,  3600,       60, 0),
     NUM("hmi.alarm_duration_s",       "s",     "FR-RUN-06",   KILN_CFG_T_U16,   alarm_duration_s,        0,   600,       30, 0),
 

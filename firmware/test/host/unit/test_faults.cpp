@@ -108,3 +108,79 @@ KILN_TEST(every_error_code_has_a_message)
     }
     CHECK_STR_EQ(kiln_err_str((kiln_err_t)999), "unknown error");
 }
+
+/* --- NFR-23: German --------------------------------------------------- */
+
+KILN_TEST(nfr23_every_fault_has_a_german_label_and_cause)
+{
+    for (int c = 0; c < KILN_FAULT_MAX; c++) {
+        const kiln_fault_t f = (kiln_fault_t)c;
+        const char *l = kiln_fault_label_in(f, KILN_LANG_DE);
+        const char *m = kiln_fault_cause_in(f, KILN_LANG_DE);
+        CHECK_MSG(l[0] != '\0', "fault %d has no German label", c);
+        CHECK_MSG(m[0] != '\0', "fault %d has no German cause", c);
+    }
+}
+
+KILN_TEST(nfr23_every_warning_has_a_german_label_and_cause)
+{
+    for (int b = 0; b < KILN_WARN_COUNT; b++) {
+        const kiln_warn_bit_t w = (kiln_warn_bit_t)b;
+        CHECK_MSG(kiln_warn_label_in(w, KILN_LANG_DE)[0] != '\0',
+                  "warning %d has no German label", b);
+        CHECK_MSG(kiln_warn_cause_in(w, KILN_LANG_DE)[0] != '\0',
+                  "warning %d has no German cause", b);
+    }
+}
+
+KILN_TEST(nfr23_german_text_actually_differs_from_english)
+{
+    /* A table copied from the English column would pass the emptiness checks
+     * above and be useless.  Every cause must actually have been translated;
+     * a handful of labels legitimately coincide (OK, WATCHDOG, PHASE?). */
+    int same = 0;
+    for (int c = 1; c < KILN_FAULT_MAX; c++) {
+        const kiln_fault_t f = (kiln_fault_t)c;
+        if (strcmp(kiln_fault_cause_in(f, KILN_LANG_EN),
+                   kiln_fault_cause_in(f, KILN_LANG_DE)) == 0) {
+            same++;
+        }
+    }
+    CHECK_MSG(same == 0, "%d fault causes are identical in both languages", same);
+}
+
+KILN_TEST(nfr23_the_unsuffixed_calls_stay_english)
+{
+    /* Diagnostics, the log and requirement traceability should read the same
+     * whoever filed the report. */
+    CHECK_STR_EQ(kiln_fault_label(KILN_FAULT_DOOR_OPEN),
+                 kiln_fault_label_in(KILN_FAULT_DOOR_OPEN, KILN_LANG_EN));
+    CHECK(strcmp(kiln_fault_label(KILN_FAULT_DOOR_OPEN),
+                 kiln_fault_label_in(KILN_FAULT_DOOR_OPEN, KILN_LANG_DE)) != 0);
+}
+
+KILN_TEST(nfr23_an_unknown_language_falls_back_to_english)
+{
+    /* An operator who sees English has a worse day than one who sees German;
+     * an operator who sees nothing cannot act at all. */
+    CHECK_STR_EQ(kiln_fault_label_in(KILN_FAULT_OVERTEMP, (kiln_lang_t)99),
+                 kiln_fault_label_in(KILN_FAULT_OVERTEMP, KILN_LANG_EN));
+    CHECK_STR_EQ(kiln_lang_tag((kiln_lang_t)99), "en");
+    CHECK_STR_EQ(kiln_lang_tag(KILN_LANG_DE), "de");
+}
+
+KILN_TEST(nfr23_german_labels_still_fit_the_display)
+{
+    /* FR-HMI: the label column is 16 characters on a 128 px display, and a
+     * translation that overflows it is a translation that cannot be shown. */
+    for (int c = 0; c < KILN_FAULT_MAX; c++) {
+        const char *l = kiln_fault_label_in((kiln_fault_t)c, KILN_LANG_DE);
+        CHECK_MSG(strlen(l) <= 16, "German label '%s' is %zu chars, max 16",
+                  l, strlen(l));
+    }
+    for (int b = 0; b < KILN_WARN_COUNT; b++) {
+        const char *l = kiln_warn_label_in((kiln_warn_bit_t)b, KILN_LANG_DE);
+        CHECK_MSG(strlen(l) <= 16, "German warning label '%s' is %zu chars, max 16",
+                  l, strlen(l));
+    }
+}

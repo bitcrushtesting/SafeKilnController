@@ -3,12 +3,12 @@ SPDX-FileCopyrightText: 2026 Bitcrush Testing
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-# KilnControl — Software Architecture
+# KilnControl, Software Architecture
 
 | | |
 |---|---|
 | **Document** | Software Architecture Description |
-| **Project** | KilnControl — PID kiln controller |
+| **Project** | KilnControl, PID kiln controller |
 | **Version** | 0.1 (draft) |
 | **Date** | 2026-09-26 |
 | **Status** | For review |
@@ -51,7 +51,7 @@ as a decision in [§3](#3-key-decisions).
 | **AD-03** | **Explicit context structs, no globals** in the core. | `TR-04`. Lets one test process run several controllers, and makes every test independent. | Slightly more verbose call sites. |
 | **AD-04** | **The safety supervisor is a separate, higher-priority task that owns the heat-enable output.** The control path can only *request* heat; safety alone grants it. | `SR-01`, `SR-02`, `SR-13`. A bug, deadlock or overrun anywhere in control, HMI, web or networking cannot produce heat. | Two components must agree on a shared view of the plant; that view is passed as an immutable snapshot, not shared state. |
 | **AD-05** | **Heat enable is a software-generated square wave into a hardware charge pump**, not a static level. | `SR-02`, `HR-07`, and gives `SR-14` for free: a hung safety task stops toggling and the contactor drops in ~1 s with no code involved. | Requires the RC/charge-pump circuit on the board; the toggle must never be delegated to a hardware PWM peripheral, or the property is lost. |
-| **AD-06** | **The setpoint generator is separate from the PID.** The program produces a moving setpoint; the PID only ever tracks the setpoint it is given. | `FR-CTL-09`. The two hardest pieces of behaviour — curve execution with hold-back, and loop tuning — become independently testable. Also makes manual mode and autotune trivially reuse the same PID. | An extra component and an extra data hand-off per cycle. |
+| **AD-06** | **The setpoint generator is separate from the PID.** The program produces a moving setpoint; the PID only ever tracks the setpoint it is given. | `FR-CTL-09`. The two hardest pieces of behaviour, curve execution with hold-back, and loop tuning, become independently testable. Also makes manual mode and autotune trivially reuse the same PID. | An extra component and an extra data hand-off per cycle. |
 | **AD-07** | **The SSR window is driven by a 10 ms periodic timer callback** that reads a duty value published atomically by the control task. | `FR-CTL-07`, `FR-CTL-08`, `NFR-04`. Switching precision is decoupled from the 1 s control period and from any task scheduling delay. | The callback runs in a timer context: it must be allocation-free, lock-free and short. |
 | **AD-17** | **Heater current is measured gated to the commanded output state**, not continuously averaged: conduction current is sampled inside a commanded-on interval and leakage current inside a commanded-off interval, each after a settle delay. | `FR-CUR-04`. A time-proportional output at 2 % duty is off 98 % of the time; a blind average would read ~2 % of full current and make `SR-25`/`SR-26` meaningless. Gating is what turns the measurement into a statement about the *relay*. | The sampler must know the window phase, so it is driven by the same 10 ms timer that owns the SSR pin (`AD-07`), not by an independent ADC loop. Windows too short to measure are skipped rather than mis-measured. |
 | **AD-18** | **The log record grows from 16 to 20 bytes** to carry current and its validity flags. | `FR-CUR-09`. Current without a flag saying whether the sample was a conduction, leakage or skipped measurement is uninterpretable. | 204 records per sector instead of 255; capacity falls from 362 h to **290 h** at the default interval, still well above the 150 h of `FR-LOG-07`. Recomputed in [§10.4](#104-flash-endurance-analysis). |
@@ -63,8 +63,8 @@ as a decision in [§3](#3-key-decisions).
 | **AD-13** | **Tasks communicate by queues and immutable snapshots**, with no mutex on the control path. | `NFR-01`, `NFR-02`. Removes priority inversion and unbounded blocking as a class of failure. | Snapshot copying each cycle; at ~64 bytes per snapshot this is negligible. |
 | **AD-14** | **Dual-target build**: the same core sources compile as ESP-IDF components and as a plain CMake library for host tests. | `TR-01`, `TR-13`, `TR-19`. Coverage and sanitisers are available where the logic actually lives. | The core may not include a single IDF header; enforced by a build check ([§14.5](#145-enforcement)). |
 | **AD-15** | **Core affinity split**: connectivity and UI on core 0, control and safety on core 1. | `NFR-01`, `NFR-02`. WiFi (priority 23) and lwIP cannot preempt the control or safety task at all, so their deadlines do not depend on radio behaviour. | The core is tied to a dual-core target; `CON-02` fixes ESP32-S3, which is dual-core. |
-| **AD-19** | **The log ring is `kiln_core/logring` over a `port_flash`**, not logic inside the log-store adapter. | Everything interesting about the ring is a decision with a failure mode `FR-LOG-06` and `FR-LOG-08` name explicitly: head discovery across 512 sector headers, erase-immediately-before-write ordering so a power cut cannot destroy data the index still claims, and terminating a sector scan at a torn record. Behind `esp_partition` none of it is testable; in the core it is driven by a fake that can cut power mid-write. Revises [§5.2](#52-ports)'s original placement. | One more port, and the core now provides an implementation of `port_logstore` rather than only consuming ports. The adapter in exchange has no logic left to get wrong — three calls that pass straight through. |
-| **AD-20** | **The firmware is C++20, analysed by `clang-tidy` as a high-integrity profile.** Not MISRA: `clang-tidy` implements no MISRA checks, and the `hicpp-*` module that approximated High Integrity C++ has been removed from LLVM. The equivalent content is enabled under its current names (`cppcoreguidelines-*`, `bugprone-*`, `cert-*`, `clang-analyzer-*`). | `CON-05` permits C or C++; `NFR-25` requires a static analysis configuration and `TR-24` requires CI to run it, and the C toolchain offered no comparable check set. The migration cost was 9 compile errors across 22 597 lines, because the code already had no heap, no VLAs and explicit context structs. C++20 rather than C++17 because the 152 designated initialisers that name every safety default are a C99 feature C++ regained only in C++20. | A `-std=gnu++20` floor on both build halves. Genuine MISRA C++ compliance is now a *commercial tooling* decision rather than a language one, and nothing in the repository may claim it. Three check groups are deferred rather than clean — `tasklist.md` section F. |
+| **AD-19** | **The log ring is `kiln_core/logring` over a `port_flash`**, not logic inside the log-store adapter. | Everything interesting about the ring is a decision with a failure mode `FR-LOG-06` and `FR-LOG-08` name explicitly: head discovery across 512 sector headers, erase-immediately-before-write ordering so a power cut cannot destroy data the index still claims, and terminating a sector scan at a torn record. Behind `esp_partition` none of it is testable; in the core it is driven by a fake that can cut power mid-write. Revises [§5.2](#52-ports)'s original placement. | One more port, and the core now provides an implementation of `port_logstore` rather than only consuming ports. The adapter in exchange has no logic left to get wrong, three calls that pass straight through. |
+| **AD-20** | **The firmware is C++20, analysed by `clang-tidy` as a high-integrity profile.** Not MISRA: `clang-tidy` implements no MISRA checks, and the `hicpp-*` module that approximated High Integrity C++ has been removed from LLVM. The equivalent content is enabled under its current names (`cppcoreguidelines-*`, `bugprone-*`, `cert-*`, `clang-analyzer-*`). | `CON-05` permits C or C++; `NFR-25` requires a static analysis configuration and `TR-24` requires CI to run it, and the C toolchain offered no comparable check set. The migration cost was 9 compile errors across 22 597 lines, because the code already had no heap, no VLAs and explicit context structs. C++20 rather than C++17 because the 152 designated initialisers that name every safety default are a C99 feature C++ regained only in C++20. | A `-std=gnu++20` floor on both build halves. Genuine MISRA C++ compliance is now a *commercial tooling* decision rather than a language one, and nothing in the repository may claim it. Three check groups are deferred rather than clean, `tasklist.md` section F. |
 | **AD-16** | **The web UI is served only through the public REST API** it documents. | `FR-WEB-19`. The API is exercised by the UI on every use, so it cannot rot; and the UI is replaceable. | No shortcuts for the UI; occasionally a slightly chattier interaction. |
 
 ## 4. Layering and dependency rules
@@ -78,7 +78,7 @@ flowchart TD
     subgraph L3["Application / orchestration"]
         APP["kiln_app<br/>tasks, run controller, event bus, wiring"]
     end
-    subgraph L2["Domain core — no hardware, no RTOS, no clock"]
+    subgraph L2["Domain core, no hardware, no RTOS, no clock"]
         CORE["kiln_core"]
         PID["pid"]
         SPG["setpoint"]
@@ -88,7 +88,7 @@ flowchart TD
         REC["logrec"]
         CFG["configmodel"]
     end
-    subgraph L1["Ports — interface headers only"]
+    subgraph L1["Ports, interface headers only"]
         PORTS["kiln_ports"]
     end
     subgraph L0["Adapters"]
@@ -115,7 +115,7 @@ flowchart TD
 **Rules**, enforced at build time (`TR-07`):
 
 1. `kiln_core` may include only C standard library headers and `kiln_ports` headers. Any `esp_*`, `freertos/*`, `driver/*` or `<time.h>` clock call in `kiln_core` is a build failure.
-2. `kiln_ports` contains headers only — no `.c` files, no implementation.
+2. `kiln_ports` contains headers only, no `.c` files, no implementation.
 3. Nothing depends on `kiln_hal_esp32s3` or `kiln_sim` except the composition root in `kiln_app` (and the test harnesses).
 4. `kiln_web` and `kiln_hmi` never touch `kiln_core` state directly; they go through `kiln_app`'s command and query interface.
 5. Dependencies are acyclic.
@@ -126,19 +126,19 @@ flowchart TD
 
 | Component | Responsibility | Depends on | Verified by |
 |---|---|---|---|
-| `pid` | PID computation: P/I/D terms, anti-windup, derivative on measurement, bumpless transfer, output clamping. Pure function of state + inputs + `dt`. | — | Host unit, host integration |
+| `pid` | PID computation: P/I/D terms, anti-windup, derivative on measurement, bumpless transfer, output clamping. Pure function of state + inputs + `dt`. |, | Host unit, host integration |
 | `setpoint` | Executes a profile: advances segment index, ramps the setpoint, applies hold-back, enforces dwell tolerance and acknowledgement gates, computes remaining and predicted end times. Those estimates assume the kiln keeps up, and are **optimistic through a cooling segment**: `FR-CTL-13` makes cooling ramps passive, so a real kiln cools as fast as it cools rather than at the rate the program names. The API and the UI say so. | `profile` | Host unit, host integration |
 | `profile` | Program data model, validation, duration prediction, JSON encode/decode. | `configmodel` (for limits) | Host unit |
 | `safety` | All detection rules of requirements `SR-04`–`SR-13` and the current-based relay rules `SR-25`–`SR-30`, including the weld-discrimination sequence of `SR-27`. Consumes a plant snapshot, emits a verdict: heat permitted or a specific fault. Stateful (timers, baselines) but pure. | `configmodel` | Host unit, host integration, fault-injection suite |
 | `autotune` | Relay-autotune state machine, peak detection, cycle qualification, `Ku`/`Tu` identification, gain-rule application. | `pid` (types only) | Host unit, host integration |
-| `window` | Duty → on/off decision for the current 10 ms tick, honouring minimum on/off time. | — | Host unit |
-| `tempfilt` | First-order filter, calibration, rate-of-change regression. | — | Host unit |
-| `current` | RMS accumulation over whole mains cycles, window gating and settle handling, CT calibration, reference-current learning, deviation and wear tracking. Pure: fed raw ADC samples plus the window phase. | — | Host unit, integration |
-| `logrec` | Log record and sector-header encode/decode, CRC, torn-record detection, decimation with extrema preservation. | — | Host unit (incl. fuzz) |
+| `window` | Duty → on/off decision for the current 10 ms tick, honouring minimum on/off time. |, | Host unit |
+| `tempfilt` | First-order filter, calibration, rate-of-change regression. |, | Host unit |
+| `current` | RMS accumulation over whole mains cycles, window gating and settle handling, CT calibration, reference-current learning, deviation and wear tracking. Pure: fed raw ADC samples plus the window phase. |, | Host unit, integration |
+| `logrec` | Log record and sector-header encode/decode, CRC, torn-record detection, decimation with extrema preservation. |, | Host unit (incl. fuzz) |
 | `logring` | The circular store itself (`AD-19`): head discovery, wrap and erase ordering, torn-record handling, run selection, store statistics. Pure logic over `port_flash`. | `logrec` | Host unit (incl. power-cut injection) |
-| `configmodel` | Configuration schema: item table with type, unit, range, default; validation; versioned migration; JSON projection. | — | Host unit |
+| `configmodel` | Configuration schema: item table with type, unit, range, default; validation; versioned migration; JSON projection. |, | Host unit |
 | `runstate` | Run record model; reconstruction of resume state from a log tail. | `logrec`, `profile` | Host unit |
-| `faults` | Fault and warning code tables with descriptions ([requirements Appendix A](requirements.md#appendix-a--fault-code-allocation)). | — | Inspection + code-generated consistency test |
+| `faults` | Fault and warning code tables with descriptions ([requirements Appendix A](requirements.md#appendix-a--fault-code-allocation)). |, | Inspection + code-generated consistency test |
 
 ### 5.2 Ports (`kiln_ports`)
 
@@ -192,15 +192,15 @@ double is a compile-time-checked substitution.
 
 | Task | Core | Prio | Trigger | Period | Stack | Blocking allowed? |
 |---|---|---|---|---|---|---|
-| `heat_window` | 1 | timer ctx | `esp_timer` | 10 ms | — | **No** |
+| `heat_window` | 1 | timer ctx | `esp_timer` | 10 ms |, | **No** |
 | `safety` | 1 | 20 | timer | 100 ms | 3 kB | No |
 | `control` | 1 | 18 | timer | 250 ms … 5 s (cfg, default 1 s) | 4 kB | No |
 | `acquire` | 1 | 19 | timer | 250 ms | 3 kB | SPI only, bounded |
 | `current` | 1 | 17 | burst complete | per output window | 3 kB | No (DMA completion) |
 | `logger` | 0 | 8 | queue | on demand | 3 kB | Yes (flash) |
 | `hmi` | 0 | 6 | timer | 100 ms | 4 kB | I²C only, bounded |
-| `httpd` | 0 | 5 | socket | — | 8 kB | Yes |
-| `net` | 0 | 4 | events | — | 4 kB | Yes |
+| `httpd` | 0 | 5 | socket |, | 8 kB | Yes |
+| `net` | 0 | 4 | events |, | 4 kB | Yes |
 
 Rationale for the ordering: `safety` outranks everything so its verdict is never
 late (`SR-13`, `NFR-03`); `acquire` outranks `control` so a control cycle always
@@ -341,7 +341,7 @@ A cooling segment (`target_c < pv_c`) ramps the setpoint downward and the PID's
 own 0 % floor makes it passive; no negative duty exists (`FR-CTL-13`).
 
 Both remaining-time and predicted-end-time are computed by running this same
-generator forward over a copy of the state with the current PV held constant —
+generator forward over a copy of the state with the current PV held constant , 
 one algorithm, one set of tests, no second estimator to drift out of agreement.
 
 ### 7.2 PID
@@ -423,11 +423,11 @@ Gain rules (`FR-TUN-06`), with `Ki = Kp / Ti` and `Kd = Kp · Td`:
 | Rule | `Kp` | `Ti` | `Td` | Character |
 |---|---|---|---|---|
 | Ziegler–Nichols (PID) | `0.60 · Ku` | `0.50 · Tu` | `0.125 · Tu` | Fast, overshoots |
-| **Tyreus–Luyben (PID)** — default | `Ku / 2.2` | `2.2 · Tu` | `Tu / 6.3` | Conservative, low overshoot — suited to a slow, high-inertia kiln and to `NFR-08` |
+| **Tyreus–Luyben (PID)**: default | `Ku / 2.2` | `2.2 · Tu` | `Tu / 6.3` | Conservative, low overshoot, suited to a slow, high-inertia kiln and to `NFR-08` |
 
 Both sets are presented; nothing is stored until the operator accepts
 (`FR-TUN-09`), and the accepted set is recorded with its provenance
-(`FR-TUN-11`). Safety supervision is fully active throughout — autotune is just
+(`FR-TUN-11`). Safety supervision is fully active throughout, autotune is just
 another duty requester, subject to the same authority.
 
 ## 8. Safety subsystem
@@ -459,6 +459,7 @@ row below is one host test (`TR-09`, `TR-23`).
 
 | Req | Rule | Inputs | Default thresholds | Action |
 |---|---|---|---|---|
+| `SR-31` | Door interlock open | door switch | heat off **immediately**; latch after 0.2 s | Latch 27, drop contactor |
 | `SR-04` | TC fault persists past grace | fault bits, comms status | 5 s grace | Latch 1–5, 16 |
 | `SR-05` | Reversed TC | PV falling while duty high | falling while duty > 50 % | Latch 6 |
 | `SR-06` | Stuck sensor | ΔPV over window, duty | < 2 °C over 10 min at > 50 % | Latch 7 |
@@ -482,6 +483,21 @@ The insulation baseline of `SR-12` is established from the run history: the
 median duty-seconds required to pass each 100 °C boundary across previous
 comparable runs, stored in the run index.
 
+`SR-31` is evaluated **first**, ahead even of `SR-13`. It is the only rule that
+needs no history, no timer and no trust in any other reading: a door that is
+open is a fact, where every other row is an inference from a measurement. It is
+also the only rule with an unconditional tier, heat is withheld and the
+contactor dropped on the *first* open sample, and only the latch waits for the
+confirmation window. An implementation that waited 200 ms before dropping the
+heater would satisfy the latch test and miss the requirement, so the two tiers
+are tested separately.
+
+Note what the table cannot show: `HR-21` requires the same switch to be wired
+in series with the contactor coil as well. The row above is the controller's
+*knowledge* of the door, which is what latches, annunciates and logs; the
+interlock itself is hardware, and works whether or not this firmware does. The
+argument is `AD-05`'s, applied to a second input.
+
 Two parameters in the table deserve their own note, because both change when the
 rule is active rather than merely how sensitive it is:
 
@@ -490,8 +506,8 @@ rule is active rather than merely how sensitive it is:
   inward from the elements, and arming immediately would read that as a shorted
   SSR. The consequence is worth stating plainly: during a normal firing duty is
   rarely zero for a full minute, so **`SR-08` is effectively inactive while
-  running**. That is precisely why `SR-25` — which sees the same failure in amps,
-  inside a second — is the primary detection and `SR-08` the backstop for a kiln
+  running**. That is precisely why `SR-25`: which sees the same failure in amps,
+  inside a second, is the primary detection and `SR-08` the backstop for a kiln
   whose current monitoring is off or whose transformer has failed (`FR-CUR-12`).
 - **`SR-05`'s confirmation window** (`reversed_confirm_s`, default 30 s). The drop
   must persist, not merely occur. A kiln with transport lag whose gains are
@@ -505,7 +521,7 @@ rule is active rather than merely how sensitive it is:
 A latched fault is written to NVS with its code, a snapshot and a timestamp
 before the alarm sounds, so an immediate power loss cannot lose it (`SR-17`).
 Clearing requires an explicit operator acknowledgement, and the acknowledgement
-is refused while the triggering rule still evaluates true (`SR-18`) — the same
+is refused while the triggering rule still evaluates true (`SR-18`), the same
 rule function is reused for that check, so there is no second implementation to
 disagree.
 
@@ -571,7 +587,7 @@ For an 8 MB device (`NFR-13`); a 16 MB device enlarges only the log partition.
 
 | Name | Type | Size | Purpose |
 |---|---|---|---|
-| bootloader + table | — | 64 kB | — |
+| bootloader + table |, | 64 kB |, |
 | `nvs` | data/nvs | 24 kB | Configuration, latched fault, WiFi credentials |
 | `otadata` | data/ota | 8 kB | OTA selector |
 | `phy_init` | data/phy | 4 kB | RF calibration |
@@ -579,7 +595,7 @@ For an 8 MB device (`NFR-13`); a 16 MB device enlarges only the log partition.
 | `ota_1` | app | 2 MB | Application slot B |
 | `storage` | data/littlefs | 512 kB | Programs, run index, run records |
 | `kilnlog` | data (custom) | 2 MB | Circular sample log (`AD-08`) |
-| *(unallocated)* | — | ≈ 1.4 MB | Headroom |
+| *(unallocated)* |, | ≈ 1.4 MB | Headroom |
 
 ### 10.2 Log record format
 
@@ -611,7 +627,7 @@ Sector header, 16 bytes at the start of each 4 kB sector:
 | Off | Size | Field |
 |---|---|---|
 | 0 | 4 | magic `"KLOG"` |
-| 4 | 4 | `seq` — monotonic sector sequence number, defines ring order |
+| 4 | 4 | `seq`: monotonic sector sequence number, defines ring order |
 | 8 | 4 | `run_id` |
 | 12 | 2 | `format_version` |
 | 14 | 2 | `crc16` |
@@ -632,7 +648,7 @@ So each 4 kB sector holds `(4096 − 16) / 20 = 204` records.
 One sector fills in `204 × 10 s = 34 min` of logging, so one erase per 34 min of
 *running*. Continuous 24/7 operation for 10 years gives
 `87 600 h / 34 min ≈ 154 600` sector erases spread over 512 sectors ≈ **302
-erases per sector** — 0.6 % of the 100 000-cycle budget of `ASM-08`, and far
+erases per sector**: 0.6 % of the 100 000-cycle budget of `ASM-08`, and far
 inside the 50 000 of `NFR-14`. Realistic hobby use (a few hundred hours a year)
 is two orders of magnitude below that again.
 
@@ -650,7 +666,7 @@ decimated series equal the extrema of the full series.
 
 ## 11. Configuration
 
-`configmodel` holds a static table — one row per item, with key, type, unit,
+`configmodel` holds a static table, one row per item, with key, type, unit,
 minimum, maximum, default, flags (`secret`, `reboot_required`, `locked_while_running`).
 Everything else is derived from that table: NVS persistence, JSON projection for
 the API, range validation, the web form, and the documentation table. Adding a
@@ -702,14 +718,24 @@ set (`FR-WEB-23`).
 
 Every handler declares a maximum body size and parses into a fixed buffer; there
 is no unbounded accumulation and no allocation proportional to input
-(`NFR-19`). Long responses — log queries, program lists — are streamed in
+(`NFR-19`). Long responses, log queries, program lists, are streamed in
 bounded chunks. Handlers never call into `kiln_core` directly; they post commands
 to `kiln_app` and read the published snapshot (`AD-16`), so no HTTP request can
 delay or reorder a control cycle (`NFR-02`, `FR-WEB-21`).
 
 Authentication compares a salted hash of the password in constant time and
-applies an increasing delay after repeated failures (`NFR-19`). The OTA endpoint
-is refused while a run or autotune is active (`FR-UPD-04`, `FR-UPD-08`).
+applies an increasing delay after repeated failures (`NFR-19`).
+
+`FR-WEB-26` makes the interface an observation surface: no route reachable over
+the network can put heat into the kiln, write configuration or clear a latched
+fault. The handlers for those routes are **deleted rather than disabled**: the
+firmware cannot start a firing over HTTP because the code to do it is not in
+the image, which is a stronger claim than a flag somebody could flip back. What
+remains writable is program authoring, on the reasoning that a stored curve
+cannot heat anything until it is started at the kiln; that is a *capability*
+distinction, not a read/write one, and it is the reason the interface is not
+literally read-only. Refusals are `403 read_only`, not `405`: the operation
+does not exist here at any verb, and the message says where the control is.
 
 ### 12.3 Client
 
@@ -722,7 +748,7 @@ The chart is a self-contained canvas renderer in `web/chart.js`: two y-axes, the
 measured trace plus the setpoint, optional duty and case series, zoom and pan on
 the time axis, and a cursor readout (`FR-WEB-06`, `FR-WEB-07`, `FR-WEB-10`). It
 requests `max_points` matched to the canvas width, so a 24 h run arrives as
-roughly 800 decimated points rather than 8 600 raw ones — which is how
+roughly 800 decimated points rather than 8 600 raw ones, which is how
 `FR-WEB-11` is met, and why `FR-LOG-11` insists that decimation preserve
 extrema. During a run, the planned remainder is fetched from
 `/api/programs/{id}/preview` and drawn as a dashed continuation of the actual
@@ -742,7 +768,7 @@ stale and reconnects with backoff rather than showing old data as current
 | `app.css` | 6 kB |
 | `app.js` (views, SSE, API client) | 24 kB |
 | `chart.js` | 10 kB |
-| Font | 0 — system font stack only |
+| Font | 0, system font stack only |
 | **Total** | **≤ 48 kB** embedded in the image (`AD-11`) |
 
 ## 13. Cross-cutting concerns
@@ -756,13 +782,13 @@ does not stop a firing (log store unavailable, display gone, WiFi down) and is
 published and displayed but not latched; an **error** is a rejected request,
 returned to its caller with a reason and never escalated to the plant.
 
-A failure in the HMI, log store, network or web server can never stop a firing —
+A failure in the HMI, log store, network or web server can never stop a firing , 
 those subsystems are downstream of the control path by construction
 (`FR-HMI-14`, `FR-LOG-14`, `FR-NET-07`).
 
 ### 13.2 Diagnostic logging
 
-ESP-IDF `ESP_LOGx` at a configurable level, over USB-Serial-JTAG only — never on
+ESP-IDF `ESP_LOGx` at a configurable level, over USB-Serial-JTAG only, never on
 a pin shared with a peripheral (`NFR-24`). Operationally significant events go
 to the *event* log in flash, not to the console, so a post-mortem needs no
 attached terminal. Optional UDP syslog mirrors events for `FR-NET-10`.
@@ -813,7 +839,7 @@ kilncontrol/
 │   ├── partitions.csv
 │   ├── main/                    app_main: composition root only
 │   ├── components/
-│   │   ├── kiln_core/           pure logic (AD-01) — no IDF headers
+│   │   ├── kiln_core/           pure logic (AD-01), no IDF headers
 │   │   ├── kiln_ports/          interface headers only
 │   │   ├── kiln_hal_esp32s3/    adapters: max31856, ssd1306, encoder,
 │   │   │                        heat output, logstore, nvs, littlefs, clock
@@ -968,7 +994,7 @@ Requirement-level traceability is maintained mechanically by `tools/trace`
 | The charge-pump enable circuit (`AD-05`) is unfamiliar and could be built wrong or "simplified" to a static GPIO. | The central safety property of the design is silently lost. | The HIL suite verifies contactor release on halting the safety task; the schematic and this document both mark the circuit as safety-critical. |
 | 2 MB OTA partition becomes tight with assets embedded. | Update path breaks late in development. | CI size report on every build; asset budget of [§12.4](#124-asset-budget); 1.4 MB unallocated flash as headroom. |
 | Host-testable core drifts as hardware access is added "just this once". | The testability driver erodes. | `tools/layercheck` is CI-blocking (`TR-01`), not advisory. |
-| A three-phase kiln is monitored on one phase only (`ASM-10`), so a fault confined to another phase escapes the current rules. | A failed element goes undetected electrically. | The thermal backstop (`SR-07`, `SR-28` on total heat input) still catches it, more slowly. `OQ-06` decides whether to fit three CTs; the `current` component takes a channel index so a second and third are additive rather than a rewrite. |
+| ~~A three-phase kiln is monitored on one phase only~~ | ~~A failed element goes undetected electrically.~~ | **Closed 2026-10-05.** `OQ-06` resolved in favour of three transformers (`HR-23`), selected by a strap (`HR-22`). `FR-CUR-15` evaluates `SR-25` to `SR-30` against the worst phase, so a fault on any phase is caught electrically in seconds. The channel index the `current` component already took made this additive, as predicted. |
 | CT fitted to the wrong conductor, or clipped around both conductors (net current zero). | Current reads ~0 always; `SR-26` fires on every run, or worse the installer disables monitoring. | Commissioning procedure verifies a plausible reference current before the first firing; `FR-CUR-11` distinguishes "no signal at all" from "zero current". |
 | Single-zone assumption (`ASM-02`) proves wrong for a real kiln. | Rework of the control path. | `control` already takes a zone context ([`AD-03`](#3-key-decisions)); `OQ-05` is to be resolved before the control component is frozen. |
 
@@ -976,12 +1002,12 @@ Requirement-level traceability is maintained mechanically by `tools/trace`
 
 | Milestone | Content | Exit criterion |
 |---|---|---|
-| **M1 — Skeleton** | Repository, dual-target build, ports, simulator, CI with layercheck and coverage gates. | A trivial core component is unit-tested on the host and built for the target in CI. |
-| **M2 — Measure** | MAX31856 adapter, `tempfilt`, OLED, encoder, default screen. | `FR-ACQ`, `FR-HMI-01`–`FR-HMI-05` pass; current and target temperature on the display. |
-| **M3 — Control** | `pid`, `window`, `setpoint`, `profile`, `control` task, heat output. | A program runs closed-loop against the simulator to `NFR-05`. |
-| **M4 — Safety** | `core/safety`, safety task, charge-pump enable, latching, watchdogs. | Every rule in [§8.2](#82-rule-table) has a passing automated test; HIL confirms contactor release. |
-| **M4b — Current** | `core/current`, CT adapter, `SR-25`–`SR-30`, weld discrimination. | Every current rule has a passing automated test; HIL confirms `SR-27` against an emulated welded contactor. |
-| **M5 — Persist** | Log ring, run index, programs, configuration, power-loss recovery. | `FR-LOG`, `FR-CFG`, `FR-RUN-08` pass; endurance analysis confirmed by measurement. |
-| **M6 — Web** | HTTP server, REST API, SSE, dashboard, chart, program editor, settings, OTA. | `FR-WEB`, `FR-UPD` pass; API suite green. |
-| **M7 — Tune** | `autotune` and its UI. | `FR-TUN` passes across the simulator's plant parameter sweep. |
-| **M8 — Commission** | Soak test, timing report, documentation, real kiln firing. | `NFR-10`, `TR-18` reports published; a real firing completed and logged. |
+| **M1, Skeleton** | Repository, dual-target build, ports, simulator, CI with layercheck and coverage gates. | A trivial core component is unit-tested on the host and built for the target in CI. |
+| **M2, Measure** | MAX31856 adapter, `tempfilt`, OLED, encoder, default screen. | `FR-ACQ`, `FR-HMI-01`–`FR-HMI-05` pass; current and target temperature on the display. |
+| **M3, Control** | `pid`, `window`, `setpoint`, `profile`, `control` task, heat output. | A program runs closed-loop against the simulator to `NFR-05`. |
+| **M4, Safety** | `core/safety`, safety task, charge-pump enable, latching, watchdogs. | Every rule in [§8.2](#82-rule-table) has a passing automated test; HIL confirms contactor release. |
+| **M4b, Current** | `core/current`, CT adapter, `SR-25`–`SR-30`, weld discrimination. | Every current rule has a passing automated test; HIL confirms `SR-27` against an emulated welded contactor. |
+| **M5, Persist** | Log ring, run index, programs, configuration, power-loss recovery. | `FR-LOG`, `FR-CFG`, `FR-RUN-08` pass; endurance analysis confirmed by measurement. |
+| **M6, Web** | HTTP server, REST API, SSE, dashboard, chart, program editor, settings, OTA. | `FR-WEB`, `FR-UPD` pass; API suite green. |
+| **M7, Tune** | `autotune` and its UI. | `FR-TUN` passes across the simulator's plant parameter sweep. |
+| **M8, Commission** | Soak test, timing report, documentation, real kiln firing. | `NFR-10`, `TR-18` reports published; a real firing completed and logged. |

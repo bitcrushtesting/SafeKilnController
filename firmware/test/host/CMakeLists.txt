@@ -67,6 +67,8 @@ kiln_add_test(test_faults      unit/test_faults.cpp)
 kiln_add_test(test_json        unit/test_json.cpp)
 kiln_add_test(test_safety_thermal unit/test_safety_thermal.cpp)
 kiln_add_test(test_safety_current unit/test_safety_current.cpp)
+kiln_add_test(test_safety_door    unit/test_safety_door.cpp)
+kiln_add_test(test_phases         unit/test_phases.cpp)
 
 kiln_add_test(test_integration integration/test_integration.cpp)
 kiln_add_test(test_persistence integration/test_persistence.cpp)

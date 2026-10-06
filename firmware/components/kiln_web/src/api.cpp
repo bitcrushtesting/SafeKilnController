@@ -222,7 +222,30 @@ bool kiln_api_needs_auth(const kiln_api_req_t *req)
 
 /* --- GET /api/status (FR-RUN-05) --------------------------------------- */
 
-static void write_warnings(kiln_json_t *j, uint32_t mask)
+/* FR-WEB-26: the web interface is an observation surface.  Nothing reachable
+ * over the network may put heat into the kiln.
+ *
+ * 403 and not 405.  405 means "wrong verb for this URL" and invites a client to
+ * try another one; the truth here is that the operation does not exist on this
+ * interface at any verb, and the operator has to walk to the kiln.  The message
+ * says so, because a UI that reports "method not allowed" teaches nobody where
+ * the control actually is.
+ *
+ * The handlers behind these routes are *deleted*, not disabled: the firmware
+ * cannot start a firing over HTTP because the code to do it is not in the
+ * image, which is a stronger claim than a flag that could be flipped back.
+ */
+static kiln_err_t reject_read_only(kiln_api_resp_t *resp, const char *what)
+{
+    char msg[200];
+    snprintf(msg, sizeof(msg),
+             "%s is not available over the network; use the controls on the kiln",
+             what);
+    kiln_api_error(resp, 403, "read_only", msg);
+    return KILN_ERR_UNSUPPORTED;
+}
+
+static void write_warnings(kiln_json_t *j, uint32_t mask, kiln_lang_t lang)
 {
     kiln_json_key(j, "warnings");
     kiln_json_arr_open(j);
@@ -231,9 +254,11 @@ static void write_warnings(kiln_json_t *j, uint32_t mask)
             continue;
         }
         kiln_json_obj_open(j);
+        /* NFR-23: the code is the stable thing a client should key on; the
+         * text is a courtesy, rendered in the configured language. */
         kiln_json_kv_uint(j, "code", kiln_warn_code((kiln_warn_bit_t)b));
-        kiln_json_kv_str(j, "label", kiln_warn_label((kiln_warn_bit_t)b));
-        kiln_json_kv_str(j, "message", kiln_warn_cause((kiln_warn_bit_t)b));
+        kiln_json_kv_str(j, "label", kiln_warn_label_in((kiln_warn_bit_t)b, lang));
+        kiln_json_kv_str(j, "message", kiln_warn_cause_in((kiln_warn_bit_t)b, lang));
         kiln_json_obj_close(j);
     }
     kiln_json_arr_close(j);
@@ -302,7 +327,7 @@ static void write_status(kiln_api_ctx_t *ctx, kiln_json_t *j)
         kiln_json_kv_str(j, "requirement", kiln_fault_requirement(a->fault));
         kiln_json_obj_close(j);
     }
-    write_warnings(j, a->warnings);
+    write_warnings(j, a->warnings, (kiln_lang_t)ctx->app->cfg.language);
 
     kiln_json_obj_close(j);
 }
@@ -312,6 +337,10 @@ static void write_status(kiln_api_ctx_t *ctx, kiln_json_t *j)
 static void write_info(kiln_api_ctx_t *ctx, kiln_json_t *j)
 {
     kiln_json_obj_open(j);
+
+    /* NFR-23: what language the device is rendering in, so the client can
+     * match it and set the document language for a screen reader. */
+    kiln_json_kv_str(j, "language", kiln_lang_tag((kiln_lang_t)ctx->app->cfg.language));
 
     kiln_fw_info_t fw = {};
     if ((ctx->system != nullptr) && (ctx->system->fw_info != nullptr)) {
@@ -422,119 +451,6 @@ static void write_config(kiln_api_ctx_t *ctx, kiln_json_t *j)
     kiln_json_obj_close(j);
 }
 
-static kiln_err_t handle_config_put(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
-                                   kiln_api_resp_t *resp)
-{
-    static kiln_json_tok_t toks[KILN_API_MAX_TOKENS];
-    const int ntok = kiln_json_parse(req->body, req->body_len, toks, KILN_API_MAX_TOKENS);
-    if (ntok < 1 || toks[0].type != KILN_JSON_OBJECT) {
-        kiln_api_error(resp, 400, "bad_json", "the body is not a JSON object");
-        return KILN_ERR_INVALID_ARG;
-    }
-
-    /* FR-CFG-03 is atomic, so the incoming values are applied to a copy and the
-     * copy is handed over whole.  A partially applied configuration is exactly
-     * what the requirement forbids. */
-    kiln_config_t next = ctx->app->cfg;
-
-    int i = 1;
-    for (int n = 0; n < toks[0].size && i < ntok; n++) {
-        if (toks[i].type != KILN_JSON_STRING) {
-            break;
-        }
-
-        char key[48];
-        if (!kiln_json_str_at(req->body, toks, i, key, sizeof(key))) {
-            kiln_api_error(resp, 400, "bad_key", "a configuration key was not usable");
-            return KILN_ERR_INVALID_ARG;
-        }
-        const kiln_cfg_item_t *it = kiln_config_find(key);
-        if (it == nullptr) {
-            char msg[96];
-            snprintf(msg, sizeof(msg), "no such configuration item: %s", key);
-            kiln_api_error(resp, 400, "unknown_item", msg);
-            return KILN_ERR_INVALID_ARG;
-        }
-
-        const int vi = i + 1;
-        kiln_err_t se;
-        if (it->type == KILN_CFG_T_STRING) {
-            char v[KILN_CFG_PASS_LEN];
-            if (!kiln_json_str_at(req->body, toks, vi, v, sizeof(v))) {
-                char msg[96];
-                snprintf(msg, sizeof(msg), "%s must be a string that fits", key);
-                kiln_api_error(resp, 400, "invalid_value", msg);
-                return KILN_ERR_INVALID_ARG;
-            }
-            se = kiln_config_set_str(&next, it, v);
-        } else if (it->type == KILN_CFG_T_BOOL) {
-            bool b = false;
-            double d = 0.0;
-            if (kiln_json_bool_at(req->body, toks, vi, &b)) {
-                se = kiln_config_set_num(&next, it, b ? 1.0 : 0.0);
-            } else if (kiln_json_num_at(req->body, toks, vi, &d)) {
-                se = kiln_config_set_num(&next, it, d != 0.0 ? 1.0 : 0.0);
-            } else {
-                se = KILN_ERR_INVALID_ARG;
-            }
-        } else {
-            double d = 0.0;
-            if (!kiln_json_num_at(req->body, toks, vi, &d)) {
-                char msg[96];
-                snprintf(msg, sizeof(msg), "%s must be a number", key);
-                kiln_api_error(resp, 400, "invalid_value", msg);
-                return KILN_ERR_INVALID_ARG;
-            }
-            se = kiln_config_set_num(&next, it, d);
-        }
-
-        if (se != KILN_OK) {
-            char msg[128];
-            snprintf(msg, sizeof(msg), "%s is out of range (%g to %g %s)",
-                     key, it->min, it->max, it->unit);
-            kiln_api_error(resp, 400, "out_of_range", msg);
-            return KILN_ERR_RANGE;
-        }
-
-        /* Skip the value's whole subtree. */
-        i = vi + 1;
-        if (toks[vi].type == KILN_JSON_OBJECT || toks[vi].type == KILN_JSON_ARRAY) {
-            while (i < ntok && toks[i].start < toks[vi].end) {
-                i++;
-            }
-        }
-    }
-
-    const kiln_cfg_item_t *bad = NULL;
-    const kiln_err_t e = kiln_app_apply_config(ctx->app, &next, &bad);
-    if (e != KILN_OK) {
-        char msg[160];
-        if (e == KILN_ERR_STATE && (bad != nullptr)) {
-            snprintf(msg, sizeof(msg),
-                     "%s cannot be changed while a run is in progress", bad->key);
-            kiln_api_error(resp, 409, "locked_while_running", msg);
-        }
-        else if (bad != nullptr) {
-            snprintf(msg, sizeof(msg), "%s was rejected", bad->key);
-            kiln_api_error(resp, 400, "invalid_value", msg);
-        }
-        else {
-            resp_from_err(resp, e, "the configuration was rejected");
-        }
-        return e;
-    }
-
-    kiln_json_t j;
-    resp_begin(resp, &j);
-    kiln_json_obj_open(&j);
-    kiln_json_kv_bool(&j, "ok", true);
-    /* FR-CFG-04: tell the operator a restart is needed rather than leaving them
-     * to wonder why nothing changed. */
-    kiln_json_kv_bool(&j, "reboot_required",
-                      kiln_config_reboot_required(&ctx->app->cfg, &next));
-    kiln_json_obj_close(&j);
-    return resp_end(resp, &j);
-}
 
 /* --- /api/programs (FR-PRG-07, FR-WEB-12, FR-WEB-13) ------------------- */
 
@@ -887,123 +803,20 @@ static kiln_err_t ok_response(kiln_api_resp_t *resp)
     return resp_end(resp, &j);
 }
 
-static kiln_err_t handle_run(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
-                             const char *tail, kiln_api_resp_t *resp)
-{
-    if (req->method != KILN_HTTP_POST && req->method != KILN_HTTP_PATCH) {
-        kiln_api_error(resp, 405, "method_not_allowed", "use POST");
-        return KILN_ERR_UNSUPPORTED;
-    }
-
-    if (path_is(tail, "") && req->method == KILN_HTTP_POST) {
-        if (ctx->filestore == nullptr) {
-            kiln_api_error(resp, 503, "no_storage", "program storage is unavailable");
-            return KILN_ERR_IO;
-        }
-        static kiln_json_tok_t toks[KILN_API_MAX_TOKENS];
-        const int ntok = kiln_json_parse(req->body, req->body_len, toks, KILN_API_MAX_TOKENS);
-        double id = 0.0;
-        if (ntok < 1 || !kiln_json_get_num(req->body, toks, ntok, 0, "program_id", &id)) {
-            kiln_api_error(resp, 400, "invalid_request", "program_id is required");
-            return KILN_ERR_INVALID_ARG;
-        }
-        if (id < 0.0 || id >= (double)KILN_PROGRAM_SLOTS) {
-            kiln_api_error(resp, 404, "not_found", "no such program");
-            return KILN_ERR_NOT_FOUND;
-        }
-        kiln_program_t p;
-        if (kiln_program_store_get_slot(ctx->filestore, (uint8_t)id, &p) != KILN_OK) {
-            kiln_api_error(resp, 404, "not_found", "no such program");
-            return KILN_ERR_NOT_FOUND;
-        }
-
-        const kiln_err_t e = kiln_app_start(ctx->app, &p);
-        if (e != KILN_OK) {
-            /* FR-RUN-02 and FR-RUN-10 refuse for several different reasons, and
-             * the operator needs to know which one. */
-            const char *why = "the run could not be started";
-            if (ctx->app->fault != KILN_FAULT_NONE) {
-                why = "a fault is latched; acknowledge it first";
-            } else if (ctx->app->state != KILN_STATE_IDLE &&
-                       ctx->app->state != KILN_STATE_COMPLETE) {
-                why = "the kiln is not idle";
-            } else if (!ctx->app->kiln_valid) {
-                why = "the chamber thermocouple is not reading";
-            } else if (ctx->app->cfg.current_enabled) {
-                why = "current monitoring is unavailable (FR-CUR-12)";
-            }
-            resp_from_err(resp, e, why);
-            return e;
-        }
-        return ok_response(resp);
-    }
-
-    if (path_is(tail, "pause"))  { const kiln_err_t e = kiln_app_pause(ctx->app);
-        if (e != KILN_OK) { resp_from_err(resp, e, "not running"); return e; }
-        return ok_response(resp); }
-    if (path_is(tail, "resume")) { const kiln_err_t e = kiln_app_resume(ctx->app);
-        if (e != KILN_OK) { resp_from_err(resp, e, "not paused"); return e; }
-        return ok_response(resp); }
-    if (path_is(tail, "abort"))  { const kiln_err_t e = kiln_app_abort(ctx->app);
-        if (e != KILN_OK) { resp_from_err(resp, e, "nothing to abort"); return e; }
-        return ok_response(resp); }
-    if (path_is(tail, "ack")) {
-        const kiln_err_t e = kiln_app_ack_segment(ctx->app);
-        if (e != KILN_OK) {
-            resp_from_err(resp, e, "no segment is waiting for acknowledgement");
-            return e;
-        }
-        return ok_response(resp);
-    }
-
-    if (path_is(tail, "segments") && req->method == KILN_HTTP_PATCH) {
-        /* FR-PRG-10: only the segments that have not started. */
-        kiln_program_t updated;
-        if (!decode_program(req->body, req->body_len, &updated, resp)) {
-            return KILN_ERR_INVALID_ARG;
-        }
-        const kiln_err_t e = kiln_setpoint_replace_remaining(&ctx->app->sp, &updated);
-        if (e != KILN_OK) {
-            resp_from_err(resp, e,
-                "only segments that have not started may be changed (FR-PRG-10)");
-            return e;
-        }
-        return ok_response(resp);
-    }
-
-    kiln_api_error(resp, 404, "not_found", "no such run route");
-    return KILN_ERR_NOT_FOUND;
-}
 
 /* --- /api/manual, /api/fault/ack, /api/tune ---------------------------- */
 
-static kiln_err_t handle_manual(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
-                                kiln_api_resp_t *resp)
-{
-    static kiln_json_tok_t toks[KILN_API_MAX_TOKENS];
-    const int ntok = kiln_json_parse(req->body, req->body_len, toks, KILN_API_MAX_TOKENS);
-    double duty = 0.0;
-    if (ntok < 1 || !kiln_json_get_num(req->body, toks, ntok, 0, "duty_permille", &duty)) {
-        kiln_api_error(resp, 400, "invalid_request",
-                       "duty_permille is required (0 to the configured maximum)");
-        return KILN_ERR_INVALID_ARG;
-    }
-    if (duty < 0.0 || duty > (double)KILN_DUTY_MAX) {
-        kiln_api_error(resp, 400, "out_of_range", "duty_permille must be 0 to 1000");
-        return KILN_ERR_RANGE;
-    }
-    const kiln_err_t e = kiln_app_manual(ctx->app, (uint16_t)duty);
-    if (e != KILN_OK) {
-        resp_from_err(resp, e, "manual mode is not available in this state");
-        return e;
-    }
-    return ok_response(resp);
-}
 
 static kiln_err_t handle_tune(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
                               const char *tail, kiln_api_resp_t *resp)
 {
     const kiln_autotune_t *at = &ctx->app->tune;
+
+    /* FR-WEB-26: watching a tune converge is reading; starting one heats the
+     * kiln to its relay-oscillation amplitude, which is firing by another name. */
+    if (req->method != KILN_HTTP_GET) {
+        return reject_read_only(resp, "starting or cancelling automatic tuning");
+    }
 
     if (req->method == KILN_HTTP_GET && path_is(tail, "")) {
         /* FR-TUN-10: phase, cycles and the candidate gain sets, so the operator
@@ -1174,12 +987,20 @@ static kiln_err_t handle_runs(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
 static kiln_err_t handle_current(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
                                  const char *tail, kiln_api_resp_t *resp)
 {
-    const kiln_current_t *c = &ctx->app->cur;
+    const kiln_app_t     *app = ctx->app;
+    const kiln_current_t *c   = &app->cur[0];
 
     if (req->method == KILN_HTTP_GET && path_is(tail, "")) {
         kiln_json_t j;
         resp_begin(resp, &j);
         kiln_json_obj_open(&j);
+
+        /* HR-22 / FR-CUR-15: how the kiln is wired, and how much of it is
+         * actually measured.  A client that shows a power figure has to be able
+         * to say what it is the power *of*. */
+        kiln_json_kv_uint(&j, "phases", kiln_app_phases(app));
+        kiln_json_kv_uint(&j, "channels", app->cur_channels);
+
         kiln_json_kv_bool(&j, "enabled", c->cfg.enabled);
         kiln_json_kv_bool(&j, "available", kiln_current_available(c));
         kiln_json_kv_num(&j, "current_a", kiln_current_amps(c), 2);
@@ -1187,12 +1008,38 @@ static kiln_err_t handle_current(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
         kiln_json_kv_bool(&j, "reference_valid", kiln_current_ref_valid(c));
         kiln_json_kv_bool(&j, "reference_rejected", c->ref_rejected);
         kiln_json_kv_uint(&j, "flags", kiln_current_flags(c));
-        /* FR-CUR-07, stating the assumption as the requirement demands. */
-        kiln_json_kv_num(&j, "apparent_va", kiln_current_apparent_va(c), 0);
-        kiln_json_kv_num(&j, "energy_wh", kiln_current_energy_wh(c), 1);
-        kiln_json_kv_str(&j, "power_basis", "apparent power, resistive load assumed");
+
+        /* FR-CUR-07, summed over the measured phases, with the assumption
+         * stated as the requirement demands.  mains_v is the *phase* voltage,
+         * so this is a plain sum and not a sqrt(3) line-voltage form. */
+        kiln_json_kv_num(&j, "apparent_va", kiln_app_apparent_va(app), 0);
+        kiln_json_kv_num(&j, "energy_wh", kiln_app_energy_wh(app), 1);
+        kiln_json_kv_str(&j, "power_basis",
+            "apparent power, resistive load assumed, summed over measured phases");
         kiln_json_kv_uint(&j, "measurements", c->measurements);
         kiln_json_kv_uint(&j, "skipped", c->skipped);
+
+        /* FR-CUR-15: per phase, because losing one element group of three is a
+         * step change on one phase and barely visible in the total. */
+        kiln_json_key(&j, "per_phase");
+        kiln_json_arr_open(&j);
+        for (uint8_t ch = 0; ch < app->cur_channels && ch < KILN_CUR_CHANNELS; ch++) {
+            const kiln_current_t *pc = &app->cur[ch];
+            kiln_json_obj_open(&j);
+            kiln_json_kv_uint(&j, "channel", ch);
+            kiln_json_kv_bool(&j, "available", kiln_current_available(pc));
+            kiln_json_kv_num(&j, "current_a", kiln_current_amps(pc), 2);
+            kiln_json_kv_num(&j, "reference_a", kiln_current_ref(pc), 2);
+            kiln_json_kv_num(&j, "apparent_va", kiln_current_apparent_va(pc), 0);
+            kiln_json_kv_num(&j, "energy_wh", kiln_current_energy_wh(pc), 1);
+            kiln_json_kv_uint(&j, "flags", kiln_current_flags(pc));
+            float pdev = 0.0f;
+            kiln_json_key(&j, "deviation");
+            if (kiln_current_deviation(pc, &pdev)) { kiln_json_num(&j, pdev, 4); }
+            else                                   { kiln_json_null(&j); }
+            kiln_json_obj_close(&j);
+        }
+        kiln_json_arr_close(&j);
 
         float dev = 0.0f;
         kiln_json_key(&j, "deviation");
@@ -1221,29 +1068,9 @@ static kiln_err_t handle_current(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
         return resp_end(resp, &j);
     }
 
-    if (req->method == KILN_HTTP_POST && path_is(tail, "calibrate")) {
-        static kiln_json_tok_t toks[KILN_API_MAX_TOKENS];
-        const int ntok = kiln_json_parse(req->body, req->body_len, toks, KILN_API_MAX_TOKENS);
-        double known = 0.0;
-        if (ntok < 1 || !kiln_json_get_num(req->body, toks, ntok, 0, "known_a", &known)) {
-            kiln_api_error(resp, 400, "invalid_request",
-                           "known_a is required: the reference meter's reading");
-            return KILN_ERR_INVALID_ARG;
-        }
-        const kiln_err_t e = kiln_current_calibrate(&ctx->app->cur, (float)known);
-        if (e != KILN_OK) {
-            resp_from_err(resp, e,
-                "calibration needs a valid conduction measurement; run the kiln at "
-                "full power with a known load first (FR-CUR-06)");
-            return e;
-        }
-        kiln_json_t j;
-        resp_begin(resp, &j);
-        kiln_json_obj_open(&j);
-        kiln_json_kv_bool(&j, "ok", true);
-        kiln_json_kv_num(&j, "cal_gain", ctx->app->cur.cfg.cal_gain, 4);
-        kiln_json_obj_close(&j);
-        return resp_end(resp, &j);
+    if (path_is(tail, "calibrate")) {
+        /* FR-WEB-26: the calibration reference feeds SR-28's deviation bands. */
+        return reject_read_only(resp, "calibrating the current transformer");
     }
 
     kiln_api_error(resp, 404, "not_found", "no such current route");
@@ -1404,27 +1231,10 @@ kiln_err_t kiln_api_handle(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
             write_config(ctx, &j);
             return resp_end(resp, &j);
         }
-        if (req->method == KILN_HTTP_PUT) {
-            return handle_config_put(ctx, req, resp);
-        }
-        goto method;
+        return reject_read_only(resp, "changing configuration");
     }
     if (path_is(p, "/api/config/defaults")) {
-        if (req->method != KILN_HTTP_POST) {
-            goto method;
-        }
-        kiln_config_t defaults;
-        kiln_config_defaults(&defaults);
-        /* FR-CFG-06 restores defaults, but FR-CFG-08 still applies: a run in
-         * progress is not the moment to reset the maximum temperature. */
-        const kiln_cfg_item_t *bad = NULL;
-        const kiln_err_t e = kiln_app_apply_config(ctx->app, &defaults, &bad);
-        if (e != KILN_OK) {
-            resp_from_err(resp, e,
-                "configuration cannot be reset while a run is in progress");
-            return e;
-        }
-        return ok_response(resp);
+        return reject_read_only(resp, "resetting configuration to defaults");
     }
     if (path_is(p, "/api/programs")) {
         return handle_programs(ctx, req, resp);
@@ -1432,34 +1242,20 @@ kiln_err_t kiln_api_handle(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
     if (path_split_id(p, "/api/programs/", &id, &tail)) {
         return handle_program_item(ctx, req, id, tail, resp);
     }
-    if (path_is(p, "/api/run")) {
-        return handle_run(ctx, req, "", resp);
-    }
-    if (strncmp(p, "/api/run/", 9) == 0) {
-        return handle_run(ctx, req, p + 9, resp);
+    /* FR-WEB-26.  Run *state* is readable at /api/status; run *control* is not
+     * reachable from here at all. */
+    if (path_is(p, "/api/run") || strncmp(p, "/api/run/", 9) == 0) {
+        return reject_read_only(resp, "starting, pausing, resuming or aborting a firing");
     }
     if (path_is(p, "/api/manual")) {
-        if (req->method != KILN_HTTP_POST) {
-            goto method;
-        }
-        return handle_manual(ctx, req, resp);
+        return reject_read_only(resp, "manual heating");
     }
+    /* FR-WEB-26 and SR-17 pulling the same way: acknowledging a fault re-arms a
+     * kiln that has already failed once, and the operator should be looking at
+     * it when they do.  Reading the latched fault stays available at
+     * /api/status, which is what the FR-WEB-24 banner needs. */
     if (path_is(p, "/api/fault/ack")) {
-        if (req->method != KILN_HTTP_POST) {
-            goto method;
-        }
-        const kiln_err_t e = kiln_app_clear_fault(ctx->app);
-        if (e != KILN_OK) {
-            /* SR-18: refused while the triggering condition still holds, which is
-             * the message the operator needs rather than a bare 409. */
-            char msg[200];
-            snprintf(msg, sizeof(msg),
-                     "the fault cannot be cleared yet: %s",
-                     kiln_fault_cause(ctx->app->fault));
-            kiln_api_error(resp, 409, "still_faulted", msg);
-            return e;
-        }
-        return ok_response(resp);
+        return reject_read_only(resp, "acknowledging a fault");
     }
     if (path_is(p, "/api/tune")) {
         return handle_tune(ctx, req, "", resp);

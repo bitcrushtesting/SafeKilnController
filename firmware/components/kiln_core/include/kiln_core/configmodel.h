@@ -154,6 +154,7 @@ typedef struct {
 
     /* HMI */
     uint8_t  units;                      /* kiln_units_t */
+    uint8_t  language;                   /* kiln_lang_t (NFR-23) */
     uint16_t dim_timeout_s;
     uint16_t alarm_duration_s;
 

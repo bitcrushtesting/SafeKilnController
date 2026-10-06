@@ -13,6 +13,13 @@
  * AD-16: the UI uses only this API, with no privileged back channel, so anything
  * the UI can do is in this table and is documented by it.
  *
+ * FR-WEB-26: this is an *observation* surface.  No route here can put heat into
+ * the kiln, write configuration or clear a latched fault -- and the handlers
+ * that used to are deleted, not disabled, so the capability is absent from the
+ * image rather than switched off in it.  Program authoring is the one write
+ * that remains, because a stored curve cannot heat anything until somebody
+ * starts it at the kiln.  Refusals are 403 `read_only`.
+ *
  * 12.2's rules, which are the security-relevant ones:
  *   - every handler writes into a caller-owned buffer and reports truncation;
  *     nothing accumulates and nothing allocates proportionally to input (NFR-19)
@@ -125,7 +132,12 @@ bool kiln_api_query_uint(const char *query, const char *key, uint32_t *out);
 
 /* FR-WEB-23: which routes change state and therefore need authentication.
  * Decided here rather than in the transport, so adding a route cannot
- * accidentally leave it unprotected. */
+ * accidentally leave it unprotected.
+ *
+ * After FR-WEB-26 the set of state-changing routes is program authoring alone;
+ * everything else non-GET is refused outright.  The method test is kept rather
+ * than narrowed to those routes, because it still fails safe: a new write route
+ * is authenticated by default. */
 bool kiln_api_needs_auth(const kiln_api_req_t *req);
 
 /* The SSE payload for one telemetry event (FR-WEB-05).  Separate from
