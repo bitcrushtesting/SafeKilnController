@@ -12,10 +12,12 @@ set(KILN_WEB_SRCS
 )
 
 if(ESP_PLATFORM)
+    # httpd.cpp is the socket half and only exists on the target; everything
+    # it serves is decided in api.cpp, which the host suite covers.
     idf_component_register(
-        SRCS ${KILN_WEB_SRCS}
+        SRCS ${KILN_WEB_SRCS} "src/httpd.cpp"
         INCLUDE_DIRS include
-        REQUIRES kiln_app kiln_core kiln_ports
+        REQUIRES kiln_app kiln_core kiln_ports esp_http_server
     )
 else()
     add_library(kiln_web STATIC ${KILN_WEB_SRCS})

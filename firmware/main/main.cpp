@@ -27,6 +27,9 @@
 #include "kiln_core/profile.h"
 #include "kiln_hal/hal_esp32s3.h"
 #include "kiln_hmi/hmi.h"
+#ifndef CONFIG_KILN_PLANT_SIM
+#include "kiln_web/httpd.h"
+#endif
 #include "kiln_ports/port_system.h"
 
 #ifdef CONFIG_KILN_PLANT_SIM
@@ -76,6 +79,7 @@ static kiln_port_door_t       s_door_port;
 static kiln_port_alarm_t      s_alarm_hw_port;
 static kiln_port_display_t    s_display_port;
 static kiln_port_input_t      s_input_port;
+static kiln_port_net_t        s_net_port;
 #endif
 
 /* --- port_alarm: a stub, until the buzzer adapter exists ---------------- */
@@ -429,11 +433,23 @@ static void hmi_build_view(kiln_hmi_view_t *v)
     (void)snprintf(v->version, sizeof(v->version), "%s", fw.version);
     v->uptime_s = (uint32_t)(esp_timer_get_time() / 1000000);
 
-    /* No net adapter yet (tasklist L5), so the screen says so rather than
-     * showing a plausible address that is not there. */
-    v->net_up = false;
-    (void)snprintf(v->hostname, sizeof(v->hostname), "%s", "no wifi adapter");
-    (void)snprintf(v->ip, sizeof(v->ip), "%s", "-");
+    /* FR-HMI-07: where the web interface is, which is the question an operator
+     * standing at the kiln actually has. */
+    kiln_net_status_t ns = {};
+    if (s_net_port.status != nullptr &&
+        s_net_port.status(s_net_port.ctx, &ns) == KILN_OK) {
+        v->net_up = (ns.state == KILN_NET_STA_CONNECTED) ||
+                    (ns.state == KILN_NET_AP_FALLBACK);
+        /* The device's own name, not the SSID: FR-HMI-07 asks where the web
+         * interface is, and "kilncontrol" is half that answer. */
+        (void)snprintf(v->hostname, sizeof(v->hostname), "%s", ns.hostname);
+        (void)snprintf(v->ip, sizeof(v->ip), "%s",
+                       (ns.ip[0] != '\0') ? ns.ip : "no address");
+    } else {
+        v->net_up = false;
+        (void)snprintf(v->hostname, sizeof(v->hostname), "%s", "wifi down");
+        (void)snprintf(v->ip, sizeof(v->ip), "%s", "-");
+    }
 }
 
 static void hmi_task(void *arg)
@@ -647,6 +663,35 @@ extern "C" void app_main(void)
         ESP_LOGE(TAG, "kiln_app_init failed: %s", kiln_err_str(e));
         return;
     }
+
+#ifndef CONFIG_KILN_PLANT_SIM
+    /* FR-NET-01..FR-NET-09, started after the application and never waited on.
+     * FR-NET-07 requires that losing the network cannot alter a running
+     * firing, so the kiln is already fully operational before the radio is
+     * touched and nothing above depends on this succeeding.
+     *
+     * It does not go into kiln_app_ports_t, because the application has no use
+     * for it: the network is read by the HMI's network screen (FR-HMI-07) and
+     * by the web API, neither of which is a control path. */
+    if (kiln_hal_net_init(&s_app.cfg, &s_net_port) != KILN_OK) {
+        ESP_LOGE(TAG, "WiFi did not start; the kiln runs, the web does not");
+    }
+
+    /* The REST API over HTTP (FR-WEB-19 to FR-WEB-26).  Read-only, so there is
+     * nothing to authenticate and no way for a client to reach the kiln.
+     * Started last and never waited on, for FR-NET-07's reason: the firing
+     * must not depend on any of this. */
+    static kiln_api_ctx_t s_api;
+    s_api.app       = &s_app;
+    s_api.filestore = ports.filestore;
+    s_api.logstore  = ports.logstore;
+    s_api.system    = &s_system;
+    s_api.net       = &s_net_port;
+    s_api.ring      = &s_ring;
+    if (kiln_httpd_start(&s_api) != KILN_OK) {
+        ESP_LOGE(TAG, "the web server did not start; the kiln is unaffected");
+    }
+#endif
 
     /* Configuration, seeded programs, the run-id sequence, SR-17's latched fault
      * and FR-RUN-08's recovery decision.  The outage length is unknown here: a

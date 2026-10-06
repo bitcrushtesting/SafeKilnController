@@ -38,9 +38,9 @@ that is the point: every remaining firmware task is a driver.
 Ordered by what unblocks the most. The first three are the whole of "can this
 thing fire a kiln".
 
-Rows 1 to 6 are done: the adapters in section L, `kiln_hmi` in section M.
-What remains on this path is **row 7, the HTTP transport**, and then LittleFS
-and WiFi behind it.
+Rows 1 to 9 are done: the adapters in section L, `kiln_hmi` in M, WiFi in O
+and the HTTP transport in P. What remains is **row 8, LittleFS** (`E7`), row
+10's decision about `port_update`, and the asset embedding of `C9`.
 
 | | Port / component | Why it is where it is |
 |---|---|---|
@@ -50,9 +50,9 @@ and WiFi behind it.
 | **4** | ~~`port_door`, `port_phase`~~ **done** | Small, new, and the features that depend on them (`SR-31`, `FR-CUR-15`) are already written and tested. Cheap to finish. |
 | **5** | ~~`port_alarm`, `port_counters`~~ **done** | Small. `port_counters` unblocks `SR-30`, which can never fire today because the counts restart at every boot (`E8`). |
 | **6** | ~~`kiln_hmi`, `port_display`, `port_input`~~ **done**, see section M | Now the **only** way to start a firing, because `FR-WEB-26` withdrew run control from the network. Until this exists the only control path is the simulator console. |
-| **7** | HTTP transport over `esp_http_server` | `kiln_web` is complete and host-tested but **unreachable on the device**: nothing terminates TCP, parses headers, or checks a password. Most of `security.md` is a specification until this lands, and `SRR-02` must be settled first. |
+| **7** | ~~HTTP transport over `esp_http_server`~~ **done**, see section P |
 | **8** | `port_filestore`, LittleFS | Programs and run records are RAM-only on target, so nothing survives a reboot (`E7`). |
-| **9** | `port_net`, WiFi | Needed by 7, not before it. |
+| **9** | ~~`port_net`, WiFi~~ **done**, see section O |
 | **10** | `port_update` | **Probably delete it.** `FR-UPD-01` was inverted: no image is accepted over the network, so the port has no caller. Decide this rather than leaving a dead interface (`H2`, `OQ-08`). |
 
 ### Where the open items are
@@ -73,6 +73,8 @@ and WiFi behind it.
 | [L](#l-target-adapters-m2-and-m4b-2026-10-06) | Target adapters |
 | [M](#m-kiln_hmi-the-local-interface-2026-10-06) | Local interface |
 | [N](#n-single-phase-only-2026-10-06) | Single-phase scope change |
+| [O](#o-wifi-fr-net-2026-10-06) | WiFi |
+| [P](#p-the-http-transport-and-a-fully-read-only-api-2026-10-06) | HTTP transport |
 
 ---
 
@@ -1214,12 +1216,10 @@ Three decisions worth keeping:
 
 - [x] **L3. `kiln_hmi` does not exist.** Written 2026-10-06, section M.
 
-- [ ] **L4. The HTTP transport does not exist.** `kiln_web` is complete and
-  host-tested but unreachable on the device. `SRR-02` (salted hash against the
-  stored plaintext password) has to be settled before it is written, not after.
+- [x] **L4. The HTTP transport does not exist.** Written 2026-10-06, section P. `SRR-02` was settled by removing the password entirely.
 
-- [ ] **L5. `port_filestore` and `port_net` have no adapter.** LittleFS is
-  `E7`; WiFi is wanted by `L4` and not before it. `port_logstore` correctly has
+- [ ] **L5. `port_filestore` has no adapter.** LittleFS is `E7`. WiFi was
+  done in section O. `port_logstore` correctly has
   none, being provided by `kiln_core/logring` over `port_flash` (`AD-19`), and
   `port_update` probably wants deleting rather than implementing now that
   `FR-UPD-01` accepts no network image.
@@ -1390,3 +1390,124 @@ and all.
   case. On a single-phase kiln it should go back to scaling the whole heater,
   or `SR-28`'s deviation test is exercising something the hardware can no
   longer produce.
+
+---
+
+## O. WiFi, FR-NET (2026-10-06)
+
+Station with access-point fallback, exponential-backoff reconnection, SNTP and
+the diagnostics of `FR-NET-09`. Thirteen of sixteen ports now have a target
+adapter.
+
+`FR-NET-07` shaped the whole file: losing the network must not interrupt,
+pause or otherwise alter a running firing. So nothing blocks, nothing is on
+the control path, and the radio is started **after** `kiln_app_init` so the
+kiln is already fully operational before it is touched. Reconnection is
+event-driven with a 1 s to 60 s backoff, because an adapter that retried in a
+tight loop would satisfy "connects to WiFi" and quietly violate `FR-NET-07`.
+
+The port is not in `kiln_app_ports_t` and that is deliberate: the application
+has no use for the network. It is read by the HMI's network screen and by the
+web API, neither of which is a control path.
+
+Two things the compiler caught that were worth fixing rather than silencing:
+
+- **The configuration strings are longer than the radio's fields.** An SSID cut
+  at 32 characters simply never associates, leaving an operator looking at a
+  kiln that will not join a network it can see. `copy_checked()` refuses and
+  logs which item is too long, and unusable credentials fall through to the
+  provisioning AP, which is how the operator gets to correct them.
+- **An open access point is never started.** `FR-NET-05` wants at least eight
+  characters; where none is configured the adapter derives a device-unique
+  passphrase from the MAC rather than leaving the provisioning page open to
+  anyone in radio range.
+
+- [ ] **O1. `FR-NET-04` (mDNS, `kiln.local`) is not implemented.** mDNS left
+  the ESP-IDF tree for the component manager, and `CON-04` forbids a
+  build-time fetch from an unpinned source, which is the same constraint that
+  has LittleFS waiting to be vendored (`E7`). Adding a managed dependency for
+  a convenience feature would be the wrong trade against a constraint the
+  project applies everywhere else, so the device is reachable by IP until mDNS
+  is vendored deliberately. The address is on the HMI network screen, which is
+  where an operator would look anyway.
+
+- [ ] **O2. The image grew by 540 kB.** WiFi takes it from 292 kB to 831 kB,
+  which is 60.4 % of the OTA slot still free, so `NFR-13` holds comfortably.
+  Worth watching once the web assets are embedded (`C9`): that budget is
+  architecture 12.4's and it has not been measured against a real asset build.
+
+- [ ] **O3. Untested against a radio.** Same class as `L2`: it compiles and
+  passes analysis. Nobody has watched it associate, fall back to the AP,
+  recover from a dropped connection, or sync time.
+
+---
+
+## P. The HTTP transport, and a fully read-only API (2026-10-06)
+
+`kiln_web` is reachable on the device. Writing the transport turned up a
+blocker first, and the answer changed the shape of the interface.
+
+**The web password could not be set by anything.** `FR-WEB-26` had already
+withdrawn configuration writes from the network, the local interface has no
+text entry, and nothing else in the firmware wrote
+`security.web_password`. So `FR-WEB-23`'s optional password protection was
+permanently off, and writing authentication would have meant writing a gate
+that could never be armed. An authentication gate that cannot be armed is
+worse than none, because it reads as protection.
+
+The decision was to make the interface **fully read-only**, which dissolved
+the problem rather than working around it:
+
+- Program authoring is withdrawn. `/api/programs` reads; it no longer creates,
+  edits, deletes or copies. `FR-WEB-12` becomes a viewer and `FR-WEB-13` is
+  withdrawn outright, since there is no save to re-validate.
+- `FR-WEB-23` is withdrawn and `security.web_password` is gone from the
+  configuration schema. `SRR-02` (salted hash against stored plaintext) and
+  `OQ-S1` are both closed by there being no password.
+- `SEC-01` and `SEC-04` dissolve in `security.md`: no client may change state,
+  authenticated or not. `TH-05` (CSRF and DNS rebinding) **closes** without
+  any code, because a forged request can only read. That is the one threat the
+  decision closed for free.
+- The web UI's editor became a viewer and now makes zero write calls.
+
+The transport itself is small as a result. It registers **GET and nothing
+else**, so a write does not reach a handler at all, which is a second
+independent enforcement of `FR-WEB-26` alongside api.cpp's own refusal.
+Neither is load-bearing on its own and both are cheap.
+
+Three decisions in the transport worth keeping:
+
+- **An over-long URI is refused, not truncated.** A path cut at the buffer
+  length could match a *different* route from the one the client asked for.
+- **A truncated response is a 500, not a partial body.** A client cannot tell
+  a cut JSON document from a corrupt one, and serving the first 4 kB of a
+  response would be the worst of both. The log route streams precisely so that
+  it never hits this.
+- **One shared response buffer, not one per session.** The handlers are
+  serialised by the server's single task, so four sessions do not cost four
+  buffers, which is what keeps this inside architecture 13.4's 40 kB.
+
+- [ ] **P1. The UI is not served.** The transport answers `/api/*` and nothing
+  else: `C9`'s asset embedding is not done, so there is no `index.html` in the
+  image and a browser at the device's address gets a 404. The API is usable
+  with `curl` today. `AD-11` wants the assets gzipped into the image, which
+  also needs the budget of architecture 12.4 measured for the first time.
+
+- [ ] **P2. Server-Sent Events are not implemented.** `FR-WEB-05` wants live
+  values pushed at least once a second, and `kiln_api_telemetry_event()` is
+  written and tested for exactly that, but the transport has no `/api/events`
+  handler. The UI falls back to nothing: it reads `/api/status` on a timer
+  already, so this is a refinement rather than a gap in function.
+
+- [ ] **P3. Where do firing programs come from now?** Recorded as `OQ-09`.
+  Authoring is gone from the web and there is no local editor, so a user
+  cannot create a curve of their own: they get the seeded examples of
+  `FR-PRG-09` and nothing else. This is a real functional gap and the most
+  likely thing to make somebody reverse the read-only decision. A file import
+  at provisioning time is probably the cheapest answer.
+
+- [ ] **P4. Untested against a client.** It compiles and passes analysis. No
+  request has been made of it. The host API suite covers every route's
+  behaviour, so what is unverified is specifically the socket half: URI
+  splitting, chunked streaming, the four-session limit, and whether a slow
+  client can hold a buffer long enough to matter.

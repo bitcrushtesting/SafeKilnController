@@ -113,7 +113,6 @@ telemetry, nothing that reaches off the box.
       <div class="col">
         <h2 data-i18n="programs">Programs</h2>
         <ul id="prog-list" class="list"></ul>
-        <button id="b-new" class="primary" data-i18n="new_program">New program</button>
       </div>
       <div class="col">
         <h2 id="ed-title" data-i18n="editor">Editor</h2>
@@ -129,17 +128,17 @@ telemetry, nothing that reaches off the box.
           </tr></thead>
           <tbody id="ed-body"></tbody>
         </table>
-        <div class="controls">
-          <button id="b-addseg" data-i18n="add_segment">Add segment</button>
-          <button id="b-save" class="primary" data-i18n="save">Save</button>
-          <button id="b-copy" data-i18n="copy">Copy</button>
-          <button id="b-del" class="danger" data-i18n="delete">Delete</button>
-        </div>
+        <div class="controls">        </div>
         <div id="ed-msg" class="note" hidden></div>
         <canvas id="ed-chart" height="200"></canvas>
       </div>
     </div>
   </section>
+
+  <p id="programs-readonly-note" class="readonly-note">
+    <strong>Display only.</strong> Firing programs are shown here but are
+    authored at the kiln, not over the network (FR-WEB-26).
+  </p>
 
   <!-- History -->
   <section id="view-history" class="view" hidden>

@@ -369,7 +369,7 @@ KILN_TEST(frcfg07_a_secret_is_never_returned_only_whether_it_is_set)
     static rig_t r;
     rig_init(&r);
 
-    CHECK_OK(local_set_cfg_str(&r, "security.web_password", "hunter2"));
+    CHECK_OK(local_set_cfg_str(&r, "net.wifi_pass", "hunter2"));
 
     const kiln_api_resp_t resp = call(&r, KILN_HTTP_GET, "/api/config", NULL, NULL);
     /* The one assertion that matters: the password is not in the response at
@@ -384,7 +384,7 @@ KILN_TEST(frcfg07_a_secret_is_never_returned_only_whether_it_is_set)
     for (int k = 0; k < g_toks[items].size && i < n; k++) {
         char key[48] = "";
         if (kiln_json_get_str(resp.body, g_toks, n, i, "key", key, sizeof(key)) &&
-            strcmp(key, "security.web_password") == 0) {
+            strcmp(key, "net.wifi_pass") == 0) {
             bool set = false;
             CHECK(kiln_json_get_bool(resp.body, g_toks, n, i, "set", &set));
             CHECK(set);
@@ -477,124 +477,62 @@ KILN_TEST(frprg09_the_examples_are_listed_and_marked_readonly)
     CHECK(kiln_json_find(resp.body, g_toks, n, first, "peak_c") > 0);
 }
 
-KILN_TEST(frweb13_the_server_revalidates_and_never_trusts_the_client)
+KILN_TEST(frweb26_an_unknown_program_slot_is_404_and_not_an_empty_list)
 {
+    /* Asking for a program that is not there is a different mistake from
+     * asking what programs exist, and the status has to say which. */
     static rig_t r;
     rig_init(&r);
+    const kiln_api_resp_t missing = call(&r, KILN_HTTP_GET, "/api/programs/99", NULL, NULL);
+    expect_error(missing, 404, "not_found");
+}
 
-    /* A target above the configured maximum.  A client that skipped its own
-     * validation, or lied, must not be able to store this. */
-    const kiln_api_resp_t resp = call(&r, KILN_HTTP_POST, "/api/programs", NULL,
-        "{\"name\":\"too hot\",\"segments\":[{\"target_c\":1340,\"rate_c_per_h\":100}]}");
-    expect_error(resp, 400, "invalid_program");
+KILN_TEST(frweb26_programs_are_readable_and_nothing_more)
+{
+    /* Authoring went the way of the other writes on 2026-10-06: the password
+     * that would have guarded it could not be set from anywhere, and an
+     * authenticated write whose gate can never be armed is an unauthenticated
+     * write with extra steps. */
+    static rig_t r;
+    rig_init(&r);
 
     const kiln_api_resp_t list = call(&r, KILN_HTTP_GET, "/api/programs", NULL, NULL);
-    CHECK(strstr(list.body, "too hot") == NULL);
+    CHECK_EQ_INT(list.status, 200);
+    CHECK_MSG(strstr(list.body, "segments") != NULL,
+              "the seeded examples should still be readable: %.120s", list.body);
+
+    const kiln_api_resp_t one = call(&r, KILN_HTTP_GET, "/api/programs/1", NULL, NULL);
+    CHECK_EQ_INT(one.status, 200);
+
+    expect_read_only(&r, KILN_HTTP_POST,   "/api/programs",   "{\"name\":\"x\"}");
+    expect_read_only(&r, KILN_HTTP_PUT,    "/api/programs/1", "{\"name\":\"x\"}");
+    expect_read_only(&r, KILN_HTTP_DELETE, "/api/programs/1", NULL);
+    expect_read_only(&r, KILN_HTTP_POST,   "/api/programs/1/copy", NULL);
 }
 
-KILN_TEST(frprg07_a_program_round_trips_through_the_api)
+KILN_TEST(frprg09_a_read_only_example_is_marked_as_such)
 {
+    /* FR-PRG-09's protection is now moot over the API, since nothing can be
+     * edited at all, but the flag still has to reach a client so the local
+     * interface can show it. */
     static rig_t r;
     rig_init(&r);
-
-    const kiln_api_resp_t created = call(&r, KILN_HTTP_POST, "/api/programs", NULL,
-        "{\"name\":\"my glaze\",\"description\":\"cone 6\",\"segments\":["
-        "{\"target_c\":150,\"rate_c_per_h\":100},"
-        "{\"target_c\":1100,\"rate_c_per_h\":150},"
-        "{\"target_c\":1222,\"rate_c_per_h\":60,\"dwell_min\":15,\"require_ack\":true}]}");
-    CHECK_EQ_INT(created.status, 201);
-
-    /* Find its id in the list, then read it back. */
     const kiln_api_resp_t list = call(&r, KILN_HTTP_GET, "/api/programs", NULL, NULL);
-    const int n = parse_resp(&list);
-    const int arr = kiln_json_find(list.body, g_toks, n, 0, "programs");
-    int id = -1;
-    int i = arr + 1;
-    for (int k = 0; k < g_toks[arr].size && i < n; k++) {
-        char name[40] = "";
-        double d = 0.0;
-        if (kiln_json_get_str(list.body, g_toks, n, i, "name", name, sizeof(name)) &&
-            strcmp(name, "my glaze") == 0 &&
-            kiln_json_get_num(list.body, g_toks, n, i, "id", &d)) {
-            id = (int)d;
-        }
-        const int end = g_toks[i].end;
-        i++;
-        while (i < n && g_toks[i].start < end) {
-            i++;
-        }
-    }
-    CHECK(id >= 0);
-
-    char path[48];
-    snprintf(path, sizeof(path), "/api/programs/%d", id);
-    const kiln_api_resp_t got = call(&r, KILN_HTTP_GET, path, NULL, NULL);
-    CHECK_EQ_INT(got.status, 200);
-    const int gn = parse_resp(&got);
-
-    char desc[64];
-    str_of(&got, gn, "description", desc, sizeof(desc));
-    CHECK_STR_EQ(desc, "cone 6");
-    CHECK_NEAR(num_of(&got, gn, "segment_count"), 3.0, 0.001);
-    CHECK_NEAR(num_of(&got, gn, "peak_c"), 1222.0, 0.001);
-
-    bool valid = false;
-    CHECK(kiln_json_get_bool(got.body, g_toks, gn, 0, "valid", &valid));
-    CHECK(valid);
-
-    /* FR-PRG-06: the planned curve the chart draws as the intended firing. */
-    snprintf(path, sizeof(path), "/api/programs/%d/preview", id);
-    const kiln_api_resp_t prev = call(&r, KILN_HTTP_GET, path, NULL, NULL);
-    CHECK_EQ_INT(prev.status, 200);
-    const int pn = parse_resp(&prev);
-    const int curve = kiln_json_find(prev.body, g_toks, pn, 0, "curve");
-    CHECK(curve > 0);
-    CHECK(g_toks[curve].size >= 4);
-
-    /* Delete. */
-    snprintf(path, sizeof(path), "/api/programs/%d", id);
-    CHECK_EQ_INT(call(&r, KILN_HTTP_DELETE, path, NULL, NULL).status, 200);
-    CHECK_EQ_INT(call(&r, KILN_HTTP_GET, path, NULL, NULL).status, 404);
+    CHECK_EQ_INT(list.status, 200);
+    CHECK(strstr(list.body, "readonly") != NULL);
 }
 
-KILN_TEST(frprg09_an_example_cannot_be_edited_but_can_be_copied)
+KILN_TEST(frweb26_a_body_on_a_read_only_route_changes_nothing)
 {
+    /* There is no parser left to confuse: the method is refused before the
+     * body is looked at, which is also why an oversized or malformed body on
+     * a write route can no longer reach any parsing code. */
     static rig_t r;
     rig_init(&r);
-
-    const kiln_api_resp_t put = call(&r, KILN_HTTP_PUT, "/api/programs/0", NULL,
-        "{\"name\":\"hijacked\",\"segments\":[{\"target_c\":500,\"rate_c_per_h\":100}]}");
-    expect_error(put, 409, "readonly");
-    CHECK_EQ_INT(call(&r, KILN_HTTP_DELETE, "/api/programs/0", NULL, NULL).status, 409);
-
-    /* A copy is editable, which is how FR-PRG-09 stays a protection rather than
-     * an obstruction. */
-    const kiln_api_resp_t copy = call(&r, KILN_HTTP_POST, "/api/programs/0/copy",
-                                      NULL, NULL);
-    CHECK_EQ_INT(copy.status, 201);
-    const int n = parse_resp(&copy);
-    char name[48];
-    str_of(&copy, n, "name", name, sizeof(name));
-    CHECK(strstr(name, "copy") != NULL);
-}
-
-KILN_TEST(a_malformed_program_body_is_rejected_with_a_useful_message)
-{
-    static rig_t r;
-    rig_init(&r);
-
-    expect_error(call(&r, KILN_HTTP_POST, "/api/programs", NULL, "not json"),
-                 400, "bad_json");
-    expect_error(call(&r, KILN_HTTP_POST, "/api/programs", NULL, "{}"),
-                 400, "invalid_value");
-    expect_error(call(&r, KILN_HTTP_POST, "/api/programs", NULL,
-                       "{\"name\":\"x\"}"), 400, "invalid_value");
-    expect_error(call(&r, KILN_HTTP_POST, "/api/programs", NULL,
-                       "{\"name\":\"x\",\"segments\":[{\"rate_c_per_h\":1}]}"),
-                 400, "invalid_value");
-    expect_error(call(&r, KILN_HTTP_POST, "/api/programs", NULL,
-                       "{\"name\":\"x\",\"segments\":[{\"target_c\":1e9}]}"),
-                 400, "out_of_range");
+    expect_read_only(&r, KILN_HTTP_POST, "/api/programs",
+                     "{\"name\":\"\x01\x02 not json at all");
+    const kiln_api_resp_t list = call(&r, KILN_HTTP_GET, "/api/programs", NULL, NULL);
+    CHECK_EQ_INT(list.status, 200);
 }
 
 /* --- run control (FR-RUN) ---------------------------------------------- */

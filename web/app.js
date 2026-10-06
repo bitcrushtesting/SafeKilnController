@@ -44,9 +44,6 @@ async function api(method, path, body) {
 }
 
 const get = p => api('GET', p);
-const post = (p, b) => api('POST', p, b);
-const put = (p, b) => api('PUT', p, b);
-const del = p => api('DELETE', p);
 
 function toast(node, message, kind) {
   node.textContent = message;
@@ -366,23 +363,22 @@ function segRow(seg, i) {
   return tr;
 }
 
+/* FR-WEB-26: a viewer, not an editor.  Every field is disabled unconditionally
+   rather than by the program's readonly flag, because nothing here can be
+   saved whatever the flag says. */
 function renderEditor() {
   if (!editing) return;
-  $('ed-title').textContent = editing.id === null ? 'New program' : editing.name;
+  $('ed-title').textContent = editing.name || 'Program';
   $('ed-ro').hidden = !editing.readonly;
   $('ed-name').value = editing.name || '';
   $('ed-desc').value = editing.description || '';
-  $('ed-name').disabled = $('ed-desc').disabled = !!editing.readonly;
+  $('ed-name').disabled = true;
+  $('ed-desc').disabled = true;
 
   const body = $('ed-body');
   body.innerHTML = '';
   editing.segments.forEach((s, i) => body.append(segRow(s, i)));
-  body.querySelectorAll('input').forEach(i => { i.disabled = !!editing.readonly; });
-
-  $('b-save').disabled = !!editing.readonly;
-  $('b-del').disabled = !!editing.readonly || editing.id === null;
-  $('b-copy').disabled = editing.id === null;
-  $('b-addseg').disabled = !!editing.readonly;
+  body.querySelectorAll('input').forEach(i => { i.disabled = true; });
   previewEdit();
 }
 
@@ -570,18 +566,14 @@ async function pollTune() {
       const box = $('tune-state');
       box.hidden = false;
       box.innerHTML = '';
-      box.append(el('b', null, 'Tuning converged. Choose a rule:'));
+      /* FR-WEB-26: the candidates are shown, and accepting one is done at
+         the kiln. Listing them here is still worth it, because choosing a
+         rule is a judgement the operator makes better with the numbers in
+         front of them than from a menu on a 128x64 panel. */
+      box.append(el('b', null, 'Tuning converged. Accept a rule at the kiln:'));
       for (const c of t.candidates) {
-        const b = el('button', null,
-          `${c.rule} — Kp ${c.kp.toFixed(3)} Ki ${c.ki.toFixed(4)} Kd ${c.kd.toFixed(1)}`);
-        b.onclick = async () => {
-          try {
-            await post('/api/tune/accept', { rule: c.rule });
-            toast($('tune-state'), 'gains stored', 'ok');
-            loadDiagnostics();
-          } catch (e) { toast($('tune-state'), e.message, 'bad'); }
-        };
-        box.append(el('div')).append(b);
+        box.append(el('div', null,
+          `${c.rule}: Kp ${c.kp.toFixed(3)} Ki ${c.ki.toFixed(4)} Kd ${c.kd.toFixed(1)}`));
       }
     }
   } catch { /* leave the last state visible */ }
@@ -624,62 +616,10 @@ function wire() {
   ['c-sp', 'c-plan', 'c-duty', 'c-cur', 'c-case'].forEach(id => { $(id).onchange = vis; });
   $('c-reset').onclick = () => chart.resetZoom();
 
-  /* FR-WEB-14: start and abort are confirmed.  Both commit a kiln to hours of
-   * heat or throw away hours of work, and neither should be one stray tap away. */
+  /* FR-WEB-26: the program screen displays a stored curve and does not edit
+     one. The name and description fields are read-only for the same reason
+     the buttons are gone. */
 
-  $('b-new').onclick = () => {
-    editing = {
-      id: null, name: 'New program', description: '', readonly: false,
-      segments: [{ target_c: 100, rate_c_per_h: 100, dwell_min: 0, require_ack: false }],
-    };
-    renderEditor();
-  };
-  $('b-addseg').onclick = () => {
-    const last = editing.segments[editing.segments.length - 1];
-    editing.segments.push({
-      target_c: last ? last.target_c : 100, rate_c_per_h: 100,
-      dwell_min: 0, require_ack: false,
-    });
-    renderEditor();
-  };
-  $('ed-name').oninput = () => { editing.name = $('ed-name').value; };
-  $('ed-desc').oninput = () => { editing.description = $('ed-desc').value; };
-
-  $('b-save').onclick = async () => {
-    const payload = {
-      name: editing.name, description: editing.description,
-      segments: editing.segments.map(s => ({
-        target_c: Number(s.target_c), rate_c_per_h: Number(s.rate_c_per_h),
-        dwell_min: Number(s.dwell_min), require_ack: !!s.require_ack,
-      })),
-    };
-    try {
-      if (editing.id === null) await post('/api/programs', payload);
-      else await put(`/api/programs/${editing.id}`, payload);
-      toast($('ed-msg'), 'saved', 'ok');
-      await loadPrograms();
-    } catch (e) {
-      /* The server's reason, verbatim: it knows which segment and why. */
-      toast($('ed-msg'), e.message, 'bad');
-    }
-  };
-  $('b-copy').onclick = async () => {
-    try {
-      const r = await post(`/api/programs/${editing.id}/copy`);
-      toast($('ed-msg'), `copied as "${r.name}"`, 'ok');
-      await loadPrograms();
-    } catch (e) { toast($('ed-msg'), e.message, 'bad'); }
-  };
-  $('b-del').onclick = async () => {
-    if (!confirm(`Delete "${editing.name}"?`)) return;
-    try {
-      await del(`/api/programs/${editing.id}`);
-      editing = null;
-      await loadPrograms();
-      $('ed-body').innerHTML = '';
-      $('ed-title').textContent = 'Editor';
-    } catch (e) { toast($('ed-msg'), e.message, 'bad'); }
-  };
 
 
 

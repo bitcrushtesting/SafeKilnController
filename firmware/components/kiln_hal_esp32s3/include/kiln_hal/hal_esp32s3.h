@@ -21,6 +21,7 @@
 #define KILN_HAL_ESP32S3_H
 
 #include "kiln/err.h"
+#include "kiln_core/configmodel.h"
 #include "kiln_ports/port_alarm.h"
 #include "kiln_ports/port_clock.h"
 #include "kiln_ports/port_counters.h"
@@ -29,6 +30,7 @@
 #include "kiln_ports/port_door.h"
 #include "kiln_ports/port_heat.h"
 #include "kiln_ports/port_input.h"
+#include "kiln_ports/port_net.h"
 #include "kiln_ports/port_tc.h"
 #include "kiln_ports/port_flash.h"
 #include "kiln_ports/port_kvstore.h"
@@ -91,5 +93,11 @@ kiln_err_t kiln_hal_display_init(kiln_port_display_t *out);
 
 /* Rotary encoder on the pulse counter unit, plus its button (HR-05). */
 kiln_err_t kiln_hal_input_init(kiln_port_input_t *out);
+
+/* WiFi station with AP fallback and SNTP (FR-NET-01..FR-NET-09, less
+ * FR-NET-04: mDNS is not in the IDF tree and CON-04 forbids fetching it).
+ * Nothing here is on the control path: FR-NET-07 requires that losing the
+ * network cannot alter a running firing. */
+kiln_err_t kiln_hal_net_init(const kiln_config_t *cfg, kiln_port_net_t *out);
 
 #endif

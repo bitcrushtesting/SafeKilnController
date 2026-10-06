@@ -87,7 +87,6 @@ KILN_TEST(frcfg02_the_minimum_item_set_is_present)
         "hmi.units", "hmi.dim_timeout_s", "hmi.alarm_duration_s",
         "net.wifi_mode", "net.wifi_ssid", "net.hostname", "net.ntp_server",
         "net.timezone",
-        "security.web_password",
     };
 
     for (size_t i = 0; i < sizeof(required) / sizeof(required[0]); i++) {
@@ -186,10 +185,18 @@ KILN_TEST(frcfg04_reboot_required_is_reported_for_the_items_that_need_one)
 
 KILN_TEST(frcfg07_secrets_are_flagged_so_they_are_never_serialised_outward)
 {
-    const char *secrets[] = { "net.wifi_pass", "net.ap_pass", "security.web_password" };
+    /* security.web_password was removed on 2026-10-06: FR-WEB-26 left nothing
+     * over the network to authenticate, so there was nothing for it to guard. */
+    const char *secrets[] = { "net.wifi_pass", "net.ap_pass" };
     for (size_t i = 0; i < sizeof(secrets) / sizeof(secrets[0]); i++) {
         const kiln_cfg_item_t *it = kiln_config_find(secrets[i]);
-        CHECK(it != NULL);
+        CHECK_MSG(it != NULL, "%s is not in the schema", secrets[i]);
+        /* `continue` rather than fall through: CHECK records a failure and
+         * keeps going, so dereferencing here would turn a missing item into a
+         * segfault and hide which item was missing. */
+        if (it == NULL) {
+            continue;
+        }
         CHECK_MSG(it->flags & KILN_CFG_F_SECRET, "%s is not flagged secret", secrets[i]);
     }
 }

@@ -126,7 +126,6 @@ static const kiln_cfg_item_t k_items[] = {
     STR("net.timezone",                        "FR-LOG-12",   timezone,  KILN_CFG_HOST_LEN, "UTC0",         0),
 
     /* security */
-    STR("security.web_password",               "FR-CFG-07",   web_password, KILN_CFG_PASS_LEN, "", SECRET),
 };
 
 uint16_t kiln_config_item_count(void)

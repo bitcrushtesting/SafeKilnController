@@ -169,7 +169,6 @@ typedef struct {
     char     timezone[KILN_CFG_HOST_LEN];
 
     /* security */
-    char     web_password[KILN_CFG_PASS_LEN];
 } kiln_config_t;
 
 void kiln_config_defaults(kiln_config_t *cfg);

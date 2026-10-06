@@ -489,307 +489,8 @@ static void write_program(kiln_json_t *j, const kiln_program_t *p, uint8_t id,
     kiln_json_obj_close(j);
 }
 
-/* Decode a program from a request body.  FR-WEB-13: the server re-validates and
- * never relies on the client having done so. */
-static bool decode_program(const char *body, size_t len, kiln_program_t *out,
-                           kiln_api_resp_t *resp)
-{
-    static kiln_json_tok_t toks[KILN_API_MAX_TOKENS];
-    const int ntok = kiln_json_parse(body, len, toks, KILN_API_MAX_TOKENS);
-    if (ntok < 1 || toks[0].type != KILN_JSON_OBJECT) {
-        kiln_api_error(resp, 400, "bad_json", "the body is not a JSON object");
-        return false;
-    }
 
-    kiln_profile_init_empty(out, NULL);
 
-    char name[KILN_PROGRAM_NAME_LEN];
-    if (!kiln_json_get_str(body, toks, ntok, 0, "name", name, sizeof(name))) {
-        kiln_api_error(resp, 400, "invalid_value",
-                       "name is required and must fit 31 characters");
-        return false;
-    }
-    kiln_profile_init_empty(out, name);
-
-    char desc[KILN_PROGRAM_DESC_LEN];
-    if (kiln_json_get_str(body, toks, ntok, 0, "description", desc, sizeof(desc))) {
-        memcpy(out->description, desc, strlen(desc) + 1u);
-    }
-
-    const int segs = kiln_json_find(body, toks, ntok, 0, "segments");
-    if (segs < 0 || toks[segs].type != KILN_JSON_ARRAY) {
-        kiln_api_error(resp, 400, "invalid_value", "segments must be an array");
-        return false;
-    }
-    if (toks[segs].size > KILN_MAX_SEGMENTS) {
-        kiln_api_error(resp, 400, "too_many_segments",
-                       "a program may have at most 32 segments");
-        return false;
-    }
-
-    int i = segs + 1;
-    uint8_t n = 0;
-    for (int k = 0; k < toks[segs].size && i < ntok; k++) {
-        if (toks[i].type != KILN_JSON_OBJECT) {
-            kiln_api_error(resp, 400, "invalid_value", "each segment must be an object");
-            return false;
-        }
-        double target = 0.0, rate = 0.0, dwell = 0.0;
-        if (!kiln_json_get_num(body, toks, ntok, i, "target_c", &target)) {
-            kiln_api_error(resp, 400, "invalid_value", "each segment needs target_c");
-            return false;
-        }
-        (void)kiln_json_get_num(body, toks, ntok, i, "rate_c_per_h", &rate);
-        (void)kiln_json_get_num(body, toks, ntok, i, "dwell_min", &dwell);
-
-        /* Clamp into the field widths before storing, so an absurd number
-         * becomes a validation failure rather than a wrapped uint16. */
-        if (target < 0.0 || target > 65535.0 || rate < 0.0 || rate > 65535.0 ||
-            dwell < 0.0 || dwell > 65535.0) {
-            kiln_api_error(resp, 400, "out_of_range", "a segment value is out of range");
-            return false;
-        }
-        out->segments[n].target_c     = (uint16_t)target;
-        out->segments[n].rate_c_per_h = (uint16_t)rate;
-        out->segments[n].dwell_min    = (uint16_t)dwell;
-
-        bool ack = false;
-        if (kiln_json_get_bool(body, toks, ntok, i, "require_ack", &ack) && ack) {
-            out->segments[n].flags |= KILN_SEG_FLAG_REQUIRE_ACK;
-        }
-        n++;
-
-        /* Next array element. */
-        const int end = toks[i].end;
-        i++;
-        while (i < ntok && toks[i].start < end) {
-            i++;
-        }
-    }
-    out->segment_count = n;
-    return true;
-}
-
-static kiln_err_t handle_programs(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
-                                  kiln_api_resp_t *resp)
-{
-    if (ctx->filestore == nullptr) {
-        kiln_api_error(resp, 503, "no_storage", "program storage is unavailable");
-        return KILN_ERR_IO;
-    }
-    const float max_temp = ctx->app->cfg.max_temp_c;
-
-    if (req->method == KILN_HTTP_GET) {
-        kiln_json_t j;
-        resp_begin(resp, &j);
-        kiln_json_obj_open(&j);
-        kiln_json_key(&j, "programs");
-        kiln_json_arr_open(&j);
-        for (uint8_t id = 0; id < KILN_PROGRAM_SLOTS; id++) {
-            kiln_program_t p;
-            if (kiln_program_store_get_slot(ctx->filestore, id, &p) != KILN_OK) {
-                continue;
-            }
-            write_program(&j, &p, id, max_temp);
-        }
-        kiln_json_arr_close(&j);
-        kiln_json_obj_close(&j);
-        return resp_end(resp, &j);
-    }
-
-    if (req->method == KILN_HTTP_POST) {
-        kiln_program_t p;
-        if (!decode_program(req->body, req->body_len, &p, resp)) {
-            return KILN_ERR_INVALID_ARG;
-        }
-        /* FR-WEB-13: re-validated here, by the same validator the executor uses. */
-        const kiln_prog_validation_t v = kiln_profile_validate(&p, max_temp);
-        if (v.code != KILN_PROG_OK) {
-            char msg[128];
-            snprintf(msg, sizeof(msg), "%s", kiln_profile_validation_str(v.code));
-            kiln_api_error(resp, 400, "invalid_program", msg);
-            return KILN_ERR_RANGE;
-        }
-        const kiln_err_t e = kiln_program_store_save(ctx->filestore, &p, max_temp);
-        if (e != KILN_OK) {
-            resp_from_err(resp, e, "the program could not be stored");
-            return e;
-        }
-        kiln_json_t j;
-        resp_begin(resp, &j);
-        resp->status = 201;
-        kiln_json_obj_open(&j);
-        kiln_json_kv_bool(&j, "ok", true);
-        kiln_json_kv_str(&j, "name", p.name);
-        kiln_json_obj_close(&j);
-        return resp_end(resp, &j);
-    }
-
-    kiln_api_error(resp, 405, "method_not_allowed", "use GET or POST");
-    return KILN_ERR_UNSUPPORTED;
-}
-
-static kiln_err_t handle_program_item(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
-                                      uint32_t id, const char *tail,
-                                      kiln_api_resp_t *resp)
-{
-    if (ctx->filestore == nullptr) {
-        kiln_api_error(resp, 503, "no_storage", "program storage is unavailable");
-        return KILN_ERR_IO;
-    }
-    if (id >= KILN_PROGRAM_SLOTS) {
-        kiln_api_error(resp, 404, "not_found", "no such program");
-        return KILN_ERR_NOT_FOUND;
-    }
-    const float max_temp = ctx->app->cfg.max_temp_c;
-
-    kiln_program_t p;
-    const bool exists = kiln_program_store_get_slot(ctx->filestore, (uint8_t)id, &p) == KILN_OK;
-
-    if (path_is(tail, "") && req->method == KILN_HTTP_GET) {
-        if (!exists) {
-            kiln_api_error(resp, 404, "not_found", "no such program");
-            return KILN_ERR_NOT_FOUND;
-        }
-        kiln_json_t j;
-        resp_begin(resp, &j);
-        write_program(&j, &p, (uint8_t)id, max_temp);
-        return resp_end(resp, &j);
-    }
-
-    if (path_is(tail, "") && req->method == KILN_HTTP_PUT) {
-        if (!exists) {
-            kiln_api_error(resp, 404, "not_found", "no such program");
-            return KILN_ERR_NOT_FOUND;
-        }
-        if ((p.flags & KILN_PROG_FLAG_READONLY) != 0u) {
-            kiln_api_error(resp, 409, "readonly",
-                           "the built-in examples cannot be edited; copy it first");
-            return KILN_ERR_STATE;
-        }
-        kiln_program_t edited;
-        if (!decode_program(req->body, req->body_len, &edited, resp)) {
-            return KILN_ERR_INVALID_ARG;
-        }
-        const kiln_prog_validation_t v = kiln_profile_validate(&edited, max_temp);
-        if (v.code != KILN_PROG_OK) {
-            kiln_api_error(resp, 400, "invalid_program",
-                           kiln_profile_validation_str(v.code));
-            return KILN_ERR_RANGE;
-        }
-        /* Renaming would otherwise leave the old name in another slot. */
-        if (strcmp(edited.name, p.name) != 0) {
-            (void)kiln_program_store_delete(ctx->filestore, p.name);
-        }
-        const kiln_err_t e = kiln_program_store_save(ctx->filestore, &edited, max_temp);
-        if (e != KILN_OK) { resp_from_err(resp, e, "could not store"); return e; }
-
-        kiln_json_t j;
-        resp_begin(resp, &j);
-        kiln_json_obj_open(&j);
-        kiln_json_kv_bool(&j, "ok", true);
-        kiln_json_obj_close(&j);
-        return resp_end(resp, &j);
-    }
-
-    if (path_is(tail, "") && req->method == KILN_HTTP_DELETE) {
-        if (!exists) {
-            kiln_api_error(resp, 404, "not_found", "no such program");
-            return KILN_ERR_NOT_FOUND;
-        }
-        const kiln_err_t e = kiln_program_store_delete(ctx->filestore, p.name);
-        if (e != KILN_OK) {
-            resp_from_err(resp, e,
-                "the built-in examples cannot be deleted (FR-PRG-09)");
-            return e;
-        }
-        kiln_json_t j;
-        resp_begin(resp, &j);
-        kiln_json_obj_open(&j);
-        kiln_json_kv_bool(&j, "ok", true);
-        kiln_json_obj_close(&j);
-        return resp_end(resp, &j);
-    }
-
-    if (path_is(tail, "copy") && req->method == KILN_HTTP_POST) {
-        if (!exists) {
-            kiln_api_error(resp, 404, "not_found", "no such program");
-            return KILN_ERR_NOT_FOUND;
-        }
-        /* A copy is editable even when its source is not, which is how FR-PRG-09
-         * stays a protection rather than an obstruction. */
-        kiln_program_t copy = p;
-        copy.flags = (uint8_t)(copy.flags & ~KILN_PROG_FLAG_READONLY);
-        snprintf(copy.name, sizeof(copy.name), "%.*s copy",
-                 (int)sizeof(copy.name) - 6, p.name);
-
-        const kiln_err_t e = kiln_program_store_save(ctx->filestore, &copy, max_temp);
-        if (e != KILN_OK) { resp_from_err(resp, e, "could not store the copy"); return e; }
-
-        kiln_json_t j;
-        resp_begin(resp, &j);
-        resp->status = 201;
-        kiln_json_obj_open(&j);
-        kiln_json_kv_bool(&j, "ok", true);
-        kiln_json_kv_str(&j, "name", copy.name);
-        kiln_json_obj_close(&j);
-        return resp_end(resp, &j);
-    }
-
-    if (path_is(tail, "preview") && req->method == KILN_HTTP_GET) {
-        if (!exists) {
-            kiln_api_error(resp, 404, "not_found", "no such program");
-            return KILN_ERR_NOT_FOUND;
-        }
-        /* FR-PRG-06 and FR-WEB-08: the planned curve, as vertices rather than
-         * samples -- the chart interpolates, and a hundred vertices is a tenth of
-         * the bytes of a thousand points. */
-        kiln_json_t j;
-        resp_begin(resp, &j);
-        kiln_json_obj_open(&j);
-        kiln_json_kv_str(&j, "name", p.name);
-        kiln_json_kv_uint(&j, "duration_s", kiln_profile_duration_s(&p, 20.0f));
-
-        kiln_json_key(&j, "curve");
-        kiln_json_arr_open(&j);
-        {
-            double t = 0.0;
-            float from = 20.0f;
-            kiln_json_obj_open(&j);
-            kiln_json_kv_uint(&j, "t_s", 0);
-            kiln_json_kv_num(&j, "c", from, 1);
-            kiln_json_obj_close(&j);
-
-            for (uint8_t i = 0; i < p.segment_count; i++) {
-                const kiln_segment_t *s = &p.segments[i];
-                const float target = (float)s->target_c;
-                const float span   = target > from ? target - from : from - target;
-                if (s->rate_c_per_h > 0) {
-                    t += (double)span * 3600.0 / (double)s->rate_c_per_h;
-                }
-                kiln_json_obj_open(&j);
-                kiln_json_kv_uint(&j, "t_s", (unsigned long long)t);
-                kiln_json_kv_num(&j, "c", target, 1);
-                kiln_json_obj_close(&j);
-
-                if (s->dwell_min > 0) {
-                    t += (double)s->dwell_min * 60.0;
-                    kiln_json_obj_open(&j);
-                    kiln_json_kv_uint(&j, "t_s", (unsigned long long)t);
-                    kiln_json_kv_num(&j, "c", target, 1);
-                    kiln_json_obj_close(&j);
-                }
-                from = target;
-            }
-        }
-        kiln_json_arr_close(&j);
-        kiln_json_obj_close(&j);
-        return resp_end(resp, &j);
-    }
-
-    kiln_api_error(resp, 404, "not_found", "no such program route");
-    return KILN_ERR_NOT_FOUND;
-}
 
 /* --- /api/run and friends ---------------------------------------------- */
 
@@ -929,6 +630,52 @@ static kiln_err_t handle_tune(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
 }
 
 /* --- /api/runs, /api/current, /api/storage, /api/net ------------------- */
+
+/* FR-PRG-07: the stored programs, read only. */
+static kiln_err_t handle_program_list(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
+{
+    if (ctx->filestore == nullptr) {
+        kiln_api_error(resp, 503, "no_storage", "program storage is unavailable");
+        return KILN_ERR_IO;
+    }
+    kiln_json_t j;
+    resp_begin(resp, &j);
+    kiln_json_obj_open(&j);
+    kiln_json_key(&j, "programs");
+    kiln_json_arr_open(&j);
+    const uint8_t n = kiln_program_store_count(ctx->filestore);
+    for (uint8_t i = 0; i < n; i++) {
+        kiln_program_t prog;
+        if (kiln_program_store_get_slot(ctx->filestore, i, &prog) != KILN_OK) {
+            continue;
+        }
+        write_program(&j, &prog, i, ctx->app->cfg.max_temp_c);
+    }
+    kiln_json_arr_close(&j);
+    kiln_json_obj_close(&j);
+    return resp_end(resp, &j);
+}
+
+/* One stored program by slot.  A missing slot is 404 and not an empty list:
+ * a client asking for a program that is not there has made a different
+ * mistake from one asking what programs exist. */
+static kiln_err_t handle_program_one(kiln_api_ctx_t *ctx, uint8_t id,
+                                     kiln_api_resp_t *resp)
+{
+    if (ctx->filestore == nullptr) {
+        kiln_api_error(resp, 503, "no_storage", "program storage is unavailable");
+        return KILN_ERR_IO;
+    }
+    kiln_program_t prog;
+    if (kiln_program_store_get_slot(ctx->filestore, id, &prog) != KILN_OK) {
+        kiln_api_error(resp, 404, "not_found", "no program in that slot");
+        return KILN_ERR_NOT_FOUND;
+    }
+    kiln_json_t j;
+    resp_begin(resp, &j);
+    write_program(&j, &prog, id, ctx->app->cfg.max_temp_c);
+    return resp_end(resp, &j);
+}
 
 static kiln_err_t handle_runs(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
 {
@@ -1206,11 +953,20 @@ kiln_err_t kiln_api_handle(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
     if (path_is(p, "/api/config/defaults")) {
         return reject_read_only(resp, "resetting configuration to defaults");
     }
+    /* FR-WEB-26: stored programs are readable and nothing more.  Authoring
+     * went the way of the rest of the writes once it was clear the password
+     * guarding it could not be set from anywhere. */
     if (path_is(p, "/api/programs")) {
-        return handle_programs(ctx, req, resp);
+        if (req->method != KILN_HTTP_GET) {
+            return reject_read_only(resp, "creating, editing or deleting a program");
+        }
+        return handle_program_list(ctx, resp);
     }
     if (path_split_id(p, "/api/programs/", &id, &tail)) {
-        return handle_program_item(ctx, req, id, tail, resp);
+        if (req->method != KILN_HTTP_GET) {
+            return reject_read_only(resp, "creating, editing or deleting a program");
+        }
+        return handle_program_one(ctx, id, resp);
     }
     /* FR-WEB-26.  Run *state* is readable at /api/status; run *control* is not
      * reachable from here at all. */
