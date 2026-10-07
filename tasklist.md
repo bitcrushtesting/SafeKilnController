@@ -624,6 +624,12 @@ either the supervisor's pin count or a requirement.
   is answered by this change and `K2` dissolves, the enclosure channel not
   being in the supervisor's remit.
 
+  The lid is likewise not in it. Its switch breaks the coil in hardware, which
+  is already safe without firmware, and `SR-31`'s latch is gated on a heating
+  state only the ESP32 knows; a supervisor latching on it regardless would trip
+  on every cold load. So `SR-31` and `HR-21` are unchanged, the lid sense stays
+  on the ESP32, and `Q5`'s branch is the only one section K loses.
+
 - [ ] **R10. Consider making the supervisor integer-only.** It currently uses
   `float` for the chamber temperature, which on a Cortex-M0+ means every
   compare and multiply is a libgcc soft-float call, and that is why the target

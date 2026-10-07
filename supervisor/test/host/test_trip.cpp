@@ -18,7 +18,6 @@ sup_input_t ok_at(float c)
     in.chamber_c     = c;
     in.chamber_valid = true;
     in.fault_bits    = 0u;
-    in.lid_open      = false;
     return in;
 }
 
@@ -143,32 +142,18 @@ KILN_TEST(sr04_a_transient_fault_shorter_than_the_grace_does_not_latch)
 KILN_TEST(ad22_an_unusable_reading_latches_as_stale_not_as_a_fault)
 {
     /* Different cause, same consequence, reported separately so the other side
-     * can say which it was. */
+     * can say which it was.  A good reading first, so this is staleness and
+     * not a front end that never started. */
     sup_t s;
     sup_init(&s, true);
-    sup_input_t stale = ok_at(500.0f);
+    const sup_input_t good = ok_at(500.0f);
+    sup_step(&s, &good, 0.1f);
+
+    sup_input_t stale = good;
     stale.chamber_valid = false;
     run_for(&s, &stale, SUP_FAULT_GRACE_S + 0.2f);
     CHECK(s.tripped);
     CHECK_EQ_INT(s.reason, SUP_TRIP_SENSOR_STALE);
-}
-
-KILN_TEST(sr31_lid_open_drops_heat_on_the_same_cycle_and_latches_after_confirm)
-{
-    sup_t s;
-    sup_init(&s, true);
-    sup_input_t in = ok_at(700.0f);
-    sup_step(&s, &in, 0.1f);
-    CHECK(s.permit);
-
-    in.lid_open = true;
-    sup_step(&s, &in, 0.1f);
-    CHECK(!s.permit);                   /* NFR-04: immediately */
-    CHECK(!s.tripped);
-
-    run_for(&s, &in, SUP_LID_CONFIRM_S + 0.2f);
-    CHECK(s.tripped);
-    CHECK_EQ_INT(s.reason, SUP_TRIP_LID_OPEN);
 }
 
 KILN_TEST(ad22_a_nan_reading_is_stale_and_never_permits)
@@ -236,7 +221,6 @@ KILN_TEST(ad22_flags_describe_what_the_supervisor_is_doing)
     CHECK((f & SUP_FLAG_TC_VALID) != 0u);
     CHECK((f & SUP_FLAG_SELFTEST_OK) != 0u);
     CHECK((f & SUP_FLAG_TRIPPED) == 0u);
-    CHECK((f & SUP_FLAG_LID_OPEN) == 0u);
 }
 
 KILN_TEST(nfr17_null_and_negative_time_are_refused_not_faulted)
@@ -363,19 +347,100 @@ KILN_TEST(r4_the_button_cannot_clear_a_failed_selftest)
 
 KILN_TEST(r4_the_button_cannot_clear_a_condition_that_still_holds)
 {
-    /* Clearing while the lid is still open re-latches on the same cycle, so
-     * the operator cannot hold the button to keep firing with the lid up. */
+    /* Clearing while the kiln is still too hot re-latches on the same cycle,
+     * so the button cannot be held down to keep firing. */
     sup_t s;
     sup_init(&s, true);
-    sup_input_t in = ok_at(700.0f);
-    sup_step(&s, &in, 0.1f);            /* arm, permitted */
+    sup_input_t cool = ok_at(700.0f);
+    sup_step(&s, &cool, 0.1f);          /* arm, permitted */
 
-    in.lid_open = true;
-    run_for(&s, &in, SUP_LID_CONFIRM_S + 0.2f);
+    sup_input_t hot = ok_at(SUP_OVERTEMP_C + 5.0f);
+    sup_step(&s, &hot, 0.1f);
     CHECK(s.tripped);
 
-    in.clear_pressed = true;
-    run_for(&s, &in, SUP_CLEAR_HOLD_S + 0.5f);
-    CHECK(!s.permit);                   /* whatever the latch says */
-    CHECK(s.tripped);                   /* and it latches straight back */
+    hot.clear_pressed = true;
+    run_for(&s, &hot, SUP_CLEAR_HOLD_S + 0.5f);
+    CHECK(!s.permit);
+    CHECK(s.tripped);
+}
+
+/* --- the lid is not the supervisor's concern ---------------------------- */
+
+KILN_TEST(hr21_the_supervisor_has_no_lid_input_so_loading_cold_cannot_trip_it)
+{
+    /* The lid breaks the coil in hardware and SR-31's latch is the ESP32's,
+     * which knows whether a firing is running.  A supervisor that latched on
+     * lid open regardless would trip on every cold load, which is the nuisance
+     * trip HZ-10 warns about.  There is nothing here to latch on, and this
+     * test exists so that stays true. */
+    sup_t s;
+    sup_init(&s, true);
+    const sup_input_t in = ok_at(300.0f);
+    run_for(&s, &in, 300.0f);           /* five minutes of loading the kiln */
+    CHECK(s.permit);
+    CHECK(!s.tripped);
+    CHECK_EQ_INT(s.reason, SUP_TRIP_NONE);
+}
+
+/* --- bringing the front end up ----------------------------------------- */
+
+KILN_TEST(ad22_a_front_end_still_starting_up_withholds_heat_without_latching)
+{
+    /* Boot: no conversion has arrived yet.  The supervisor must not permit,
+     * and must not latch either, or a front end whose first conversion takes
+     * longer than the grace would demand a button press at every power-on
+     * with nothing actually wrong. */
+    sup_t s;
+    sup_init(&s, true);
+    sup_input_t starting = ok_at(0.0f);
+    starting.chamber_valid = false;
+
+    run_for(&s, &starting, 30.0f);      /* far beyond the grace */
+    CHECK(!s.permit);
+    CHECK(!s.tripped);
+    CHECK(!s.seen_valid);
+
+    /* Then it comes up, and heat is permitted with no acknowledgement. */
+    const sup_input_t good = ok_at(400.0f);
+    sup_step(&s, &good, 0.1f);
+    CHECK(s.permit);
+    CHECK(!s.tripped);
+    CHECK(s.seen_valid);
+}
+
+KILN_TEST(ad22_a_reading_that_was_working_and_stopped_does_latch)
+{
+    /* The other half: once a reading has been seen, losing it is a fault to
+     * acknowledge rather than a slow start. */
+    sup_t s;
+    sup_init(&s, true);
+    const sup_input_t good = ok_at(400.0f);
+    sup_step(&s, &good, 0.1f);
+    CHECK(s.seen_valid);
+
+    sup_input_t lost = good;
+    lost.chamber_valid = false;
+    sup_step(&s, &lost, 0.1f);
+    CHECK(!s.permit);                   /* immediately */
+    CHECK(!s.tripped);
+
+    run_for(&s, &lost, SUP_FAULT_GRACE_S + 0.2f);
+    CHECK(s.tripped);
+    CHECK_EQ_INT(s.reason, SUP_TRIP_SENSOR_STALE);
+}
+
+KILN_TEST(ad22_a_reported_fault_latches_even_before_a_first_reading)
+{
+    /* A front end actively reporting a fault is not "still starting up": it is
+     * telling us something is wrong, and that latches whether or not a good
+     * conversion ever arrived. */
+    sup_t s;
+    sup_init(&s, true);
+    sup_input_t faulted = ok_at(0.0f);
+    faulted.chamber_valid = false;
+    faulted.fault_bits    = 1u;         /* open circuit */
+
+    run_for(&s, &faulted, SUP_FAULT_GRACE_S + 0.2f);
+    CHECK(s.tripped);
+    CHECK_EQ_INT(s.reason, SUP_TRIP_TC_FAULT);
 }

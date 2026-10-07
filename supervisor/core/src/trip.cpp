@@ -59,24 +59,26 @@ void sup_step(sup_t *s, const sup_input_t *in, float dt_s)
     /* A reported fault and an unusable reading are different causes with the
      * same consequence, and are reported separately so the ESP32 can say which
      * it was. */
+    if (in->chamber_valid && (in->fault_bits == 0u)) {
+        s->seen_valid = true;
+    }
+
     const bool unusable = (in->fault_bits != 0u) || !in->chamber_valid;
     if (unusable) {
         s->fault_s += dt_s;
+        /* A reported fault latches whether or not a reading ever arrived: the
+         * front end is telling us something is wrong.  Staleness only latches
+         * once a reading has been seen, so a front end that is still bringing
+         * itself up withholds heat without demanding an acknowledgement. */
         if (s->fault_s >= SUP_FAULT_GRACE_S) {
-            latch(s, (in->fault_bits != 0u) ? SUP_TRIP_TC_FAULT
-                                            : SUP_TRIP_SENSOR_STALE);
+            if (in->fault_bits != 0u) {
+                latch(s, SUP_TRIP_TC_FAULT);
+            } else if (s->seen_valid) {
+                latch(s, SUP_TRIP_SENSOR_STALE);
+            }
         }
     } else {
         s->fault_s = 0.0f;
-    }
-
-    if (in->lid_open) {
-        s->lid_s += dt_s;
-        if (s->lid_s >= SUP_LID_CONFIRM_S) {
-            latch(s, SUP_TRIP_LID_OPEN);
-        }
-    } else {
-        s->lid_s = 0.0f;
     }
 
     /* --- the clear button ------------------------------------------------
@@ -106,7 +108,6 @@ void sup_step(sup_t *s, const sup_input_t *in, float dt_s)
              && !s->tripped
              && in->chamber_valid
              && (in->fault_bits == 0u)
-             && !in->lid_open
              && (in->chamber_c <= SUP_OVERTEMP_C);
 }
 
@@ -118,7 +119,6 @@ void sup_clear(sup_t *s)
     s->tripped = false;
     s->reason  = SUP_TRIP_NONE;
     s->fault_s = 0.0f;
-    s->lid_s   = 0.0f;
     /* permit stays false until the next sup_step re-establishes every term.
      * The arming state is deliberately not touched: sup_step owns it, and a
      * caller clearing the latch directly must not re-arm the button. */
@@ -132,7 +132,6 @@ uint8_t sup_flags(const sup_t *s, const sup_input_t *in)
     }
     uint32_t f = 0;
     if (s->permit)        { f |= SUP_FLAG_PERMIT; }
-    if (in->lid_open)     { f |= SUP_FLAG_LID_OPEN; }
     if (s->tripped)       { f |= SUP_FLAG_TRIPPED; }
     if (in->chamber_valid){ f |= SUP_FLAG_TC_VALID; }
     if (s->selftest_ok)   { f |= SUP_FLAG_SELFTEST_OK; }

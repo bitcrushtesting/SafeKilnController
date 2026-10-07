@@ -47,8 +47,8 @@ flowchart LR
     TC["Chamber<br/>thermocouple"] --> FE["MAX31856"]
     FE -- "SPI" --> SUP["STM32<br/>supervisor"]
     FE -- "~FAULT" --> SUP
-    LID["Lid switch<br/>(NC)"] --> SUP
     SUP -- "UART, report only" --> ESP["ESP32-S3<br/>everything else"]
+    LID["Lid switch<br/>(NC)"] -- "sense" --> ESP
     SUP -- "permit" --> CHAIN["Coil series<br/>element"]
     ESP -- "charge pump<br/>(alive)" --> CHAIN
     LID -- "series contact" --> CHAIN
@@ -59,13 +59,13 @@ flowchart LR
 
 - the chamber MAX31856, over its own SPI, including configuring the fault mask
 - that device's `~FAULT` output as a discrete input
-- the lid switch as a discrete input
 - one series interrupting element in the contactor coil path
 - its own independent watchdog
 
 **The ESP32 keeps** everything else: the PID and the setpoint generator, the
 programs, logging, the current transformer and all the electrical detection
-rules (`SR-25` to `SR-30`), the enclosure channel and `SR-11`, the HMI, WiFi,
+rules (`SR-25` to `SR-30`), the enclosure channel and `SR-11`, **the lid switch
+and `SR-31`**, the HMI, WiFi,
 the web API, the charge pump of L3, and its own thermal rules.
 
 The ESP32's thermal rules are **not** removed. They keep their own detections
@@ -75,13 +75,30 @@ a backstop with one job, not a replacement for a layer that reasons.
 
 ## 3. What the supervisor trips on
 
-Three conditions, all hard-coded, all latching:
+Two conditions, both hard-coded, both latching:
 
 | | Condition | Why it is here and not in the ESP32 |
 |---|---|---|
 | 1 | Chamber temperature above the absolute backstop | The one condition that must survive any ESP32 defect |
 | 2 | A thermocouple fault reported by the front end, or `~FAULT` asserted, persisting beyond a short grace period | Without a trustworthy reading, condition 1 cannot be evaluated, so the absence of a reading must itself be a trip |
-| 3 | Lid switch open | Fast, and it needs no reasoning |
+
+**The lid is not one of them.** Its switch breaks the contactor coil in
+hardware (`HR-21`), so it is already safe with no firmware involved, and
+`SR-31`'s latch is gated on "while a heating state is active", which only the
+ESP32 knows. A supervisor latching on lid open regardless would trip every time
+the kiln was loaded cold: a nuisance trip, and `HZ-10` names nuisance trips as
+how protections come to be disabled. So the lid sense goes to the ESP32, which
+has the context, and the supervisor is not given a third path that duplicated
+the hardware one while adding a failure mode of its own.
+
+Condition 2 has one qualification worth stating, because it is the same trap in
+a different place. Staleness only latches once a usable reading has been seen.
+"The front end never started" and "the front end was working and stopped" are
+different, and only the second is a fault to acknowledge; without the
+distinction, a front end whose first conversion takes longer than the grace
+would demand a button press at every power-on with nothing wrong. A front end
+*reporting* a fault latches either way, because then it is telling us
+something.
 
 ### How a latched trip is cleared
 
@@ -99,9 +116,9 @@ in the trip core with the rest of the safety function, not in the board layer,
 because it is behaviour and behaviour gets tested.
 
 Clearing cannot override a live condition. The latch drops and the next cycle
-re-establishes it if the kiln is still too hot or the lid is still open, so the
-button cannot be held down to keep firing with the lid up. A failed start-up
-self-test is not clearable by an operator at all.
+re-establishes it if the kiln is still too hot, so the button cannot be held
+down to keep firing. A failed start-up self-test is not clearable by an
+operator at all.
 
 **The supervisor's latch does not survive a power cycle**, and that is a
 decision rather than an oversight. It lives in RAM: persisting it would mean a
@@ -328,7 +345,7 @@ New requirements:
 
 | Area | What it must say |
 |---|---|
-| `SR` | An independent supervisor, on its own MCU, shall de-energise the heater above a hard-coded absolute chamber temperature, on a persistent thermocouple fault, and on lid open, independently of the main controller. |
+| `SR` | An independent supervisor, on its own MCU, shall de-energise the heater above a hard-coded absolute chamber temperature and on a persistent thermocouple fault, independently of the main controller. |
 | `SR` | The supervisor's trip shall latch, and shall be clearable only by power cycle or a local action, never by a command over the link. |
 | `HR` | The supervisor shall be a separate microcontroller with its own watchdog, its own series interrupting element in the coil path, and its own programming interface. |
 | `HR` | The link shall be point-to-point serial, report only, and shall carry no message able to raise the supervisor's trip threshold or clear its latch. |
@@ -346,6 +363,8 @@ Changed:
 - `AD-04`, the safety supervisor as a task, which is now one of two supervisors
 - `AD-05`, the charge pump, which remains but is no longer the only hardware
   path to the coil
+- `SR-31` and `HR-21` are **unchanged**: the lid stays the ESP32's input and the
+  hardware contact stays in the coil. The supervisor does not touch either.
 - `safety.md` §5 and §6: a new layer and a new row in the independence table,
   which is the point of the exercise
 - `SG-01` and `SG-03`, which are about single failures and series devices

@@ -452,14 +452,16 @@ RELATIONS:
 [DECISION]
 UID: AD-22
 STATEMENT: >>>
-**The absolute over-temperature trip, the thermocouple-fault trip and the lid
-trip move to a second microcontroller**, an STM32, which owns the chamber
-front end and one series element in the contactor coil. It reports temperature
+**The absolute over-temperature trip and the thermocouple-fault trip move to a
+second microcontroller**, an STM32, which owns the chamber front end and one
+series element in the contactor coil. The lid is not among them: its switch
+breaks the coil in hardware (`HR-21`) and `SR-31`'s latch needs run state that
+only the ESP32 has, so the lid sense stays on the ESP32. It reports temperature
 and status to the ESP32 over a point-to-point serial link and takes no
 instruction from it. Every other function stays in the ESP32.
 <<<
 RATIONALE: >>>
-`SR-09`, `SR-04` and `SR-31`, and the independence claim of
+`SR-09` and `SR-04`, and the independence claim of
 [`safety.md`](safety.md) section 6, which currently has to admit that L1 to L4
 all share one MCU and that the only fully independent layer is `HR-13`, the
 external cutout, which is outside this product.
@@ -499,9 +501,6 @@ RELATIONS:
   ROLE: Satisfies
 - TYPE: Parent
   VALUE: SR-04
-  ROLE: Satisfies
-- TYPE: Parent
-  VALUE: SR-31
   ROLE: Satisfies
 - TYPE: Parent
   VALUE: NFR-04

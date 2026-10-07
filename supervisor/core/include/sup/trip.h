@@ -25,7 +25,15 @@
 
 #include "sup_proto.h"
 
-/* --- the hard-coded thresholds ------------------------------------------
+/* The lid is NOT here, deliberately.  Its switch breaks the contactor coil in
+ * hardware (HR-21), so it is already safe without any firmware involvement,
+ * and SR-31's latch is gated on "while a heating state is active", which only
+ * the ESP32 knows.  A supervisor that latched on lid open regardless would
+ * trip every time the kiln was loaded cold: a nuisance trip, which HZ-10 names
+ * as how protections come to be disabled.  The lid sense goes to the ESP32,
+ * which has both the context and the run state.
+ *
+ * --- the hard-coded thresholds ------------------------------------------
  *
  * SUP_OVERTEMP_C must agree with KILN_SUPERVISOR_TRIP_C on the ESP32 side, and
  * must stay above that side's KILN_TEMP_CEILING_C of 1300 degC.  The 50 degC
@@ -39,10 +47,6 @@
  * protection. */
 #define SUP_FAULT_GRACE_S   1.0f
 
-/* SR-31 wants the lid to de-energise immediately and latch only if it stays
- * open.  Same split: permit drops on the same cycle, the latch waits. */
-#define SUP_LID_CONFIRM_S   0.2f
-
 /* How long the clear button must be held.  Long enough to be deliberate, short
  * enough not to be a puzzle.  See the note on edge triggering below. */
 #define SUP_CLEAR_HOLD_S    0.5f
@@ -51,7 +55,6 @@ typedef struct {
     float    chamber_c;     /* linearised, degC                              */
     bool     chamber_valid; /* a conversion completed and was in range        */
     uint16_t fault_bits;    /* KILN_TC_FAULT_*, 0 for none                    */
-    bool     lid_open;      /* switch is normally closed, so open means open  */
     bool     clear_pressed; /* the local clear button, debounced by the cycle */
 } sup_input_t;
 
@@ -61,7 +64,14 @@ typedef struct {
     sup_trip_reason_t reason;      /* why, latched with the trip              */
     bool              selftest_ok;
     float             fault_s;     /* how long the fault has persisted        */
-    float             lid_s;
+    /* Whether a usable reading has *ever* arrived.  Before the first one the
+     * supervisor withholds permission but does not latch: "the sensor never
+     * got going" and "the sensor was working and stopped" are different, and
+     * only the second is a fault to acknowledge.  Without this the stale timer
+     * runs from the first cycle and latches at boot if the front end's first
+     * conversion takes longer than the grace, which is a trip with nothing
+     * wrong behind it. */
+    bool              seen_valid;
     /* The clear button is edge triggered, and these are why.
      *
      * A latch cleared on the pin *level* is not a latch: a button shorted to

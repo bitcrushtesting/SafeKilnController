@@ -70,7 +70,6 @@ void board_gpio_init()
     GPIOA_BSRR = (1u << SUP_PIN_TC_CS);         /* ~CS idle high */
 
     pin_mode(SUP_PIN_TC_FAULT, 0u, 1u);         /* input, pull-up */
-    pin_mode(SUP_PIN_LID,      0u, 1u);         /* input, pull-up: NC switch */
     pin_mode(SUP_PIN_CLEAR,    0u, 1u);
 
     pin_af(SUP_PIN_SPI_SCK,  SUP_AF_SPI1);
@@ -180,7 +179,6 @@ int main()
         in.chamber_c     = tc.chamber_c;
         in.chamber_valid = tc.valid && !pin_low(SUP_PIN_TC_FAULT);
         in.fault_bits    = tc.fault_bits;
-        in.lid_open      = pin_low(SUP_PIN_LID);   /* NC switch: open reads low */
         /* The button is a level on a pin; whether it *means* anything is
          * sup_step's decision, because it is edge triggered and held and that
          * belongs in the part that has tests. */

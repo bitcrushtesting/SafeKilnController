@@ -53,17 +53,15 @@ typedef enum {
     SUP_TRIP_NONE = 0,
     SUP_TRIP_OVERTEMP,      /* above the hard-coded backstop                 */
     SUP_TRIP_TC_FAULT,      /* front end reported a fault, past its grace     */
-    SUP_TRIP_LID_OPEN,      /* lid open, past its confirmation period         */
-    SUP_TRIP_SENSOR_STALE,  /* no good conversion within the grace period     */
+    SUP_TRIP_SENSOR_STALE,  /* a reading was working and stopped              */
     SUP_TRIP_SELF_TEST,     /* start-up self-test failed; never permits       */
     SUP_TRIP_COUNT
 } sup_trip_reason_t;
 
 #define SUP_FLAG_PERMIT      (1u << 0) /* supervisor is permitting heat now   */
-#define SUP_FLAG_LID_OPEN    (1u << 1)
-#define SUP_FLAG_TRIPPED     (1u << 2) /* latched; needs a local clear        */
-#define SUP_FLAG_TC_VALID    (1u << 3) /* chamber reading is usable           */
-#define SUP_FLAG_SELFTEST_OK (1u << 4)
+#define SUP_FLAG_TRIPPED     (1u << 1) /* latched; needs a local clear        */
+#define SUP_FLAG_TC_VALID    (1u << 2) /* chamber reading is usable           */
+#define SUP_FLAG_SELFTEST_OK (1u << 3)
 
 typedef struct {
     uint8_t           version;

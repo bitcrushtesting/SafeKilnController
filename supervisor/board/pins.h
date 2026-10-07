@@ -26,7 +26,9 @@
 #define SUP_PIN_SPI_MOSI    7u   /* to MAX31856 SDI    AF0  (confirm)       */
 #define SUP_PIN_TC_CS       4u   /* MAX31856 ~CS, plain output              */
 #define SUP_PIN_TC_FAULT    5u   /* MAX31856 ~FAULT, input, pulled up       */
-#define SUP_PIN_LID         8u   /* lid switch, NC, input pulled up         */
+/* No lid input: the switch breaks the coil in hardware (HR-21) and SR-31's
+ * latch belongs to the ESP32, which knows whether a firing is running.  PA8 is
+ * free. */
 #define SUP_PIN_PERMIT      9u   /* coil series element, high permits       */
 #define SUP_PIN_CLEAR      10u   /* local clear button, input pulled up     */
 #define SUP_PIN_UART_TX     2u   /* USART2 TX to the ESP32  AF1  (confirm)  */
