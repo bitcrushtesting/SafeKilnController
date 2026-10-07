@@ -391,6 +391,15 @@ question is whether it is worth its cost.
   how protections get disabled. Consider a fitted-by-default `0R` in `Q5`'s
   drain so the enclosure branch can be depopulated without cutting a track.
 
+  Decide this together with section 1 of
+  [`docs/bom-optimisation.md`](docs/bom-optimisation.md), which reaches the same
+  question from the parts end: if this branch is depopulatable then the
+  MAX31856 on the enclosure channel has nothing left to justify it, since it is
+  bought for its `FAULT` pin rather than for measuring 40 to 90 degC. That
+  document's preferred option removes the channel entirely, using the chamber
+  front end's own cold-junction reading for `SR-11` and a bimetallic cutout in
+  the coil for a hardware trip.
+
 - [ ] **K3. `D7` is an unwired LED.** Pre-existing, not from this change: the
   coil indicator's cathode is on `COIL_DRV` and its anode goes nowhere. It
   needs a series resistor to the coil supply. Note that taking it from
