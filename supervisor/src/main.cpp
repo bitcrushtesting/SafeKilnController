@@ -181,16 +181,16 @@ int main()
         in.chamber_valid = tc.valid && !pin_low(SUP_PIN_TC_FAULT);
         in.fault_bits    = tc.fault_bits;
         in.lid_open      = pin_low(SUP_PIN_LID);   /* NC switch: open reads low */
+        /* The button is a level on a pin; whether it *means* anything is
+         * sup_step's decision, because it is edge triggered and held and that
+         * belongs in the part that has tests. */
+        in.clear_pressed = pin_low(SUP_PIN_CLEAR);
 
         sup_step(&sup, &in, CYCLE_S);
 
         /* The output is driven every cycle rather than on change, so a bit
          * corrupted in the GPIO register is corrected within one cycle. */
         permit(sup.permit);
-
-        if (pin_low(SUP_PIN_CLEAR)) {
-            sup_clear(&sup);            /* local only; there is no receive path */
-        }
 
         sup_report_t rep = {};
         rep.version     = SUP_VERSION;

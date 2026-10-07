@@ -48,7 +48,7 @@ reused: gaps in the numbering are items that have been closed.
 | [O](#o-wifi-fr-net) | WiFi | 3 |
 | [P](#p-http-transport-and-the-api) | HTTP transport and the API | 4 |
 | [Q](#q-the-file-store-ad-21) | The file store | 5 |
-| [R](#r-the-independent-safety-supervisor-ad-22) | Independent safety supervisor | 8 |
+| [R](#r-the-independent-safety-supervisor-ad-22) | Independent safety supervisor | 7 |
 
 ---
 
@@ -574,21 +574,6 @@ Designed in [`docs/safety-supervisor.md`](docs/safety-supervisor.md). Nothing
 below can start until `R1` to `R4` are answered, because each of them changes
 either the supervisor's pin count or a requirement.
 
-- [ ] **R3. Decide whether the supervisor gets its own chamber couple.** With
-  one couple the independence won is against software and MCU failure, not
-  against a plausible-but-wrong reading (`HZ-03`). Section 9 of the design
-  notes that `TC2`'s front end is already on the board and, per
-  [`bom-optimisation.md`](docs/bom-optimisation.md), buying a `FAULT` pin it no
-  longer needs; repurposing it as a second chamber channel would let the two
-  MCUs disagree, which is a detection neither can make alone. **Blocks the
-  schematic and section 1 of the BOM document.**
-
-- [ ] **R4. Decide how a latched supervisor trip is cleared.** Not over the
-  link, which would put the ESP32 back inside the safety function. Power cycle
-  alone, or a dedicated local button. `SR-17` already requires an explicit
-  operator acknowledgement that survives power loss, and its wording will need
-  to cover a trip the ESP32 cannot clear. **Blocks the panel.**
-
 - [ ] **R9. Retire `sense.tc_type` from the chamber channel.** `FR-ACQ-02` now
   fixes the chamber couple as type K, and after `AD-22` the ESP32 does not
   configure that front end at all, so the config item is meaningless on this
@@ -597,11 +582,32 @@ either the supervisor's pin count or a requirement.
   supervisor's firmware work rather than bumping the schema twice.
 
 - [ ] **R5. Write the requirement deltas.** Six new requirements and nine
-  changed ones, listed in section 11 of the design. `SR-23`, `FR-ACQ-01`,
-  `FR-ACQ-02`, `HR-02`, `HR-24` superseded, `AD-04`, `AD-05`, `safety.md`
-  sections 5 and 6, `SG-01` and `SG-03`. The independence table gaining a row
-  that genuinely says yes is the point of the exercise, so it is worth writing
-  carefully rather than last.
+  changed ones, listed in section 11 of the design. `SR-23` and `FR-ACQ-02` are
+  done; still to do are `FR-ACQ-01`, `HR-02`, `HR-24` superseded, `AD-04`,
+  `AD-05`, `SG-01`, `SG-03` and `safety.md` sections 5 and 6.
+
+  With `R3` and `R4` settled, §6's independence table is now writable and says
+  three specific things. A new row for the supervisor against the ESP32 that
+  genuinely says **yes**: separate silicon, firmware, clock and watchdog,
+  sharing only the 3V3 rail. A new row, or an amendment to the L1-vs-L2 one,
+  recording that the chamber couple is shared by *both* MCUs, so the
+  independence is against software and not against a plausible-but-wrong
+  reading. And the existing "thermal rules vs. current rules" row promoted from
+  defence in depth to **load-bearing**, because with one couple the CT is the
+  only physically independent detection channel left in the system.
+
+  `SR-17` also needs a sentence: the supervisor's latch does not survive a
+  power cycle by design, and the system-level obligation is met by the ESP32's
+  persisted fault. Section 3 of the design states the gap that leaves.
+
+- [ ] **R11. The clear button on the panel.** `R4` decided a local button and
+  the firmware implements it (edge triggered, held 0.5 s, and a line stuck low
+  never arms, so a short fails towards the latch holding). What is left is
+  physical: the button itself, its position relative to the HMI, and whether it
+  is labelled as clearing the *supervisor* or clearing *a fault*, which are not
+  the same thing and the operator cannot see the difference. The ESP32's own
+  latched fault still needs its own acknowledgement (`SR-17`), so there are two
+  acknowledgements and the panel should not imply there is one.
 
 - [ ] **R6. Select the part and draw it.** STM32G031 or STM32C031; the G0's
   `IWDG` runs from the LSI so a system clock failure does not stop the

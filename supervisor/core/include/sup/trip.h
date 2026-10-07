@@ -43,11 +43,16 @@
  * open.  Same split: permit drops on the same cycle, the latch waits. */
 #define SUP_LID_CONFIRM_S   0.2f
 
+/* How long the clear button must be held.  Long enough to be deliberate, short
+ * enough not to be a puzzle.  See the note on edge triggering below. */
+#define SUP_CLEAR_HOLD_S    0.5f
+
 typedef struct {
     float    chamber_c;     /* linearised, degC                              */
     bool     chamber_valid; /* a conversion completed and was in range        */
     uint16_t fault_bits;    /* KILN_TC_FAULT_*, 0 for none                    */
     bool     lid_open;      /* switch is normally closed, so open means open  */
+    bool     clear_pressed; /* the local clear button, debounced by the cycle */
 } sup_input_t;
 
 typedef struct {
@@ -57,6 +62,19 @@ typedef struct {
     bool              selftest_ok;
     float             fault_s;     /* how long the fault has persisted        */
     float             lid_s;
+    /* The clear button is edge triggered, and these are why.
+     *
+     * A latch cleared on the pin *level* is not a latch: a button shorted to
+     * ground, or one stuck down, would clear it on every cycle, and the
+     * supervisor would then permit heat whenever the instantaneous condition
+     * happened to be good.  That is the latch defeated by a single solder
+     * bridge.
+     *
+     * So the input has to be seen *released* before it can clear anything
+     * (`clear_armed`), and it has to be held (`clear_s`).  A shorted line
+     * never arms, because it is never seen released, including at power-on. */
+    bool              clear_armed;
+    float             clear_s;
 } sup_t;
 
 /* Comes up refusing heat: chamber_valid is false until a conversion has been
@@ -66,8 +84,13 @@ void sup_init(sup_t *s, bool selftest_ok);
 /* One cycle.  dt_s is the elapsed time since the previous call. */
 void sup_step(sup_t *s, const sup_input_t *in, float dt_s);
 
-/* Clears a latched trip.  Called only from a local action, never from the
- * link, which the supervisor cannot receive on in any case. */
+/* Clears a latched trip.
+ *
+ * sup_step() calls this itself when the clear button has been armed and held,
+ * so the whole behaviour is in the tested core rather than in the board layer.
+ * It stays public because a test should be able to drive it directly.
+ *
+ * There is no path to this from the link: the supervisor has no receiver. */
 void sup_clear(sup_t *s);
 
 /* The flags byte for the wire, derived rather than tracked separately. */

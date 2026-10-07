@@ -79,6 +79,23 @@ void sup_step(sup_t *s, const sup_input_t *in, float dt_s)
         s->lid_s = 0.0f;
     }
 
+    /* --- the clear button ------------------------------------------------
+     *
+     * Edge triggered and held, for the reason given in sup_t: a line stuck low
+     * must not be able to clear the latch, so it has to be seen released
+     * before it counts, and clearing disarms it until it is released again. */
+    if (!in->clear_pressed) {
+        s->clear_armed = true;
+        s->clear_s     = 0.0f;
+    } else if (s->clear_armed) {
+        s->clear_s += dt_s;
+        if (s->clear_s >= SUP_CLEAR_HOLD_S) {
+            sup_clear(s);
+            s->clear_armed = false;
+            s->clear_s     = 0.0f;
+        }
+    }
+
     /* --- permission ----------------------------------------------------- */
 
     /* Conjunctive, and evaluated fresh every cycle: every term must be true
@@ -102,7 +119,9 @@ void sup_clear(sup_t *s)
     s->reason  = SUP_TRIP_NONE;
     s->fault_s = 0.0f;
     s->lid_s   = 0.0f;
-    /* permit stays false until the next sup_step re-establishes every term. */
+    /* permit stays false until the next sup_step re-establishes every term.
+     * The arming state is deliberately not touched: sup_step owns it, and a
+     * caller clearing the latch directly must not re-arm the button. */
     s->permit  = false;
 }
 

@@ -83,6 +83,41 @@ Three conditions, all hard-coded, all latching:
 | 2 | A thermocouple fault reported by the front end, or `~FAULT` asserted, persisting beyond a short grace period | Without a trustworthy reading, condition 1 cannot be evaluated, so the absence of a reading must itself be a trip |
 | 3 | Lid switch open | Fast, and it needs no reasoning |
 
+### How a latched trip is cleared
+
+**Decided: a local button.** Held for 0.5 s, and **edge triggered, not level
+triggered**, which is not a detail. A latch cleared on the level of a pin is
+not a latch: a button shorted to ground, or one wedged down, would clear it on
+every cycle, and the supervisor would then permit heat whenever the
+instantaneous condition happened to be good. That is a safety latch defeated by
+one solder bridge.
+
+So the input must be seen *released* before it can clear anything, and
+clearing disarms it until it is released again. A line stuck low never arms at
+all, including at power-on, so it fails towards the latch holding. The logic is
+in the trip core with the rest of the safety function, not in the board layer,
+because it is behaviour and behaviour gets tested.
+
+Clearing cannot override a live condition. The latch drops and the next cycle
+re-establishes it if the kiln is still too hot or the lid is still open, so the
+button cannot be held down to keep firing with the lid up. A failed start-up
+self-test is not clearable by an operator at all.
+
+**The supervisor's latch does not survive a power cycle**, and that is a
+decision rather than an oversight. It lives in RAM: persisting it would mean a
+flash write on the trip path, which is more firmware, more wear and another
+failure mode in the one component whose argument is its simplicity. The system
+level obligation of `SR-17`, that a latched fault survives power loss and needs
+an explicit acknowledgement, is met by the ESP32, which has non-volatile
+storage and already does it.
+
+The gap that leaves, stated plainly: a transient over-temperature that has
+since cooled would be cleared by switching the controller off and on, without
+anyone pressing the button. What stops that mattering is the ESP32's own
+latched fault, which does persist. If the supervisor's latch is ever wanted to
+persist independently, that is a change to `SR-17` and to this paragraph, not a
+small firmware edit.
+
 Condition 2 is what fixes the defect `K1` records. The present discrete chain
 is open-drain and therefore closed when the front end is unpowered or absent,
 and the MAX31856 does not report an open circuit until its fault mask has been
@@ -226,30 +261,49 @@ being told anything. See section 5.
 
 ## 9. The remaining common cause: one thermocouple
 
-With a single chamber couple, the supervisor and the ESP32 share a sensor. The
-independence won is against **software and MCU failure**, which is what was
-asked for and is the larger risk. It is not independence against a sensor that
-reads plausibly but wrongly, which `safety.md` §6 already names as `HZ-03` and
-which `SR-04` to `SR-06` exist to interrogate.
+**Decided: one chamber couple, owned by the supervisor, relayed to the ESP32
+over the link.** The option below of giving the supervisor a second couple is
+declined.
 
-There is an option here that was not available before. The enclosure channel
-`TC2` is, on the analysis in
-[`bom-optimisation.md` §1](bom-optimisation.md), a MAX31856 bought for a
-`FAULT` pin it no longer needs, measuring a band a cent part would measure
-better. Rather than deleting it, **give the supervisor its own chamber
-couple**: a second element in the chamber, its own front end, read only by the
-supervisor. Then:
+So the independence this buys is against **software and MCU failure**, which
+was the point, and is explicitly *not* independence against a sensor that reads
+plausibly but wrongly. `safety.md` §6 names that as `HZ-03`, and it stays
+covered the way it is covered today: by `SR-04` to `SR-06` interrogating the
+measurement rather than trusting it, and by the electrical rules reasoning from
+a different sensor entirely.
 
-- the supervisor and the ESP32 agree on temperature or they do not, and a
-  disagreement beyond a band is itself a detection neither could make alone
-- `HZ-03` is covered by comparison rather than only by interrogation
-- the enclosure measurement moves to `cj_c` or a cheap I²C part as that
-  document recommends
+Two consequences are worth stating rather than discovering.
 
-That is a stronger safety argument than the one being bought here, for roughly
-the cost of the part already on the board. It is offered as an option, not
-folded into the decision, because it changes the sensor count in the chamber
-and that is an installation question as much as an electrical one.
+**The ESP32 no longer has any independent view of temperature.** It does not
+read a thermocouple at all now; `SR-05` (reversed couple), `SR-06` (stuck
+sensor), `SR-07` (runaway) and `SR-08` (shorted SSR) all reason about a value
+that arrived over the link. They still work, and the front end's fault bits
+arrive with it, but they are no longer a second opinion about the measurement.
+They are a second opinion about the *kiln*.
+
+**The current transformer is therefore the only physically independent
+detection channel left in the system.** `safety.md` §6 already records
+"L2 thermal rules vs. L2 current rules: yes, physically, different sensor,
+different quantity, different front end". That row was defence in depth before.
+It is now load-bearing, and `FR-CUR-12`'s refusal to start a firing without a
+fitted CT carries more weight than it did when it was written. Anyone proposing
+to make the CT optional should be sent here first.
+
+### The option that was declined
+
+For the record, since it may come up again. The enclosure channel `TC2` is, on
+the analysis in [`bom-optimisation.md` §1](bom-optimisation.md), a MAX31856
+bought for a `FAULT` pin it no longer needs. Repurposed as a second chamber
+couple read only by the supervisor, the two MCUs could have been made to
+disagree, and a disagreement beyond a band is a detection neither can make
+alone, which would have covered `HZ-03` by comparison rather than only by
+interrogation.
+
+It was declined because it changes the sensor count in the chamber, and that is
+an installation question as much as an electrical one: a second couple means a
+second penetration, a second probe to fit correctly, and a second thing to get
+wrong in the field. One well-fitted couple reporting to a supervisor that
+cannot be talked out of tripping is the simpler product.
 
 ## 10. Part selection
 
@@ -300,10 +354,11 @@ Changed:
 
 1. ~~Thermocouple type~~ **decided: type K only**, section 8.
 2. ~~The two limits~~ **decided: ceiling 1300 °C, trip 1350 °C**, section 4.
-3. **Second chamber couple?**, section 9. Blocks the schematic and the decision
-   in `bom-optimisation.md` §1.
-4. **How a latched trip is cleared**, section 3. Power cycle alone, or a
-   dedicated local button. Blocks the panel and `SR-17`'s wording.
+3. ~~Second chamber couple~~ **declined: one couple, the supervisor's**,
+   section 9.
+4. ~~How a latched trip is cleared~~ **decided: a local button, edge triggered
+   and held**, section 3. Its wording against `SR-17` is still to write, since
+   the supervisor's latch deliberately does not survive a power cycle.
 5. **Does the ESP32 need to distinguish "supervisor tripped" from "link
    dead"?** It can, via the frame's trip reason, but only while the link
    works. If the display must explain the trip to an operator, that is an

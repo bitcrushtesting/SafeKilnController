@@ -257,3 +257,125 @@ KILN_TEST(nfr17_null_and_negative_time_are_refused_not_faulted)
     sup_step(&s, &faulted, NAN);
     CHECK_NEAR(s.fault_s, 0.0f, 1e-6);
 }
+
+/* --- the clear button (R4) ---------------------------------------------- */
+
+KILN_TEST(r4_a_held_button_clears_the_latch_once_the_hold_elapses)
+{
+    sup_t s;
+    sup_init(&s, true);
+    sup_input_t in = ok_at(SUP_OVERTEMP_C + 5.0f);
+    sup_step(&s, &in, 0.1f);
+    CHECK(s.tripped);
+
+    /* Released first, so the button arms, then cooled, then held. */
+    in = ok_at(300.0f);
+    sup_step(&s, &in, 0.1f);
+    CHECK(s.tripped);
+
+    in.clear_pressed = true;
+    sup_step(&s, &in, 0.1f);
+    CHECK(s.tripped);                   /* not yet: it must be held */
+
+    run_for(&s, &in, SUP_CLEAR_HOLD_S + 0.2f);
+    CHECK(!s.tripped);
+    CHECK_EQ_INT(s.reason, SUP_TRIP_NONE);
+}
+
+KILN_TEST(r4_a_tap_shorter_than_the_hold_does_not_clear)
+{
+    sup_t s;
+    sup_init(&s, true);
+    sup_input_t in = ok_at(SUP_OVERTEMP_C + 5.0f);
+    sup_step(&s, &in, 0.1f);
+    in = ok_at(300.0f);
+    sup_step(&s, &in, 0.1f);            /* arm */
+
+    in.clear_pressed = true;
+    sup_step(&s, &in, 0.2f);            /* well short of the hold */
+    in.clear_pressed = false;
+    sup_step(&s, &in, 0.1f);
+    CHECK(s.tripped);
+}
+
+KILN_TEST(r4_a_line_stuck_low_never_clears_the_latch)
+{
+    /* The case the edge triggering exists for.  A button shorted to ground, or
+     * one wedged down, must not turn the latch into a no-op: at power-on it is
+     * never seen released, so it never arms. */
+    sup_t s;
+    sup_init(&s, true);
+    sup_input_t in = ok_at(SUP_OVERTEMP_C + 5.0f);
+    in.clear_pressed = true;            /* shorted from the very first cycle */
+    sup_step(&s, &in, 0.1f);
+    CHECK(s.tripped);
+
+    /* Hold it low for a minute at a safe temperature. */
+    sup_input_t cool = ok_at(300.0f);
+    cool.clear_pressed = true;
+    run_for(&s, &cool, 60.0f);
+    CHECK(s.tripped);                   /* still latched */
+    CHECK(!s.permit);
+}
+
+KILN_TEST(r4_clearing_disarms_until_the_button_is_released_again)
+{
+    /* One press, one clear.  Otherwise a held button would clear each time the
+     * supervisor re-latched, which is the stuck-line failure in slow motion. */
+    sup_t s;
+    sup_init(&s, true);
+    sup_input_t cool = ok_at(300.0f);
+    sup_step(&s, &cool, 0.1f);          /* arm: released and safe */
+
+    sup_input_t hot = ok_at(SUP_OVERTEMP_C + 5.0f);
+    sup_step(&s, &hot, 0.1f);
+    CHECK(s.tripped);
+
+    /* Hold the button down and stay hot: it clears once, re-latches, and must
+     * not clear again while still held. */
+    hot.clear_pressed = true;
+    run_for(&s, &hot, SUP_CLEAR_HOLD_S + 0.2f);
+    CHECK(s.tripped);                   /* re-latched on the same input */
+
+    run_for(&s, &hot, 10.0f);           /* still held, still hot */
+    CHECK(s.tripped);
+
+    /* Release, cool, press again: now it clears. */
+    sup_input_t cool2 = ok_at(300.0f);
+    sup_step(&s, &cool2, 0.1f);
+    cool2.clear_pressed = true;
+    run_for(&s, &cool2, SUP_CLEAR_HOLD_S + 0.2f);
+    CHECK(!s.tripped);
+}
+
+KILN_TEST(r4_the_button_cannot_clear_a_failed_selftest)
+{
+    sup_t s;
+    sup_init(&s, false);
+    sup_input_t in = ok_at(300.0f);
+    sup_step(&s, &in, 0.1f);            /* arm */
+    in.clear_pressed = true;
+    run_for(&s, &in, 5.0f);
+    CHECK(s.tripped);
+    CHECK_EQ_INT(s.reason, SUP_TRIP_SELF_TEST);
+    CHECK(!s.permit);
+}
+
+KILN_TEST(r4_the_button_cannot_clear_a_condition_that_still_holds)
+{
+    /* Clearing while the lid is still open re-latches on the same cycle, so
+     * the operator cannot hold the button to keep firing with the lid up. */
+    sup_t s;
+    sup_init(&s, true);
+    sup_input_t in = ok_at(700.0f);
+    sup_step(&s, &in, 0.1f);            /* arm, permitted */
+
+    in.lid_open = true;
+    run_for(&s, &in, SUP_LID_CONFIRM_S + 0.2f);
+    CHECK(s.tripped);
+
+    in.clear_pressed = true;
+    run_for(&s, &in, SUP_CLEAR_HOLD_S + 0.5f);
+    CHECK(!s.permit);                   /* whatever the latch says */
+    CHECK(s.tripped);                   /* and it latches straight back */
+}

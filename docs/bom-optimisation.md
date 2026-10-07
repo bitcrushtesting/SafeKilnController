@@ -34,7 +34,12 @@ opens the schematic.
 
 ## 1. TC2, the enclosure thermocouple channel
 
-**Status: open. Recommendation below; decide alongside `K2`.**
+**Status: open, and narrowed.** Tasklist `R3` has since declined the option of
+repurposing this channel as a second chamber couple, so what remains is the
+original question: delete it, or replace it with a cheap I²C part. Option A
+below also got easier, because the supervisor's link already carries the
+chamber front end's cold-junction temperature, which is the reading option A
+proposes to use for `SR-11`. Decide alongside `K2`.
 
 ### 1.1 What the channel is for
 
