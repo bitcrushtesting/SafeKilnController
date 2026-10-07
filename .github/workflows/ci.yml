@@ -312,6 +312,9 @@ jobs:
                 "$(grep -c '^\[QUESTION\]' docs/requirements.sdoc)"
               printf 'cross-refs     %s validated [LINK:] references\n' \
                 "$(grep -co '\[LINK: ' docs/requirements.sdoc)"
+              printf 'decisions      %s, with %s Satisfies relations\n' \
+                "$(grep -c '^\[DECISION\]' docs/architecture.sdoc)" \
+                "$(grep -c '^- TYPE: Parent' docs/architecture.sdoc)"
               echo '```'
             else
               echo 'StrictDoc rejected the document; see the job log.'
