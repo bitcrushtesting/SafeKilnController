@@ -48,7 +48,7 @@ reused: gaps in the numbering are items that have been closed.
 | [O](#o-wifi-fr-net) | WiFi | 3 |
 | [P](#p-http-transport-and-the-api) | HTTP transport and the API | 4 |
 | [Q](#q-the-file-store-ad-21) | The file store | 5 |
-| [R](#r-the-independent-safety-supervisor-ad-22) | Independent safety supervisor | 7 |
+| [R](#r-the-independent-safety-supervisor-ad-22) | Independent safety supervisor | 8 |
 
 ---
 
@@ -607,6 +607,15 @@ either the supervisor's pin count or a requirement.
   contact (`HR-21`): it depends on no firmware at all and costs nothing. `K1`
   is answered by this change and `K2` dissolves, the enclosure channel not
   being in the supervisor's remit.
+
+- [ ] **R10. Consider making the supervisor integer-only.** It currently uses
+  `float` for the chamber temperature, which on a Cortex-M0+ means every
+  compare and multiply is a libgcc soft-float call, and that is why the target
+  link needs `--specs=nano.specs` rather than `-nostdlib`. The MAX31856
+  already reports a signed integer in 2^-7 degC units and the wire format is
+  integer tenths, so nothing in the path actually requires a float: the
+  backstop comparison could be done in raw LSBs. Smaller, more deterministic,
+  and it removes a library dependency from a safety function.
 
 - [ ] **R8. The supervisor's firmware, and its own test strategy.** Small
   enough to read in one sitting, which is a design constraint and not an
