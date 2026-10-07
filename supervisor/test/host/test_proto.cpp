@@ -173,6 +173,19 @@ KILN_TEST(ad22_a_trip_is_still_reported_so_the_other_side_can_say_why)
     CHECK_EQ_INT(out.trip_reason, SUP_TRIP_OVERTEMP);
 }
 
+KILN_TEST(ad22_decode_tolerates_a_caller_that_does_not_want_the_skip_count)
+{
+    /* The resync path has to work for a caller passing nullptr for skip, not
+     * only for the tests that inspect it.  MC/DC found this: the condition had
+     * never been false while there was also enough input to consider. */
+    uint8_t noise[32];
+    for (size_t i = 0; i < sizeof(noise); i++) {
+        noise[i] = (uint8_t)(i * 11u + 5u);
+    }
+    sup_report_t out = {};
+    CHECK_EQ_UINT(sup_decode(noise, sizeof(noise), &out, nullptr), 0u);
+}
+
 KILN_TEST(nfr17_encode_and_decode_refuse_bad_arguments)
 {
     const sup_report_t r = sample();

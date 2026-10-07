@@ -2676,6 +2676,18 @@ The HIL jig ([LINK: TR-17]) shall be able to present a known current to the tran
 PRIORITY: M
 VERIFICATION: I
 
+[REQUIREMENT]
+UID: TR-29
+STATEMENT: >>>
+The independent safety supervisor's trip logic and the link's wire format shall achieve at least **80 % modified condition/decision coverage (MC/DC)** in host tests, measured and enforced automatically.
+
+Line and branch coverage are insufficient for this component, and the reason is specific rather than general. Its permit decision is a five-term conjunction, and a single test with every term true plus one with every term false gives 100 % line and 100 % branch coverage of that decision while demonstrating none of what matters: that a missing reading alone withholds heat, that a reported fault alone withholds heat, and so on for each term independently. MC/DC is the criterion that requires each condition to be shown to change the outcome on its own.
+
+This applies to the supervisor and not to the rest of the firmware. It is about 120 lines of logic, it is the only component in which failing to evaluate a condition means heat that should have stopped, and it is the component whose entire justification is that it can be read and verified in full ([LINK: AD-22]).
+<<<
+PRIORITY: M
+VERIFICATION: T
+
 [[/SECTION]]
 
 [[/SECTION]]

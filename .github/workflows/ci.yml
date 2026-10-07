@@ -259,6 +259,59 @@ jobs:
           path: coverage/
           if-no-files-found: warn
 
+  # --- the supervisor: unit tests and MC/DC ------------------------------
+  #
+  # The supervisor's trip logic is the one place in the project where a missed
+  # *condition* means heat that should have stopped, and its permit decision is
+  # a five-term conjunction.  One test with everything true and one with
+  # everything false gives 100 % line and branch coverage of that decision and
+  # proves almost nothing; MC/DC requires each term to be shown to change the
+  # outcome on its own.  gcov cannot measure that, so this job uses Clang's
+  # -fcoverage-mcdc rather than the gcovr used for kiln_core's line floor.
+  supervisor:
+    name: Supervisor tests and MC/DC
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Clang ${{ env.LLVM_VERSION }}
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc >/dev/null
+          sudo add-apt-repository -y \
+            "deb http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-${LLVM_VERSION} main"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq "clang-${LLVM_VERSION}" "llvm-${LLVM_VERSION}"
+
+      - name: Unit tests
+        run: |
+          cmake -B build-sup -S supervisor/test/host
+          cmake --build build-sup -j"$(nproc)"
+          ctest --test-dir build-sup --output-on-failure
+
+      - name: MC/DC
+        env:
+          CLANGXX: /usr/bin/clang++-${{ env.LLVM_VERSION }}
+          LLVM_PROFDATA: /usr/bin/llvm-profdata-${{ env.LLVM_VERSION }}
+          LLVM_COV: /usr/bin/llvm-cov-${{ env.LLVM_VERSION }}
+        run: tools/mcdc.sh
+
+      - name: Summarise
+        if: always()
+        env:
+          CLANGXX: /usr/bin/clang++-${{ env.LLVM_VERSION }}
+          LLVM_PROFDATA: /usr/bin/llvm-profdata-${{ env.LLVM_VERSION }}
+          LLVM_COV: /usr/bin/llvm-cov-${{ env.LLVM_VERSION }}
+        run: |
+          {
+            echo '### Supervisor coverage'
+            echo
+            echo 'TR-29: at least 80 % MC/DC on the trip logic and the link format.'
+            echo '```'
+            tools/mcdc.sh 2>&1 | tail -12 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # --- the requirements document ----------------------------------------
   #
   # docs/requirements.sdoc is the specification, and StrictDoc is what makes it

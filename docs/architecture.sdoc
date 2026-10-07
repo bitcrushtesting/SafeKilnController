@@ -505,3 +505,6 @@ RELATIONS:
 - TYPE: Parent
   VALUE: NFR-04
   ROLE: Satisfies
+- TYPE: Parent
+  VALUE: TR-29
+  ROLE: Satisfies

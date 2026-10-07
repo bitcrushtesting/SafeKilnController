@@ -231,7 +231,11 @@ KILN_TEST(nfr17_null_and_negative_time_are_refused_not_faulted)
     sup_step(nullptr, &in, 0.1f);       /* must not fault */
     sup_step(&s, nullptr, 0.1f);
     sup_clear(nullptr);
+    /* Both halves of each guard, independently.  A guard where only the first
+     * condition has ever been exercised is a guard half tested, which is what
+     * MC/DC measures and line coverage cannot see. */
     CHECK_EQ_UINT(sup_flags(nullptr, &in), 0u);
+    CHECK_EQ_UINT(sup_flags(&s, nullptr), 0u);
 
     /* A negative or NaN dt must not wind a timer backwards. */
     sup_input_t faulted = in;

@@ -49,6 +49,40 @@ components to be connected.
 Run under ASan and UBSan as well as plain (`TR-20`), because an arithmetic
 rule that is correct and also reads past an array is not correct.
 
+**The supervisor is held to a different coverage bar, and the reason is
+specific.** Its permit decision is a five-term conjunction:
+
+```c
+permit = selftest_ok && !tripped && chamber_valid
+      && fault_bits == 0 && chamber_c <= SUP_OVERTEMP_C;
+```
+
+One test with every term true and one with every term false gives 100 % line
+*and* 100 % branch coverage of that line, and demonstrates almost nothing: not
+that a missing reading alone withholds heat, nor that a reported fault alone
+does. `TR-29` therefore requires **80 % modified condition/decision coverage**
+of the trip logic and the wire format, which is the criterion that makes each
+condition prove it can change the outcome by itself. A five-term decision needs
+at least six cases that differ in the right way.
+
+gcov cannot measure MC/DC, so this uses Clang's `-fcoverage-mcdc` rather than
+the gcovr that enforces `kiln_core`'s line floor. `tools/mcdc.sh` measures it,
+fails below the floor, and on failure prints the exact condition pairs that are
+uncovered, because a coverage gate that only reports a percentage is a gate
+nobody can act on.
+
+It currently sits at **100 %**, and getting there found two real gaps that line
+coverage could not see: `sup_flags` had never been called with its *second*
+argument null, and `sup_decode`'s resynchronisation path had never run for a
+caller passing `nullptr` for the skip count. Both are argument guards where only
+half the guard had ever been exercised.
+
+This bar applies to the supervisor alone. It is about 120 lines, it is the only
+component where failing to evaluate a condition means heat that should have
+stopped, and its whole justification is that it can be read in full. Holding the
+other 30 000 lines to the same criterion would be a different and much larger
+argument.
+
 The fuzz suite (`firmware/test/host/fuzz/`) sits here too. It feeds the log
 record decoder deliberately hostile bytes, on the argument that the one thing
 reading data written by an earlier firmware version should survive is a record
@@ -391,6 +425,14 @@ Coverage is used here as a floor and not as a goal. A safety rule with 100 %
 line coverage and no test for the case where its input is absent is covered and
 wrong, which is why section 5 of this document exists.
 
+The supervisor is the exception, and deliberately measured differently:
+`TR-29` holds it to 80 % MC/DC, enforced by `tools/mcdc.sh`, for the reason
+given in section 2. Two criteria rather than one because the components differ:
+`kiln_core` is large and its risk is breadth, so a line floor across it is the
+useful number; the supervisor is small and its risk is a single unevaluated
+condition, so condition coverage is the useful number. One number applied to
+both would be the wrong number for one of them.
+
 ## 9. What is deliberately not tested
 
 - **The external over-temperature cutout** (`HR-13`). It is outside the product
@@ -417,6 +459,7 @@ wrong, which is why section 5 of this document exists.
 | `TR-18` | Timing measured on target | **Not met** |
 | `TR-19` | Coverage | **Partly**. Line floor gated, branch not (`C10`) |
 | `TR-20` | Sanitisers | **Met** |
+| `TR-29` | Supervisor MC/DC at least 80 % | **Met**, at 100 %, gated in CI |
 | `TR-21` | Soak and accelerated long-duration | **Not met** |
 | `TR-22`, `TR-26` | Traceability, test names carry IDs | **Not met**. 28 of 268; see section 7 |
 | `TR-23` | Every safety requirement automated | **Unverified**, because the traceability to check it against does not exist |
