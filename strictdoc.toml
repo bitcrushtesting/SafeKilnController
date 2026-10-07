@@ -6,5 +6,5 @@
 # and are deliberately NOT given to StrictDoc, which would otherwise try to
 # parse them as requirement documents and fail on the first one without an H1.
 [project]
-title = "KilnControl"
+title = "Safe Kiln Controller"
 include_doc_paths = ["docs/requirements.sdoc", "docs/architecture.sdoc"]

@@ -375,9 +375,9 @@ jobs:
         with:
           name: firmware-esp32s3-simulated
           path: |
-            firmware/build/kilncontrol.bin
-            firmware/build/kilncontrol.elf
-            firmware/build/kilncontrol.map
+            firmware/build/safekiln.bin
+            firmware/build/safekiln.elf
+            firmware/build/safekiln.map
             firmware/build/bootloader/bootloader.bin
             firmware/build/partition_table/partition-table.bin
             firmware/build/flasher_args.json
@@ -430,11 +430,11 @@ jobs:
             fi
           }
 
-          # The banner is "KilnControl <ver> (<built>, IDF <ver>) on <target>".
-          # This assertion previously looked for 'KilnControl starting', which
+          # The banner is "Safe Kiln Controller <ver> (<built>, IDF <ver>) on <target>".
+          # This assertion previously looked for 'Safe Kiln Controller starting', which
           # the firmware has never printed -- so it could only ever have passed
           # vacuously or failed.  Matched against what main.cpp actually logs.
-          want 'kiln: KilnControl .* on esp32s3' 'the composition root ran'
+          want 'kiln: Safe Kiln Controller .* on esp32s3' 'the composition root ran'
           want 'SIMULATED PLANT'                 'the simulated plant was bound'
           want 'started "'                       'a program was accepted and started'
           want '^\[RUN'                          'the run controller reached Running'

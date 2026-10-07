@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 Bitcrush Testing
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-# KilnControl Task List
+# Safe Kiln Controller Task List
 
 **Outstanding work only.** An item leaves this file when it is done; what was
 done and why is in the commit that did it, not here. Checked against
@@ -34,7 +34,7 @@ reused: gaps in the numbering are items that have been closed.
 
 | | | Open |
 |---|---|---|
-| [A](#a-schematic-and-pcb) | Schematic and PCB | 21 |
+| [A](#a-schematic-and-pcb) | Schematic and PCB | 22 |
 | [C](#c-build-test-and-ci-infrastructure) | Build, test and CI | 6 |
 | [D](#d-documentation-and-open-questions) | Documentation and open questions | 2 |
 | [F](#f-static-analysis) | Static analysis | 2 |
@@ -195,7 +195,17 @@ reused: gaps in the numbering are items that have been closed.
 
 ### A.3 Cleanup and layout follow-up (P3)
 
-- [ ] **A23. PCB review is still outstanding.** `hardware/kilncontrol.kicad_pcb`
+- [ ] **A23a. Rename the KiCad project to `safekiln`.** The project was renamed
+  to Safe Kiln Controller everywhere except `hardware/`, which was left alone
+  for two reasons: the files were being edited at the time, and the name is not
+  only a filename there. `kilncontrol` appears in several hundred internal
+  references, as `(project "kilncontrol")` in every symbol instance of the
+  schematic and as `(sheetfile "kilncontrol.kicad_sch")` in every footprint of
+  the PCB. Do it with KiCad's own Save As / rename rather than `git mv` plus a
+  substitution, so the cross-references are rewritten by the tool that owns
+  them. `board_pins.h` cites the schematic filename and will follow.
+
+- [ ] **A23. PCB review is still outstanding.** `hardware/safekiln.kicad_pcb`
   has placement but no copper: zero tracks, zero vias, sixteen zones untouched.
   Creepage and clearance for the mains section, the coil interrupt chain (`K4`),
   star-grounding of the analogue front end, and the thermal path of the LDO

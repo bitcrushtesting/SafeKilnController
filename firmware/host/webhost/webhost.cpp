@@ -474,7 +474,7 @@ int main(int argc, char **argv)
         }
         else {
             (void)fprintf(stderr,
-                "KilnControl development harness -- real firmware logic, simulated kiln.\n"
+                "Safe Kiln Controller development harness -- real firmware logic, simulated kiln.\n"
                 "\n"
                 "  --port N    listen port (default 8080)\n"
                 "  --accel X   simulated time multiplier (default 60)\n"
@@ -515,7 +515,7 @@ int main(int argc, char **argv)
     }
     if (listen(listener, 8) != 0) { perror("listen"); return 1; }
 
-    printf("KilnControl harness on http://127.0.0.1:%d  (simulated kiln, %gx time)\n",
+    printf("Safe Kiln Controller harness on http://127.0.0.1:%d  (simulated kiln, %gx time)\n",
            port, g_accel);
     printf("Serving assets from %s\n", g_web_dir);
     printf("Ctrl-C to stop.\n");

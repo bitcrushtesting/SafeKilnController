@@ -471,7 +471,7 @@ void hmi_build_view(kiln_hmi_view_t *v)
         v->net_up = (ns.state == KILN_NET_STA_CONNECTED) ||
                     (ns.state == KILN_NET_AP_FALLBACK);
         /* The device's own name, not the SSID: FR-HMI-07 asks where the web
-         * interface is, and "kilncontrol" is half that answer. */
+         * interface is, and "safekiln" is half that answer. */
         (void)snprintf(v->hostname, sizeof(v->hostname), "%s", ns.hostname);
         (void)snprintf(v->ip, sizeof(v->ip), "%s",
                        (ns.ip[0] != '\0') ? ns.ip : "no address");
@@ -533,7 +533,7 @@ extern "C" void app_main(void)
 
     kiln_fw_info_t fw = {};
     (void)s_system.fw_info(s_system.ctx, &fw);
-    ESP_LOGI(TAG, "KilnControl %s (%s, IDF %s) on %s",
+    ESP_LOGI(TAG, "Safe Kiln Controller %s (%s, IDF %s) on %s",
              fw.version, fw.build_time, fw.idf_version, fw.target);
     ESP_LOGI(TAG, "reset cause %d%s", (int)cause,
              kiln_reset_was_abnormal(cause) ? "  (ABNORMAL -- SR-14)" : "");

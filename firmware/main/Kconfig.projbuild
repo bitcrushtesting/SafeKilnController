@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Bitcrush Testing
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-menu "KilnControl"
+menu "Safe Kiln Controller"
 
 config KILN_PLANT_SIM
     bool "Simulate the kiln process instead of driving hardware"

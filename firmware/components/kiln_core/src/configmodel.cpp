@@ -125,9 +125,9 @@ const kiln_cfg_item_t k_items[] = {
     ENUMI("net.wifi_mode",                     "FR-NET-02",   wifi_mode, k_wifi_names, KILN_WIFI_MODE_COUNT, KILN_WIFI_STA_AP_FALLBACK, BOOTR),
     STR("net.wifi_ssid",                       "FR-NET-01",   wifi_ssid, KILN_CFG_STR_LEN,  "",            BOOTR),
     STR("net.wifi_pass",                       "FR-NET-01",   wifi_pass, KILN_CFG_PASS_LEN, "",            BOOTR | SECRET),
-    STR("net.ap_ssid",                         "FR-NET-02",   ap_ssid,   KILN_CFG_STR_LEN,  "kilncontrol", BOOTR),
+    STR("net.ap_ssid",                         "FR-NET-02",   ap_ssid,   KILN_CFG_STR_LEN,  "safekiln", BOOTR),
     STR("net.ap_pass",                         "FR-NET-02",   ap_pass,   KILN_CFG_PASS_LEN, "",            BOOTR | SECRET),
-    STR("net.hostname",                        "FR-NET-04",   hostname,  KILN_CFG_HOST_LEN, "kilncontrol", BOOTR),
+    STR("net.hostname",                        "FR-NET-04",   hostname,  KILN_CFG_HOST_LEN, "kiln",     BOOTR),
     STR("net.ntp_server",                      "FR-LOG-12",   ntp_server,KILN_CFG_HOST_LEN, "pool.ntp.org", 0),
     STR("net.timezone",                        "FR-LOG-12",   timezone,  KILN_CFG_HOST_LEN, "UTC0",         0),
 

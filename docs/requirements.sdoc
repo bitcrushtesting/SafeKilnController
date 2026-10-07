@@ -1,6 +1,6 @@
 [DOCUMENT]
-TITLE: KilnControl, Requirements Specification
-UID: KILNCONTROL-SRS
+TITLE: Safe Kiln Controller, Requirements Specification
+UID: SAFEKILN-SRS
 VERSION: 0.1 (draft)
 DATE: 2026-09-26
 OPTIONS:
@@ -11,7 +11,7 @@ METADATA:
   SPDX-FileCopyrightText: 2026 Bitcrush Testing
   SPDX-License-Identifier: GPL-3.0-or-later
   Status: For review
-  Project: KilnControl, PID kiln controller
+  Project: Safe Kiln Controller, PID kiln controller
 
 [GRAMMAR]
 ELEMENTS:
@@ -93,7 +93,7 @@ TITLE: 1.1 Purpose
 
 [TEXT]
 STATEMENT: >>>
-This document specifies the requirements for **KilnControl**, an open-source
+This document specifies the requirements for **Safe Kiln Controller**, an open-source
 temperature controller for electric ceramic / glass kilns. It is the reference
 for implementation, verification and review. The software architecture derived
 from this document is [`architecture.md`](architecture.md).
@@ -107,7 +107,7 @@ TITLE: 1.2 Scope
 
 [TEXT]
 STATEMENT: >>>
-KilnControl replaces the mechanical or simple on/off controller of an electric
+Safe Kiln Controller replaces the mechanical or simple on/off controller of an electric
 kiln with a closed-loop PID controller that follows a user-defined
 **firing curve** (a time/temperature program). The operator interacts with the
 device through a small local display and, over WiFi, through a built-in web
@@ -246,10 +246,10 @@ no external services, a redundant SSR + contactor output stage, and safety
 supervision covering runaway, probe failure, SSR failure and insulation
 degradation.
 
-KilnControl deliberately diverges in the following respects, and these
+Safe Kiln Controller deliberately diverges in the following respects, and these
 divergences drive many requirements below:
 
-| Aspect | PIDKiln | KilnControl | Driver |
+| Aspect | PIDKiln | Safe Kiln Controller | Driver |
 |---|---|---|---|
 | Framework | Arduino-ESP32 | ESP-IDF v5.x ([LINK: CON-01]) | Explicit requirement; better test tooling, partition/OTA control, watchdogs |
 | MCU | ESP32-WROVER | ESP32-S3 ([LINK: HR-01]) | Explicit requirement |
@@ -259,7 +259,7 @@ divergences drive many requirements below:
 | Heater current | Optional 30 A/1 V power meter, not used for protection | **Mandatory** current transformer driving relay fail-on / fail-off detection and weld discrimination (FR-CUR ([LINK: SEC-3-12]), [LINK: SR-25]–[LINK: SR-30]) | Explicit requirement; resolves [LINK: OQ-02] |
 | Architecture | Arduino sketch, hardware access throughout | Layered, HAL-isolated, host-testable core (TR ([LINK: SEC-7])) | Explicit requirement: design for testability |
 
-No PIDKiln source code is copied. KilnControl is licensed GPL-3.0-or-later, the
+No PIDKiln source code is copied. Safe Kiln Controller is licensed GPL-3.0-or-later, the
 same licence as PIDKiln, so derivation remains possible in either direction.
 <<<
 
@@ -280,7 +280,7 @@ STATEMENT: >>>
 ```mermaid
 flowchart LR
     OP(["Operator"])
-    subgraph KC["KilnControl device"]
+    subgraph KC["Safe Kiln Controller device"]
         MCU["ESP32-S3<br/>controller"]
         OLED["128x64 OLED"]
         ENC["Encoder<br/>+ button"]
@@ -2221,7 +2221,7 @@ VERIFICATION: T
 [REQUIREMENT]
 UID: SR-24
 STATEMENT: >>>
-The documentation shall state that KilnControl is **not** a safety-certified device, that an independent hardware over-temperature cutout is required ([LINK: HR-13]), and that mains wiring must be performed by a competent person in accordance with local regulation [R6].
+The documentation shall state that Safe Kiln Controller is **not** a safety-certified device, that an independent hardware over-temperature cutout is required ([LINK: HR-13]), and that mains wiring must be performed by a competent person in accordance with local regulation [R6].
 <<<
 VERIFICATION: I
 

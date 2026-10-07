@@ -3,12 +3,12 @@ SPDX-FileCopyrightText: 2026 Bitcrush Testing
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-# KilnControl, Software Architecture
+# Safe Kiln Controller, Software Architecture
 
 | | |
 |---|---|
 | **Document** | Software Architecture Description |
-| **Project** | KilnControl, PID kiln controller |
+| **Project** | Safe Kiln Controller, PID kiln controller |
 | **Version** | 0.1 (draft) |
 | **Date** | 2026-09-26 |
 | **Status** | For review |
@@ -864,7 +864,7 @@ This section is the implementation of [requirements §7](requirements.sdoc).
 ### 14.1 Repository layout
 
 ```
-kilncontrol/
+safekiln/
 ├── LICENSE                      GPL-3.0
 ├── README.md
 ├── strictdoc.toml               StrictDoc project config

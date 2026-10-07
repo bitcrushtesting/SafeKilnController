@@ -1,14 +1,14 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Pin map for the kilncontrol rev A board (HR-10).
+ * Pin map for the safekiln rev A board (HR-10).
  *
  * HR-10 requires pin assignments to be defined in one place per board variant
  * and not duplicated across the codebase.  This is that place.  Every adapter
  * in this component takes its pins from here, and nothing else in the firmware
  * mentions a GPIO number.
  *
- * Transcribed from hardware/kilncontrol.kicad_sch and verified against the
+ * Transcribed from hardware/safekiln.kicad_sch and verified against the
  * netlist rather than the drawing, so the names below are the net names.
  *
  * ---------------------------------------------------------------------------

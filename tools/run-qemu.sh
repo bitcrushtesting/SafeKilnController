@@ -44,7 +44,7 @@ run|all)
     cat <<'BANNER'
 
 --------------------------------------------------------------------
- KilnControl under QEMU -- simulated plant, no hardware driven.
+ Safe Kiln Controller under QEMU -- simulated plant, no hardware driven.
 
  The firing starts by itself.  Keys (press 'h' for the full list):
    s start   a abort   p pause   r resume   c clear fault   i idle

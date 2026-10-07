@@ -66,7 +66,7 @@ jobs:
             idf.py build
             # One image covering bootloader, partition table and app, so flashing
             # is a single command and cannot be done half way.
-            idf.py merge-bin -o build/kilncontrol-merged.bin
+            idf.py merge-bin -o build/safekiln-merged.bin
             idf.py size > build/size.txt
             idf.py size-components > build/size-components.txt
 
@@ -75,13 +75,13 @@ jobs:
           tag='${{ steps.version.outputs.tag }}'
           # SIMULATED belongs in the filename and not only in the notes: a file
           # outlives the page it was downloaded from.
-          base="kilncontrol-${tag}-esp32s3-SIMULATED"
+          base="safekiln-${tag}-esp32s3-SIMULATED"
           mkdir -p dist
 
-          cp firmware/build/kilncontrol-merged.bin  "dist/${base}-merged.bin"
-          cp firmware/build/kilncontrol.bin         "dist/${base}-app.bin"
-          cp firmware/build/kilncontrol.elf         "dist/${base}.elf"
-          cp firmware/build/kilncontrol.map         "dist/${base}.map"
+          cp firmware/build/safekiln-merged.bin  "dist/${base}-merged.bin"
+          cp firmware/build/safekiln.bin         "dist/${base}-app.bin"
+          cp firmware/build/safekiln.elf         "dist/${base}.elf"
+          cp firmware/build/safekiln.map         "dist/${base}.map"
           cp firmware/build/bootloader/bootloader.bin \
                                                     "dist/${base}-bootloader.bin"
           cp firmware/build/partition_table/partition-table.bin \
@@ -99,7 +99,7 @@ jobs:
         run: |
           tag='${{ steps.version.outputs.tag }}'
           prev='${{ steps.version.outputs.prev }}'
-          base="kilncontrol-${tag}-esp32s3-SIMULATED"
+          base="safekiln-${tag}-esp32s3-SIMULATED"
 
           # Built line by line rather than from a heredoc: a heredoc inside a
           # YAML block scalar carries the block's indentation into its output,

@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 Bitcrush Testing
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-# Running KilnControl against a simulated kiln
+# Running Safe Kiln Controller against a simulated kiln
 
 The firmware can be run with the kiln process simulated instead of driven, in two
 places: on a development host, where the host test suite does it, and on the

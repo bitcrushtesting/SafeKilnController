@@ -3,12 +3,12 @@ SPDX-FileCopyrightText: 2026 Bitcrush Testing
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-# KilnControl, Security Concept
+# Safe Kiln Controller, Security Concept
 
 | | |
 |---|---|
 | **Document** | Security Concept |
-| **Project** | KilnControl, PID kiln controller |
+| **Project** | Safe Kiln Controller, PID kiln controller |
 | **Version** | 0.1 (draft) |
 | **Date** | 2026-10-05 |
 | **Status** | For review |
@@ -17,7 +17,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
 
-> **KilnControl is designed for a trusted local network and nothing else**
+> **Safe Kiln Controller is designed for a trusted local network and nothing else**
 > ([`NFR-20`](requirements.sdoc),
 > [`ASM-05`](requirements.sdoc)). It must not be exposed to the
 > internet, port-forwarded, or placed on a network it shares with untrusted
@@ -40,7 +40,7 @@ kiln into a dangerous state.
 It covers the firmware's network-facing surfaces, its stored secrets, its
 update path, and physical access to the board. It does not cover the security of
 the user's own network, their browser, or their WiFi infrastructure, except to
-say where KilnControl depends on them.
+say where Safe Kiln Controller depends on them.
 
 Identifiers introduced here extend the scheme of
 [requirements §1.4](requirements.sdoc) and of
@@ -95,7 +95,7 @@ flowchart TB
         BROWSER["Operator's browser"]
         OTHER["Other LAN devices<br/>(IoT, guests, malware)"]
     end
-    subgraph DEVICE["KilnControl"]
+    subgraph DEVICE["Safe Kiln Controller"]
         HTTP["HTTP server<br/>**not implemented**"]
         API["REST API, kiln_web<br/>built, host-tested"]
         APP["kiln_app, commands"]
@@ -123,7 +123,7 @@ The trust boundaries, named:
 
 | # | Boundary | Crossed by | Enforced by |
 |---|---|---|---|
-| **B-1** | Internet → LAN | Nothing, by assumption | The user's router. KilnControl has no control here and no defence if it is wrong. |
+| **B-1** | Internet → LAN | Nothing, by assumption | The user's router. Safe Kiln Controller has no control here and no defence if it is wrong. |
 | **B-2** | LAN → device | Every HTTP request | The HTTP transport, **which does not exist**. |
 | **B-3** | Unauthenticated → authenticated | State-changing requests | [`kiln_api_needs_auth`](../firmware/components/kiln_web/include/kiln_web/api.h) decides *which*; the transport would decide *whether*. |
 | **B-4** | Request data → parser | Bodies, query strings, JSON | Bounded buffers in `kiln_web` **[built]**. |

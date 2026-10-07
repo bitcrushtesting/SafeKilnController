@@ -3,12 +3,12 @@ SPDX-FileCopyrightText: 2026 Bitcrush Testing
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-# KilnControl, Safety Concept
+# Safe Kiln Controller, Safety Concept
 
 | | |
 |---|---|
 | **Document** | Safety Concept |
-| **Project** | KilnControl, PID kiln controller |
+| **Project** | Safe Kiln Controller, PID kiln controller |
 | **Version** | 0.1 (draft) |
 | **Date** | 2026-10-05 |
 | **Status** | For review |
@@ -17,7 +17,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
 
-> **KilnControl is not a safety-certified device.** This document explains the
+> **Safe Kiln Controller is not a safety-certified device.** This document explains the
 > reasoning behind its protective measures; it is not a declaration of
 > conformity, a functional-safety assessment to IEC 61508 or ISO 13849, and it
 > does not assign a SIL or a performance level. An **independent hardware
@@ -69,7 +69,7 @@ flowchart TB
         OP["Attending operator (ASM-06)"]
         KILN["Kiln body, elements,<br/>lid interlock, wiring"]
     end
-    subgraph IN["Inside the boundary, KilnControl"]
+    subgraph IN["Inside the boundary, Safe Kiln Controller"]
         MCU["ESP32-S3 firmware:<br/>control + safety supervisor"]
         CP["Charge pump → contactor coil"]
         CON["Safety contactor"]
@@ -453,7 +453,7 @@ it.
 
 ## 9. Limitations and obligations
 
-### 9.1 What KilnControl is not
+### 9.1 What Safe Kiln Controller is not
 
 - **Not a safety-certified device.** No SIL, no performance level, no
   third-party assessment. This document is engineering reasoning, not evidence

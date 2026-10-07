@@ -94,7 +94,7 @@ bool copy_checked(void *dst, size_t cap, const char *src, const char *what)
 
 /* FR-NET-05: at least eight characters, device-unique, derived from the MAC so
  * it can be printed on the display and on a label rather than being a shared
- * secret every KilnControl in the world has. */
+ * secret every Safe Kiln Controller in the world has. */
 void default_ap_pass(char *out, size_t n)
 {
     uint8_t mac[6] = {};
@@ -113,9 +113,9 @@ void start_ap(const kiln_config_t *cfg)
      * own defaults.
      * NOLINTNEXTLINE(bugprone-invalid-enum-default-initialization) */
     wifi_config_t ap = {};
-    const char *ssid = (cfg->ap_ssid[0] != '\0') ? cfg->ap_ssid : "kilncontrol";
+    const char *ssid = (cfg->ap_ssid[0] != '\0') ? cfg->ap_ssid : "safekiln";
     if (!copy_checked(ap.ap.ssid, sizeof(ap.ap.ssid), ssid, "net.ap_ssid")) {
-        ssid = "kilncontrol";
+        ssid = "safekiln";
         (void)copy_checked(ap.ap.ssid, sizeof(ap.ap.ssid), ssid, "fallback");
     }
     ap.ap.ssid_len       = (uint8_t)strlen(ssid); /* just copied from here */
@@ -265,7 +265,7 @@ kiln_err_t kiln_hal_net_init(const kiln_config_t *cfg, kiln_port_net_t *out)
     s_net.retry_ms         = RETRY_MIN_MS;
     s_net.fallback_after_s = 60;        /* FR-NET-02 default */
     (void)snprintf(s_net.hostname, sizeof(s_net.hostname), "%s",
-                   (cfg->hostname[0] != '\0') ? cfg->hostname : "kilncontrol");
+                   (cfg->hostname[0] != '\0') ? cfg->hostname : "safekiln");
 
     out->ctx    = &s_net;
     out->status = net_status;

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Bitcrush Testing
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// KilnControl -- enclosure
+// Safe Kiln Controller -- enclosure
 //
 // Parametric two-part housing: a base holding the controller PCB and the
 // mains switching relay in segregated bays, and a lid carrying the display
@@ -11,9 +11,9 @@
 //   git submodule update --init --recursive
 //
 // Render:
-//   openscad -D 'part="base"' -o base.stl kilncontrol.scad
-//   openscad -D 'part="lid"'  -o lid.stl  kilncontrol.scad
-//   openscad -D 'part="all"'  -o all.stl  kilncontrol.scad   (assembled preview)
+//   openscad -D 'part="base"' -o base.stl safekiln.scad
+//   openscad -D 'part="lid"'  -o lid.stl  safekiln.scad
+//   openscad -D 'part="all"'  -o all.stl  safekiln.scad   (assembled preview)
 
 include <libraries/BOSL2/std.scad>
 

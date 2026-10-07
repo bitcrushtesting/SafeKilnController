@@ -21,4 +21,4 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 # every component rather than per component so the two cannot drift.
 idf_build_set_property(CXX_COMPILE_OPTIONS "-std=gnu++20" APPEND)   # defined by project.cmake, so it must follow it
 
-project(kilncontrol)
+project(safekiln)

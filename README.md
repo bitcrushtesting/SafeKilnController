@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 Bitcrush Testing
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-# KilnControl
+# Safe Kiln Controller
 
 An open-source PID controller for electric ceramic and glass kilns, built on the
 **ESP32-S3** with **ESP-IDF**.
@@ -84,7 +84,7 @@ housing/    enclosure
 
 ## Scope
 
-KilnControl supports **single-phase kilns only**. A three-phase kiln can be
+Safe Kiln Controller supports **single-phase kilns only**. A three-phase kiln can be
 monitored on one representative phase, but a fault confined to one of the other
 two would be caught only by the thermal rules, slowly, and the power and energy
 figures would cover a third of the load. Neither is a safe basis for firing a
@@ -110,14 +110,14 @@ Details and rationale are in
 
 Functionally inspired by [**PIDKiln**](https://github.com/Saur0o0n/PIDKiln) by
 Adrian Siemieniak, which showed that a low-cost ESP32 can run a real kiln well.
-KilnControl borrows its ideas, segment-based programs, dual local/web control,
+Safe Kiln Controller borrows its ideas, segment-based programs, dual local/web control,
 on-device storage, a redundant SSR + contactor output stage, and rebuilds them
 on ESP-IDF with a host-testable core and automatic PID tuning. No PIDKiln source
 code is used
 
 ## Safety
 
-KilnControl is **not** a safety-certified device. A kiln is a multi-kilowatt mains
+Safe Kiln Controller is **not** a safety-certified device. A kiln is a multi-kilowatt mains
 heater reaching temperatures at which its own wiring and the surrounding building
 are at risk.
 
@@ -127,7 +127,7 @@ The hazards, the layered protection concept and the risk that remains are
 set out in [`docs/safety.md`](docs/safety.md); the requirements it derives from
 are [requirements §5](docs/requirements.sdoc).
 
-KilnControl is designed for a **trusted local network** and must not be exposed
+Safe Kiln Controller is designed for a **trusted local network** and must not be exposed
 to the internet. The threat model, the controls and what is still only specified are in [`docs/security.md`](docs/security.md).
 
 ## License

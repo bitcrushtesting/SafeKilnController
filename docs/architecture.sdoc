@@ -1,6 +1,6 @@
 [DOCUMENT]
-TITLE: KilnControl, Architecture Decisions
-UID: KILNCONTROL-AD
+TITLE: Safe Kiln Controller, Architecture Decisions
+UID: SAFEKILN-AD
 OPTIONS:
   MARKUP: Markdown
   VIEW_STYLE: Table
@@ -8,7 +8,7 @@ OPTIONS:
 METADATA:
   SPDX-FileCopyrightText: 2026 Bitcrush Testing
   SPDX-License-Identifier: GPL-3.0-or-later
-  Project: KilnControl, PID kiln controller
+  Project: Safe Kiln Controller, PID kiln controller
 
 [GRAMMAR]
 ELEMENTS:
