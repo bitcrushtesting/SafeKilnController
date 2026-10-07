@@ -65,6 +65,7 @@ builds a release.
 | [`docs/safety.md`](docs/safety.md) | Safety concept, hazard analysis, safety goals, the layered protection concept and the independence claimed between layers, detection coverage and timing, residual risk, and the obligations on the installer and on anyone changing the design. |
 | [`docs/security.md`](docs/security.md) | Security concept, assets, attack surface and trust boundaries, threats and the controls against them (marked built / specified / absent), why a security compromise here is a safety event, and the residual risk. |
 | [`docs/architecture.md`](docs/architecture.md) | Software architecture, key decisions, component decomposition, task and timing design, control and safety algorithms, persistence and flash-endurance design, REST API, and the build and test architecture. |
+| [`docs/safety-supervisor.md`](docs/safety-supervisor.md) | The independent safety supervisor (`AD-22`): a second microcontroller holding the absolute over-temperature, thermocouple-fault and lid trips, what moves and what stays, the link, the failure modes, and the questions still open. |
 | [`docs/bom-optimisation.md`](docs/bom-optimisation.md) | Parts the design might do without or do more cheaply, each worked through to a recommendation with the requirements a change would touch. Candidates, not decisions. |
 | [`docs/simulation.md`](docs/simulation.md) | Running the firmware against a simulated kiln, on the host and under QEMU, including fault injection. |
 | [`tasklist.md`](tasklist.md) | Outstanding work, by priority. |

@@ -448,3 +448,61 @@ RELATIONS:
 - TYPE: Parent
   VALUE: FR-WEB-19
   ROLE: Satisfies
+
+[DECISION]
+UID: AD-22
+STATEMENT: >>>
+**The absolute over-temperature trip, the thermocouple-fault trip and the lid
+trip move to a second microcontroller**, an STM32, which owns the chamber
+front end and one series element in the contactor coil. It reports temperature
+and status to the ESP32 over a point-to-point serial link and takes no
+instruction from it. Every other function stays in the ESP32.
+<<<
+RATIONALE: >>>
+`SR-09`, `SR-04` and `SR-31`, and the independence claim of
+[`safety.md`](safety.md) section 6, which currently has to admit that L1 to L4
+all share one MCU and that the only fully independent layer is `HR-13`, the
+external cutout, which is outside this product.
+
+This is the first protection layer inside the product boundary that a defect in
+the ESP32 firmware cannot reach, including a defect in the safety supervisor
+task of [LINK: AD-04]. It also fixes what tasklist `K1` records about the
+discrete fault chain: an open-drain output is closed when the front end is
+absent, and the MAX31856 reports no open circuit until its fault mask is
+configured, so that interlock is inert out of reset. A supervisor starts
+de-energised and permits heat only after it has valid conversions, which turns
+absence of evidence into a trip rather than a permission.
+<<<
+COMMENT: >>>
+A second firmware to build, review and flash, and the independence is only
+worth what that firmware's simplicity is worth: a scheduler, a parser or a
+configuration model in it would start to rot the claim.
+
+The ESP32's process value now arrives over the link, so the link is
+availability-critical even though it is not protection-critical: silence means
+no temperature, which means no heat. The chamber thermocouple remains shared,
+so the independence won is against software and MCU failure and not against a
+sensor that reads plausibly but wrongly.
+
+Supersedes `HR-24` and removes the discrete chain of tasklist section K
+(`Q5`, `Q6`, `R28` to `R31`). The lid's series contact is kept, being the one
+element that depends on no firmware at all. Forces `SR-23`'s 1350 degC
+configurable ceiling to move, because a hard-coded backstop needs room above
+the highest configurable limit.
+
+Designed in [`safety-supervisor.md`](safety-supervisor.md), which carries the
+open questions. Does not replace `HR-13`.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SR-09
+  ROLE: Satisfies
+- TYPE: Parent
+  VALUE: SR-04
+  ROLE: Satisfies
+- TYPE: Parent
+  VALUE: SR-31
+  ROLE: Satisfies
+- TYPE: Parent
+  VALUE: NFR-04
+  ROLE: Satisfies

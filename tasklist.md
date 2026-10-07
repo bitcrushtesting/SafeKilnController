@@ -48,6 +48,7 @@ reused: gaps in the numbering are items that have been closed.
 | [O](#o-wifi-fr-net) | WiFi | 3 |
 | [P](#p-http-transport-and-the-api) | HTTP transport and the API | 4 |
 | [Q](#q-the-file-store-ad-21) | The file store | 5 |
+| [R](#r-the-independent-safety-supervisor-ad-22) | Independent safety supervisor | 8 |
 
 ---
 
@@ -554,3 +555,70 @@ question is whether it is worth its cost.
   slots too, and the walk is now the only reason `run_index` reads at all. Not a
   problem, just the place where the store being an array rather than a directory
   would let the index get simpler if it were ever revisited.
+
+---
+
+## R. The independent safety supervisor, AD-22
+
+Designed in [`docs/safety-supervisor.md`](docs/safety-supervisor.md). Nothing
+below can start until `R1` to `R4` are answered, because each of them changes
+either the supervisor's pin count or a requirement.
+
+- [ ] **R1. Decide the thermocouple type question.** `FR-ACQ-02` allows eight
+  types and the MAX31856 linearises according to a register, so whoever sets
+  that register decides what the supervisor's temperature *means*. Hard-coding
+  type K while a type S couple is fitted makes the backstop read about a
+  quarter of the true output at 1300 degC and it never fires. Tripping on raw
+  microvolts does not escape it either. Options and a recommendation are in
+  section 8 of the design: type K only, or strap pins. **Blocks the supervisor
+  firmware and possibly its pin count.**
+
+- [ ] **R2. Reconcile the two temperature limits.** `SR-23` caps the
+  configurable maximum at 1350 degC, which is also the top of type K's range,
+  so there is no room above it for a hard-coded backstop. Preferred resolution:
+  configurable ceiling to 1300 degC, supervisor trips at 1350 degC, the two
+  numbers stated together with the margin as the reason. **Blocks `SR-23` and
+  the supervisor's constant.**
+
+- [ ] **R3. Decide whether the supervisor gets its own chamber couple.** With
+  one couple the independence won is against software and MCU failure, not
+  against a plausible-but-wrong reading (`HZ-03`). Section 9 of the design
+  notes that `TC2`'s front end is already on the board and, per
+  [`bom-optimisation.md`](docs/bom-optimisation.md), buying a `FAULT` pin it no
+  longer needs; repurposing it as a second chamber channel would let the two
+  MCUs disagree, which is a detection neither can make alone. **Blocks the
+  schematic and section 1 of the BOM document.**
+
+- [ ] **R4. Decide how a latched supervisor trip is cleared.** Not over the
+  link, which would put the ESP32 back inside the safety function. Power cycle
+  alone, or a dedicated local button. `SR-17` already requires an explicit
+  operator acknowledgement that survives power loss, and its wording will need
+  to cover a trip the ESP32 cannot clear. **Blocks the panel.**
+
+- [ ] **R5. Write the requirement deltas.** Six new requirements and nine
+  changed ones, listed in section 11 of the design. `SR-23`, `FR-ACQ-01`,
+  `FR-ACQ-02`, `HR-02`, `HR-24` superseded, `AD-04`, `AD-05`, `safety.md`
+  sections 5 and 6, `SG-01` and `SG-03`. The independence table gaining a row
+  that genuinely says yes is the point of the exercise, so it is worth writing
+  carefully rather than last.
+
+- [ ] **R6. Select the part and draw it.** STM32G031 or STM32C031; the G0's
+  `IWDG` runs from the LSI so a system clock failure does not stop the
+  watchdog, which is the property that matters. Needs SPI, one UART, four or
+  five GPIO and SWD brought out to a test point, because the whole argument
+  rests on this firmware being independently reviewable. The two expansion pins
+  `KILN_PIN_EXP_IO2` and `KILN_PIN_EXP_IO42` are free and are enough for the
+  link; `UART0` is the console and must not be used.
+
+- [ ] **R7. Remove what the supervisor supersedes.** `Q5`, `Q6` and `R28` to
+  `R31` of section K, and `HR-24` rewritten rather than deleted, because the
+  property it reached for is now delivered differently. Keep the lid's series
+  contact (`HR-21`): it depends on no firmware at all and costs nothing. `K1`
+  is answered by this change and `K2` dissolves, the enclosure channel not
+  being in the supervisor's remit.
+
+- [ ] **R8. The supervisor's firmware, and its own test strategy.** Small
+  enough to read in one sitting, which is a design constraint and not an
+  aspiration. It needs its own host-testable core on the same argument as
+  `AD-01`, and the link needs a test that proves the ESP32 withholds heat on
+  silence and on a stale sequence number, which are different failures.
