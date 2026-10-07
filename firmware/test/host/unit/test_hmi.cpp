@@ -399,3 +399,56 @@ KILN_TEST(drawing_clips_instead_of_running_off_the_buffer)
     kiln_fb_progress(&fb, -10, 60, 300, 20, 250);
     CHECK(true);   /* reaching here without ASan complaining is the assertion */
 }
+
+/* --- the supervisor on the fault screen (AD-22, R12) -------------------- */
+
+KILN_TEST(ad22_the_fault_screen_differs_when_the_supervisor_tripped)
+{
+    /* The two latches are cleared differently -- the supervisor's by the button
+     * on the panel -- so an operator shown the controller's instruction would
+     * press the wrong thing.  No text search here, so the assertion is that the
+     * rendered screen is not the same screen. */
+    kiln_hmi_view_t v = base_view();
+    v.snap.state = KILN_STATE_FAULT;
+    v.fault      = KILN_FAULT_OVERTEMP;
+    v.sup_fitted = true;
+
+    kiln_hmi_t controller;
+    kiln_hmi_init(&controller, 0);
+    v.sup_tripped = false;                  /* the supervisor is content */
+    v.sup_reason  = KILN_SUP_OK;
+    (void)feed(&controller, &v, KILN_INPUT_NONE);
+
+    kiln_hmi_t supervisor;
+    kiln_hmi_init(&supervisor, 0);
+    v.sup_tripped = true;
+    v.sup_reason  = KILN_SUP_OVERTEMP;
+    (void)feed(&supervisor, &v, KILN_INPUT_NONE);
+
+    CHECK(memcmp(kiln_hmi_frame(&controller), kiln_hmi_frame(&supervisor),
+                 KILN_DISPLAY_BYTES) != 0);
+}
+
+KILN_TEST(ad22_a_missing_supervisor_is_shown_differently_from_one_that_tripped)
+{
+    /* "The backstop fired" and "there is no backstop" are different sentences
+     * and must not render the same. */
+    kiln_hmi_view_t v = base_view();
+    v.snap.state  = KILN_STATE_FAULT;
+    v.fault       = KILN_FAULT_OVERTEMP;
+    v.sup_fitted  = true;
+    v.sup_tripped = true;
+
+    kiln_hmi_t fired;
+    kiln_hmi_init(&fired, 0);
+    v.sup_reason = KILN_SUP_OVERTEMP;
+    (void)feed(&fired, &v, KILN_INPUT_NONE);
+
+    kiln_hmi_t absent;
+    kiln_hmi_init(&absent, 0);
+    v.sup_reason = KILN_SUP_LINK_DEAD;
+    (void)feed(&absent, &v, KILN_INPUT_NONE);
+
+    CHECK(memcmp(kiln_hmi_frame(&fired), kiln_hmi_frame(&absent),
+                 KILN_DISPLAY_BYTES) != 0);
+}

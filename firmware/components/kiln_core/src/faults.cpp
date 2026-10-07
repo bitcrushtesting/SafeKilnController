@@ -260,6 +260,79 @@ constexpr bool indexed_by_code(const T (&table)[N])
 
 } // namespace
 
+namespace {
+
+/* AD-22.  Indexed by kiln_sup_reason_t; the static_assert below holds the
+ * table to the enum, as the fault tables are held to theirs.
+ *
+ * The cause text says what to *do*, not only what happened, because the
+ * supervisor's latch is cleared by the button on the panel and not by the
+ * acknowledgement an operator has learned for every other fault.  Two
+ * acknowledgements exist and the operator did not choose that. */
+constexpr struct {
+    kiln_sup_reason_t code;
+    const char *label[KILN_LANG_COUNT];
+    const char *cause[KILN_LANG_COUNT];
+} k_sup_reasons[] = {
+    { KILN_SUP_OK,
+        { "OK", "OK" },
+        { "The independent supervisor is permitting heat.",
+          "Der unabhaengige Waechter gibt die Heizung frei." } },
+    { KILN_SUP_OVERTEMP,
+        { "SUPERVISOR OVER-TEMP", "WAECHTER UEBERTEMPERATUR" },
+        { "The independent supervisor stopped the kiln above its own fixed "
+          "limit, which sits above every configurable one. The controller "
+          "should have stopped first, so treat this as a controller fault as "
+          "well. Press the supervisor's clear button on the panel.",
+          "Der unabhaengige Waechter hat den Ofen oberhalb seiner eigenen "
+          "festen Grenze abgeschaltet, die ueber allen einstellbaren liegt. "
+          "Die Steuerung haette vorher abschalten muessen, also auch als "
+          "Fehler der Steuerung behandeln. Quittiertaste des Waechters am "
+          "Bedienfeld druecken." } },
+    { KILN_SUP_TC_FAULT,
+        { "SUPERVISOR TC FAULT", "WAECHTER FUEHLERFEHLER" },
+        { "The independent supervisor's thermocouple front end reported a "
+          "fault. Check the chamber probe and its wiring, then press the "
+          "supervisor's clear button on the panel.",
+          "Die Fuehlerelektronik des unabhaengigen Waechters meldet einen "
+          "Fehler. Kammerfuehler und Verdrahtung pruefen, dann Quittiertaste "
+          "des Waechters am Bedienfeld druecken." } },
+    { KILN_SUP_SENSOR_STALE,
+        { "SUPERVISOR NO READING", "WAECHTER KEIN MESSWERT" },
+        { "The independent supervisor was reading the chamber and stopped "
+          "getting a value. Check the probe and its wiring, then press the "
+          "supervisor's clear button on the panel.",
+          "Der unabhaengige Waechter hat die Kammer gemessen und erhaelt "
+          "keinen Wert mehr. Fuehler und Verdrahtung pruefen, dann "
+          "Quittiertaste des Waechters am Bedienfeld druecken." } },
+    { KILN_SUP_SELF_TEST,
+        { "SUPERVISOR SELF-TEST", "WAECHTER SELBSTTEST" },
+        { "The independent supervisor could not configure its thermocouple "
+          "front end at start-up and will not permit heat. This is not "
+          "clearable by the operator; the supervisor needs servicing.",
+          "Der unabhaengige Waechter konnte seine Fuehlerelektronik beim Start "
+          "nicht konfigurieren und gibt die Heizung nicht frei. Nicht durch "
+          "den Bediener quittierbar; der Waechter muss instand gesetzt "
+          "werden." } },
+    { KILN_SUP_LINK_DEAD,
+        { "NO SUPERVISOR", "KEIN WAECHTER" },
+        { "Nothing is arriving from the independent supervisor, so there is no "
+          "chamber temperature and no heat. This is the absence of the "
+          "backstop rather than the backstop acting: check that the supervisor "
+          "is powered and its link is connected.",
+          "Vom unabhaengigen Waechter kommt nichts an, daher gibt es keine "
+          "Kammertemperatur und keine Heizung. Das ist das Fehlen der "
+          "Rueckfallebene, nicht ihr Ansprechen: pruefen, ob der Waechter "
+          "versorgt und die Verbindung angeschlossen ist." } },
+};
+
+}  // namespace
+
+static_assert(std::size(k_sup_reasons) == KILN_SUP_REASON_COUNT,
+              "k_sup_reasons must have one row per kiln_sup_reason_t");
+static_assert(indexed_by_code<kiln_sup_reason_t>(k_sup_reasons),
+              "k_sup_reasons must be indexed by kiln_sup_reason_t");
+
 static_assert(std::size(k_faults) == KILN_FAULT_MAX,
               "k_faults must have one row per kiln_fault_t");
 static_assert(indexed_by_code<kiln_fault_t>(k_faults),
@@ -371,4 +444,34 @@ const char *kiln_warn_cause(kiln_warn_bit_t bit)
 const char *kiln_state_label(kiln_state_t state)
 {
     return state_name(state);
+}
+
+/* --- the independent supervisor (AD-22) --------------------------------- */
+
+const char *kiln_sup_reason_label_in(kiln_sup_reason_t r, kiln_lang_t lang)
+{
+    const size_t i = static_cast<size_t>(r);
+    if (i >= std::size(k_sup_reasons)) {
+        return "?";
+    }
+    return pick(k_sup_reasons[i].label, lang);
+}
+
+const char *kiln_sup_reason_label(kiln_sup_reason_t r)
+{
+    return kiln_sup_reason_label_in(r, KILN_LANG_EN);
+}
+
+const char *kiln_sup_reason_cause_in(kiln_sup_reason_t r, kiln_lang_t lang)
+{
+    const size_t i = static_cast<size_t>(r);
+    if (i >= std::size(k_sup_reasons)) {
+        return "";
+    }
+    return pick(k_sup_reasons[i].cause, lang);
+}
+
+const char *kiln_sup_reason_cause(kiln_sup_reason_t r)
+{
+    return kiln_sup_reason_cause_in(r, KILN_LANG_EN);
 }

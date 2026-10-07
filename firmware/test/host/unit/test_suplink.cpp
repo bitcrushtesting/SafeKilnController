@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "kiln_check.h"
+#include "kiln_core/faults.h"
 #include "kiln_core/suplink.h"
 
 namespace {
@@ -290,4 +291,143 @@ KILN_TEST(nfr17_suplink_refuses_bad_arguments)
     send(&s, rep(1u, 500.0f));
     kiln_suplink_tick(&s, -5.0f);
     CHECK(kiln_suplink_fresh(&s));
+}
+
+/* --- what the operator is told (R12) ------------------------------------ */
+
+KILN_TEST(ad22_the_reason_reaches_the_operators_vocabulary)
+{
+    kiln_suplink_t s;
+    kiln_suplink_init(&s);
+    kiln_port_supervisor_t sup = {};
+    kiln_suplink_bind_supervisor(&s, &sup);
+
+    sup_report_t r = rep(1u, 1361.0f);
+    r.flags       = (uint8_t)(SUP_FLAG_TRIPPED | SUP_FLAG_TC_VALID | SUP_FLAG_SELFTEST_OK);
+    r.trip_reason = SUP_TRIP_OVERTEMP;
+    send(&s, r);
+
+    kiln_sup_status_t st = {};
+    CHECK(sup.status(sup.ctx, &st));
+    CHECK_EQ_INT(st.reason, KILN_SUP_OVERTEMP);
+    CHECK(st.tripped);
+    CHECK(!st.permitting);
+    CHECK(st.link_ok);
+}
+
+KILN_TEST(ad22_a_silent_supervisor_reads_as_absent_not_as_content)
+{
+    /* The reason the port has its own enum: a supervisor that has gone quiet
+     * cannot report that it is quiet, and the distinction between "the
+     * backstop fired" and "the backstop is missing" is the one an operator
+     * most needs. */
+    kiln_suplink_t s;
+    kiln_suplink_init(&s);
+    kiln_port_supervisor_t sup = {};
+    kiln_suplink_bind_supervisor(&s, &sup);
+
+    kiln_sup_status_t st = {};
+    CHECK(!sup.status(sup.ctx, &st));           /* never heard from */
+    CHECK_EQ_INT(st.reason, KILN_SUP_LINK_DEAD);
+
+    /* Heard, happy, then silent: the last frame said OK and permitting, and
+     * neither may survive the link going away. */
+    send(&s, rep(1u, 600.0f));
+    CHECK(sup.status(sup.ctx, &st));
+    CHECK_EQ_INT(st.reason, KILN_SUP_OK);
+    CHECK(st.permitting);
+
+    for (int i = 0; i < 5; i++) { kiln_suplink_tick(&s, 0.25f); }
+    CHECK(sup.status(sup.ctx, &st));            /* it did speak, once */
+    CHECK_EQ_INT(st.reason, KILN_SUP_LINK_DEAD);
+    CHECK(!st.permitting);
+    CHECK(!st.link_ok);
+}
+
+KILN_TEST(ad22_every_wire_reason_maps_to_one_the_operator_can_read)
+{
+    const struct { sup_trip_reason_t wire; kiln_sup_reason_t shown; } cases[] = {
+        { SUP_TRIP_NONE,         KILN_SUP_OK },
+        { SUP_TRIP_OVERTEMP,     KILN_SUP_OVERTEMP },
+        { SUP_TRIP_TC_FAULT,     KILN_SUP_TC_FAULT },
+        { SUP_TRIP_SENSOR_STALE, KILN_SUP_SENSOR_STALE },
+        { SUP_TRIP_SELF_TEST,    KILN_SUP_SELF_TEST },
+    };
+    for (size_t ci = 0; ci < sizeof(cases) / sizeof(cases[0]); ci++) {
+        const auto &c = cases[ci];
+        kiln_suplink_t s;
+        kiln_suplink_init(&s);
+        sup_report_t r = rep(1u, 500.0f);
+        r.trip_reason = c.wire;
+        send(&s, r);
+        CHECK_EQ_INT(kiln_suplink_reason(&s), c.shown);
+    }
+}
+
+KILN_TEST(ad22_an_unrecognised_wire_reason_is_a_fault_not_an_ok)
+{
+    /* Same protocol version, a reason this build does not know.  Reporting it
+     * as OK would turn a trip into silence. */
+    kiln_suplink_t s;
+    kiln_suplink_init(&s);
+    const sup_report_t r = rep(1u, 500.0f);
+    uint8_t f[SUP_FRAME_BYTES];
+    (void)sup_encode(&r, f, sizeof(f));
+    f[10] = 200u;                               /* not a known reason */
+    const uint16_t crc = sup_crc16(f, 11u);
+    f[11] = (uint8_t)(crc & 0xFFu);
+    f[12] = (uint8_t)(crc >> 8u);
+    kiln_suplink_feed(&s, f, sizeof(f));
+    CHECK_EQ_INT(kiln_suplink_reason(&s), KILN_SUP_TC_FAULT);
+}
+
+KILN_TEST(nfr23_every_supervisor_reason_has_text_in_both_languages)
+{
+    /* The same obligation the fault table carries: a reason with no German is
+     * a screen that falls back to English in front of an operator who does not
+     * read it. */
+    for (int i = 0; i < KILN_SUP_REASON_COUNT; i++) {
+        const kiln_sup_reason_t r = (kiln_sup_reason_t)i;
+        const kiln_lang_t langs[] = { KILN_LANG_EN, KILN_LANG_DE };
+        for (size_t li = 0; li < sizeof(langs) / sizeof(langs[0]); li++) {
+            const char *label = kiln_sup_reason_label_in(r, langs[li]);
+            const char *cause = kiln_sup_reason_cause_in(r, langs[li]);
+            CHECK(label != nullptr && label[0] != '\0');
+            CHECK(cause != nullptr && cause[0] != '\0');
+        }
+        /* And the two languages must actually differ, or the row is a stub. */
+        if (r != KILN_SUP_OK) {
+            CHECK(strcmp(kiln_sup_reason_label_in(r, KILN_LANG_EN),
+                         kiln_sup_reason_label_in(r, KILN_LANG_DE)) != 0);
+        }
+    }
+    /* Out of range is answered, not faulted. */
+    CHECK_STR_EQ(kiln_sup_reason_label_in((kiln_sup_reason_t)99, KILN_LANG_EN), "?");
+}
+
+KILN_TEST(r12_the_link_counters_tell_wiring_apart_from_a_dead_supervisor)
+{
+    /* Bytes discarded while frames still climb is noise or wiring; frames
+     * stopping altogether is a dead supervisor.  The field needs both.
+     *
+     * Bytes rather than a frame count because resynchronisation slides a
+     * window: in noise there are no frame boundaries to count. */
+    kiln_suplink_t s;
+    kiln_suplink_init(&s);
+    kiln_port_supervisor_t sup = {};
+    kiln_suplink_bind_supervisor(&s, &sup);
+
+    for (uint8_t i = 1u; i <= 5u; i++) {
+        send(&s, rep(i, 500.0f));
+        /* a corrupt frame between each good one */
+        uint8_t f[SUP_FRAME_BYTES];
+        const sup_report_t r = rep((uint8_t)(i + 100u), 500.0f);
+        (void)sup_encode(&r, f, sizeof(f));
+        f[4] ^= 0x01u;   /* corrupt it */
+        kiln_suplink_feed(&s, f, sizeof(f));
+    }
+    kiln_sup_status_t st = {};
+    CHECK(sup.status(sup.ctx, &st));
+    CHECK_EQ_UINT(st.frames, 5u);
+    CHECK(st.discarded > 0u);
 }

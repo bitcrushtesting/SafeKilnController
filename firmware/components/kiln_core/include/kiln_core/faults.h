@@ -17,6 +17,7 @@
 #define KILN_CORE_FAULTS_H
 
 #include "kiln/types.h"
+#include "kiln_ports/port_supervisor.h"
 
 /* Short label, fits the 128 px display. */
 const char *kiln_fault_label(kiln_fault_t code);
@@ -37,6 +38,17 @@ static inline uint16_t kiln_warn_code(kiln_warn_bit_t bit)
 }
 
 const char *kiln_state_label(kiln_state_t state);
+
+/* --- the independent supervisor (AD-22) ---------------------------------
+ *
+ * Why the supervisor stopped the kiln, in the operator's language.  Separate
+ * from the fault table because these are not this firmware's faults: the
+ * supervisor acted on its own, and the operator needs to be told that the
+ * button on the panel is what clears it, not the usual acknowledgement. */
+const char *kiln_sup_reason_label(kiln_sup_reason_t r);
+const char *kiln_sup_reason_label_in(kiln_sup_reason_t r, kiln_lang_t lang);
+const char *kiln_sup_reason_cause(kiln_sup_reason_t r);
+const char *kiln_sup_reason_cause_in(kiln_sup_reason_t r, kiln_lang_t lang);
 
 /* The BCP-47-ish tag for a language, for the API and the HTML lang attribute. */
 const char *kiln_lang_tag(kiln_lang_t lang);

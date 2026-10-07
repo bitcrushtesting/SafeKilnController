@@ -28,6 +28,7 @@
 #define KILN_HMI_H
 
 #include "kiln/types.h"
+#include "kiln_core/faults.h"
 #include "kiln_hmi/draw.h"
 #include "kiln_ports/port_input.h"
 
@@ -58,6 +59,14 @@ typedef struct {
 
     kiln_fault_t    fault;
     uint32_t        warnings;        /* KILN_WARN_BIT mask */
+
+    /* AD-22.  The supervisor acts on its own, so when it is the reason the
+     * kiln stopped, the fault screen has to say so: its latch is cleared by
+     * the button on the panel and not by the acknowledgement the operator has
+     * learned for every other fault. */
+    bool              sup_fitted;
+    kiln_sup_reason_t sup_reason;
+    bool              sup_tripped;
     kiln_lang_t     language;        /* NFR-23, FR-HMI-15  */
     bool            fahrenheit;      /* FR-HMI-13          */
 

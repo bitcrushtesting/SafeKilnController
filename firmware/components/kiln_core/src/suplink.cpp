@@ -92,12 +92,14 @@ void kiln_suplink_feed(kiln_suplink_t *s, const uint8_t *data, size_t len)
                  * frame; discarding it is what stops a buffer of noise
                  * wedging this loop. */
                 if (skip > 0u && skip <= s->rx_len) {
+                    s->discarded += (uint32_t)skip;
                     memmove(s->rx, &s->rx[skip], s->rx_len - skip);
                     s->rx_len -= skip;
                 }
                 break;
             }
-            s->crc_errors += (uint32_t)(skip / SUP_FRAME_BYTES);
+            /* Whatever sat in front of the accepted frame was noise. */
+            s->discarded += (uint32_t)skip;
             memmove(s->rx, &s->rx[used], s->rx_len - used);
             s->rx_len -= used;
 
@@ -127,6 +129,7 @@ void kiln_suplink_feed(kiln_suplink_t *s, const uint8_t *data, size_t len)
         if (s->rx_len == sizeof(s->rx)) {
             /* Full and still no frame: keep the tail that could start one. */
             const size_t keep = SUP_FRAME_BYTES - 1u;
+            s->discarded += (uint32_t)(s->rx_len - keep);
             memmove(s->rx, &s->rx[s->rx_len - keep], keep);
             s->rx_len = keep;
         }
@@ -159,6 +162,70 @@ bool kiln_suplink_status(const kiln_suplink_t *s, sup_report_t *out)
     }
     *out = s->last;
     return true;
+}
+
+kiln_sup_reason_t kiln_suplink_reason(const kiln_suplink_t *s)
+{
+    if (s == nullptr) {
+        return KILN_SUP_LINK_DEAD;
+    }
+    /* Never heard from, or heard from and then not: both are a dead link, and
+     * neither can be reported by the supervisor itself, which is why this
+     * reason exists on this side only.  It is checked first because a stale
+     * frame's trip reason describes the past. */
+    if (!s->have || !kiln_suplink_fresh(s)) {
+        return KILN_SUP_LINK_DEAD;
+    }
+    switch (s->last.trip_reason) {
+    case SUP_TRIP_NONE:         return KILN_SUP_OK;
+    case SUP_TRIP_OVERTEMP:     return KILN_SUP_OVERTEMP;
+    case SUP_TRIP_TC_FAULT:     return KILN_SUP_TC_FAULT;
+    case SUP_TRIP_SENSOR_STALE: return KILN_SUP_SENSOR_STALE;
+    case SUP_TRIP_SELF_TEST:    return KILN_SUP_SELF_TEST;
+    case SUP_TRIP_COUNT:
+    default:
+        /* A reason this firmware does not know about, from a supervisor
+         * speaking the same version.  Reported as a fault rather than as OK:
+         * an unrecognised trip is still a trip. */
+        return KILN_SUP_TC_FAULT;
+    }
+}
+
+namespace {
+
+bool sl_status(void *ctx, kiln_sup_status_t *out)
+{
+    const kiln_suplink_t *s = static_cast<const kiln_suplink_t *>(ctx);
+    if ((s == nullptr) || (out == nullptr)) {
+        return false;
+    }
+    const kiln_sup_status_t zero = {};
+    *out = zero;
+    out->reason     = kiln_suplink_reason(s);
+    out->link_ok    = kiln_suplink_fresh(s);
+    out->frames     = s->frames;
+    out->discarded  = s->discarded;
+    out->repeats    = s->repeats;
+    if (s->have) {
+        out->permitting = (s->last.flags & SUP_FLAG_PERMIT) != 0u;
+        out->tripped    = (s->last.flags & SUP_FLAG_TRIPPED) != 0u;
+    }
+    /* A dead link is not a permission, whatever the last frame said. */
+    if (!out->link_ok) {
+        out->permitting = false;
+    }
+    return s->have;
+}
+
+}  // namespace
+
+void kiln_suplink_bind_supervisor(kiln_suplink_t *s, kiln_port_supervisor_t *out)
+{
+    if ((s == nullptr) || (out == nullptr)) {
+        return;
+    }
+    out->ctx    = s;
+    out->status = sl_status;
 }
 
 void kiln_suplink_bind(kiln_suplink_t *s, kiln_port_tc_t *out)

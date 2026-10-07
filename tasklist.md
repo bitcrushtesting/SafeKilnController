@@ -48,7 +48,7 @@ reused: gaps in the numbering are items that have been closed.
 | [O](#o-wifi-fr-net) | WiFi | 3 |
 | [P](#p-http-transport-and-the-api) | HTTP transport and the API | 4 |
 | [Q](#q-the-file-store-ad-21) | The file store | 5 |
-| [R](#r-the-independent-safety-supervisor-ad-22) | Independent safety supervisor | 8 |
+| [R](#r-the-independent-safety-supervisor-ad-22) | Independent safety supervisor | 7 |
 
 ---
 
@@ -687,15 +687,6 @@ either the supervisor's pin count or a requirement.
   integer tenths, so nothing in the path actually requires a float: the
   backstop comparison could be done in raw LSBs. Smaller, more deterministic,
   and it removes a library dependency from a safety function.
-
-- [ ] **R12. The supervisor's state needs surfacing to the operator.**
-  `kiln_suplink_status` exposes the trip reason, the permit flag and the latch,
-  and nothing consumes it yet. When the supervisor trips, the HMI and the API
-  should be able to say *which* of the two conditions it was rather than only
-  reporting a thermocouple fault, which is what the core currently infers. Also
-  worth surfacing: the link counters, since a rising CRC count with frames
-  still arriving is a wiring problem and silence is a dead supervisor, and
-  those want telling apart in the field.
 
 - [ ] **R8. The supervisor's firmware, and its own test strategy.** Small
   enough to read in one sitting, which is a design constraint and not an

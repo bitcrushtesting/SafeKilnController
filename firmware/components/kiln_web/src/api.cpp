@@ -287,6 +287,29 @@ void write_status(kiln_api_ctx_t *ctx, kiln_json_t *j)
     kiln_json_kv_str(j, "state", kiln_state_label((kiln_state_t)s.state));
     kiln_json_kv_uint(j, "state_code", s.state);
 
+    /* AD-22.  Reported whenever a supervisor is fitted, not only when it has
+     * tripped: "no supervisor" is a thing a client needs to be able to see,
+     * and it is the absence of the backstop rather than its action. */
+    if (a->ports.supervisor != nullptr && a->ports.supervisor->status != nullptr) {
+        kiln_sup_status_t sup = {};
+        const bool heard = a->ports.supervisor->status(a->ports.supervisor->ctx, &sup);
+        kiln_json_key(j, "supervisor");
+        kiln_json_obj_open(j);
+        kiln_json_kv_bool(j, "heard", heard);
+        kiln_json_kv_bool(j, "link_ok", sup.link_ok);
+        kiln_json_kv_bool(j, "permitting", sup.permitting);
+        kiln_json_kv_bool(j, "tripped", sup.tripped);
+        /* The code is the stable thing to key on; the text is a courtesy in
+         * the configured language, as for faults and warnings. */
+        kiln_json_kv_uint(j, "reason_code", (unsigned long long)sup.reason);
+        kiln_json_kv_str(j, "reason", kiln_sup_reason_label_in(sup.reason, (kiln_lang_t)a->cfg.language));
+        kiln_json_kv_str(j, "message", kiln_sup_reason_cause_in(sup.reason, (kiln_lang_t)a->cfg.language));
+        kiln_json_kv_uint(j, "frames", sup.frames);
+        kiln_json_kv_uint(j, "discarded", sup.discarded);
+        kiln_json_kv_uint(j, "repeats", sup.repeats);
+        kiln_json_obj_close(j);
+    }
+
     /* FR-WEB-25 depends on the client being able to tell stale from current, so
      * validity travels with the value rather than being inferred from it. */
     kiln_json_key(j, "kiln_c");

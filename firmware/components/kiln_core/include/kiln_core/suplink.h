@@ -33,6 +33,7 @@
 
 #include "kiln/err.h"
 #include "kiln/types.h"
+#include "kiln_ports/port_supervisor.h"
 #include "kiln_ports/port_tc.h"
 #include "sup_proto.h"
 
@@ -62,12 +63,12 @@ typedef struct {
     float        since_s;       /* since the last frame with a new seq */
 
     /* Diagnostics.  FR-NET-09 asks for link counters and these are the
-     * supervisor link's equivalent; a rising crc count with frames still
-     * arriving is a wiring problem, not a dead supervisor. */
+     * supervisor link's equivalent: bytes discarded while frames still arrive
+     * is noise or wiring, frames stopping is a dead supervisor. */
     uint32_t     frames;
-    uint32_t     crc_errors;
+    uint32_t     discarded;     /* bytes dropped without forming a frame */
     uint32_t     version_errors;
-    uint32_t     repeats;       /* a frame whose seq had not advanced */
+    uint32_t     repeats;       /* a frame whose seq had not advanced    */
 } kiln_suplink_t;
 
 void kiln_suplink_init(kiln_suplink_t *s);
@@ -88,5 +89,14 @@ bool kiln_suplink_status(const kiln_suplink_t *s, sup_report_t *out);
 
 /* Bind as the chamber thermocouple port. */
 void kiln_suplink_bind(kiln_suplink_t *s, kiln_port_tc_t *out);
+
+/* Bind as the supervisor status port, so the HMI and the API can say which
+ * condition tripped rather than only that a thermocouple is unhappy. */
+void kiln_suplink_bind_supervisor(kiln_suplink_t *s, kiln_port_supervisor_t *out);
+
+/* The wire reason translated into the operator's vocabulary, with the one
+ * reason the wire cannot carry (a silent supervisor) inferred from staleness.
+ * Exposed for its own test. */
+kiln_sup_reason_t kiln_suplink_reason(const kiln_suplink_t *s);
 
 #endif /* KILN_CORE_SUPLINK_H */

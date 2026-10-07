@@ -45,6 +45,7 @@
 #include "kiln_core/window.h"
 #include "kiln_ports/port_alarm.h"
 #include "kiln_ports/port_door.h"
+#include "kiln_ports/port_supervisor.h"
 #include "kiln_ports/port_counters.h"
 #include "kiln_ports/port_current.h"
 #include "kiln_ports/port_clock.h"
@@ -64,6 +65,11 @@ typedef struct {
     const kiln_port_counters_t *counters;   /* optional */
     const kiln_port_alarm_t    *alarm;      /* optional */
     const kiln_port_door_t     *door;       /* optional: SR-31, warning 113 */
+    /* AD-22.  Optional, and reporting only: the supervisor's authority is a
+     * series element in the coil, not anything this firmware consults.  What
+     * this port is for is being able to tell the operator *which* condition
+     * tripped, and that the button on the panel is what clears it. */
+    const kiln_port_supervisor_t *supervisor;
 
     /* Persistence (M5).  All optional: FR-LOG-14 requires the firing to
      * continue with a warning when the log store is unavailable, and the same

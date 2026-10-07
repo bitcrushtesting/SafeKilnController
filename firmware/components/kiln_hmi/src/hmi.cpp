@@ -129,16 +129,30 @@ void draw_fault(kiln_hmi_t *h, const kiln_hmi_view_t *v)
      * every other screen is a fault screen somebody walks past. */
     kiln_fb_fill(&h->fb, 0, 0, KILN_DISPLAY_W, 12, true);
 
+    /* AD-22: when the supervisor is the reason, say so on the banner and show
+     * *its* instruction instead of the controller's.  The two are cleared
+     * differently -- the supervisor's by the button on the panel -- and an
+     * operator shown the wrong instruction will press the wrong thing. */
+    const bool sup_blame = v->sup_fitted && v->sup_tripped
+                        && (v->sup_reason != KILN_SUP_OK);
+
     char buf[40];
-    (void)snprintf(buf, sizeof(buf), "FAULT %u", (unsigned)v->fault);
+    if (sup_blame) {
+        (void)snprintf(buf, sizeof(buf), "SUPERVISOR");
+    } else {
+        (void)snprintf(buf, sizeof(buf), "FAULT %u", (unsigned)v->fault);
+    }
     kiln_fb_text(&h->fb, 2, 2, buf, 1, false);
     kiln_fb_text_right(&h->fb, KILN_DISPLAY_W - 2, 2,
-                       kiln_fault_label_in(v->fault, v->language), 1);
+                       sup_blame ? kiln_sup_reason_label_in(v->sup_reason, v->language)
+                                 : kiln_fault_label_in(v->fault, v->language), 1);
 
     /* The cause, wrapped to the panel.  Word wrapping rather than hard cuts:
      * these sentences are the operator's instructions, and a word split across
      * two lines in a hurry reads as a different word. */
-    const char *cause = kiln_fault_cause_in(v->fault, v->language);
+    const char *cause = sup_blame
+                      ? kiln_sup_reason_cause_in(v->sup_reason, v->language)
+                      : kiln_fault_cause_in(v->fault, v->language);
     const int   cols  = KILN_DISPLAY_W / 6;
     int         y     = 16;
     while ((*cause != '\0') && y < (KILN_DISPLAY_H - 8)) {

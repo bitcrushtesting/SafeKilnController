@@ -68,6 +68,7 @@ kiln_port_flash_t    s_flash;
 kiln_port_flash_t    s_fs_flash;
 kiln_fileslots_t     s_fileslots;
 kiln_suplink_t       s_suplink;
+kiln_port_supervisor_t s_sup_port;
 kiln_port_kvstore_t  s_kv;
 kiln_port_clock_t    s_clock;
 kiln_port_system_t   s_system;
@@ -473,6 +474,15 @@ void hmi_build_view(kiln_hmi_view_t *v)
     v->energy_wh  = kiln_app_energy_wh(&s_app);
     v->kp = s_app.cfg.kp; v->ki = s_app.cfg.ki; v->kd = s_app.cfg.kd;
 
+    /* AD-22: so the fault screen can show the supervisor's own instruction,
+     * which names the button on the panel rather than the acknowledgement the
+     * operator has learned for every other fault. */
+    kiln_sup_status_t sup = {};
+    v->sup_fitted = (s_sup_port.status != nullptr)
+                 && s_sup_port.status(s_sup_port.ctx, &sup);
+    v->sup_reason  = sup.reason;
+    v->sup_tripped = sup.tripped || !sup.link_ok;
+
     kiln_fw_info_t fw = {};
     if (s_system.fw_info != NULL) {
         (void)s_system.fw_info(s_system.ctx, &fw);
@@ -669,6 +679,11 @@ extern "C" void app_main(void)
     kiln_suplink_init(&s_suplink);
     kiln_suplink_bind(&s_suplink, &s_tc_port);
     ports.tc = &s_tc_port;
+    /* Reporting only: the supervisor's authority is a series element in the
+     * coil, not anything this firmware consults.  This is so the panel and the
+     * API can say which condition tripped. */
+    kiln_suplink_bind_supervisor(&s_suplink, &s_sup_port);
+    ports.supervisor = &s_sup_port;
     if (kiln_hal_suplink_init() != KILN_OK) {
         ESP_LOGE(TAG, "supervisor link did not come up: no chamber temperature, "
                       "so no heat");
