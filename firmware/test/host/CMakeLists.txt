@@ -54,6 +54,7 @@ endfunction()
 
 kiln_add_test(test_pid         unit/test_pid.cpp)
 kiln_add_test(test_window      unit/test_window.cpp)
+kiln_add_test(test_suplink     unit/test_suplink.cpp)
 kiln_add_test(test_tempfilt    unit/test_tempfilt.cpp)
 kiln_add_test(test_setpoint    unit/test_setpoint.cpp)
 kiln_add_test(test_profile     unit/test_profile.cpp)

@@ -83,6 +83,27 @@ constexpr int KILN_PIN_ENC_A = 16;
 constexpr int KILN_PIN_ENC_B = 17;
 constexpr int KILN_PIN_ENC_BTN = 15;
 
+/* --- the supervisor link (AD-22) ---------------------------------------
+ *
+ * One wire, receive only.  The supervisor transmits at 10 Hz and is told
+ * nothing, so no TX pin is assigned here or bound in the UART driver: the
+ * simplex link is structural at both ends rather than conventional at one.
+ *
+ * IO47 because it is free on every ESP32-S3-WROOM-1 variant, is not a
+ * strapping pin (those are IO0, IO3, IO45, IO46 and the supervisor's TX idles
+ * high, which would hold a strap through boot), is not JTAG (IO39 to IO42),
+ * and is neither USB nor the console.  IO35 to IO37 were avoided because the
+ * octal-PSRAM module variants consume them internally.
+ *
+ * The line needs a 10k pull-up to 3V3 at this end: the supervisor's TX is
+ * high-impedance between its reset and the moment it configures the pin, and
+ * permanently so if it is absent.  Idling high is the UART's idle state, so an
+ * absent supervisor presents as silence, which kiln_suplink already treats as
+ * a comms fault.  Without the pull-up it presents as noise, which looks like a
+ * different fault. */
+constexpr int KILN_PIN_SUP_RX = 47;
+constexpr int KILN_HAL_SUP_UART = 1;   /* UART0 is the console */
+
 /* --- expansion --------------------------------------------------------- */
 constexpr int KILN_PIN_EXP_IO2 = 2;
 constexpr int KILN_PIN_EXP_IO42 = 42;

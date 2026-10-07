@@ -67,6 +67,16 @@ kiln_err_t kiln_hal_tc_bus_init(void);
 /* One MAX31856: `which` is 0 for the chamber and 1 for the enclosure. */
 kiln_err_t kiln_hal_tc_init(uint8_t which, kiln_port_tc_t *out);
 
+/* --- the supervisor link (AD-22) ----------------------------------------
+ *
+ * The chamber thermocouple is the supervisor's, and arrives over a one-wire
+ * serial link.  These two move bytes and nothing else: what the bytes mean is
+ * kiln_core/suplink's problem, where a host test can reach it.
+ *
+ * Receive only; no transmit pin is bound to the peripheral. */
+kiln_err_t kiln_hal_suplink_init();
+size_t     kiln_hal_suplink_read(uint8_t *out, size_t cap);
+
 /* SSR channels and the heat-enable charge pump.  Read the banner in
  * hal_heat.cpp before touching enable_refresh: AD-05 and SR-02 rest on it. */
 void kiln_hal_heat_init(kiln_port_heat_t *out);

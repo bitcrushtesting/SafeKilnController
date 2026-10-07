@@ -39,13 +39,13 @@
  * 13 bytes at 10 Hz is 130 B/s, which is nothing at 115200 baud.  Fixed length
  * means there is no length field to be wrong about, and the receiver resyncs by
  * sliding a window until the CRC checks rather than trusting the SOF alone. */
-#define SUP_FRAME_BYTES 13u
-#define SUP_SOF         0xA5u
-#define SUP_VERSION     1u
+constexpr size_t  SUP_FRAME_BYTES = 13u;
+constexpr uint8_t SUP_SOF         = 0xA5u;
+constexpr uint8_t SUP_VERSION     = 1u;
 
 /* Temperatures travel as tenths of a degree, the same encoding the log record
  * uses, so the two never need converting between each other. */
-#define SUP_TEMP_SCALE  10.0f
+constexpr float SUP_TEMP_SCALE = 10.0f;
 
 /* Reported in every frame, including after a trip: the supervisor keeps talking
  * so the ESP32 can say *why* the heat went away. */
@@ -58,10 +58,13 @@ typedef enum {
     SUP_TRIP_COUNT
 } sup_trip_reason_t;
 
-#define SUP_FLAG_PERMIT      (1u << 0) /* supervisor is permitting heat now   */
-#define SUP_FLAG_TRIPPED     (1u << 1) /* latched; needs a local clear        */
-#define SUP_FLAG_TC_VALID    (1u << 2) /* chamber reading is usable           */
-#define SUP_FLAG_SELFTEST_OK (1u << 3)
+/* uint32_t, not the uint8_t field they live in: a narrower constant promotes
+ * to *int* before a bitwise operator, so composing a mask would be signed
+ * arithmetic.  Same reasoning as the KILN_TC_FAULT_* masks in kiln/types.h. */
+constexpr uint32_t SUP_FLAG_PERMIT      = 1u << 0u; /* permitting heat now     */
+constexpr uint32_t SUP_FLAG_TRIPPED     = 1u << 1u; /* latched; local clear    */
+constexpr uint32_t SUP_FLAG_TC_VALID    = 1u << 2u; /* reading is usable       */
+constexpr uint32_t SUP_FLAG_SELFTEST_OK = 1u << 3u;
 
 typedef struct {
     uint8_t           version;

@@ -20,7 +20,7 @@ sup_report_t sample()
     r.chamber_c   = 1234.5f;
     r.cj_c        = 28.3f;
     r.fault_bits  = 0u;
-    r.flags       = SUP_FLAG_PERMIT | SUP_FLAG_TC_VALID | SUP_FLAG_SELFTEST_OK;
+    r.flags = (uint8_t)(SUP_FLAG_PERMIT | SUP_FLAG_TC_VALID | SUP_FLAG_SELFTEST_OK);
     r.trip_reason = SUP_TRIP_NONE;
     return r;
 }
@@ -160,7 +160,7 @@ KILN_TEST(ad22_temperatures_saturate_rather_than_wrap_and_survive_a_nan)
 KILN_TEST(ad22_a_trip_is_still_reported_so_the_other_side_can_say_why)
 {
     sup_report_t r = sample();
-    r.flags       = SUP_FLAG_TRIPPED | SUP_FLAG_TC_VALID | SUP_FLAG_SELFTEST_OK;
+    r.flags = (uint8_t)(SUP_FLAG_TRIPPED | SUP_FLAG_TC_VALID | SUP_FLAG_SELFTEST_OK);
     r.trip_reason = SUP_TRIP_OVERTEMP;
     r.chamber_c   = 1361.2f;
 

@@ -9,19 +9,36 @@
 namespace {
 
 /* Tenths of a degree, saturating, and NaN-safe: a non-finite reading must not
- * reach the cast, which is undefined for it. */
+ * reach the cast, which is undefined for it.
+ *
+ * The NaN test comes first and on its own.  Folding it into the range check
+ * relies on a NaN failing every comparison, which is true and is exactly the
+ * kind of cleverness that gets simplified away by someone who does not know
+ * why it was written. */
+constexpr float   ENC_LIMIT_C = 3276.7f;
+constexpr int16_t ENC_SAT_HI  = 32767;
+constexpr int16_t ENC_SAT_LO  = -32767;
+
 int16_t enc_temp(float c)
 {
-    if (!(c > -3276.7f && c < 3276.7f)) {   /* false for NaN, by construction */
-        return (c > 0.0f) ? 32767 : (isnan(c) ? 0 : -32767);
+    if (isnan(c)) {
+        return 0;               /* a defined value; not a hot kiln */
     }
-    return (int16_t)lroundf(c * SUP_TEMP_SCALE);
+    if (c > ENC_LIMIT_C) {
+        return ENC_SAT_HI;
+    }
+    if (c < -ENC_LIMIT_C) {
+        return ENC_SAT_LO;
+    }
+    return static_cast<int16_t>(lroundf(c * SUP_TEMP_SCALE));
 }
 
 void put_u16(uint8_t *p, uint16_t v)
 {
-    p[0] = (uint8_t)(v & 0xFFu);
-    p[1] = (uint8_t)((v >> 8u) & 0xFFu);
+    /* Widened first: a uint16_t promotes to int before it is shifted. */
+    const uint32_t w = v;
+    p[0] = (uint8_t)(w & 0xFFu);
+    p[1] = (uint8_t)((w >> 8u) & 0xFFu);
 }
 
 uint16_t get_u16(const uint8_t *p)

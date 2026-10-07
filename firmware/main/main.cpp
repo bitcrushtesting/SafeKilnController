@@ -24,6 +24,7 @@
 #include "kiln_app/run_index.h"
 #include "kiln_core/faults.h"
 #include "kiln_core/fileslots.h"
+#include "kiln_core/suplink.h"
 #include "kiln_core/logring.h"
 #include "kiln_core/profile.h"
 #include "kiln_hal/hal_esp32s3.h"
@@ -66,6 +67,7 @@ kiln_app_t s_app;
 kiln_port_flash_t    s_flash;
 kiln_port_flash_t    s_fs_flash;
 kiln_fileslots_t     s_fileslots;
+kiln_suplink_t       s_suplink;
 kiln_port_kvstore_t  s_kv;
 kiln_port_clock_t    s_clock;
 kiln_port_system_t   s_system;
@@ -157,6 +159,21 @@ void acquire_task(void *arg)
     const TickType_t period = pdMS_TO_TICKS(ACQUIRE_PERIOD_MS);
 
     for (;;) {
+        /* Drain the supervisor link first, so the acquisition cycle reads a
+         * reading from this cycle and not the previous one.  Non-blocking:
+         * whatever has arrived is taken, and the staleness timer in
+         * kiln_core/suplink is what notices when that is nothing.
+         *
+         * Pumped here, at 4 Hz, because that is FR-ACQ-03's acquisition rate
+         * and the supervisor's 10 Hz report gives 2.5 frames per cycle of
+         * margin.  KILN_SUPLINK_STALE_S is sized against this period. */
+        uint8_t rx[64];
+        size_t  got;
+        while ((got = kiln_hal_suplink_read(rx, sizeof(rx))) > 0u) {
+            kiln_suplink_feed(&s_suplink, rx, got);
+        }
+        kiln_suplink_tick(&s_suplink, (float)ACQUIRE_PERIOD_MS / 1000.0f);
+
         kiln_app_acquire_cycle(&s_app, (float)ACQUIRE_PERIOD_MS / 1000.0f * TIME_ACCEL);
         vTaskDelayUntil(&next, period);
     }
@@ -642,14 +659,23 @@ extern "C" void app_main(void)
     kiln_hal_heat_init(&s_heat_port);
     ports.heat = &s_heat_port;
 
-    /* Two MAX31856 on one bus with separate chip selects (HR-02).  The chamber
-     * is required; the enclosure is optional, and SR-11 stands down without it
-     * rather than refusing to run. */
-    if (kiln_hal_tc_init(0, &s_tc_port) == KILN_OK) {
-        ports.tc = &s_tc_port;
-    } else {
-        ESP_LOGE(TAG, "chamber thermocouple front end did not answer");
+    /* AD-22: the chamber thermocouple is the supervisor's.  This firmware does
+     * not read that front end and cannot configure it; the reading arrives
+     * over a one-wire serial link and is bound as the chamber port, so nothing
+     * in the core knows the difference.
+     *
+     * A link that never comes up, or that goes quiet, presents to the core as
+     * KILN_TC_FAULT_COMMS, which is what SR-04 already handles. */
+    kiln_suplink_init(&s_suplink);
+    kiln_suplink_bind(&s_suplink, &s_tc_port);
+    ports.tc = &s_tc_port;
+    if (kiln_hal_suplink_init() != KILN_OK) {
+        ESP_LOGE(TAG, "supervisor link did not come up: no chamber temperature, "
+                      "so no heat");
     }
+
+    /* The enclosure channel is still this firmware's own MAX31856 (HR-02), and
+     * is optional: SR-11 stands down without it rather than refusing to run. */
     if (kiln_hal_tc_init(1, &s_case_tc_port) == KILN_OK) {
         ports.case_tc = &s_case_tc_port;
     } else {
