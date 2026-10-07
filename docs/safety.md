@@ -12,7 +12,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 | **Version** | 0.1 (draft) |
 | **Date** | 2026-10-05 |
 | **Status** | For review |
-| **Derives from** | [`requirements.md`](requirements.md) v0.1, [`architecture.md`](architecture.md) v0.1 |
+| **Derives from** | [`requirements.sdoc`](requirements.sdoc) v0.1, [`architecture.md`](architecture.md) v0.1 |
 | **License** | GPL-3.0-or-later |
 
 ---
@@ -22,14 +22,14 @@ SPDX-License-Identifier: GPL-3.0-or-later
 > conformity, a functional-safety assessment to IEC 61508 or ISO 13849, and it
 > does not assign a SIL or a performance level. An **independent hardware
 > over-temperature cutout is required** in every installation
-> ([HR-13](requirements.md#6-hardware-interface-requirements)), mains wiring must
+> ([HR-13](requirements.sdoc)), mains wiring must
 > be carried out by a competent person in accordance with local regulation [R6],
 > and the kiln must not be fired unattended
-> ([ASM-06](requirements.md#9-assumptions)). See [§9](#9-limitations-and-obligations).
+> ([ASM-06](requirements.sdoc)). See [§9](#9-limitations-and-obligations).
 
 ## 1. Purpose and scope
 
-[`requirements.md` §5](requirements.md#5-safety-requirements) states *what* the
+[`requirements.sdoc` §5](requirements.sdoc) states *what* the
 system must detect and do. [`architecture.md` §8](architecture.md#8-safety-subsystem)
 states *how* the software is built to do it. This document supplies the layer
 between them: the hazards being defended against, the safety goals derived from
@@ -44,7 +44,7 @@ code:
 3. What is left over, and who is responsible for it?
 
 Identifiers introduced here extend the scheme of
-[requirements §1.4](requirements.md#14-requirement-conventions):
+[requirements §1.4](requirements.sdoc):
 
 | Prefix | Meaning |
 |---|---|
@@ -94,7 +94,7 @@ its conditioning, and the annunciation.
 **Outside the boundary, but relied upon.** The supply protection, the
 independent cutout, the kiln's own construction and the operator. Each is the
 subject of an assumption in
-[requirements §9](requirements.md#9-assumptions), and every assumption that is
+[requirements §9](requirements.sdoc), and every assumption that is
 load-bearing for a safety goal is identified as such in [§6](#6-independence)
 and [§9](#9-limitations-and-obligations). An assumption that is wrong in the
 field is a defeated protection layer, which is why they are listed rather than
@@ -272,7 +272,7 @@ Outside this project entirely: its own sensor, its own contacts, in the safety
 chain ahead of everything the controller drives (`HR-13`). It is **mandatory**,
 not advisory, and it is the only layer that is unaffected by a design error
 anywhere in L1–L4. The project does not propose to replace it, and
-[requirements §12](requirements.md#12-out-of-scope) places doing so explicitly
+[requirements §12](requirements.sdoc) places doing so explicitly
 out of scope.
 
 ### 5.6 L6, Installation and operator
@@ -430,7 +430,7 @@ reached by convenience:
 
 Every fault carries a unique, stable numeric code with a human-readable cause,
 presented on both the display and the web interface and documented in
-[requirements appendix A](requirements.md#appendix-a--fault-code-allocation)
+[requirements appendix A](requirements.sdoc)
 (`SR-19`). Codes are never reused.
 
 ## 8. Residual risk
@@ -441,7 +441,7 @@ it.
 | ID | Residual risk | Why it remains | Carried by | Mitigation in place |
 |---|---|---|---|---|
 | **RR-01** | **Welded contactor with a shorted SSR.** Both series devices conducting leaves the controller with no means of interrupting the heater circuit. | There is no third interrupting device inside the boundary. | **L5 cutout and the operator.** | `SR-27` discriminates the case within ~4 s and latches fault 22, whose operator instruction is to isolate at the supply; the alarm sounds; `SR-30` warns of the intermittent mismatches that precede outright relay failure. |
-| **RR-02** | **A three-phase kiln cannot be fired safely with this controller.** It measures one phase, so a fault on either of the other two would be caught only by the thermal backstop, slowly, and the power and energy figures would cover a third of the load. | Three-phase support was dropped on 2026-10-06 rather than half-built, because partial electrical cover is the kind that gets trusted. | The installer, who must not fit this controller to a three-phase kiln. | Stated as out of scope in the README, in [requirements §12](requirements.md#12-out-of-scope) and in `ASM-10`, rather than left as a limitation to be discovered. The thermal rules still protect a single-phase kiln in full. |
+| **RR-02** | **A three-phase kiln cannot be fired safely with this controller.** It measures one phase, so a fault on either of the other two would be caught only by the thermal backstop, slowly, and the power and energy figures would cover a third of the load. | Three-phase support was dropped on 2026-10-06 rather than half-built, because partial electrical cover is the kind that gets trusted. | The installer, who must not fit this controller to a three-phase kiln. | Stated as out of scope in the README, in [requirements §12](requirements.sdoc) and in `ASM-10`, rather than left as a limitation to be discovered. The thermal rules still protect a single-phase kiln in full. |
 | **RR-03** | **A CT fitted to the wrong conductor, or clipped around two conductors** (net current ≈ 0) makes the entire electrical channel blind or makes it trip on every run. | The controller cannot tell a correctly fitted CT reading zero from a wrongly fitted one. | The installer. | Commissioning verifies a plausible reference current before the first firing; `FR-CUR-11` distinguishes "no signal at all" from "zero current"; a disabled or failed channel raises warning 111 continuously rather than going quiet. |
 | **RR-04** | **A systematic error in the safety rules themselves**: a wrong threshold, an inverted comparison, a timer that never advances, is not caught by L2 or L3, since both would be working as written. | L3 checks liveness, not correctness. | The project, through verification. | 100 % of safety decision branches covered by automated host tests (`TR-19`); every `SR` covered by at least one automated test, inspection alone insufficient (`TR-23`); rules are pure functions driven directly by tests (`TR-09`); CI blocks merge on any failure (`TR-24`). **L5 remains the only protection genuinely independent of this risk.** |
 | **RR-05** | **Common-cause failure of the MCU and its rails** defeats L2, L3 and L4 together. | One MCU, one supply. | The design, by choice. | Every one of those layers fails *towards* de-energised, so the common-cause outcome is the safe state rather than an unsafe one. L5 is unaffected. |
@@ -459,7 +459,7 @@ it.
   third-party assessment. This document is engineering reasoning, not evidence
   of conformity.
 - **Not a replacement for the independent over-temperature cutout.** Explicitly
-  out of scope ([requirements §12](requirements.md#12-out-of-scope)).
+  out of scope ([requirements §12](requirements.sdoc)).
 - **Not a substitute for competent mains installation**, correct supply
   protection, or correctly sized contactors and conductors.
 - **Not designed for unattended firing.**
@@ -484,7 +484,7 @@ it.
 | The heat-enable charge pump must stay a **software-generated** square wave. Never a static GPIO, never a hardware PWM peripheral. | `AD-05`, `HR-07`, [§5.3](#53-l3--the-heat-authority-hardware) |
 | Heat authority stays in one place, the safety supervisor, and no other code path may grant it. | `AD-04` |
 | A door interlock is hardware first and software second: `SR-31` latches and annunciates, `HR-21`'s series wiring is what actually interrupts. Do not let the software rule become the justification for dropping the wiring. | `HR-21`, `AD-05` |
-| The thermal rules and the current rules are both load-bearing. Neither may be removed because the other exists. | [§6](#6-independence), [requirements §5.2](requirements.md#52-detection-requirements) |
+| The thermal rules and the current rules are both load-bearing. Neither may be removed because the other exists. | [§6](#6-independence), [requirements §5.2](requirements.sdoc) |
 | A new fault code must be given an explicit clearability decision; it does not inherit one. | [§7.4](#74-reaction-and-recovery) |
 | **No part of this project may be described as MISRA-compliant.** `clang-tidy` implements no MISRA checks in any release; the `hicpp-*` module that approximated High Integrity C++ is gone from LLVM; cppcheck's free addon is MISRA **C** 2012 only and needs non-redistributable rule texts. Real MISRA C++:2023 checking is commercial. What `.clang-tidy` enforces is a high-integrity profile, which is a different and more honest claim. | `AD-20`, `.clang-tidy` |
 | A change to a safety rule requires a host test that fails before it and passes after. | `TR-25` |
@@ -494,7 +494,7 @@ it.
 ## 10. Verification of this concept
 
 The safety concept is verified by the strategy of
-[requirements §10](requirements.md#10-verification-strategy-summary) and
+[requirements §10](requirements.sdoc) and
 [architecture §14](architecture.md#14-build-and-test-architecture). The parts
 that bear specifically on the claims made above:
 

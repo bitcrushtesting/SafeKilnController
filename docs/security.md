@@ -12,14 +12,14 @@ SPDX-License-Identifier: GPL-3.0-or-later
 | **Version** | 0.1 (draft) |
 | **Date** | 2026-10-05 |
 | **Status** | For review |
-| **Derives from** | [`requirements.md`](requirements.md) v0.1, [`architecture.md`](architecture.md) v0.1, [`safety.md`](safety.md) v0.1 |
+| **Derives from** | [`requirements.sdoc`](requirements.sdoc) v0.1, [`architecture.md`](architecture.md) v0.1, [`safety.md`](safety.md) v0.1 |
 | **License** | GPL-3.0-or-later |
 
 ---
 
 > **KilnControl is designed for a trusted local network and nothing else**
-> ([`NFR-20`](requirements.md#4-non-functional-requirements),
-> [`ASM-05`](requirements.md#9-assumptions)). It must not be exposed to the
+> ([`NFR-20`](requirements.sdoc),
+> [`ASM-05`](requirements.sdoc)). It must not be exposed to the
 > internet, port-forwarded, or placed on a network it shares with untrusted
 > devices. There is **no transport encryption**: everything, the web password
 > included, crosses the LAN in cleartext.
@@ -43,7 +43,7 @@ the user's own network, their browser, or their WiFi infrastructure, except to
 say where KilnControl depends on them.
 
 Identifiers introduced here extend the scheme of
-[requirements §1.4](requirements.md#14-requirement-conventions) and of
+[requirements §1.4](requirements.sdoc) and of
 [`safety.md` §1](safety.md#1-purpose-and-scope):
 
 | Prefix | Meaning |
@@ -78,7 +78,7 @@ What is worth attacking, in the order an attacker would care about.
 |---|---|---|
 | **A-1** | **Control of the heater** | The kiln is a multi-kilowatt mains heater reaching 1350 °C. This is the asset; everything else is a means to it. |
 | **A-2** | **The safety configuration** | Maximum chamber temperature, runaway thresholds, current limits. Loosening these does not start a fire by itself, but it removes the layer that would stop one. |
-| **A-3** | **The latched-fault state** | A latched fault is the mechanism that keeps a failed kiln off ([`SR-17`](requirements.md#53-reaction-and-recovery-requirements)). Clearing one remotely re-arms a kiln that something has already gone wrong with. |
+| **A-3** | **The latched-fault state** | A latched fault is the mechanism that keeps a failed kiln off ([`SR-17`](requirements.sdoc)). Clearing one remotely re-arms a kiln that something has already gone wrong with. |
 | **A-4** | **WiFi credentials** | `net.wifi_pass` is the user's network password, stored on the device. Its loss is a breach of their network, not merely of this device. |
 | **A-5** | **The web password** | `security.web_password`, guarding A-1 to A-3. |
 | **A-6** | **The firmware image** | Write access to it is total and persistent control of A-1. |

@@ -27,6 +27,12 @@ env:
   # checks, and with WarningsAsErrors: '*' a new check is a red build on a
   # commit that changed nothing.
   LLVM_VERSION: '20'
+  # Pinned for the same reason: StrictDoc validates the requirements document
+  # (duplicate UIDs, references to requirements that do not exist), and a
+  # validator that changes under a safety-relevant document is a variable
+  # nobody asked for.  A new release can add a rule and turn a green build red
+  # on a commit that changed nothing.
+  STRICTDOC_VERSION: '0.30.1'
 
   # Pinned to the version the build is actually verified against, rather than
   # floating: a toolchain that changes under a safety-relevant build is a
@@ -71,9 +77,9 @@ jobs:
             grep -q 'SPDX-License-Identifier' "$f" \
               || { echo "::error file=$f::no SPDX header"; missing=1; }
           done < <(git ls-files \
-                     '*.cpp' '*.h' '*.md' 'CMakeLists.txt' '*/CMakeLists.txt' \
+                     '*.cpp' '*.h' '*.md' '*.sdoc' 'CMakeLists.txt' '*/CMakeLists.txt' \
                      'firmware/**/Kconfig*' 'firmware/*.csv' 'firmware/sdkconfig.*' \
-                     'tools/*.sh' '.github/workflows/*.yml' \
+                     'tools/*.sh' '.github/workflows/*.yml' 'strictdoc.toml' \
                    | grep -v '^LICENSE')
           exit $missing
 
@@ -252,6 +258,75 @@ jobs:
           name: coverage
           path: coverage/
           if-no-files-found: warn
+
+  # --- the requirements document ----------------------------------------
+  #
+  # docs/requirements.sdoc is the specification, and StrictDoc is what makes it
+  # more than prose: it refuses to build a document with two nodes sharing a
+  # UID, or an inline reference to a requirement that does not exist.  Both of
+  # those were real defects in the markdown this replaced -- FR-WEB-26 was
+  # defined twice, and SR-31 had been orphaned by a blank line in the middle of
+  # its table -- and neither was findable by reading.
+  #
+  # So this job is a gate first and a publisher second: `strictdoc export`
+  # fails on an invalid document, and the HTML it produces is uploaded only if
+  # the document was valid.
+  requirements:
+    name: Requirements (StrictDoc)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install StrictDoc ${{ env.STRICTDOC_VERSION }}
+        run: |
+          pipx install "strictdoc==${STRICTDOC_VERSION}"
+          strictdoc --version
+
+      # Validation and export are the same command: the export fails on a
+      # duplicate UID or a dangling [LINK: ...] rather than producing a
+      # document that quietly disagrees with itself.
+      - name: Validate and export
+        run: strictdoc export . --output-dir build-docs --formats=html,json
+
+      - name: Summarise
+        if: always()
+        run: |
+          {
+            echo '### Requirements specification'
+            echo
+            if [ -d build-docs/html ]; then
+              echo "StrictDoc validated \`docs/requirements.sdoc\` and exported it."
+              echo
+              echo '```'
+              printf 'requirements   %s\n' \
+                "$(grep -c '^\[REQUIREMENT\]' docs/requirements.sdoc)"
+              printf 'constraints    %s\n' \
+                "$(grep -c '^\[CONSTRAINT\]' docs/requirements.sdoc)"
+              printf 'assumptions    %s\n' \
+                "$(grep -c '^\[ASSUMPTION\]' docs/requirements.sdoc)"
+              printf 'open questions %s\n' \
+                "$(grep -c '^\[QUESTION\]' docs/requirements.sdoc)"
+              printf 'cross-refs     %s validated [LINK:] references\n' \
+                "$(grep -co '\[LINK: ' docs/requirements.sdoc)"
+              echo '```'
+            else
+              echo 'StrictDoc rejected the document; see the job log.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # _cache is StrictDoc's own incremental-build directory and is not part
+      # of the output worth keeping.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: requirements-strictdoc
+          path: |
+            build-docs/html
+            build-docs/json
+          if-no-files-found: error
 
   # --- architecture 14.6: the target build ------------------------------
   firmware:

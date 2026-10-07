@@ -61,14 +61,14 @@ builds a release.
 
 | Document | Contents |
 |---|---|
-| [`docs/requirements.md`](docs/requirements.md) | Requirements specification, functional, safety, non-functional, hardware-interface and testability requirements, each with an identifier and a verification method. |
+| [`docs/requirements.sdoc`](docs/requirements.sdoc) | Requirements specification, functional, safety, non-functional, hardware-interface and testability requirements, each with an identifier and a verification method. |
 | [`docs/safety.md`](docs/safety.md) | Safety concept, hazard analysis, safety goals, the layered protection concept and the independence claimed between layers, detection coverage and timing, residual risk, and the obligations on the installer and on anyone changing the design. |
 | [`docs/security.md`](docs/security.md) | Security concept, assets, attack surface and trust boundaries, threats and the controls against them (marked built / specified / absent), why a security compromise here is a safety event, and the residual risk. |
 | [`docs/architecture.md`](docs/architecture.md) | Software architecture, key decisions, component decomposition, task and timing design, control and safety algorithms, persistence and flash-endurance design, REST API, and the build and test architecture. |
 | [`docs/simulation.md`](docs/simulation.md) | Running the firmware against a simulated kiln, on the host and under QEMU, including fault injection. |
 | [`tasklist.md`](tasklist.md) | Outstanding work, by priority. |
 
-Start with [`docs/requirements.md`](docs/requirements.md); the architecture
+Start with [`docs/requirements.sdoc`](docs/requirements.sdoc); the architecture
 document cites it throughout.
 
 ## Repository layout
@@ -102,7 +102,7 @@ three-phase kiln, so it is out of scope rather than partially supported.
 | Connectivity | WiFi station with access-point fallback, `kiln.local` via mDNS |
 
 Details and rationale are in
-[requirements §6](docs/requirements.md#6-hardware-interface-requirements).
+[requirements §6](docs/requirements.sdoc).
 
 ## Credit
 
@@ -123,7 +123,7 @@ Mains wiring must be carried out by a competent person in accordance with local 
 
 The hazards, the layered protection concept and the risk that remains are
 set out in [`docs/safety.md`](docs/safety.md); the requirements it derives from
-are [requirements §5](docs/requirements.md#5-safety-requirements).
+are [requirements §5](docs/requirements.sdoc).
 
 KilnControl is designed for a **trusted local network** and must not be exposed
 to the internet. The threat model, the controls and what is still only specified are in [`docs/security.md`](docs/security.md).

@@ -7,7 +7,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 **Outstanding work only.** An item leaves this file when it is done; what was
 done and why is in the commit that did it, not here. Checked against
-[`docs/requirements.md`](docs/requirements.md),
+[`docs/requirements.sdoc`](docs/requirements.sdoc),
 [`docs/architecture.md`](docs/architecture.md), [`docs/safety.md`](docs/safety.md)
 and [`docs/security.md`](docs/security.md).
 
@@ -35,7 +35,7 @@ reused: gaps in the numbering are items that have been closed.
 | | | Open |
 |---|---|---|
 | [A](#a-schematic-and-pcb) | Schematic and PCB | 21 |
-| [C](#c-build-test-and-ci-infrastructure) | Build, test and CI | 5 |
+| [C](#c-build-test-and-ci-infrastructure) | Build, test and CI | 6 |
 | [D](#d-documentation-and-open-questions) | Documentation and open questions | 2 |
 | [F](#f-static-analysis) | Static analysis | 2 |
 | [G](#g-door-interlock-sr-31) | Door interlock | 3 |
@@ -221,6 +221,27 @@ reused: gaps in the numbering are items that have been closed.
   it carries the UI, read-only and translated. What is missing is the build step
   that gzips it into `kiln_web/assets` so `AD-11` holds and the assets ship
   inside the image, within the budget of architecture §12.4.
+
+- [ ] **C11. `main.cpp` and `httpd.cpp` are analysed by nothing.** Found while
+  starting section P. `tools/tidy.sh` drives from the host compile database,
+  which cannot reach either file; `tools/tidy-target.sh` hardcodes
+  `kiln_hal_esp32s3/src`, so it does not either. Subtracting the host database
+  from the target one gives 14 target-only translation units, and two of them
+  are outside every gate in the project.
+
+  Widening the script is three lines -- the set should be *computed* as "in the
+  target build, not in the host build", which also cannot drift when the next
+  target-only file appears -- but it is **102 findings**: 20 in `httpd.cpp`
+  and 82 in `main.cpp`. 54 of those are inside `ESP_LOGx` and
+  `ESP_ERROR_CHECK` and want the same component-scoped exemption
+  `kiln_hal_esp32s3` already carries, which for `main.cpp` is a clean
+  `firmware/main/.clang-tidy` but for `httpd.cpp` cannot be, because
+  `kiln_web/src` also holds the host-analysed `api.cpp` and `json.cpp` and must
+  keep those checks. The remaining ~48 are the ordinary `F2`/`F4`/`F5`/`F6`
+  passes that never ran on these two files.
+
+  Nothing here is hard; it is the size of the diff that makes it its own
+  commit rather than a detour inside another one.
 
 - [ ] **C10. Coverage gate.** 90 % lines on control, safety, setpoint, program and
   autotune is enforced; 100 % of safety decision branches (`TR-19`) is not.

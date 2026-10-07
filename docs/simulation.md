@@ -73,7 +73,7 @@ The firing starts on its own and the console prints a line a second:
 
 The `I` column is the gated current measurement and the letter after it is the
 flag that says what the measurement *means*
-([`FR-CUR-04`](requirements.md#312-heater-current-measurement-fr-cur)): `C`
+([`FR-CUR-04`](requirements.sdoc)): `C`
 conduction, `L` leakage, `S` skipped because the window was too short, `~` stale,
 `!` transformer fault. Without that flag a reading of `0.00 A` is uninterpretable,
 which is why [`AD-18`](architecture.md#3-key-decisions) put it in the log record
@@ -164,7 +164,7 @@ The simulator does model the charge pump as a *decay timeout*, so the firmware's
 side of the property, that nothing refreshes the pump when the safety task stops,
 and the contactor releases, is tested (`ad05_a_stopped_safety_cycle_releases_the_contactor`
 in the integration suite). Whether the real circuit reaches the contactor's
-drop-out voltage inside [`NFR-04`](requirements.md#4-non-functional-requirements)'s
+drop-out voltage inside [`NFR-04`](requirements.sdoc)'s
 one second is a question about resistors, and is open as tasklist item A7.
 
 > **Never flash a `CONFIG_KILN_PLANT_SIM` build to a kiln.** The SSR and contactor

@@ -12,14 +12,14 @@ SPDX-License-Identifier: GPL-3.0-or-later
 | **Version** | 0.1 (draft) |
 | **Date** | 2026-09-26 |
 | **Status** | For review |
-| **Derives from** | [`requirements.md`](requirements.md) v0.1 |
+| **Derives from** | [`requirements.sdoc`](requirements.sdoc) v0.1 |
 | **License** | GPL-3.0-or-later |
 
 ---
 
 ## 1. Purpose and scope
 
-This document describes how the software satisfies [`requirements.md`](requirements.md).
+This document describes how the software satisfies [`requirements.sdoc`](requirements.sdoc).
 It defines the decomposition into components, the dependency rules between them,
 the runtime (task) structure, the data and persistence design, the algorithms of
 the control and safety subsystems, and the build and test architecture.
@@ -139,7 +139,7 @@ flowchart TD
 | `logring` | The circular store itself (`AD-19`): head discovery, wrap and erase ordering, torn-record handling, run selection, store statistics. Pure logic over `port_flash`. | `logrec` | Host unit (incl. power-cut injection) |
 | `configmodel` | Configuration schema: item table with type, unit, range, default; validation; versioned migration; JSON projection. |, | Host unit |
 | `runstate` | Run record model; reconstruction of resume state from a log tail. | `logrec`, `profile` | Host unit |
-| `faults` | Fault and warning code tables with descriptions ([requirements Appendix A](requirements.md#appendix-a--fault-code-allocation)). |, | Inspection + code-generated consistency test |
+| `faults` | Fault and warning code tables with descriptions ([requirements Appendix A](requirements.sdoc)). |, | Inspection + code-generated consistency test |
 
 ### 5.2 Ports (`kiln_ports`)
 
@@ -169,7 +169,7 @@ double is a compile-time-checked substitution.
 | Component | Responsibility |
 |---|---|
 | `composition` | The only place that binds ports to concrete adapters. One function; the test harnesses provide their own. |
-| `run_controller` | The mode state machine of [requirements §2.2](requirements.md#22-operating-modes). Owns the transition rules, start-up self-check, pause/resume/abort, completion, fault latching and acknowledgement, and power-loss recovery policy. |
+| `run_controller` | The mode state machine of [requirements §2.2](requirements.sdoc). Owns the transition rules, start-up self-check, pause/resume/abort, completion, fault latching and acknowledgement, and power-loss recovery policy. |
 | `control_task` | Per-cycle orchestration: read sensors, publish snapshot, advance setpoint, run PID, publish duty, emit log sample. |
 | `safety_task` | Per-cycle safety evaluation and the heat-enable refresh. The only writer of heat authority. |
 | `event_bus` | Fan-out of state changes, faults, warnings and telemetry to subscribers (logger, HMI, SSE). Bounded queues, non-blocking publish, drop-with-count on overflow. |
@@ -185,7 +185,7 @@ double is a compile-time-checked substitution.
 |---|---|
 | `kiln_hmi` | Screen composition into a framebuffer, font and layout, menu and confirmation flows, encoder event interpretation, fault screen precedence. Rendering logic is pure and produces a framebuffer, so screens are verifiable by golden-image comparison on the host. |
 | `kiln_web` | `esp_http_server` wiring, route table, request parsing and bounded buffering, authentication, JSON serialisation, SSE stream, OTA endpoint, embedded asset serving. |
-| `web/` (browser) | Dashboard, chart, program editor, config, run history. Plain ES modules, no framework, no runtime dependency ([`FR-WEB-02`](requirements.md#37-web-interface-fr-web)). |
+| `web/` (browser) | Dashboard, chart, program editor, config, run history. Plain ES modules, no framework, no runtime dependency ([`FR-WEB-02`](requirements.sdoc)). |
 
 ## 6. Runtime view
 
@@ -798,7 +798,7 @@ roughly 800 decimated points rather than 8 600 raw ones, which is how
 `FR-WEB-11` is met, and why `FR-LOG-11` insists that decimation preserve
 extrema. During a run, the planned remainder is fetched from
 `/api/programs/{id}/preview` and drawn as a dashed continuation of the actual
-trace (`FR-WEB-08`). [`OQ-04`](requirements.md#11-open-questions) is hereby
+trace (`FR-WEB-08`). [`OQ-04`](requirements.sdoc) is hereby
 resolved in favour of a hand-written renderer: the requirement is two axes and a
 handful of series, and this keeps the asset budget and the licence audit trivial.
 
@@ -868,7 +868,7 @@ Measured and reported by the instrumented build (`TR-18`).
 
 ## 14. Build and test architecture
 
-This section is the implementation of [requirements §7](requirements.md#7-testability-requirements).
+This section is the implementation of [requirements §7](requirements.sdoc).
 
 ### 14.1 Repository layout
 
@@ -876,8 +876,9 @@ This section is the implementation of [requirements §7](requirements.md#7-testa
 kilncontrol/
 ├── LICENSE                      GPL-3.0
 ├── README.md
+├── strictdoc.toml               StrictDoc project config
 ├── docs/
-│   ├── requirements.md
+│   ├── requirements.sdoc        the requirements (StrictDoc)
 │   └── architecture.md          this document
 ├── firmware/
 │   ├── CMakeLists.txt

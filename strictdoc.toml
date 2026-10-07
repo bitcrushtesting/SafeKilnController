@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 Bitcrush Testing
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# StrictDoc project configuration.  The requirements specification lives in
+# docs/requirements.sdoc; the other documents under docs/ are prose markdown
+# and are deliberately NOT given to StrictDoc, which would otherwise try to
+# parse them as requirement documents and fail on the first one without an H1.
+[project]
+title = "KilnControl"
+include_doc_paths = ["docs/requirements.sdoc"]
