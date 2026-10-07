@@ -5,6 +5,13 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Safe Kiln Controller
 
+[![CI](https://img.shields.io/github/actions/workflow/status/bitcrushtesting/SafeKilnController/ci.yml?branch=main&label=CI&style=flat-square)](https://github.com/bitcrushtesting/SafeKilnController/actions/workflows/ci.yml)
+[![Coverage gate](https://img.shields.io/badge/coverage%20gate-%E2%89%A5%2090%25%20lines-blue?style=flat-square)](.github/workflows/ci.yml)
+[![MC/DC gate](https://img.shields.io/badge/MC%2FDC%20gate-%E2%89%A5%2080%25-blue?style=flat-square)](tools/mcdc.sh)
+[![clang-tidy](https://img.shields.io/badge/clang--tidy-host%20%2B%20target-blue?style=flat-square)](.clang-tidy)
+[![Requirements](https://img.shields.io/badge/requirements-StrictDoc%20validated-blue?style=flat-square)](docs/requirements.sdoc)
+[![Licence](https://img.shields.io/badge/licence-GPL--3.0--or--later-blue?style=flat-square)](LICENSE)
+
 An open-source PID controller for electric ceramic and glass kilns, built on the
 **ESP32-S3** with **ESP-IDF**.
 
