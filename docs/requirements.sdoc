@@ -1591,7 +1591,7 @@ VERIFICATION: T
 [REQUIREMENT]
 UID: FR-UPD-06
 STATEMENT: >>>
-The system shall report the running firmware version, build time, git revision and target in the interface and via the API.
+The system shall report the running firmware version, build time, git revision and target in the interface and via the API. The version shall follow **semantic versioning** and shall be derived by the build from the release tag rather than maintained by hand, so that it cannot disagree with the tag it was built from. A build that is not on a release tag shall remain a valid semantic version and shall say so, by carrying the commit count and revision as build metadata.
 <<<
 PRIORITY: M
 VERIFICATION: T
@@ -1738,6 +1738,68 @@ Current measurement shall not delay or block the control or safety cycles ([LINK
 <<<
 PRIORITY: M
 VERIFICATION: T
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SEC-3-13
+TITLE: 3.13 Device identity (FR-PROD)
+
+[TEXT]
+STATEMENT: >>>
+> Two kinds of identity, kept apart on purpose.
+>
+> The **firmware** version answers "what is running on this unit", changes with
+> every release, and is derived from the release tag by the build so that no
+> human has to remember to update it.
+>
+> The **unit** identity answers "which unit is this", is written once at
+> manufacture and never again, and must survive everything the firmware is
+> allowed to do to its own storage, including the configuration erase that
+> [LINK: FR-CFG-05] permits on an NVS format change.
+>
+> A support conversation needs both, which is why they are reported together.
+<<<
+
+[REQUIREMENT]
+UID: FR-PROD-01
+STATEMENT: >>>
+The device shall carry a **production data block** in non-volatile storage containing the manufacturer, the device model, the board revision, the serial number and the production date. It shall be held in a storage partition separate from the one holding operator configuration, so that erasing or reformatting configuration storage cannot destroy it.
+<<<
+PRIORITY: M
+VERIFICATION: T, I
+
+[REQUIREMENT]
+UID: FR-PROD-02
+STATEMENT: >>>
+The firmware shall read the production data block **read-only**. No firmware function, local or remote, shall write, modify or erase it; the only writer shall be a production tool acting over a programming interface at manufacture.
+<<<
+PRIORITY: M
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: FR-PROD-03
+STATEMENT: >>>
+The production data block shall be reported in the device information API alongside the firmware version of [LINK: FR-UPD-06], and shown in the web interface.
+<<<
+PRIORITY: S
+VERIFICATION: T
+
+[REQUIREMENT]
+UID: FR-PROD-04
+STATEMENT: >>>
+A device whose production data block is absent or incomplete shall boot and operate normally, and shall report its identity as **unprogrammed** rather than reporting partial or invented values. Incompleteness shall be treated as absence: a block missing any required field shall not be reported as programmed.
+<<<
+PRIORITY: M
+VERIFICATION: T
+
+[REQUIREMENT]
+UID: FR-PROD-05
+STATEMENT: >>>
+A tool shall be provided that creates the production data block and writes it to a device, validating every field before writing, and taking the target storage offset from the firmware's own partition table rather than from a separately maintained constant.
+<<<
+PRIORITY: M
+VERIFICATION: T, D
 
 [[/SECTION]]
 

@@ -14,6 +14,7 @@ idf_component_register(
         "src/hal_kvstore.cpp"
         "src/hal_clock.cpp"
         "src/hal_system.cpp"
+        "src/hal_prod.cpp"
         "src/hal_tc.cpp"
         "src/hal_heat.cpp"
         "src/hal_current.cpp"

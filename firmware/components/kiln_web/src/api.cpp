@@ -387,6 +387,23 @@ void write_info(kiln_api_ctx_t *ctx, kiln_json_t *j)
     kiln_json_kv_str(j, "target", (fw.target[0] != 0) ? fw.target : "host");
     kiln_json_kv_str(j, "idf_version", fw.idf_version);
 
+    /* FR-PROD-03: who made this unit and which one it is.  Always present as an
+     * object, with `programmed` saying whether the rest means anything, so a
+     * client never has to distinguish "absent key" from "absent data". */
+    kiln_json_key(j, "production");
+    kiln_prod_info_t prod = {};
+    if ((ctx->system != nullptr) && (ctx->system->prod_info != nullptr)) {
+        (void)ctx->system->prod_info(ctx->system->ctx, &prod);
+    }
+    kiln_json_obj_open(j);
+    kiln_json_kv_bool(j, "programmed", prod.programmed);
+    kiln_json_kv_str(j, "manufacturer", prod.manufacturer);
+    kiln_json_kv_str(j, "model", prod.model);
+    kiln_json_kv_str(j, "revision", prod.revision);
+    kiln_json_kv_str(j, "serial", prod.serial);
+    kiln_json_kv_str(j, "production_date", prod.production_date);
+    kiln_json_obj_close(j);
+
     kiln_sys_stats_t st = {};
     if ((ctx->system != nullptr) && (ctx->system->stats != nullptr)) {
         (void)ctx->system->stats(ctx->system->ctx, &st);

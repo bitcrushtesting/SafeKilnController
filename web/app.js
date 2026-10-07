@@ -92,6 +92,7 @@ const I18N = {
     dl_json: 'JSON herunterladen',
     tuning: 'Abstimmung',
     diagnostics: 'Diagnose',
+    identity: 'Dieses Gerät',
   },
 };
 
@@ -548,9 +549,51 @@ async function loadDiagnostics() {
     live.info = info;
     $('foot-ver').textContent =
       `${info.version || 'dev'} · ${info.target} · up ${fmtDur(info.uptime_s) || '0 min'}`;
+    renderIdentity(info);
     $('diag').textContent = JSON.stringify({ info, storage, current, net }, null, 1);
   } catch (e) {
     $('diag').textContent = 'diagnostics unavailable: ' + e.message;
+  }
+}
+
+/* FR-PROD-03.  The firmware always sends a `production` object and says in it
+ * whether it means anything, so the unprogrammed case is a label rather than a
+ * missing section: a board that has not been through production should say so
+ * out loud, not render as a unit with blank fields. */
+function renderIdentity(info) {
+  const dl = $('identity');
+  if (!dl) return;
+  const p = info.production || {};
+  const rows = [
+    ['Firmware', info.version || 'dev'],
+    ['Revision', info.git_rev || 'unknown'],
+    ['Built', info.build_time || ''],
+  ];
+  if (p.programmed) {
+    rows.push(
+      ['Manufacturer', p.manufacturer],
+      ['Model', p.model],
+      ['Board revision', p.revision],
+      ['Serial number', p.serial],
+      ['Production date', p.production_date],
+    );
+  }
+  dl.replaceChildren();
+  for (const [k, v] of rows) {
+    if (!v) continue;
+    const dt = document.createElement('dt');
+    dt.textContent = k;
+    const dd = document.createElement('dd');
+    dd.textContent = v;
+    dl.append(dt, dd);
+  }
+  if (!p.programmed) {
+    const dt = document.createElement('dt');
+    dt.textContent = 'Unit';
+    const dd = document.createElement('dd');
+    dd.textContent = 'no production data programmed';
+    dd.className = 'warn';
+    dl.append(dt, dd);
   }
 }
 

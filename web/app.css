@@ -217,6 +217,17 @@ label.inline { display: inline-flex; align-items: center; gap: 0.4rem; font-size
 .note.ok  { border-left-color: var(--ok); }
 .diag { font: 12px/1.5 var(--mono); background: var(--raised); border: 1px solid var(--line); padding: 0.8rem; overflow-x: auto; color: var(--dim); }
 
+/* The identity list (FR-PROD-03).  Two columns on anything but a phone, where
+ * the label sits above its value rather than squeezing both into 180px. */
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 0.3rem 1rem; margin: 0 0 1rem; }
+.kv dt { color: var(--dim); }
+.kv dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
+.kv dd.warn { color: var(--warn); font-family: inherit; }
+@media (max-width: 30rem) {
+  .kv { grid-template-columns: 1fr; gap: 0 0; }
+  .kv dt { margin-top: 0.5rem; }
+}
+
 .cfg-group { border: 1px solid var(--line); margin-bottom: 1rem; }
 .cfg-group > summary {
   padding: 0.6rem 0.8rem; cursor: pointer; background: var(--surface);

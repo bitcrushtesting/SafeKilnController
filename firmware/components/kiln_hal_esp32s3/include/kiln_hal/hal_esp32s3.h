@@ -58,6 +58,13 @@ void kiln_hal_clock_init(kiln_port_clock_t *out);
 /* Reset cause, firmware identity and the task watchdog (NFR-15, SR-14). */
 void kiln_hal_system_init(kiln_port_system_t *out);
 
+/* FR-PROD-02: read the `prod` partition into a cache, once.  Safe to call on a
+ * board that has never been programmed; the block is then reported as
+ * unprogrammed.  Call it before kiln_hal_system_init so that the port's
+ * prod_info answers from a populated cache. */
+kiln_err_t kiln_hal_prod_init(void);
+kiln_err_t kiln_hal_prod_get(kiln_prod_info_t *out);
+
 /* --- M2 / M4b adapters -------------------------------------------------- */
 
 /* The shared thermocouple SPI bus (HR-02, HR-03).  Called once; kiln_hal_tc_init

@@ -335,6 +335,107 @@ KILN_TEST(frupd06_info_reports_identity_and_gain_provenance)
     CHECK(kiln_json_get_bool(resp.body, g_toks, n, g, "tuned", &tuned));
 }
 
+/* --- the production data block (FR-PROD-03) ----------------------------- */
+
+namespace {
+
+/* A system port that reports a programmed unit, and one that reports an
+ * unprogrammed one.  The real reader is hal_prod.cpp over NVS, which no host
+ * test can reach; what is testable here, and what a client actually depends on,
+ * is the shape of the payload in both states. */
+kiln_err_t fake_prod_programmed(void *ctx, kiln_prod_info_t *out)
+{
+    (void)ctx;
+    memset(out, 0, sizeof(*out));
+    out->programmed = true;
+    (void)snprintf(out->manufacturer, sizeof(out->manufacturer), "Bitcrush Testing");
+    (void)snprintf(out->model, sizeof(out->model), "SafeKiln-1");
+    (void)snprintf(out->revision, sizeof(out->revision), "rev-C");
+    (void)snprintf(out->serial, sizeof(out->serial), "SK1-2026-000042");
+    (void)snprintf(out->production_date, sizeof(out->production_date), "2026-10-07");
+    return KILN_OK;
+}
+
+kiln_err_t fake_prod_blank(void *ctx, kiln_prod_info_t *out)
+{
+    (void)ctx;
+    memset(out, 0, sizeof(*out));
+    return KILN_OK;
+}
+
+}  // namespace
+
+KILN_TEST(fprod03_info_reports_the_production_block_when_programmed)
+{
+    static rig_t r;
+    rig_init(&r);
+
+    static kiln_port_system_t sys;
+    memset(&sys, 0, sizeof(sys));
+    sys.prod_info = fake_prod_programmed;
+    r.api.system = &sys;
+
+    const kiln_api_resp_t resp = call(&r, KILN_HTTP_GET, "/api/info", NULL, NULL);
+    CHECK_EQ_INT(resp.status, 200);
+    const int n = parse_resp(&resp);
+
+    const int p = kiln_json_find(resp.body, g_toks, n, 0, "production");
+    CHECK(p > 0);
+
+    bool programmed = false;
+    CHECK(kiln_json_get_bool(resp.body, g_toks, n, p, "programmed", &programmed));
+    CHECK(programmed);
+
+    char buf[40];
+    CHECK(kiln_json_get_str(resp.body, g_toks, n, p, "serial", buf, sizeof(buf)));
+    CHECK_STR_EQ(buf, "SK1-2026-000042");
+    CHECK(kiln_json_get_str(resp.body, g_toks, n, p, "model", buf, sizeof(buf)));
+    CHECK_STR_EQ(buf, "SafeKiln-1");
+    CHECK(kiln_json_get_str(resp.body, g_toks, n, p, "production_date", buf, sizeof(buf)));
+    CHECK_STR_EQ(buf, "2026-10-07");
+}
+
+KILN_TEST(fprod04_an_unprogrammed_unit_says_so_rather_than_omitting_the_block)
+{
+    static rig_t r;
+    rig_init(&r);
+
+    static kiln_port_system_t sys;
+    memset(&sys, 0, sizeof(sys));
+    sys.prod_info = fake_prod_blank;
+    r.api.system = &sys;
+
+    const kiln_api_resp_t resp = call(&r, KILN_HTTP_GET, "/api/info", NULL, NULL);
+    CHECK_EQ_INT(resp.status, 200);
+    const int n = parse_resp(&resp);
+
+    /* The object is present either way: a client must never have to tell an
+     * absent key apart from absent data. */
+    const int p = kiln_json_find(resp.body, g_toks, n, 0, "production");
+    CHECK(p > 0);
+    bool programmed = true;
+    CHECK(kiln_json_get_bool(resp.body, g_toks, n, p, "programmed", &programmed));
+    CHECK(!programmed);
+}
+
+KILN_TEST(fprod04_a_port_without_prod_info_still_answers_with_the_block)
+{
+    static rig_t r;
+    rig_init(&r);
+    /* No system port at all, which is the rig's normal state and the one the
+     * host build has: the handler must not dereference a null function
+     * pointer, and must still emit the object. */
+    const kiln_api_resp_t resp = call(&r, KILN_HTTP_GET, "/api/info", NULL, NULL);
+    CHECK_EQ_INT(resp.status, 200);
+    const int n = parse_resp(&resp);
+
+    const int p = kiln_json_find(resp.body, g_toks, n, 0, "production");
+    CHECK(p > 0);
+    bool programmed = true;
+    CHECK(kiln_json_get_bool(resp.body, g_toks, n, p, "programmed", &programmed));
+    CHECK(!programmed);
+}
+
 /* --- configuration (FR-CFG, FR-WEB-17) --------------------------------- */
 
 KILN_TEST(frweb17_config_is_generated_from_the_schema_with_units_and_ranges)

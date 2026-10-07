@@ -558,10 +558,27 @@ extern "C" void app_main(void)
     kiln_hal_system_init(&s_system);
     const kiln_reset_cause_t cause = s_system.reset_cause(s_system.ctx);
 
+    /* FR-PROD-02: before the system port is wired, so its prod_info answers
+     * from a populated cache rather than reading flash per call. */
+    (void)kiln_hal_prod_init();
+
     kiln_fw_info_t fw = {};
     (void)s_system.fw_info(s_system.ctx, &fw);
-    ESP_LOGI(TAG, "Safe Kiln Controller %s (%s, IDF %s) on %s",
-             fw.version, fw.build_time, fw.idf_version, fw.target);
+    ESP_LOGI(TAG, "Safe Kiln Controller %s (rev %s, %s, IDF %s) on %s",
+             fw.version, fw.git_rev, fw.build_time, fw.idf_version, fw.target);
+
+    /* FR-PROD-03: which unit this is, in the log, next to which firmware it is
+     * running.  A support report that carries one without the other is half a
+     * report. */
+    kiln_prod_info_t prod = {};
+    (void)s_system.prod_info(s_system.ctx, &prod);
+    if (prod.programmed) {
+        ESP_LOGI(TAG, "unit %s %s %s, serial %s, made %s",
+                 prod.manufacturer, prod.model, prod.revision,
+                 prod.serial, prod.production_date);
+    } else {
+        ESP_LOGW(TAG, "unit has no production data; see tools/prod-data.py");
+    }
     ESP_LOGI(TAG, "reset cause %d%s", (int)cause,
              kiln_reset_was_abnormal(cause) ? "  (ABNORMAL -- SR-14)" : "");
 

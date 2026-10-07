@@ -67,13 +67,27 @@ kiln_err_t sys_fw_info(void *ctx, kiln_fw_info_t *out)
                        d->date, d->time);
         (void)snprintf(out->idf_version, sizeof(out->idf_version), "%.*s",
                        (int)sizeof(out->idf_version) - 1, d->idf_ver);
-        /* The build sets `version` from `git describe` in a git checkout, so the
-         * revision is in there rather than in a field of its own. */
-        (void)snprintf(out->git_rev, sizeof(out->git_rev), "%.*s",
-                       (int)sizeof(out->git_rev) - 1, d->version);
     }
+    /* The revision comes from the build as its own definition rather than being
+     * dug back out of the version string: `version` is semantic versioning and
+     * on a release tag it carries no hash at all, so parsing it would report an
+     * empty revision for exactly the builds that matter most. */
+#ifdef KILN_GIT_REV
+    (void)snprintf(out->git_rev, sizeof(out->git_rev), "%.*s",
+                   (int)sizeof(out->git_rev) - 1, KILN_GIT_REV);
+#else
+    (void)snprintf(out->git_rev, sizeof(out->git_rev), "unknown");
+#endif
     (void)snprintf(out->target, sizeof(out->target), "esp32s3");
     return KILN_OK;
+}
+
+/* FR-PROD-02.  The block is cached by hal_prod at init, so this cannot touch
+ * flash and cannot delay a caller. */
+kiln_err_t sys_prod_info(void *ctx, kiln_prod_info_t *out)
+{
+    (void)ctx;
+    return kiln_hal_prod_get(out);
 }
 
 kiln_err_t sys_stats(void *ctx, kiln_sys_stats_t *out)
@@ -128,6 +142,7 @@ void kiln_hal_system_init(kiln_port_system_t *out)
     memset(out, 0, sizeof(*out));
     out->reset_cause   = sys_reset_cause;
     out->fw_info       = sys_fw_info;
+    out->prod_info     = sys_prod_info;
     out->stats         = sys_stats;
     out->wdt_subscribe = sys_wdt_subscribe;
     out->wdt_feed      = sys_wdt_feed;

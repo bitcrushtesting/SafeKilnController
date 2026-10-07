@@ -39,14 +39,38 @@ static inline bool kiln_reset_was_abnormal(kiln_reset_cause_t c)
            c == KILN_RESET_BROWNOUT;
 }
 
-/* FR-UPD-06 */
+/* FR-UPD-06.
+ *
+ * `version` is semantic versioning derived from the release tag by the build
+ * (firmware/CMakeLists.txt), so it is as long as "10.20.30+123.a1b2c3d.dirty":
+ * 32 rather than 24, because a version truncated in the middle of its build
+ * metadata is worse than no build metadata. */
 typedef struct {
-    char version[24];
+    char version[32];
     char build_time[24];
     char git_rev[16];
     char target[16];
     char idf_version[16];
 } kiln_fw_info_t;
+
+/* FR-PROD-01: the production data block, written once at manufacture and read
+ * only here.  It is deliberately NOT part of kiln_config_t: the configuration is
+ * the operator's and is erased with it (FR-CFG-05, and the NVS format-change
+ * path in hal_kvstore), whereas this identifies the unit for its whole life.
+ *
+ * All fields are NUL-terminated strings, including the date, because this block
+ * is read to be displayed and reported rather than computed with, and a string
+ * cannot acquire an epoch or a timezone it did not have at manufacture.
+ * `programmed` is false when the block is absent or incomplete, which is the
+ * normal state of a board that has not been through the production step. */
+typedef struct {
+    bool programmed;
+    char manufacturer[32];
+    char model[24];
+    char revision[16];       /* board revision, e.g. "rev-C" */
+    char serial[24];
+    char production_date[11];   /* ISO 8601 date, "YYYY-MM-DD" */
+} kiln_prod_info_t;
 
 typedef struct {
     uint32_t uptime_s;
@@ -60,6 +84,9 @@ typedef struct kiln_port_system {
     void *ctx;
     kiln_reset_cause_t (*reset_cause)(void *ctx);
     kiln_err_t (*fw_info)(void *ctx, kiln_fw_info_t *out);
+    /* FR-PROD-02.  Optional: a port that does not implement it leaves the
+     * pointer null, and every caller already has to tolerate that. */
+    kiln_err_t (*prod_info)(void *ctx, kiln_prod_info_t *out);
     kiln_err_t (*stats)(void *ctx, kiln_sys_stats_t *out);
     /* SR-14: each supervised task checks in; the port owns the task watchdog. */
     kiln_err_t (*wdt_subscribe)(void *ctx);

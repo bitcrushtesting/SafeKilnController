@@ -22,4 +22,17 @@ ota_0,      app,  ota_0,    0x20000,  2M,
 ota_1,      app,  ota_1,    0x220000, 2M,
 kilnfs,     0x40, 0x01,     0x420000, 512K,
 kilnlog,    0x40, 0x00,     0x4A0000, 2M,
-# ~1.4 MB beyond 0x6A0000 is deliberately unallocated headroom.
+prod,       data, nvs,      0x6A0000, 16K,
+# ~1.4 MB beyond 0x6A4000 is deliberately unallocated headroom.
+#
+# `prod` (FR-PROD-01) is the production data block: manufacturer, model, board
+# revision, serial number and production date, written once by
+# tools/prod-data.py at manufacture and opened NVS_READONLY by the firmware.
+#
+# It is a partition of its own rather than a namespace in `nvs` for one reason:
+# hal_kvstore calls nvs_flash_erase() when NVS reports no free pages or a format
+# change, which is the right answer for configuration (FR-CFG-05: defaults beat
+# refusing to boot) and the wrong one for a serial number. A separate partition
+# cannot be collateral damage of that path. It is placed after `kilnlog` so no
+# existing offset moves, and 16K is the smallest useful NVS (4 sectors against a
+# 3 sector minimum) for roughly 130 bytes of payload.
