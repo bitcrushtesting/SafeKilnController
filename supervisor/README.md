@@ -17,9 +17,57 @@ The design, the failure analysis and the open questions are in
 
 | | |
 |---|---|
-| Core | Cortex-M0+, 64 KB flash, 8 KB RAM |
+| Part | STM32G031K8T6 |
+| Core | Cortex-M0+ at 16 MHz from HSI16, no crystal |
+| Memory | 64 KB flash (3.5 KB used), 8 KB RAM |
 | Package | LQFP32, 0.8 mm pitch |
-| Uses | SPI1, USART2, IWDG, 9 GPIO |
+| Uses | SPI1, USART2, IWDG, 8 GPIO |
+
+### Pins
+
+Taken from ST's own data: the pinout and alternate functions from CubeMX's MCU
+database for this part, the register and bit positions from the CMSIS-SVD.
+Neither is a build-time fetch, both ship with ST's tools.
+
+| Pin | Pos | Function | Mode |
+|---|---|---|---|
+| `PA0` | 7 | clear button | input, pull-up |
+| `PA2` | 9 | UART TX to the ESP32 | AF1, `USART2_TX` |
+| `PA3` | 10 | MAX31856 `~FAULT` | input, pull-up |
+| `PA4` | 11 | MAX31856 `~CS` | output, idle high |
+| `PA5` | 12 | SPI1 `SCK` | AF0 |
+| `PA6` | 13 | SPI1 `MISO` | AF0 |
+| `PA7` | 14 | SPI1 `MOSI` | AF0 |
+| `PA8` | 18 | coil permit | output, low opens the coil |
+| `PA13` | 24 | `SWDIO` | reserved |
+| `PA14` | 25 | `SWCLK` | reserved |
+| `PF2` | 6 | `NRST` | |
+
+Three properties of this assignment are deliberate and should survive any
+change to it.
+
+**Everything is on port A.** `startup.cpp` drives the permit line low before
+`.data` is copied, and enables exactly one GPIO clock to do it. A function
+moved to port B would be driven before its port had a clock.
+
+**`PA9` to `PA12` are avoided entirely.** On this package `PA11`/`PA12` can be
+remapped to act as `PA9`/`PA10` through `SYSCFG_CFGR1`, and positions 19 and 21
+are listed as NC-or-`PA9`/`PA10` depending on bonding. A supervisor should not
+depend on a remap bit being right.
+
+**The UART's receive pin is never configured.** `USART2_RX` would be `PA3`, and
+`PA3` is the `~FAULT` input instead, so the simplex link is unwired rather than
+merely unused. `RE` is left clear in `CR1` for the same reason.
+
+`PA5`/`PA6`/`PA7` are adjacent and all AF0, putting the whole SPI bus on three
+neighbouring pins beside the chip select. Free for later: `PA1`, `PA15`,
+`PB0`–`PB9`, `PC6`, `PC14`, `PC15`.
+
+One requirement this places on the hardware: the permit line is active high and
+every GPIO is high-impedance between reset and the first instruction, so the
+series element must be held off by an **external pull-down**, not by this pin.
+Without it there is a window at every reset where the element's state is
+whatever the board leaks to.
 
 Why this one:
 

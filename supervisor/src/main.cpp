@@ -27,21 +27,32 @@
 
 namespace {
 
+/* HSI16 is the reset default: 16 MHz, no PLL, no external crystal, and ample
+ * for a 10 Hz loop.  Running from the internal oscillator is also one less
+ * component whose failure the supervisor would have to survive, and the IWDG
+ * has its own oscillator regardless (see board_watchdog_init). */
+constexpr uint32_t SUP_SYSCLK_HZ = 16000000u;
+constexpr uint32_t SUP_UART_BAUD = 115200u;
+
 /* 10 Hz, matching the report rate the link is specified at and the cycle the
  * ESP32's own supervisor task runs. */
 constexpr float   CYCLE_S     = 0.1f;
-constexpr uint32_t CYCLE_TICKS = 1600000u;   /* placeholder; see delay() */
+/* Four cycles of the spin below per iteration is a guess, which is why R6
+ * leaves this as a placeholder and R8 replaces the whole thing with a timer:
+ * the cycle period is a timing requirement (FR-ACQ-03, +/-10 %), not an
+ * approximation. */
+constexpr uint32_t CYCLE_TICKS = SUP_SYSCLK_HZ / 40u;
 
 /* --- board, unverified -------------------------------------------------- */
 
 void board_clocks_init()
 {
-    /* TODO(R6): HSI16 is the reset default and is enough for this firmware at
-     * 10 Hz; confirm flash latency is valid at whatever is finally chosen. */
-    FLASH_ACR = FLASH_ACR;                      /* reset default retained */
-    RCC_IOPENR |= (1u << 0);                    /* GPIOAEN */
-    RCC_APBENR2 |= (1u << 12);                  /* SPI1EN  (confirm bit) */
-    RCC_APBENR1 |= (1u << 17);                  /* USART2EN (confirm bit) */
+    /* Reset defaults are kept: HSI16, flash latency 0, which is valid at
+     * 16 MHz.  Stated rather than written, so a later change to the clock has
+     * to come back here and reconsider the latency. */
+    RCC_IOPENR  |= SUP_RCC_IOPENR_PORTA;
+    RCC_APBENR2 |= SUP_RCC_APBENR2_SPI1;
+    RCC_APBENR1 |= SUP_RCC_APBENR1_USART2;
 }
 
 void pin_mode(unsigned pin, unsigned mode, unsigned pull)
@@ -81,6 +92,22 @@ void board_gpio_init()
 
     pin_af(SUP_PIN_UART_TX, SUP_AF_USART2);
     pin_mode(SUP_PIN_UART_TX, 2u, 0u);
+
+    /* USART2_RX would be PA3, and PA3 is the ~FAULT input instead.  The link
+     * is simplex and the receiver is unwired, not merely unused. */
+}
+
+void board_uart_init()
+{
+    /* 8N1, transmit only.  RE is deliberately not set: with no receive pin
+     * configured there is nothing to receive, and leaving the receiver off
+     * means a noise burst on an adjacent track cannot even fill a register.
+     * Oversampling by 16 is the reset default, so BRR is the plain divisor. */
+    USART2_CR1 = 0u;                            /* disable while configuring */
+    USART2_BRR = SUP_SYSCLK_HZ / SUP_UART_BAUD;
+    USART2_CR2 = 0u;
+    USART2_CR3 = 0u;
+    USART2_CR1 = (1u << 3) | (1u << 0);         /* TE | UE */
 }
 
 void board_watchdog_init()
@@ -88,13 +115,29 @@ void board_watchdog_init()
     /* The IWDG runs from the LSI, not the system clock, which is the property
      * that made the G0 the choice: a stopped or wrong system clock does not
      * stop the watchdog.  Once started it cannot be disabled in software.
-     * TODO(R6): confirm the prescaler and reload for a period comfortably
-     * longer than one cycle and far shorter than NFR-04's budget. */
-    IWDG_KR  = 0x0000CCCCu;                     /* start */
-    IWDG_KR  = 0x00005555u;                     /* enable register access */
-    IWDG_PR  = 4u;                              /* /64 (confirm) */
-    IWDG_RLR = 500u;                            /* (confirm) */
-    IWDG_KR  = 0x0000AAAAu;                     /* reload */
+     *
+     * The period is bounded from both ends and the bounds nearly touch.
+     *
+     *   It must be comfortably LONGER than one cycle (100 ms) or the
+     *   supervisor resets itself for being busy.
+     *
+     *   It must be comfortably SHORTER than NFR-04's 500 ms, because a hung
+     *   supervisor stops feeding the watchdog, and the reset is what drops the
+     *   permit line (startup.cpp does it before .data is copied).  The
+     *   watchdog period is therefore the worst-case time from "the supervisor
+     *   stopped working" to "the coil is open", and that has to fit inside the
+     *   de-energise budget.
+     *
+     * LSI is 32 kHz nominal.  PR = 4 divides by 64, giving a 2 ms tick, and
+     * RLR = 175 gives 350 ms: three and a half cycles of margin below, and
+     * 150 ms of margin above, which holds even if the LSI is 10 % off in
+     * either direction.  The 1 s this was first written with would have missed
+     * NFR-04 outright. */
+    IWDG_KR  = 0x0000CCCCu;                     /* start                     */
+    IWDG_KR  = 0x00005555u;                     /* enable register access    */
+    IWDG_PR  = 4u;                              /* LSI / 64 -> 2 ms per tick */
+    IWDG_RLR = 175u;                            /* 350 ms                    */
+    IWDG_KR  = 0x0000AAAAu;                     /* reload                    */
 }
 
 void watchdog_feed() { IWDG_KR = 0x0000AAAAu; }
@@ -121,11 +164,16 @@ void permit(bool allow)
 
 void uart_write(const uint8_t *b, uint32_t n)
 {
-    /* TODO(R6): confirm the TXE/TC bit positions in USART_ISR for this part. */
+    /* TXE is bit 7 of USART_ISR on this part, from the SVD.
+     *
+     * The spin is bounded in practice: 13 bytes at 115200 baud is about 1.1 ms
+     * against a 100 ms cycle.  It is still a spin, and R8 should give it a
+     * bound, because a supervisor that can be stalled by its own reporting
+     * path has put the report ahead of the job. */
     for (uint32_t i = 0; i < n; i++) {
-        while ((USART1_ISR & (1u << 7)) == 0u) {     /* TXE */
+        while ((USART2_ISR & (1u << 7)) == 0u) {
         }
-        USART1_TDR = b[i];
+        USART2_TDR = b[i];
     }
 }
 
@@ -162,6 +210,7 @@ int main()
 {
     board_clocks_init();
     board_gpio_init();
+    board_uart_init();
     board_watchdog_init();
 
     const bool selftest_ok = tc_init();

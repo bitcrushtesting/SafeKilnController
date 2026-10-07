@@ -67,14 +67,14 @@
 #define SPI1_SR          SUP_REG32(SPI1_BASE + 0x8u)
 #define SPI1_DR          SUP_REG32(SPI1_BASE + 0xCu)
 
-/* --- USART1 ---------------------------------------------------------- */
-#define USART1_CR1       SUP_REG32(USART1_BASE + 0x0u)
-#define USART1_CR2       SUP_REG32(USART1_BASE + 0x4u)
-#define USART1_CR3       SUP_REG32(USART1_BASE + 0x8u)
-#define USART1_BRR       SUP_REG32(USART1_BASE + 0xCu)
-#define USART1_ISR       SUP_REG32(USART1_BASE + 0x1Cu)
-#define USART1_ICR       SUP_REG32(USART1_BASE + 0x20u)
-#define USART1_RDR       SUP_REG32(USART1_BASE + 0x24u)
-#define USART1_TDR       SUP_REG32(USART1_BASE + 0x28u)
+/* --- USART2 ---------------------------------------------------------- */
+#define USART2_CR1       SUP_REG32(USART2_BASE + 0x0u)
+#define USART2_CR2       SUP_REG32(USART2_BASE + 0x4u)
+#define USART2_CR3       SUP_REG32(USART2_BASE + 0x8u)
+#define USART2_BRR       SUP_REG32(USART2_BASE + 0xCu)
+#define USART2_ISR       SUP_REG32(USART2_BASE + 0x1Cu)
+#define USART2_ICR       SUP_REG32(USART2_BASE + 0x20u)
+#define USART2_RDR       SUP_REG32(USART2_BASE + 0x24u)
+#define USART2_TDR       SUP_REG32(USART2_BASE + 0x28u)
 
 #endif /* STM32G031_H */

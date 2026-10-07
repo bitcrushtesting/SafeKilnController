@@ -22,8 +22,8 @@ WANT = {
                'LCKR', 'AFRL', 'AFRH', 'BRR'],
     'GPIOB':  [], 'GPIOC': [],
     'SPI1':   ['CR1', 'CR2', 'SR', 'DR'],
-    'USART1': ['CR1', 'CR2', 'CR3', 'BRR', 'ISR', 'ICR', 'RDR', 'TDR'],
-    'USART2': [],
+    'USART1': [],
+    'USART2': ['CR1', 'CR2', 'CR3', 'BRR', 'ISR', 'ICR', 'RDR', 'TDR'],
     'IWDG':   ['KR', 'PR', 'RLR', 'SR', 'WINR'],
     'FLASH':  ['ACR'],
 }
@@ -62,18 +62,37 @@ def main() -> int:
         print(f"{svd} is {root.findtext('name')}, not STM32G031", file=sys.stderr)
         return 1
 
+    # An SVD peripheral may be derivedFrom another and carry no registers of
+    # its own: USART2 is defined that way, from USART1.  Index every
+    # peripheral's registers first, then resolve derivation, or the register
+    # list for a derived peripheral comes out empty.
+    by_name = {p.findtext('name'): p for p in root.iter('peripheral')}
+
+    def registers_of(name, seen=()):
+        p = by_name.get(name)
+        if p is None or name in seen:
+            return {}
+        own = {r.findtext('name'): r.findtext('addressOffset')
+               for r in p.iter('register')}
+        parent = p.get('derivedFrom')
+        if parent:
+            inherited = registers_of(parent, seen + (name,))
+            inherited.update(own)
+            return inherited
+        return own
+
     bases, regs = {}, {}
-    for p in root.iter('peripheral'):
-        n = p.findtext('name')
-        if n not in WANT:
+    for n in WANT:
+        p = by_name.get(n)
+        if p is None:
             continue
-        if p.findtext('baseAddress'):
-            bases[n] = p.findtext('baseAddress')
+        base = p.findtext('baseAddress')
+        if base:
+            bases[n] = base
         if WANT[n]:
-            regs[n] = sorted(
-                ((r.findtext('name'), r.findtext('addressOffset'))
-                 for r in p.iter('register') if r.findtext('name') in WANT[n]),
-                key=lambda x: int(x[1], 16))
+            all_regs = registers_of(n)
+            regs[n] = sorted(((rn, all_regs[rn]) for rn in WANT[n] if rn in all_regs),
+                             key=lambda x: int(x[1], 16))
 
     missing = [f'{p}.{r}' for p, rs in WANT.items() for r in rs
                if r not in {x[0] for x in regs.get(p, [])}]

@@ -647,13 +647,21 @@ either the supervisor's pin count or a requirement.
   latched fault still needs its own acknowledgement (`SR-17`), so there are two
   acknowledgements and the panel should not imply there is one.
 
-- [ ] **R6. Select the part and draw it.** STM32G031 or STM32C031; the G0's
-  `IWDG` runs from the LSI so a system clock failure does not stop the
-  watchdog, which is the property that matters. Needs SPI, one UART, four or
-  five GPIO and SWD brought out to a test point, because the whole argument
-  rests on this firmware being independently reviewable. The two expansion pins
-  `KILN_PIN_EXP_IO2` and `KILN_PIN_EXP_IO42` are free and are enough for the
-  link; `UART0` is the console and must not be used.
+- [ ] **R6. Draw the supervisor.** The part and the pin map are settled:
+  STM32G031K8T6, LQFP32, and the assignment is in
+  [`supervisor/README.md`](supervisor/README.md), taken from ST's own pinout
+  and alternate-function database rather than assumed. What is left is the
+  schematic.
+
+  Three things the pin map asks of the hardware. The permit line is active
+  high and every GPIO is high-impedance between reset and the first
+  instruction, so **the series element needs an external pull-down** or there
+  is a window at every reset where its state is whatever the board leaks to.
+  SWD on `PA13`/`PA14` must come out to test points, not be left as pads,
+  because the independence argument rests on this firmware being reviewable and
+  flashable on its own. And on the ESP32 side the link lands on
+  `KILN_PIN_EXP_IO2` or `KILN_PIN_EXP_IO42`, one pin, receive only; `UART0` is
+  the console and must not be used.
 
 - [ ] **R7. Remove what the supervisor supersedes.** `Q5`, `Q6` and `R28` to
   `R31` of section K, and `HR-24` rewritten rather than deleted, because the
