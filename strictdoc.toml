@@ -7,4 +7,4 @@
 # parse them as requirement documents and fail on the first one without an H1.
 [project]
 title = "Safe Kiln Controller"
-include_doc_paths = ["docs/requirements.sdoc", "docs/architecture.sdoc"]
+include_doc_paths = ["docs/requirements.sdoc", "docs/architecture.sdoc", "docs/safety.sdoc"]

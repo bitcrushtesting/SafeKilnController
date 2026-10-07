@@ -62,7 +62,8 @@ builds a release.
 | Document | Contents |
 |---|---|
 | [`docs/requirements.sdoc`](docs/requirements.sdoc) | Requirements specification, functional, safety, non-functional, hardware-interface and testability requirements, each with an identifier and a verification method. |
-| [`docs/safety.md`](docs/safety.md) | Safety concept, hazard analysis, safety goals, the layered protection concept and the independence claimed between layers, detection coverage and timing, residual risk, and the obligations on the installer and on anyone changing the design. |
+| [`docs/safety.sdoc`](docs/safety.sdoc) | Hazards, safety goals and residual risks, each with an identifier, and the chain between them as checked relations: which hazards a goal mitigates, which requirements realise it, and which risk its layers leave. |
+| [`docs/safety.md`](docs/safety.md) | Safety concept: the system boundary, the layered protection concept and the independence claimed between layers, detection coverage and timing, the reaction and recovery sequence, and the obligations on the installer and on anyone changing the design. |
 | [`docs/security.md`](docs/security.md) | Security concept, assets, attack surface and trust boundaries, threats and the controls against them (marked built / specified / absent), why a security compromise here is a safety event, and the residual risk. |
 | [`docs/architecture.md`](docs/architecture.md) | Software architecture, key decisions, component decomposition, task and timing design, control and safety algorithms, persistence and flash-endurance design, REST API, and the build and test architecture. |
 | [`docs/test-concept.md`](docs/test-concept.md) | How the product is verified: unit, integration, system and hardware-in-the-loop, what each level can and cannot prove, the HIL fixture design, and an honest status against every testability requirement. |

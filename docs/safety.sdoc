@@ -1,0 +1,923 @@
+[DOCUMENT]
+TITLE: Safe Kiln Controller, Safety Concept
+UID: SAFEKILN-SAFETY
+VERSION: 0.1 (draft)
+DATE: 2026-10-07
+OPTIONS:
+  MARKUP: Markdown
+  VIEW_STYLE: Table
+  NODE_IN_TOC: True
+METADATA:
+  SPDX-FileCopyrightText: 2026 Bitcrush Testing
+  SPDX-License-Identifier: GPL-3.0-or-later
+  Status: For review
+  Project: Safe Kiln Controller, PID kiln controller
+
+[GRAMMAR]
+ELEMENTS:
+- TAG: TEXT
+  FIELDS:
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+- TAG: SECTION
+  PROPERTIES:
+    IS_COMPOSITE: True
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: False
+  - TITLE: TITLE
+    TYPE: String
+    REQUIRED: True
+- TAG: HAZARD
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: CAUSES
+    TYPE: String
+    REQUIRED: False
+  - TITLE: CONSEQUENCE
+    TYPE: String
+    REQUIRED: False
+  - TITLE: SEVERITY
+    TYPE: SingleChoice(Catastrophic, Severe, Moderate)
+    REQUIRED: True
+  - TITLE: CODES
+    TYPE: String
+    REQUIRED: False
+  - TITLE: COMMENT
+    TYPE: String
+    REQUIRED: False
+  RELATIONS:
+  - TYPE: Child
+    ROLE: Addressed by
+    REVERSE_ROLE: Addresses
+- TAG: SAFETY_GOAL
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: LAYERS
+    TYPE: String
+    REQUIRED: False
+  - TITLE: COMMENT
+    TYPE: String
+    REQUIRED: False
+  RELATIONS:
+  - TYPE: Parent
+    ROLE: Mitigates
+    REVERSE_ROLE: Mitigated by
+  - TYPE: Child
+    ROLE: Realised by
+    REVERSE_ROLE: Realises
+- TAG: RESIDUAL_RISK
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: WHY_IT_REMAINS
+    TYPE: String
+    REQUIRED: False
+  - TITLE: CARRIED_BY
+    TYPE: String
+    REQUIRED: False
+  - TITLE: MITIGATION
+    TYPE: String
+    REQUIRED: False
+  RELATIONS:
+  - TYPE: Parent
+    ROLE: Remains under
+    REVERSE_ROLE: Leaves residual risk
+  - TYPE: Parent
+    ROLE: Remains against
+    REVERSE_ROLE: Leaves residual risk
+
+[TEXT]
+STATEMENT: >>>
+The hazards this design defends against, the safety goals derived from them, and
+the risk that remains after every layer has done its work.
+
+These were three markdown tables in [`safety.md`](safety.md). They are here
+instead for the reason the architecture decisions moved to
+[`architecture.sdoc`](architecture.sdoc): they are the part of the safety
+concept that has identity. Thirty-six stable IDs, cited from the requirements,
+from the hardware requirements and from each other, and arranged in a chain that
+was previously maintained by hand in an appendix.
+
+That chain is now built out of relations and checked whenever the document is
+built:
+
+- a `Mitigates` relation from each safety goal to the hazards it inverts,
+- a `Realised by` relation from each safety goal to the requirements that
+  discharge it,
+- a `Remains under` relation from each residual risk to the goal whose layers
+  leave it, or `Remains against` the hazard directly where there is no goal.
+
+A goal can therefore no longer claim a requirement that does not exist, a
+hazard cannot be left with no goal and no explanation, and
+[`requirements.sdoc`](requirements.sdoc) can be read in the other direction, from
+a safety requirement to the goal it realises and the hazard behind it. The
+relations are declared on this side, so no edit to the requirements
+specification was needed to create them.
+
+Everything else about the safety concept stays in [`safety.md`](safety.md): the
+system boundary, the six protection layers and what each one does, the
+independence analysis, the coverage and timing tables, the reaction and recovery
+sequence, the obligations on installers and on anyone changing the design, and
+the verification status. None of that has an ID, the diagrams are better read
+rendered than quoted inside a field, and the thresholds belong in exactly one
+place.
+
+Two conventions carried over unchanged. Severity is the worst credible outcome,
+not the typical one, and no probability figures are given: the project has no
+field population from which to derive them, and inventing them would make the
+analysis look more rigorous than it is.
+<<<
+
+[[SECTION]]
+UID: SEC-SAFETY-1
+TITLE: 1. Hazards
+
+[HAZARD]
+UID: HZ-01
+STATEMENT: >>>
+**Uncontrolled heating**: power reaching the elements that the controller did not command and cannot withdraw.
+<<<
+CAUSES: >>>
+Shorted SSR; welded contactor; firmware fault holding the output on; a static heat-enable level surviving a crash.
+<<<
+CONSEQUENCE: >>>
+Chamber past its rating, kiln wiring and surrounding structure ignite; building fire.
+<<<
+SEVERITY: Catastrophic
+CODES: 9, 21, 22, 25
+
+[HAZARD]
+UID: HZ-02
+STATEMENT: >>>
+**Commanded over-temperature**: the controller heats to a temperature it should not.
+<<<
+CAUSES: >>>
+Setpoint or program error; configured maximum set above the kiln's rating; unit confusion.
+<<<
+CONSEQUENCE: >>>
+Elements and brickwork destroyed; load destroyed; chamber past the rating of the kiln's own wiring.
+<<<
+SEVERITY: Severe
+CODES: 10, 11
+
+[HAZARD]
+UID: HZ-03
+STATEMENT: >>>
+**Heating against a false low reading**: control is nominally correct but the measurement is wrong.
+<<<
+CAUSES: >>>
+Reversed thermocouple; stuck reading; drifted or mis-calibrated channel; front end returning a plausible but stale value.
+<<<
+CONSEQUENCE: >>>
+As [LINK: HZ-01]: full duty indefinitely while the display reads a comfortable number.
+<<<
+SEVERITY: Catastrophic
+CODES: 1 to 7, 16
+
+[HAZARD]
+UID: HZ-04
+STATEMENT: >>>
+**Loss of control with heat enabled.**
+<<<
+CAUSES: >>>
+Task hang, deadlock, priority inversion, unbounded blocking in control or safety; panic; watchdog expiry.
+<<<
+CONSEQUENCE: >>>
+Last commanded duty persists with nothing supervising it.
+<<<
+SEVERITY: Catastrophic
+CODES: 13, 14, 15
+
+[HAZARD]
+UID: HZ-05
+STATEMENT: >>>
+**Enclosure over-temperature.**
+<<<
+CAUSES: >>>
+Insulation degradation; contactor or SSR dissipation; fan or ventilation blocked; ambient.
+<<<
+CONSEQUENCE: >>>
+Controller electronics fail, which is [LINK: HZ-04], and wiring insulation softens at the one place where mains and logic are close together.
+<<<
+SEVERITY: Severe
+CODES: 12, warning 101
+
+[HAZARD]
+UID: HZ-06
+STATEMENT: >>>
+**Heater over-current.**
+<<<
+CAUSES: >>>
+Shorted element; mis-wiring; SSR failing short with a lower-impedance path.
+<<<
+CONSEQUENCE: >>>
+Conductor and connector overheating upstream of any thermal sensor; fire at the terminal block.
+<<<
+SEVERITY: Severe
+CODES: 25
+
+[HAZARD]
+UID: HZ-07
+STATEMENT: >>>
+**Electric shock or arc exposure.**
+<<<
+CAUSES: >>>
+Mains wiring faults; loss of isolation between the heater circuit and the controller; CT secondary opened while carrying primary current.
+<<<
+CONSEQUENCE: >>>
+Electrocution; arc flash at the terminals.
+<<<
+SEVERITY: Catastrophic
+COMMENT: >>>
+Predominantly an installation hazard. The firmware can reduce it hardly at all, and it is discharged through construction requirements and documentation rather than through detection, which is why it has no safety goal and is addressed by requirements directly. Carried as [LINK: RR-08].
+<<<
+RELATIONS:
+- TYPE: Child
+  VALUE: HR-16
+  ROLE: Addressed by
+- TYPE: Child
+  VALUE: HR-18
+  ROLE: Addressed by
+- TYPE: Child
+  VALUE: SR-24
+  ROLE: Addressed by
+- TYPE: Child
+  VALUE: ASM-04
+  ROLE: Addressed by
+
+[HAZARD]
+UID: HZ-08
+STATEMENT: >>>
+**Unsupervised re-energisation**: the kiln heats again after a fault or a power loss without a person deciding that it should.
+<<<
+CAUSES: >>>
+Self-clearing fault logic; recovery policy resuming a run whose cause of interruption is unknown; fault state not surviving reset.
+<<<
+CONSEQUENCE: >>>
+[LINK: HZ-01] or [LINK: HZ-02] with nobody present and nobody informed.
+<<<
+SEVERITY: Catastrophic
+CODES: 19, 20
+
+[HAZARD]
+UID: HZ-09
+STATEMENT: >>>
+**Undetected failure to heat.**
+<<<
+CAUSES: >>>
+Open element; open contactor; open safety chain; blown heater fuse; SSR failed open.
+<<<
+CONSEQUENCE: >>>
+Not itself a thermal hazard, but it masks a broken safety chain and ruins the load; an operator who sees only "cold" may bypass the chain to find out why.
+<<<
+SEVERITY: Moderate
+CODES: 8, 23, 24, warning 112
+
+[HAZARD]
+UID: HZ-10
+STATEMENT: >>>
+**Protection defeated by nuisance tripping.**
+<<<
+CAUSES: >>>
+A detection rule tuned so tightly that it stops healthy firings.
+<<<
+CONSEQUENCE: >>>
+The operator widens the threshold to its limit, disables current monitoring, or bypasses the cutout. A rule that stops a healthy firing is worse than no rule, because it gets switched off.
+<<<
+SEVERITY: Severe
+CODES: warnings 108, 111
+
+[HAZARD]
+UID: HZ-13
+STATEMENT: >>>
+**Chamber opened during a firing**: the door is opened while the elements are live.
+<<<
+CAUSES: >>>
+Operator opening a hot kiln to look at the load; a lid left unlatched; an interlock not fitted.
+<<<
+CONSEQUENCE: >>>
+Exposure to a live element at mains potential, and to a 1000 °C chamber at arm's length; thermal shock to the load.
+<<<
+SEVERITY: Catastrophic
+CODES: 27, warning 113
+
+[HAZARD]
+UID: HZ-11
+STATEMENT: >>>
+**Hot surfaces and residual heat.**
+<<<
+CAUSES: >>>
+Normal operation; a kiln at temperature after a fault or a power loss.
+<<<
+CONSEQUENCE: >>>
+Burns on contact; ignition of material stored against the kiln.
+<<<
+SEVERITY: Severe
+COMMENT: >>>
+As with [LINK: HZ-07], predominantly an operating hazard, discharged through documentation rather than detection, and so addressed by requirements with no safety goal between. Carried as [LINK: RR-08].
+<<<
+RELATIONS:
+- TYPE: Child
+  VALUE: SR-24
+  ROLE: Addressed by
+- TYPE: Child
+  VALUE: NFR-26
+  ROLE: Addressed by
+- TYPE: Child
+  VALUE: ASM-06
+  ROLE: Addressed by
+
+[HAZARD]
+UID: HZ-12
+STATEMENT: >>>
+**Remote command causing a hazardous state.**
+<<<
+CAUSES: >>>
+Unauthenticated or hostile access to the web interface over the local network.
+<<<
+CONSEQUENCE: >>>
+A firing started, altered or a fault acknowledged by someone not at the kiln. **Largely closed by [LINK: FR-WEB-26]**: no network route can put heat into the kiln, write configuration or clear a fault. What remains is program *authoring*: an attacker can alter a curve the operator then starts at the kiln, bounded by [LINK: SR-23]'s ceiling.
+<<<
+SEVERITY: Moderate
+COMMENT: >>>
+Severe before [LINK: FR-WEB-26] removed every heating route, Moderate after. Analysed in full in [`security.md`](security.md).
+<<<
+
+[TEXT]
+STATEMENT: >>>
+[LINK: HZ-07] and [LINK: HZ-11] are the two hazards with no safety goal between
+them and their requirements, and both are listed deliberately. They are
+predominantly installation and operating hazards: the firmware can reduce
+neither by much, and both are discharged through construction requirements and
+documentation rather than through detection. Omitting them from a safety concept
+would misrepresent where the risk in a kiln actually lies.
+<<<
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SEC-SAFETY-2
+TITLE: 2. Safety goals
+
+[TEXT]
+STATEMENT: >>>
+Each goal is the inversion of one or more hazards into something the design can
+be held to. `LAYERS` names the protection layers that meet the goal, described
+in [`safety.md` §5](safety.md#5-the-protection-layers); the layers themselves
+stay there, because their content is diagrams and prose rather than identity.
+<<<
+
+[SAFETY_GOAL]
+UID: SG-01
+STATEMENT: >>>
+No single failure of software, MCU, sensor or switching device shall result in heating; every such failure shall result in heating being removed.
+<<<
+LAYERS: L2, L3, L5
+COMMENT: >>>
+Realised by [LINK: SR-01] and by the whole of [`safety.md` §5](safety.md#5-the-protection-layers), which is why only the one requirement is named here.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: HZ-01
+  ROLE: Mitigates
+- TYPE: Parent
+  VALUE: HZ-03
+  ROLE: Mitigates
+- TYPE: Parent
+  VALUE: HZ-04
+  ROLE: Mitigates
+- TYPE: Child
+  VALUE: SR-01
+  ROLE: Realised by
+
+[SAFETY_GOAL]
+UID: SG-02
+STATEMENT: >>>
+Heating shall exist only while software is *actively and continuously* asserting it; no static condition shall be able to hold it.
+<<<
+LAYERS: L3
+RELATIONS:
+- TYPE: Parent
+  VALUE: HZ-01
+  ROLE: Mitigates
+- TYPE: Parent
+  VALUE: HZ-04
+  ROLE: Mitigates
+- TYPE: Child
+  VALUE: SR-02
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: HR-07
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: HR-08
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: AD-05
+  ROLE: Realised by
+
+[SAFETY_GOAL]
+UID: SG-03
+STATEMENT: >>>
+There shall be two series interrupting devices under independent control, so that one failing closed does not remove the ability to interrupt.
+<<<
+LAYERS: L3
+RELATIONS:
+- TYPE: Parent
+  VALUE: HZ-01
+  ROLE: Mitigates
+- TYPE: Child
+  VALUE: SR-03
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: HR-06
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: HR-07
+  ROLE: Realised by
+
+[SAFETY_GOAL]
+UID: SG-04
+STATEMENT: >>>
+A measurement that is wrong shall be detected as wrong rather than acted upon.
+<<<
+LAYERS: L2 thermal
+RELATIONS:
+- TYPE: Parent
+  VALUE: HZ-03
+  ROLE: Mitigates
+- TYPE: Child
+  VALUE: SR-04
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SR-05
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SR-06
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: FR-ACQ-12
+  ROLE: Realised by
+
+[SAFETY_GOAL]
+UID: SG-05
+STATEMENT: >>>
+A failure of the switching devices or the elements shall be detected electrically, within seconds, independently of its thermal effect.
+<<<
+LAYERS: L2 current
+COMMENT: >>>
+Also realised by the `FR-CUR` group as a whole, which specifies the measurement the rules below depend on.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: HZ-01
+  ROLE: Mitigates
+- TYPE: Parent
+  VALUE: HZ-06
+  ROLE: Mitigates
+- TYPE: Parent
+  VALUE: HZ-09
+  ROLE: Mitigates
+- TYPE: Child
+  VALUE: SR-25
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SR-26
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SR-27
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SR-28
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SR-29
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SR-30
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: NFR-27
+  ROLE: Realised by
+
+[SAFETY_GOAL]
+UID: SG-06
+STATEMENT: >>>
+Temperature shall be bounded by configuration and by an absolute ceiling that no configuration can raise.
+<<<
+LAYERS: L1, L2
+RELATIONS:
+- TYPE: Parent
+  VALUE: HZ-02
+  ROLE: Mitigates
+- TYPE: Child
+  VALUE: SR-09
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SR-10
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SR-23
+  ROLE: Realised by
+
+[SAFETY_GOAL]
+UID: SG-07
+STATEMENT: >>>
+A detected fault shall remove heating, be annunciated, persist across power loss, and require a deliberate human act to clear, which shall be refused while the cause is still present.
+<<<
+LAYERS: L2, L4
+RELATIONS:
+- TYPE: Parent
+  VALUE: HZ-08
+  ROLE: Mitigates
+- TYPE: Child
+  VALUE: SR-16
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SR-17
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SR-18
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SR-19
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SR-20
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: FR-RUN-08
+  ROLE: Realised by
+
+[SAFETY_GOAL]
+UID: SG-08
+STATEMENT: >>>
+The controller's own operating environment shall be kept inside its limits, and exceeded limits treated as a fault.
+<<<
+LAYERS: L2
+RELATIONS:
+- TYPE: Parent
+  VALUE: HZ-05
+  ROLE: Mitigates
+- TYPE: Child
+  VALUE: SR-11
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SR-12
+  ROLE: Realised by
+
+[SAFETY_GOAL]
+UID: SG-09
+STATEMENT: >>>
+Detection shall remain effective when any single detection channel is absent or has failed.
+<<<
+LAYERS: L2 thermal + L2 current
+COMMENT: >>>
+The one goal realised by no single requirement. It is a property of the
+arrangement rather than of any clause: the thermal and the electrical channel
+use different sensors and different physical principles, and
+[`safety.md` §6](safety.md#6-independence) makes it a standing constraint that
+neither may be removed on the grounds that the other exists. The nearest thing
+to a requirement behind it is that constraint.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: HZ-01
+  ROLE: Mitigates
+- TYPE: Parent
+  VALUE: HZ-03
+  ROLE: Mitigates
+- TYPE: Parent
+  VALUE: HZ-09
+  ROLE: Mitigates
+
+[SAFETY_GOAL]
+UID: SG-10
+STATEMENT: >>>
+Every threshold shall be bounded, no detection shall be disableable, and rules shall be specified so that a healthy firing does not trip them.
+<<<
+LAYERS: L2 rule design
+COMMENT: >>>
+Also realised by the confirmation windows of
+[`safety.md` §7.3](safety.md#73-why-two-rules-carry-a-confirmation-window), which
+are rule design rather than a separate clause.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: HZ-10
+  ROLE: Mitigates
+- TYPE: Child
+  VALUE: SR-22
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SR-23
+  ROLE: Realised by
+
+[SAFETY_GOAL]
+UID: SG-11
+STATEMENT: >>>
+Heating shall be de-energised during reset, boot, firmware update and any transition through an undefined software state.
+<<<
+LAYERS: L3, L4
+RELATIONS:
+- TYPE: Parent
+  VALUE: HZ-01
+  ROLE: Mitigates
+- TYPE: Parent
+  VALUE: HZ-04
+  ROLE: Mitigates
+- TYPE: Parent
+  VALUE: HZ-08
+  ROLE: Mitigates
+- TYPE: Child
+  VALUE: SR-21
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: NFR-09
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: NFR-15
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: FR-UPD-02
+  ROLE: Realised by
+
+[SAFETY_GOAL]
+UID: SG-13
+STATEMENT: >>>
+Opening the chamber shall remove power from the elements immediately, through hardware as well as software.
+<<<
+LAYERS: L2 ([LINK: SR-31]) + L3 ([LINK: HR-21] series wiring)
+RELATIONS:
+- TYPE: Parent
+  VALUE: HZ-13
+  ROLE: Mitigates
+- TYPE: Child
+  VALUE: SR-31
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: HR-21
+  ROLE: Realised by
+
+[SAFETY_GOAL]
+UID: SG-12
+STATEMENT: >>>
+No control action that can heat the kiln shall be reachable over the network at all; what remains reachable shall be authenticated.
+<<<
+LAYERS: L1 (web)
+RELATIONS:
+- TYPE: Parent
+  VALUE: HZ-12
+  ROLE: Mitigates
+- TYPE: Child
+  VALUE: FR-WEB-26
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: NFR-19
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: NFR-20
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: ASM-05
+  ROLE: Realised by
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SEC-SAFETY-3
+TITLE: 3. Residual risk
+
+[TEXT]
+STATEMENT: >>>
+What remains after L1 to L6, stated without softening. Each entry names who
+carries it, and relates to the safety goal whose layers leave it, or to the
+hazard directly where there is no goal.
+<<<
+
+[RESIDUAL_RISK]
+UID: RR-01
+STATEMENT: >>>
+**Welded contactor with a shorted SSR.** Both series devices conducting leaves the controller with no means of interrupting the heater circuit.
+<<<
+WHY_IT_REMAINS: >>>
+There is no third interrupting device inside the boundary.
+<<<
+CARRIED_BY: >>>
+**The L5 cutout and the operator.**
+<<<
+MITIGATION: >>>
+[LINK: SR-27] discriminates the case within about 4 s and latches fault 22, whose operator instruction is to isolate at the supply; the alarm sounds; [LINK: SR-30] warns of the intermittent mismatches that precede outright relay failure.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SG-03
+  ROLE: Remains under
+
+[RESIDUAL_RISK]
+UID: RR-02
+STATEMENT: >>>
+**A three-phase kiln cannot be fired safely with this controller.** It measures one phase, so a fault on either of the other two would be caught only by the thermal backstop, slowly, and the power and energy figures would cover a third of the load.
+<<<
+WHY_IT_REMAINS: >>>
+Three-phase support was dropped on 2026-10-06 rather than half-built, because partial electrical cover is the kind that gets trusted.
+<<<
+CARRIED_BY: >>>
+The installer, who must not fit this controller to a three-phase kiln.
+<<<
+MITIGATION: >>>
+Stated as out of scope in the README, in [requirements §12](requirements.sdoc) and in [LINK: ASM-10], rather than left as a limitation to be discovered. The thermal rules still protect a single-phase kiln in full.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SG-05
+  ROLE: Remains under
+- TYPE: Parent
+  VALUE: SG-09
+  ROLE: Remains under
+
+[RESIDUAL_RISK]
+UID: RR-03
+STATEMENT: >>>
+**A CT fitted to the wrong conductor, or clipped around two conductors** (net current about 0) makes the entire electrical channel blind, or makes it trip on every run.
+<<<
+WHY_IT_REMAINS: >>>
+The controller cannot tell a correctly fitted CT reading zero from a wrongly fitted one.
+<<<
+CARRIED_BY: >>>
+The installer.
+<<<
+MITIGATION: >>>
+Commissioning verifies a plausible reference current before the first firing; [LINK: FR-CUR-11] distinguishes "no signal at all" from "zero current"; a disabled or failed channel raises warning 111 continuously rather than going quiet.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SG-05
+  ROLE: Remains under
+- TYPE: Parent
+  VALUE: SG-09
+  ROLE: Remains under
+
+[RESIDUAL_RISK]
+UID: RR-04
+STATEMENT: >>>
+**A systematic error in the safety rules themselves**: a wrong threshold, an inverted comparison, a timer that never advances, is not caught by L2 or L3, since both would be working as written.
+<<<
+WHY_IT_REMAINS: >>>
+L3 checks liveness, not correctness.
+<<<
+CARRIED_BY: >>>
+The project, through verification.
+<<<
+MITIGATION: >>>
+100 % of safety decision branches covered by automated host tests ([LINK: TR-19]); every `SR` covered by at least one automated test, inspection alone insufficient ([LINK: TR-23]); rules are pure functions driven directly by tests ([LINK: TR-09]); CI blocks merge on any failure ([LINK: TR-24]). **L5 remains the only protection genuinely independent of this risk.**
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SG-01
+  ROLE: Remains under
+- TYPE: Parent
+  VALUE: SG-04
+  ROLE: Remains under
+
+[RESIDUAL_RISK]
+UID: RR-05
+STATEMENT: >>>
+**Common-cause failure of the MCU and its rails** defeats L2, L3 and L4 together.
+<<<
+WHY_IT_REMAINS: >>>
+One MCU, one supply.
+<<<
+CARRIED_BY: >>>
+The design, by choice.
+<<<
+MITIGATION: >>>
+Every one of those layers fails *towards* de-energised, so the common-cause outcome is the safe state rather than an unsafe one. L5 is unaffected.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SG-01
+  ROLE: Remains under
+- TYPE: Parent
+  VALUE: SG-02
+  ROLE: Remains under
+
+[RESIDUAL_RISK]
+UID: RR-06
+STATEMENT: >>>
+**An operator who widens thresholds to their limits** reduces the effectiveness of detection without disabling it.
+<<<
+WHY_IT_REMAINS: >>>
+[LINK: SR-22] bounds the ranges but permits the full range.
+<<<
+CARRIED_BY: >>>
+The operator.
+<<<
+MITIGATION: >>>
+Ranges are bounded; [LINK: SR-23]'s 1350 °C ceiling is a compile-time constant no configuration can raise; nothing can be disabled outright; untuned gains and disabled monitoring are annunciated as standing warnings (108, 111).
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SG-06
+  ROLE: Remains under
+- TYPE: Parent
+  VALUE: SG-10
+  ROLE: Remains under
+
+[RESIDUAL_RISK]
+UID: RR-07
+STATEMENT: >>>
+**Network-borne program edits.** [LINK: FR-WEB-26] removed every route that can heat the kiln, so a firing can no longer be started, altered or aborted over the network. What remains is that an attacker can edit a stored firing *program*, which takes effect only if an operator then starts it at the kiln.
+<<<
+WHY_IT_REMAINS: >>>
+Program authoring on a keyboard is the one thing a rotary encoder and a 128x64 OLED are genuinely bad at, so it was kept deliberately.
+<<<
+CARRIED_BY: >>>
+The owner of the network ([LINK: ASM-05]), and the operator who confirms the start.
+<<<
+MITIGATION: >>>
+Authentication with constant-time comparison and rate-limited failures ([LINK: NFR-19]); every request body and parameter treated as untrusted; no cloud connectivity and no remote access outside the local network by design. The device is **not** to be exposed to the internet.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SG-12
+  ROLE: Remains under
+
+[RESIDUAL_RISK]
+UID: RR-08
+STATEMENT: >>>
+**Hot surfaces and residual heat** ([LINK: HZ-11]) and **mains exposure during installation or service** ([LINK: HZ-07]).
+<<<
+WHY_IT_REMAINS: >>>
+Inherent to the equipment.
+<<<
+CARRIED_BY: >>>
+The installation and the operator.
+<<<
+MITIGATION: >>>
+[LINK: HR-18] on CT isolation, creepage and clearance; [LINK: HR-16] forbidding a CT whose burden can be disconnected; documentation obligations ([LINK: NFR-26], [LINK: SR-24]).
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: HZ-07
+  ROLE: Remains against
+- TYPE: Parent
+  VALUE: HZ-11
+  ROLE: Remains against
+
+[RESIDUAL_RISK]
+UID: RR-10
+STATEMENT: >>>
+**A door interlock is optional** ([LINK: HR-21] is a *should*, not a *shall*). The board now carries the series contact and the sense divider (2026-10-06), so fitting one is wiring rather than redesign, but a kiln without a switch still has nothing against [LINK: HZ-13], and the controller cannot tell the difference between "not fitted" and "fitted and shut" except by being told.
+<<<
+WHY_IT_REMAINS: >>>
+Many existing kilns have no interlock, and retro-fitting one means working on the door furniture.
+<<<
+CARRIED_BY: >>>
+The installer.
+<<<
+MITIGATION: >>>
+Warning 113 is raised continuously whenever no interlock is configured, so the gap is visible on the display and in the API rather than silent. [LINK: SR-31]'s normally-closed requirement means a *fitted* switch cannot fail silently.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SG-13
+  ROLE: Remains under
+
+[RESIDUAL_RISK]
+UID: RR-09
+STATEMENT: >>>
+**Unattended firing**, contrary to [LINK: ASM-06], removes L6 entirely.
+<<<
+WHY_IT_REMAINS: >>>
+The firmware cannot verify attendance.
+<<<
+CARRIED_BY: >>>
+The operator.
+<<<
+MITIGATION: >>>
+Stated in the README, in [LINK: SR-24], and here. Unattended firing is **not** a design goal and the layered concept does not assume it.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SG-07
+  ROLE: Remains under
+
+[[/SECTION]]

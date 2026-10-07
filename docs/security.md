@@ -34,7 +34,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 [`safety.md`](safety.md) analyses what happens when the equipment *fails*. This
 document analyses what happens when somebody *attacks* it, and the two meet at
-one hazard: [`HZ-12`](safety.md#3-hazard-analysis), a remote command putting the
+one hazard: [`HZ-12`](safety.sdoc), a remote command putting the
 kiln into a dangerous state.
 
 It covers the firmware's network-facing surfaces, its stored secrets, its
@@ -144,7 +144,7 @@ The trust boundaries, named:
 ## 5. Threats
 
 Rated by consequence, not likelihood. "Safety" in the last column means the
-threat reaches [`HZ-12`](safety.md#3-hazard-analysis) and therefore the hazards
+threat reaches [`HZ-12`](safety.sdoc) and therefore the hazards
 behind it.
 
 | ID | Threat | Via | Consequence | Safety? |

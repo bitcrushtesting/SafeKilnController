@@ -31,10 +31,20 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 [`requirements.sdoc` §5](requirements.sdoc) states *what* the
 system must detect and do. [`architecture.md` §8](architecture.md#8-safety-subsystem)
-states *how* the software is built to do it. This document supplies the layer
-between them: the hazards being defended against, the safety goals derived from
-those hazards, the protection layers that meet each goal, the independence
-claimed between those layers, and, explicitly, the risk that remains.
+states *how* the software is built to do it. This document and its companion
+[`safety.sdoc`](safety.sdoc) supply the layer between them: the hazards being
+defended against, the safety goals derived from those hazards, the protection
+layers that meet each goal, the independence claimed between those layers, and,
+explicitly, the risk that remains.
+
+The split between the two follows the one between
+[`architecture.md`](architecture.md) and
+[`architecture.sdoc`](architecture.sdoc). The hazards, the safety goals and the
+residual risks are in `safety.sdoc`, because they have identity: a stable ID
+each, and a chain between them that is now built out of checked relations rather
+than maintained by hand. The reasoning is here: the boundary, the layers, the
+independence analysis, the coverage and timing, the reaction sequence, the
+obligations, and the verification status.
 
 It exists so that a reviewer can answer three questions without reading the
 code:
@@ -43,8 +53,9 @@ code:
 2. For each of those, what stops it, and what stops it if the first thing fails?
 3. What is left over, and who is responsible for it?
 
-Identifiers introduced here extend the scheme of
-[requirements §1.4](requirements.sdoc):
+Identifiers introduced by this concept extend the scheme of
+[requirements §1.4](requirements.sdoc), and are defined as nodes in
+[`safety.sdoc`](safety.sdoc):
 
 | Prefix | Meaning |
 |---|---|
@@ -102,54 +113,36 @@ left implicit.
 
 ## 3. Hazard analysis
 
-Hazards are rated qualitatively. *Severity* is the worst credible outcome, not
-the typical one. *Detectability* is how readily the system, not the operator , 
-can observe the condition. No probability figures are given: the project has no
-field population from which to derive them, and inventing them would make the
-analysis look more rigorous than it is.
+The thirteen hazards live in [`safety.sdoc`](safety.sdoc), not here.
 
-| ID | Hazard | Credible causes | Worst credible consequence | Severity |
-|---|---|---|---|---|
-| **HZ-01** | **Uncontrolled heating**: power reaching the elements that the controller did not command and cannot withdraw | Shorted SSR; welded contactor; firmware fault holding the output on; a static heat-enable level surviving a crash | Chamber past its rating, kiln wiring and surrounding structure ignite; building fire | Catastrophic |
-| **HZ-02** | **Commanded over-temperature**: the controller heats to a temperature it should not | Setpoint or program error; configured maximum set above the kiln's rating; unit confusion | Elements and brickwork destroyed; load destroyed; chamber past the rating of the kiln's own wiring | Severe |
-| **HZ-03** | **Heating against a false low reading**: control is nominally correct but the measurement is wrong | Reversed thermocouple; stuck reading; drifted or mis-calibrated channel; front end returning a plausible but stale value | As HZ-01: full duty indefinitely while the display reads a comfortable number | Catastrophic |
-| **HZ-04** | **Loss of control with heat enabled** | Task hang, deadlock, priority inversion, unbounded blocking in control or safety; panic; watchdog expiry | Last commanded duty persists with nothing supervising it | Catastrophic |
-| **HZ-05** | **Enclosure over-temperature** | Insulation degradation; contactor or SSR dissipation; fan or ventilation blocked; ambient | Controller electronics fail, which is HZ-04, and wiring insulation softens at the one place where mains and logic are close together | Severe |
-| **HZ-06** | **Heater over-current** | Shorted element; mis-wiring; SSR failing short with a lower-impedance path | Conductor and connector overheating upstream of any thermal sensor; fire at the terminal block | Severe |
-| **HZ-07** | **Electric shock or arc exposure** | Mains wiring faults; loss of isolation between the heater circuit and the controller; CT secondary opened while carrying primary current | Electrocution; arc flash at the terminals | Catastrophic |
-| **HZ-08** | **Unsupervised re-energisation**: the kiln heats again after a fault or a power loss without a person deciding that it should | Self-clearing fault logic; recovery policy resuming a run whose cause of interruption is unknown; fault state not surviving reset | HZ-01 or HZ-02 with nobody present and nobody informed | Catastrophic |
-| **HZ-09** | **Undetected failure to heat** | Open element; open contactor; open safety chain; blown heater fuse; SSR failed open | Not itself a thermal hazard, but it masks a broken safety chain and ruins the load; an operator who sees only "cold" may bypass the chain to find out why | Moderate |
-| **HZ-10** | **Protection defeated by nuisance tripping** | A detection rule tuned so tightly that it stops healthy firings | The operator widens the threshold to its limit, disables current monitoring, or bypasses the cutout. A rule that stops a healthy firing is worse than no rule, because it gets switched off | Severe |
-| **HZ-13** | **Chamber opened during a firing**: the door is opened while the elements are live | Operator opening a hot kiln to look at the load; a lid left unlatched; an interlock not fitted | Exposure to a live element at mains potential, and to a 1000 °C chamber at arm's length; thermal shock to the load | Catastrophic |
-| **HZ-11** | **Hot surfaces and residual heat** | Normal operation; a kiln at temperature after a fault or a power loss | Burns on contact; ignition of material stored against the kiln | Severe |
-| **HZ-12** | **Remote command causing a hazardous state** | Unauthenticated or hostile access to the web interface over the local network | A firing started, altered or a fault acknowledged by someone not at the kiln. **Largely closed by `FR-WEB-26`**: no network route can put heat into the kiln, write configuration or clear a fault. What remains is program *authoring*, an attacker can alter a curve the operator then starts at the kiln, bounded by `SR-23`'s ceiling. | Severe → **Moderate** |
+Each carries its credible causes, its worst credible consequence, a severity and
+the fault codes it is detected by. Severity is the worst credible outcome, not
+the typical one, and no probability figures are given: the project has no field
+population from which to derive them, and inventing them would make the analysis
+look more rigorous than it is.
 
-HZ-07 and HZ-11 are predominantly installation and operating hazards: the
-firmware can reduce neither by much, and both are discharged through
-construction requirements and documentation rather than through detection. They
-are listed because omitting them from a safety concept would misrepresent where
-the risk in a kiln actually lies.
+`HZ-07` (shock and arc exposure) and `HZ-11` (hot surfaces) are the two with no
+safety goal between them and their requirements. Both are predominantly
+installation and operating hazards, discharged through construction requirements
+and documentation rather than through detection, so each names the requirements
+that address it directly. They are listed because omitting them from a safety
+concept would misrepresent where the risk in a kiln actually lies.
 
 ## 4. Safety goals
 
-Each goal is the inversion of one or more hazards into something the design can
-be held to.
+The thirteen safety goals live in [`safety.sdoc`](safety.sdoc), not here.
 
-| ID | Safety goal | Addresses | Realised by |
-|---|---|---|---|
-| **SG-01** | No single failure of software, MCU, sensor or switching device shall result in heating; every such failure shall result in heating being removed | HZ-01, HZ-03, HZ-04 | `SR-01`, and the whole of [§5](#5-the-protection-layers) |
-| **SG-02** | Heating shall exist only while software is *actively and continuously* asserting it; no static condition shall be able to hold it | HZ-01, HZ-04 | `SR-02`, `HR-07`, `HR-08`, `AD-05` |
-| **SG-03** | There shall be two series interrupting devices under independent control, so that one failing closed does not remove the ability to interrupt | HZ-01 | `SR-03`, `HR-06`, `HR-07` |
-| **SG-04** | A measurement that is wrong shall be detected as wrong rather than acted upon | HZ-03 | `SR-04`–`SR-06`, `FR-ACQ-12` |
-| **SG-05** | A failure of the switching devices or the elements shall be detected electrically, within seconds, independently of its thermal effect | HZ-01, HZ-06, HZ-09 | `SR-25`–`SR-30`, `FR-CUR`, `NFR-27` |
-| **SG-06** | Temperature shall be bounded by configuration and by an absolute ceiling that no configuration can raise | HZ-02 | `SR-09`, `SR-23`, `SR-10` |
-| **SG-07** | A detected fault shall remove heating, be annunciated, persist across power loss, and require a deliberate human act to clear, which shall be refused while the cause is still present | HZ-08 | `SR-16`–`SR-20`, `FR-RUN-08` |
-| **SG-08** | The controller's own operating environment shall be kept inside its limits, and exceeded limits treated as a fault | HZ-05 | `SR-11`, `SR-12` |
-| **SG-09** | Detection shall remain effective when any single detection channel is absent or has failed | HZ-01, HZ-03, HZ-09 | Defence in depth, [§6](#6-independence) |
-| **SG-10** | Every threshold shall be bounded, no detection shall be disableable, and rules shall be specified so that a healthy firing does not trip them | HZ-10 | `SR-22`, `SR-23`, and the confirmation windows of [§7.3](#73-why-two-rules-carry-a-confirmation-window) |
-| **SG-11** | Heating shall be de-energised during reset, boot, firmware update and any transition through an undefined software state | HZ-01, HZ-04, HZ-08 | `SR-21`, `NFR-09`, `NFR-15`, `FR-UPD-02` |
-| **SG-13** | Opening the chamber shall remove power from the elements immediately, through hardware as well as software | HZ-13 | `SR-31`, `HR-21` |
-| **SG-12** | No control action that can heat the kiln shall be reachable over the network at all; what remains reachable shall be authenticated | HZ-12 | **`FR-WEB-26`**, `NFR-19`, `NFR-20`, `ASM-05` |
+Each goal is the inversion of one or more hazards into something the design can
+be held to, so each one names the hazards it mitigates and the requirements that
+realise it. In StrictDoc those are `Mitigates` and `Realised by` relations,
+checked when the document is built, which is what retired the traceability
+appendix this document used to carry: a goal can no longer cite a requirement
+that does not exist, and [`requirements.sdoc`](requirements.sdoc) can be read in
+the other direction, from a safety requirement to the goal it realises and the
+hazard behind it.
+
+Each goal also names the protection layers that meet it. The layers themselves
+stay here, in the section below.
 
 ## 5. The protection layers
 
@@ -435,21 +428,15 @@ presented on both the display and the web interface and documented in
 
 ## 8. Residual risk
 
-What remains after L1–L6, stated without softening. Each entry names who carries
-it.
+The ten residual risks live in [`safety.sdoc`](safety.sdoc), not here.
 
-| ID | Residual risk | Why it remains | Carried by | Mitigation in place |
-|---|---|---|---|---|
-| **RR-01** | **Welded contactor with a shorted SSR.** Both series devices conducting leaves the controller with no means of interrupting the heater circuit. | There is no third interrupting device inside the boundary. | **L5 cutout and the operator.** | `SR-27` discriminates the case within ~4 s and latches fault 22, whose operator instruction is to isolate at the supply; the alarm sounds; `SR-30` warns of the intermittent mismatches that precede outright relay failure. |
-| **RR-02** | **A three-phase kiln cannot be fired safely with this controller.** It measures one phase, so a fault on either of the other two would be caught only by the thermal backstop, slowly, and the power and energy figures would cover a third of the load. | Three-phase support was dropped on 2026-10-06 rather than half-built, because partial electrical cover is the kind that gets trusted. | The installer, who must not fit this controller to a three-phase kiln. | Stated as out of scope in the README, in [requirements §12](requirements.sdoc) and in `ASM-10`, rather than left as a limitation to be discovered. The thermal rules still protect a single-phase kiln in full. |
-| **RR-03** | **A CT fitted to the wrong conductor, or clipped around two conductors** (net current ≈ 0) makes the entire electrical channel blind or makes it trip on every run. | The controller cannot tell a correctly fitted CT reading zero from a wrongly fitted one. | The installer. | Commissioning verifies a plausible reference current before the first firing; `FR-CUR-11` distinguishes "no signal at all" from "zero current"; a disabled or failed channel raises warning 111 continuously rather than going quiet. |
-| **RR-04** | **A systematic error in the safety rules themselves**: a wrong threshold, an inverted comparison, a timer that never advances, is not caught by L2 or L3, since both would be working as written. | L3 checks liveness, not correctness. | The project, through verification. | 100 % of safety decision branches covered by automated host tests (`TR-19`); every `SR` covered by at least one automated test, inspection alone insufficient (`TR-23`); rules are pure functions driven directly by tests (`TR-09`); CI blocks merge on any failure (`TR-24`). **L5 remains the only protection genuinely independent of this risk.** |
-| **RR-05** | **Common-cause failure of the MCU and its rails** defeats L2, L3 and L4 together. | One MCU, one supply. | The design, by choice. | Every one of those layers fails *towards* de-energised, so the common-cause outcome is the safe state rather than an unsafe one. L5 is unaffected. |
-| **RR-06** | **An operator who widens thresholds to their limits** reduces the effectiveness of detection without disabling it. | `SR-22` bounds the ranges but permits the full range. | The operator. | Ranges are bounded; `SR-23`'s 1350 °C ceiling is a compile-time constant no configuration can raise; nothing can be disabled outright; untuned gains and disabled monitoring are annunciated as standing warnings (108, 111). |
-| **RR-07** | **Network-borne program edits.** `FR-WEB-26` removed every route that can heat the kiln, so a firing can no longer be started, altered or aborted over the network. What remains is that an attacker can edit a stored firing *program*, which takes effect only if an operator then starts it at the kiln. | Program authoring on a keyboard is the one thing a rotary encoder and a 128×64 OLED are genuinely bad at, so it was kept deliberately. | The owner of the network (`ASM-05`), and the operator who confirms the start. | Authentication with constant-time comparison and rate-limited failures (`NFR-19`); every request body and parameter treated as untrusted; no cloud connectivity and no remote access outside the local network by design. The device is **not** to be exposed to the internet. |
-| **RR-08** | **Hot surfaces and residual heat** (HZ-11) and **mains exposure during installation or service** (HZ-07). | Inherent to the equipment. | The installation and the operator. | `HR-18` on CT isolation, creepage and clearance; `HR-16` forbidding a CT whose burden can be disconnected; documentation obligations (`NFR-26`, `SR-24`). |
-| **RR-10** | **A door interlock is optional** (`HR-21` is a *should*, not a *shall*). The board now carries the series contact and the sense divider (2026-10-06), so fitting one is wiring rather than redesign, but a kiln without a switch still has nothing against HZ-13. A kiln without one is protected against HZ-13 by nothing at all, and the controller cannot tell the difference between "not fitted" and "fitted and shut" except by being told. | Many existing kilns have no interlock and retro-fitting one means working on the door furniture. | The installer. | Warning 113 is raised continuously whenever no interlock is configured, so the gap is visible on the display and in the API rather than silent. `SR-31`'s normally-closed requirement means a *fitted* switch cannot fail silently. |
-| **RR-09** | **Unattended firing**, contrary to `ASM-06`, removes L6 entirely. | The firmware cannot verify attendance. | The operator. | Stated in the README, in `SR-24`, and here. Unattended firing is **not** a design goal and the layered concept above does not assume it. |
+Each states what remains after L1 to L6 without softening, why it remains, **who
+carries it**, and what mitigation is in place, and relates to the safety goal
+whose layers leave it, or to the hazard directly where there is no goal. The two
+that bear on the heaviest claims in this document are `RR-01`, the welded
+contactor with a shorted SSR, which has no backstop inside the boundary, and
+`RR-04`, a systematic error in the safety rules themselves, against which L5 is
+the only genuinely independent protection.
 
 ## 9. Limitations and obligations
 
@@ -528,34 +515,12 @@ confirmed one. The M4 and M4b milestones exist to close exactly that gap, and
 
 ## Appendix, Traceability
 
-| Hazard | Safety goals | Principal requirements | Fault / warning codes |
-|---|---|---|---|
-| HZ-01 Uncontrolled heating | SG-01, SG-02, SG-03, SG-05, SG-09, SG-11 | `SR-01`–`SR-03`, `SR-08`, `SR-25`, `SR-27`, `SR-29`, `HR-06`–`HR-08` | 9, 21, 22, 25 |
-| HZ-02 Commanded over-temperature | SG-06 | `SR-09`, `SR-10`, `SR-23` | 10, 11 |
-| HZ-03 False low reading | SG-04, SG-09 | `SR-04`–`SR-06`, `FR-ACQ-12` | 1–7, 16 |
-| HZ-04 Loss of control | SG-01, SG-02, SG-11 | `SR-13`, `SR-14`, `AD-05`, `NFR-02` | 13, 14, 15 |
-| HZ-05 Enclosure over-temperature | SG-08 | `SR-11`, `SR-12` | 12, warning 101 |
-| HZ-06 Over-current | SG-05 | `SR-29`, `HR-06` | 25 |
-| HZ-07 Shock / arc exposure |, (installation) | `HR-16`, `HR-18`, `SR-24`, `ASM-04` |, |
-| HZ-08 Unsupervised re-energisation | SG-07, SG-11 | `SR-16`–`SR-19`, `SR-21`, `FR-RUN-08`, `NFR-15` | 19, 20 |
-| HZ-09 Undetected failure to heat | SG-05, SG-09 | `SR-07`, `SR-26`, `SR-28` | 8, 23, 24, warning 112 |
-| HZ-10 Protection defeated by nuisance trips | SG-10 | `SR-22`, `SR-23`, the confirmation windows of [§7.3](#73-why-two-rules-carry-a-confirmation-window) | warnings 108, 111 |
-| HZ-11 Hot surfaces, residual heat |, (operation) | `SR-24`, `NFR-26`, `ASM-06` |, |
-| HZ-13 Chamber opened while firing | SG-13 | `SR-31`, `HR-21` | 27, warning 113 |
-| HZ-12 Hazardous remote command | SG-12 | `NFR-19`, `NFR-20`, `ASM-05`; analysed in full in [`security.md`](security.md) |, |
+The traceability tables that were here, hazard to safety goal to requirement, and
+safety goal to protection layer to residual risk, are gone. They are relations in
+[`safety.sdoc`](safety.sdoc) now, and the trace and matrix screens of the
+StrictDoc export generate the same views from the relations themselves, in both
+directions, without anyone maintaining a table by hand.
 
-| Safety goal | Protection layers | Residual risk |
-|---|---|---|
-| SG-01 Single-fault tolerance | L2, L3, L5 | RR-04, RR-05 |
-| SG-02 Active assertion only | L3 | RR-05 |
-| SG-03 Two series interrupters | L3 | **RR-01** |
-| SG-04 Wrong measurements detected | L2 thermal | RR-04 |
-| SG-05 Electrical detection | L2 current | RR-02, RR-03 |
-| SG-06 Bounded temperature | L1, L2 | RR-06 |
-| SG-07 Latch and deliberate clearing | L2, L4 | RR-09 |
-| SG-08 Controller environment | L2 |, |
-| SG-09 Channel redundancy | L2 thermal + L2 current | RR-02, RR-03 |
-| SG-10 No nuisance tripping | L2 rule design | RR-06 |
-| SG-11 Safe through transitions | L3, L4 |, |
-| SG-12 Authenticated remote control | L1 (web) | RR-07 |
-| SG-13 Chamber opened removes power | L2 (`SR-31`) + L3 (`HR-21` series wiring) | RR-10 |
+What the tables could not do, and the relations do, is fail the build. A goal
+that cites a requirement which does not exist, or a residual risk hanging off no
+goal, is now an error in the `requirements` CI job rather than a stale row.
