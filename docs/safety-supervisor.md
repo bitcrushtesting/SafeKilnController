@@ -101,21 +101,22 @@ ESP32 believes".
 The backstop must therefore sit **above** the highest legitimately configurable
 limit, with enough margin that normal operation never approaches it.
 
-It does not fit today. [`SR-23`](requirements.sdoc) sets the configurable
+**Decided: configurable ceiling 1300 °C, supervisor trip 1350 °C.**
+
+It did not fit before. [`SR-23`](requirements.sdoc) set the configurable
 ceiling at 1350 °C, which is also the top of type K's usable range
-(`FR-ACQ-05`). There is no room above it for a backstop, so one of the two has
-to move:
+(`FR-ACQ-05`), leaving no room above it. The ceiling moved down rather than the
+backstop up, because raising the backstop would put the trip outside the
+thermocouple's specified range and make it depend on an extrapolation.
 
-- **Preferred: lower the configurable ceiling.** `SR-23` becomes 1300 °C, the
-  supervisor trips at 1350 °C. 1300 °C is above cone 10 (about 1285 °C), so no
-  real ceramic firing is lost, and the separation is 50 °C.
-- Alternatively raise the backstop above 1350 °C, which puts the trip outside
-  the thermocouple's specified range and makes it depend on an extrapolation.
-  This is worse.
+1300 °C is above cone 10 (about 1285 °C), so no real ceramic firing is lost,
+and the separation is 50 °C.
 
-Either way the two numbers must be stated together, in one place, with the
-margin between them given as the reason. Two limits that can be edited
-independently will eventually cross.
+The two numbers are stated together in `kiln/types.h`, with the margin as the
+reason and a `static_assert` that the backstop is above the ceiling, because
+two limits that can be edited independently will eventually cross. The API
+reports both for the same reason: a client showing one without the other
+invites exactly that confusion.
 
 ## 5. The interface
 
@@ -135,7 +136,7 @@ sufficient. `UART0` is the console and must not be used.
 | **Rate** | 10 Hz, unsolicited. `FR-ACQ-03` wants 4 Hz and `NFR-03` wants 4 Hz; 10 Hz matches the existing safety cycle and leaves margin for lost frames. |
 | **Frame** | Fixed length, CRC checked, carrying: chamber temperature, cold-junction temperature, front-end fault bits, lid state, the supervisor's own trip state and reason, and a monotonic sequence number. |
 | **On silence** | The ESP32 treats a stale link exactly as it treats a sensor fault today, under `FR-ACQ-12`'s grace period, and withholds heat. |
-| **ESP32 to supervisor** | Nothing that can affect the trip. See section 8 for the one unresolved exception. |
+| **ESP32 to supervisor** | **Nothing at all.** The link is simplex, one wire. With the thermocouple type fixed (section 8) the supervisor needs no configuration, so it is given no receive path: it cannot be told anything, rather than being trusted not to listen. |
 
 The sequence number matters: it distinguishes "the link is quiet" from "the
 supervisor is repeating a stale frame", which are different failures.
@@ -211,10 +212,17 @@ So the supervisor must know the type. The options:
    path, no manufacturing variant, and the strap is inspectable. Costs pins and
    board area.
 
-Preference is **1** for the first revision and **4** if the other types are
-genuinely wanted, because it keeps the ESP32 out of the decision entirely. If
-**3** is chosen, the supervisor must default to the most conservative type and
-must refuse to raise its own trip threshold on the ESP32's word.
+**Decided: option 1, type K only.** The chamber thermocouple is type K and its
+type is not configurable; [`FR-ACQ-02`](requirements.sdoc) now says so. The
+other types are a documented limitation of the supervised product rather than a
+silent hazard. The enclosure channel's type stays configurable, that channel
+not being in the supervisor's remit.
+
+This has a consequence worth taking: with the type fixed, **the supervisor
+needs nothing at all from the ESP32**. There is no configuration to send, so
+the link can be simplex, one wire, supervisor to ESP32 only. The supervisor
+then has no receive path to be confused by, and is physically incapable of
+being told anything. See section 5.
 
 ## 9. The remaining common cause: one thermocouple
 
@@ -290,9 +298,8 @@ Changed:
 
 ## 12. Open questions, in the order they block work
 
-1. **Thermocouple type**, section 8. Blocks the supervisor's firmware and
-   possibly its pin count.
-2. **The two limits**, section 4. Blocks `SR-23` and the supervisor's constant.
+1. ~~Thermocouple type~~ **decided: type K only**, section 8.
+2. ~~The two limits~~ **decided: ceiling 1300 °C, trip 1350 °C**, section 4.
 3. **Second chamber couple?**, section 9. Blocks the schematic and the decision
    in `bom-optimisation.md` §1.
 4. **How a latched trip is cleared**, section 3. Power cycle alone, or a

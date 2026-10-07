@@ -48,7 +48,7 @@ reused: gaps in the numbering are items that have been closed.
 | [O](#o-wifi-fr-net) | WiFi | 3 |
 | [P](#p-http-transport-and-the-api) | HTTP transport and the API | 4 |
 | [Q](#q-the-file-store-ad-21) | The file store | 5 |
-| [R](#r-the-independent-safety-supervisor-ad-22) | Independent safety supervisor | 8 |
+| [R](#r-the-independent-safety-supervisor-ad-22) | Independent safety supervisor | 7 |
 
 ---
 
@@ -564,22 +564,6 @@ Designed in [`docs/safety-supervisor.md`](docs/safety-supervisor.md). Nothing
 below can start until `R1` to `R4` are answered, because each of them changes
 either the supervisor's pin count or a requirement.
 
-- [ ] **R1. Decide the thermocouple type question.** `FR-ACQ-02` allows eight
-  types and the MAX31856 linearises according to a register, so whoever sets
-  that register decides what the supervisor's temperature *means*. Hard-coding
-  type K while a type S couple is fitted makes the backstop read about a
-  quarter of the true output at 1300 degC and it never fires. Tripping on raw
-  microvolts does not escape it either. Options and a recommendation are in
-  section 8 of the design: type K only, or strap pins. **Blocks the supervisor
-  firmware and possibly its pin count.**
-
-- [ ] **R2. Reconcile the two temperature limits.** `SR-23` caps the
-  configurable maximum at 1350 degC, which is also the top of type K's range,
-  so there is no room above it for a hard-coded backstop. Preferred resolution:
-  configurable ceiling to 1300 degC, supervisor trips at 1350 degC, the two
-  numbers stated together with the margin as the reason. **Blocks `SR-23` and
-  the supervisor's constant.**
-
 - [ ] **R3. Decide whether the supervisor gets its own chamber couple.** With
   one couple the independence won is against software and MCU failure, not
   against a plausible-but-wrong reading (`HZ-03`). Section 9 of the design
@@ -594,6 +578,13 @@ either the supervisor's pin count or a requirement.
   alone, or a dedicated local button. `SR-17` already requires an explicit
   operator acknowledgement that survives power loss, and its wording will need
   to cover a trip the ESP32 cannot clear. **Blocks the panel.**
+
+- [ ] **R9. Retire `sense.tc_type` from the chamber channel.** `FR-ACQ-02` now
+  fixes the chamber couple as type K, and after `AD-22` the ESP32 does not
+  configure that front end at all, so the config item is meaningless on this
+  side. Removing it is a schema change (`KILN_CFG_SCHEMA_VERSION`,
+  `FR-CFG-05` migration), so do it in the same commit as the rest of the
+  supervisor's firmware work rather than bumping the schema twice.
 
 - [ ] **R5. Write the requirement deltas.** Six new requirements and nine
   changed ones, listed in section 11 of the design. `SR-23`, `FR-ACQ-01`,

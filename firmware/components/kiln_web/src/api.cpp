@@ -384,7 +384,11 @@ void write_info(kiln_api_ctx_t *ctx, kiln_json_t *j)
                       (ctx->app->warnings & KILN_WARN_BIT(KILN_WARN_GAINS_UNTUNED)) == 0u);
     kiln_json_obj_close(j);
 
+    /* Both limits, never one: the configurable ceiling is meaningless without
+     * the backstop above it (AD-22, SR-23). */
     kiln_json_kv_uint(j, "temp_ceiling_c", (unsigned long long)KILN_TEMP_CEILING_C);
+    kiln_json_kv_uint(j, "supervisor_trip_c",
+                      (unsigned long long)KILN_SUPERVISOR_TRIP_C);
     kiln_json_obj_close(j);
 }
 

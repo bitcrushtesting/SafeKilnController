@@ -20,9 +20,34 @@
 /* --- hard limits ------------------------------------------------------- */
 
 /* SR-23: compile-time ceiling.  No configuration, program target or tuning
- * setpoint may exceed this, whatever the operator types. */
-constexpr float KILN_TEMP_CEILING_C = 1350.0f;
+ * setpoint may exceed this, whatever the operator types.
+ *
+ * The two temperature limits are stated here together, deliberately, because
+ * they are only meaningful as a pair and limits that can be edited apart
+ * eventually cross (AD-22, safety-supervisor.md section 4):
+ *
+ *   KILN_TEMP_CEILING_C   1300 degC  the highest this controller will accept
+ *                                    as a configured maximum, program target
+ *                                    or tuning setpoint.  Above cone 10
+ *                                    (~1285 degC), so no ceramic firing is
+ *                                    lost by it.
+ *   KILN_SUPERVISOR_TRIP_C 1350 degC the independent supervisor's hard-coded
+ *                                    backstop, which it applies whatever this
+ *                                    firmware believes.
+ *
+ * The 50 degC between them is the margin, and it is the reason the ceiling is
+ * 1300 rather than the 1350 it was before the supervisor existed: a backstop
+ * has to sit above the highest legitimately configurable limit or the
+ * configuration is a lie.  1350 degC is also the top of type K's usable range
+ * (FR-ACQ-05), which is why the ceiling moved down rather than the trip up. */
+constexpr float KILN_TEMP_CEILING_C = 1300.0f;
 constexpr float KILN_TEMP_FLOOR_C   = -20.0f;
+
+/* The supervisor's own constant lives in its own firmware; this is the value
+ * the ESP32 reports and validates against, and it must track it.  R2. */
+constexpr float KILN_SUPERVISOR_TRIP_C = 1350.0f;
+static_assert(KILN_SUPERVISOR_TRIP_C > KILN_TEMP_CEILING_C,
+              "the supervisor's backstop must sit above the configurable ceiling");
 
 constexpr size_t KILN_MAX_SEGMENTS     = 32;  /* FR-PRG-01 */
 constexpr size_t KILN_PROGRAM_NAME_LEN = 32;

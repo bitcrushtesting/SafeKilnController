@@ -397,7 +397,11 @@ VERIFICATION: T
 [REQUIREMENT]
 UID: FR-ACQ-02
 STATEMENT: >>>
-The system shall support a configurable thermocouple type from the set {K, N, S, R, B, E, J, T}, defaulting to **K**.
+The **chamber** thermocouple shall be type **K**, and its type shall not be configurable.
+
+The chamber front end is read by the independent safety supervisor, which applies a hard-coded temperature backstop ([LINK: SR-23]). The MAX31856 linearises according to a type register, so whoever sets that register determines what the supervisor's temperature *means*: with the supervisor expecting type K and a type S couple fitted, the reading at 1300 °C is roughly a quarter of type K's output and the backstop would never fire. Tripping on raw thermovoltage does not escape this, because a threshold set for the least sensitive type never fires for the most sensitive and one set for the most sensitive fires at a few hundred degrees for the rest.
+
+The other types are therefore a documented limitation of the supervised product rather than a silent hazard. The **enclosure** channel's type remains configurable, that channel not being in the supervisor's remit.
 <<<
 PRIORITY: M
 VERIFICATION: T
@@ -2208,7 +2212,9 @@ VERIFICATION: I, T
 [REQUIREMENT]
 UID: SR-23
 STATEMENT: >>>
-The maximum chamber temperature shall be configurable only up to an absolute compile-time ceiling of **1350 °C**, and every temperature setpoint, program target and tuning setpoint shall be clamped to the configured maximum.
+The maximum chamber temperature shall be configurable only up to an absolute compile-time ceiling of **1300 °C**, and every temperature setpoint, program target and tuning setpoint shall be clamped to the configured maximum.
+
+The independent safety supervisor's hard-coded backstop shall be **1350 °C**, above this ceiling, so that the configurable limit is always reachable and the backstop is always beyond it. The two values shall be stated together wherever either appears; limits that can be edited apart eventually cross. The 1300 °C ceiling is above cone 10 (about 1285 °C), and 1350 °C is the top of type K's usable range ([LINK: FR-ACQ-05]), which is why the ceiling moved down rather than the backstop up.
 <<<
 VERIFICATION: T
 
