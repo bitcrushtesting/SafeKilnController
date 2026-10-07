@@ -182,19 +182,17 @@ jobs:
             wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
               | tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc >/dev/null
             add-apt-repository -y \
-              "deb http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-${LLVM_VERSION} main"
+              "deb http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-${{ env.LLVM_VERSION }} main"
             apt-get update -qq
-            apt-get install -y -qq "clang-tidy-${LLVM_VERSION}"
+            apt-get install -y -qq "clang-tidy-${{ env.LLVM_VERSION }}"
             update-alternatives --install /usr/bin/clang-tidy clang-tidy \
-              "/usr/bin/clang-tidy-${LLVM_VERSION}" 100
+              "/usr/bin/clang-tidy-${{ env.LLVM_VERSION }}" 100
             clang-tidy --version
             # IDF_TOOLS_PATH is /opt/esp in this image; the script needs it to
             # find the xtensa picolibc headers, and fails loudly without them
             # rather than analysing nothing and calling it clean.
             cd "$GITHUB_WORKSPACE"
             tools/tidy-target.sh
-        env:
-          LLVM_VERSION: ${{ env.LLVM_VERSION }}
 
   # TR-19.  The line floor is enforced; measured at 97.5 % on kiln_core when
   # this was written, so 90 % is a floor with room above it rather than a

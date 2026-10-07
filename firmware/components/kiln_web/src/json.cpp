@@ -64,7 +64,7 @@ void open_container(kiln_json_t *j, char c)
     }
     separate(j);
     putc_(j, c);
-    if (j->depth + 1 >= KILN_JSON_MAX_DEPTH) { j->overflow = true; return; }
+    if ((size_t)j->depth + 1U >= KILN_JSON_MAX_DEPTH) { j->overflow = true; return; }
     j->depth++;
     j->had_item[j->depth] = false;
 }
