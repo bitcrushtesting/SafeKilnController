@@ -35,7 +35,7 @@ reused: gaps in the numbering are items that have been closed.
 | | | Open |
 |---|---|---|
 | [A](#a-schematic-and-pcb) | Schematic and PCB | 22 |
-| [C](#c-build-test-and-ci-infrastructure) | Build, test and CI | 6 |
+| [C](#c-build-test-and-ci-infrastructure) | Build, test and CI | 8 |
 | [D](#d-documentation-and-open-questions) | Documentation and open questions | 2 |
 | [F](#f-static-analysis) | Static analysis | 2 |
 | [G](#g-door-interlock-sr-31) | Door interlock | 3 |
@@ -220,7 +220,14 @@ reused: gaps in the numbering are items that have been closed.
   IDF or RTOS header and that the component graph is acyclic and layered
   (TR-01, TR-07, AD-14).
 
-- [ ] **C6. `tools/trace`.** Requirement-ID traceability from `docs/` to test
+- [ ] **C6. Requirement-to-test traceability.** *Superseded in approach:* see
+  section 7 of [`docs/test-concept.md`](docs/test-concept.md). The recommendation
+  is not to build `tools/trace` but to use StrictDoc source traceability, which
+  now owns the requirements, and have the existing `requirements` CI job publish
+  the matrix. Today 28 of 268 requirements appear in a test name and 147 appear
+  in no test file at all. Original item follows.
+
+  **`tools/trace`.** Requirement-ID traceability from `docs/` to test
   names; fails on an untraced mandatory requirement, on a test naming a
   nonexistent ID, and on any `SR-*` without an automated test
   (TR-22, TR-23, TR-26).
@@ -253,6 +260,37 @@ reused: gaps in the numbering are items that have been closed.
 
   Nothing here is hard; it is the size of the diff that makes it its own
   commit rather than a detour inside another one.
+
+- [ ] **C12. Build the HIL fixture.** Designed in section 5 of
+  [`docs/test-concept.md`](docs/test-concept.md), which closes `TR-17` and
+  `TR-28` on paper and nothing in hardware. The shape: the plant model is
+  `kiln_sim` running on a host, so an L4 scenario can be the same scenario as
+  an L2 test with the same seed, and a disagreement isolates to the adapters
+  and the electricals. The I/O board is close to dumb but timestamps in
+  hardware, because USB latency is fine for a 10 Hz thermal model and useless
+  for measuring a 10 ms SSR window.
+
+  Two parts are not obvious and are worked through there. The thermocouple
+  simulator has to *subtract* the cold-junction compensation the MAX31856 adds,
+  and the loop closes itself because the supervisor already reports `cj_c` ten
+  times a second. And the current side needs a fixture-controlled bypass across
+  the load, not a signal generator, because `SR-27` discriminates a shorted SSR
+  from a welded contactor by dropping the contactor and re-measuring, and that
+  needs real contacts behaving both ways.
+
+  The single most valuable scenario it enables: hold the ESP32 in reset, drive
+  the chamber above 1350 degC, confirm the contactor opens. That is the one
+  experiment that distinguishes this design from the one it replaced, and it
+  exists at no other level.
+
+- [ ] **C13. Make three architecture decisions structural.** Each holds today
+  by discipline alone and is cheap to enforce, per section 6 of the test
+  concept. `AD-18`, the 20-byte log record, has no `static_assert` anywhere,
+  and it guards a persisted format. `AD-03`, no globals in the core, is true
+  (zero mutable file-scope objects in `kiln_core`) with
+  `cppcoreguidelines-avoid-non-const-global-variables` switched off. `AD-02`,
+  time is injected, is true (zero direct clock reads in the core) and is a
+  grep. Three decisions that are currently claims.
 
 - [ ] **C10. Coverage gate.** 90 % lines on control, safety, setpoint, program and
   autotune is enforced; 100 % of safety decision branches (`TR-19`) is not.
