@@ -7238,6 +7238,16 @@
 	)
 	(wire
 		(pts
+			(xy 441.96 147.32) (xy 448.31 147.32)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "36141bc8-cf40-4402-a99e-eea73db94012")
+	)
+	(wire
+		(pts
 			(xy 271.78 106.68) (xy 283.21 106.68)
 		)
 		(stroke
@@ -7255,16 +7265,6 @@
 			(type default)
 		)
 		(uuid "3817cdeb-06c7-4703-bc56-1e36856d5c51")
-	)
-	(wire
-		(pts
-			(xy 444.5 69.85) (xy 452.12 69.85)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "38312107-657b-491a-abaa-d157ccdbafff")
 	)
 	(wire
 		(pts
@@ -8178,16 +8178,6 @@
 	)
 	(wire
 		(pts
-			(xy 441.96 147.32) (xy 448.31 147.32)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "97ec3e97-629a-4720-a67e-fc974ea24b7c")
-	)
-	(wire
-		(pts
 			(xy 223.52 81.28) (xy 220.98 81.28)
 		)
 		(stroke
@@ -8435,6 +8425,16 @@
 			(type default)
 		)
 		(uuid "afe64c89-39ca-4f27-887a-f03f0b70bbe0")
+	)
+	(wire
+		(pts
+			(xy 444.5 69.85) (xy 452.12 69.85)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b0705a8b-bb8a-4cdb-bb39-9d7e4fa2ea3d")
 	)
 	(wire
 		(pts
@@ -13852,8 +13852,7 @@
 	)
 	(symbol
 		(lib_id "Connector:Screw_Terminal_01x02")
-		(at 436.88 147.32 0)
-		(mirror y)
+		(at 436.88 149.86 180)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -13863,16 +13862,6 @@
 		(dnp no)
 		(uuid "37cf04d4-222b-4fbb-bd2b-a52627732b4d")
 		(property "Reference" "J4"
-			(at 436.88 144.78 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "TC2 CASE (K)"
 			(at 436.88 152.4 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13882,8 +13871,18 @@
 				)
 			)
 		)
+		(property "Value" "TC2 CASE (K)"
+			(at 436.88 144.78 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Footprint" "TerminalBlock:TerminalBlock_MaiXu_MX126-5.0-02P_1x02_P5.00mm"
-			(at 436.88 147.32 0)
+			(at 436.88 149.86 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13894,7 +13893,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 436.88 147.32 0)
+			(at 436.88 149.86 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13905,7 +13904,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 436.88 147.32 0)
+			(at 436.88 149.86 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -13915,7 +13914,7 @@
 			)
 		)
 		(property "LCSC" "C474881"
-			(at 436.88 147.32 0)
+			(at 436.88 149.86 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14020,8 +14019,7 @@
 	)
 	(symbol
 		(lib_id "Connector:Screw_Terminal_01x02")
-		(at 439.42 69.85 0)
-		(mirror y)
+		(at 439.42 72.39 180)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -14031,16 +14029,6 @@
 		(dnp no)
 		(uuid "3852952b-844a-4a0b-a786-803839e3e502")
 		(property "Reference" "J3"
-			(at 439.42 67.31 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "TC1 KILN (K)"
 			(at 439.42 74.93 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14050,8 +14038,18 @@
 				)
 			)
 		)
+		(property "Value" "TC1 KILN (K)"
+			(at 439.42 67.31 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(property "Footprint" "TerminalBlock:TerminalBlock_MaiXu_MX126-5.0-02P_1x02_P5.00mm"
-			(at 439.42 69.85 0)
+			(at 439.42 72.39 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14062,7 +14060,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 439.42 69.85 0)
+			(at 439.42 72.39 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14073,7 +14071,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 439.42 69.85 0)
+			(at 439.42 72.39 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -14083,7 +14081,7 @@
 			)
 		)
 		(property "LCSC" "C474881"
-			(at 439.42 69.85 0)
+			(at 439.42 72.39 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
