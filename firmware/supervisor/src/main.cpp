@@ -59,6 +59,8 @@ __attribute__((section(".sup_crc"), used))
 const uint32_t sup_expected_crc = SUP_CRC_UNPROGRAMMED;
 extern const uint8_t _sup_crc_region_start[];
 extern const uint8_t _sup_crc_region_end[];
+extern uint32_t _sup_stack_guard_start[];
+extern uint32_t _sup_stack_guard_end[];
 }
 
 namespace {
@@ -325,6 +327,66 @@ bool clock_ok()
     return sup_clock_ok(RCC_CR, RCC_CFGR);
 }
 
+/* --- the periodic diagnostics (SWR-SAF-33, -34, -35) --------------------
+ *
+ * One RAM block per cycle rather than all of RAM at once, because the whole of
+ * it cannot be tested while the firmware is using it. The region walked is the
+ * free memory between the stack guard and the current stack pointer: nothing
+ * lives there, so no save and restore is needed, and it is exactly the memory
+ * the stack will grow into.
+ *
+ * The margin below the stack pointer is generous on purpose. Getting it wrong
+ * does not corrupt a variable, it corrupts the return address of the function
+ * doing the testing. */
+constexpr size_t RAM_TEST_WORDS = 16u;      /* 64 bytes a cycle */
+constexpr uint32_t RAM_TEST_SP_MARGIN = 256u;
+
+uint32_t s_ram_cursor;
+
+bool ram_step()
+{
+    const uint32_t lo = reinterpret_cast<uint32_t>(_sup_stack_guard_end);
+    const uint32_t sp = reinterpret_cast<uint32_t>(__builtin_frame_address(0));
+    if (sp <= lo + RAM_TEST_SP_MARGIN) {
+        return true;        /* no room this cycle; not a failure */
+    }
+    uint32_t addr = 0;
+    if (!sup_ram_next_block(lo, sp - RAM_TEST_SP_MARGIN, RAM_TEST_WORDS,
+                            &s_ram_cursor, &addr)) {
+        return true;
+    }
+    return sup_ram_block_ok(reinterpret_cast<volatile uint32_t *>(addr),
+                            RAM_TEST_WORDS);
+}
+
+/* The start-up pass: the whole free region, in one go, before heat can be
+ * permitted. The periodic walk afterwards is what keeps it covered. */
+bool ram_startup_ok()
+{
+    const uint32_t lo = reinterpret_cast<uint32_t>(_sup_stack_guard_end);
+    const uint32_t sp = reinterpret_cast<uint32_t>(__builtin_frame_address(0));
+    if (sp <= lo + RAM_TEST_SP_MARGIN) {
+        return true;
+    }
+    const uint32_t a_lo = (lo + 3u) & ~3u;
+    const uint32_t a_hi = (sp - RAM_TEST_SP_MARGIN) & ~3u;
+    if (a_hi <= a_lo) {
+        return true;
+    }
+    const size_t words = static_cast<size_t>((a_hi - a_lo) / 4u);
+    return sup_ram_block_ok(reinterpret_cast<volatile uint32_t *>(a_lo), words);
+}
+
+size_t stack_guard_words()
+{
+    return static_cast<size_t>(_sup_stack_guard_end - _sup_stack_guard_start);
+}
+
+bool stack_ok()
+{
+    return sup_stack_guard_ok(_sup_stack_guard_start, stack_guard_words());
+}
+
 /* Program memory integrity, checked once before anything is permitted. */
 bool flash_ok()
 {
@@ -560,16 +622,31 @@ int main()
      *
      * tc_init can run for TC_FIRST_CONVERSION_CYCLES, which is 2 s against the
      * watchdog's 350 ms, so the watchdog is fed inside its wait loop. */
+    sup_stack_guard_fill(_sup_stack_guard_start, stack_guard_words());
+
     const bool clk = clock_ok();
     const bool img = flash_ok();
-    const bool selftest_ok = clk && img && tc_init();
+    /* The start-up RAM pass covers the free region in one go, which the
+     * periodic walk then re-covers a block at a time (SWR-SAF-33). */
+    const bool ram = ram_startup_ok();
+    const bool selftest_ok = clk && img && ram && tc_init();
 
     sup_t sup;
     sup_init(&sup, selftest_ok);
 
     uint8_t seq = 0;
+    /* The previous cycle's sequence verdict. The flow monitor can only report
+     * on a cycle once that cycle has finished, so the result necessarily lands
+     * in the next one; at 10 Hz that is a 100 ms delay in reporting a sequence
+     * fault, against NFR-04's 500 ms budget. */
+    bool prev_flow_ok = true;
+    sup_flow_t flow;
+
     for (;;) {
+        sup_flow_begin(&flow);
+
         const tc_reading tc = tc_read();
+        sup_flow_mark(&flow, SUP_FLOW_READ);
 
         sup_input_t in = {};
         in.chamber_c     = tc.chamber_c;
@@ -580,11 +657,18 @@ int main()
          * belongs in the part that has tests. */
         in.clear_pressed = pin_low(SUP_PIN_CLEAR);
 
+        /* SWR-SAF-36: every periodic diagnostic, in one conjunction. A false
+         * here revokes the self-test inside sup_step, which withholds heat for
+         * good and cannot be cleared by the button. */
+        in.diag_ok = stack_ok() && ram_step() && prev_flow_ok;
+
         sup_step(&sup, &in, CYCLE_S);
+        sup_flow_mark(&flow, SUP_FLOW_STEP);
 
         /* The output is driven every cycle rather than on change, so a bit
          * corrupted in the GPIO register is corrected within one cycle. */
         permit(sup.permit);
+        sup_flow_mark(&flow, SUP_FLOW_PERMIT);
 
         sup_report_t rep = {};
         rep.version     = SUP_VERSION;
@@ -599,6 +683,12 @@ int main()
         if (sup_encode(&rep, frame, sizeof(frame)) == SUP_FRAME_BYTES) {
             uart_write(frame, SUP_FRAME_BYTES);
         }
+        sup_flow_mark(&flow, SUP_FLOW_REPORT);
+
+        /* Judged here, acted on next cycle. A cycle that skipped the permit
+         * stage, or that a corrupted branch entered halfway through, finishes
+         * on time and so is invisible to the watchdog; this is what sees it. */
+        prev_flow_ok = sup_flow_complete(&flow);
 
         wait_for_cycle_end();
         /* The only feed in the loop, and deliberately the last statement: it

@@ -2234,6 +2234,50 @@ The deliberate difference from [LINK: SWR-SAF-17] is worth stating rather than l
 PRIORITY: M
 VERIFICATION: T
 
+[REQUIREMENT]
+UID: SWR-SAF-33
+STATEMENT: >>>
+**Working memory integrity.** The independent safety supervisor shall test its working memory with a pattern test that drives every bit of every tested word to both states, and shall additionally apply an **address-dependent** pattern, so that two words which are physically the same storage are detected. The test shall run over the whole of working memory before heat is first permitted, and shall thereafter run continuously, a block at a time, such that the whole is covered repeatedly while the supervisor runs. A failure shall be treated as a failed self-test ([LINK: SWR-SAF-36]).
+<<<
+RATIONALE: >>>
+An address-dependent pattern is required and not optional. Two words that alias because an address line is stuck pass every uniform pattern, because both hold the same value and both read back what was written; they fail only when asked to hold two different values at once.
+<<<
+PRIORITY: M
+VERIFICATION: T
+
+[REQUIREMENT]
+UID: SWR-SAF-34
+STATEMENT: >>>
+**Stack overflow detection.** The supervisor shall reserve a guard region below its stack, fill it at start-up with a pattern that is neither all zeros nor all ones, and check **every word** of it each cycle. A guard word that no longer holds the pattern shall be treated as a failed self-test ([LINK: SWR-SAF-36]).
+<<<
+RATIONALE: >>>
+The pattern excludes all-zeros and all-ones because those are what uninitialised and erased storage read as: a guard whose pattern matches the state it is looking for would read as intact on a board where it had never been filled. Every word is checked rather than a sample, because the stack arrives at the top of the region and a sampled check would miss a shallow overflow, which is the one that is still recoverable.
+<<<
+PRIORITY: M
+VERIFICATION: T
+
+[REQUIREMENT]
+UID: SWR-SAF-35
+STATEMENT: >>>
+**Program sequence monitoring.** Each stage of the supervisor's cycle shall announce itself, and at the end of each cycle the supervisor shall verify that every stage ran **exactly once and in order**. A cycle whose sequence is incomplete, out of order or repeated shall be treated as a failed self-test ([LINK: SWR-SAF-36]). Each cycle shall be judged on its own; a broken cycle shall not condemn the next one, because latching is the trip logic's responsibility and not the monitor's.
+<<<
+RATIONALE: >>>
+This detects what a watchdog cannot. A watchdog notices a cycle that stopped; it cannot notice a cycle that finished on time having skipped the stage that drives the permit line, or one that a corrupted branch entered halfway through. Both produce a cycle of the right duration doing the wrong work.
+<<<
+PRIORITY: M
+VERIFICATION: T
+
+[REQUIREMENT]
+UID: SWR-SAF-36
+STATEMENT: >>>
+**A failed diagnostic is not clearable.** A failure of any self-diagnostic, whether at start-up or while running, shall de-energise heating, shall latch, and shall **not** be clearable by the local button of [LINK: SWR-SAF-32] or by any other operator action. Recovery shall require a power cycle, and a diagnostic that fails again shall latch again.
+<<<
+RATIONALE: >>>
+The clear button exists so an operator can acknowledge a condition they can see and have dealt with: an open thermocouple, an over-temperature. A supervisor whose memory, stack, clock, program image or program sequence has failed is not in that category. It is a supervisor that cannot be trusted to evaluate its own conditions, and a button that returned it to service would be a button that overrides the diagnostic rather than the fault.
+<<<
+PRIORITY: M
+VERIFICATION: T
+
 [[/SECTION]]
 
 [[SECTION]]

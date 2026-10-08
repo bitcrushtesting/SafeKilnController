@@ -208,6 +208,7 @@ KILN_TEST(swa22_a_decoded_reading_drives_the_trip_logic_end_to_end)
 
     sup_tc_sample_t sample = decode(hot);
     sup_input_t in = {};
+    in.diag_ok       = true;
     in.chamber_c     = sample.chamber_c;
     in.chamber_valid = sample.valid;
     in.fault_bits    = sample.fault_bits;

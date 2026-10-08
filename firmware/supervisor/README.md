@@ -138,7 +138,15 @@ it is anybody's recollection.
 ## What is done, and what is not
 
 **Done and tested:** the trip logic, the wire format, the MAX31856 register
-decode and the self-checks: 50 host tests over four suites. Between them that is the entire safety
+decode and the self-diagnostics: 68 host tests over four suites, with MC/DC at
+100 % over all of it against an 80 % floor.
+
+One coverage gap is worth naming rather than leaving to be found. The two
+failure returns inside the RAM pattern test are unreachable from a host test,
+because host RAM cannot be made to fail on demand. That is why the comparison
+they depend on, `sup_ram_word_ok`, is a separate function with its own tests for
+a bit stuck high, a bit stuck low and both polarities of a wrong word. The loop
+around it is four lines; the judgement in it is tested. Between them that is the entire safety
 function, the entire interface and the arithmetic that turns six register bytes
 into a temperature, and none of it needs hardware to exercise. MC/DC is measured
 over all three and is at 100 % against an 80 % floor (`tools/mcdc.sh`).
@@ -180,6 +188,49 @@ invariant rather than trusting the linker script. An **unstamped** image fails:
 `SUP_CRC_UNPROGRAMMED` is a failure, not "no expectation", because an image that
 reached a board without being stamped is exactly the one whose integrity is
 unknown. The stamp is a build step so it cannot be forgotten.
+
+**Working memory** (`SWR-SAF-33`). A pattern test that drives every bit of every
+tested word to both states, plus an **address-dependent** pattern. The second one
+is required rather than decorative: two words that alias because an address line
+is stuck pass every uniform pattern, since both hold the same value and both read
+back what was written. They fail only when asked to hold two different values at
+once.
+
+The whole free region is tested once before heat can be permitted, and then
+walked 64 bytes a cycle for ever. The region walked is the memory between the
+stack guard and the current stack pointer, which nothing is using, so no save and
+restore is needed and it is exactly the memory the stack will grow into. When the
+stack has grown too close to leave a safe window, the test declines that cycle
+rather than reporting a failure: a nuisance trip is worse than a missed cycle of
+a test that runs ten times a second.
+
+**Stack overflow** (`SWR-SAF-34`). 256 words of guard below the stack, filled at
+start-up and checked in full every cycle. Every word, not a sample, because the
+stack arrives at the top of the region and a sampled check would miss the shallow
+overflow, which is the one still worth catching.
+
+**Program sequence** (`SWR-SAF-35`). The four stages of the cycle announce
+themselves, and at the end the supervisor checks that each ran exactly once and in
+order. This catches what a watchdog cannot: a cycle that finished on time having
+skipped the stage that drives the permit line, or one a corrupted branch entered
+halfway through. Both produce a cycle of the right duration doing the wrong work.
+The verdict necessarily lands in the following cycle, since a sequence can only be
+judged once it has finished, which costs 100 ms against `SWR-NFR-04`'s 500 ms.
+
+**A failed diagnostic is not clearable** (`SWR-SAF-36`). Any diagnostic failure,
+at start-up or running, revokes the self-test rather than merely tripping. That
+makes it unclearable by the local button and keeps the permit false for good,
+because the permit is conjunctive on the self-test. The distinction is deliberate:
+the button exists so an operator can acknowledge a condition they can see and have
+dealt with, and a supervisor whose memory, stack, clock, image or program sequence
+has failed is not in that category. A button that returned it to service would be
+overriding the diagnostic rather than the fault.
+
+The diagnostics reach the trip logic through `diag_ok` on the input snapshot,
+which is **positive logic** so that a zero-initialised input withholds heat. That
+is the convention `chamber_valid` already uses, and for the same reason: the safe
+state has to be the one you get by forgetting to set a field. One test does
+nothing but check that.
 
 **A windowed watchdog**, which is the clock cross-check and is easy to mistake
 for an ordinary watchdog. The IWDG counts from the LSI, an oscillator the system

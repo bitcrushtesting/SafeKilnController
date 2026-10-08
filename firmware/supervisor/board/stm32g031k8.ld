@@ -75,11 +75,18 @@ SECTIONS
     } > RAM
 
     /* A stack that has run into .bss is the failure this guards: it is a link
-     * error rather than corruption nobody traced. */
+     * error rather than corruption nobody traced.
+     *
+     * It is now also checked at run time (SWR-SAF-34): filled with a pattern at
+     * start-up and verified every cycle, so a stack that reached the region is
+     * reported before it reaches anything that matters. The symbols are what
+     * the firmware needs to find it. */
     .stack_guard (NOLOAD) :
     {
         . = ALIGN(8);
+        _sup_stack_guard_start = .;
         . = . + 1K;
+        _sup_stack_guard_end = .;
     } > RAM
 
     /DISCARD/ : { *(.note.GNU-stack) *(.gnu_debuglink) }

@@ -18,6 +18,7 @@ sup_input_t ok_at(float c)
     in.chamber_c     = c;
     in.chamber_valid = true;
     in.fault_bits    = 0u;
+    in.diag_ok       = true;
     return in;
 }
 
@@ -46,6 +47,7 @@ KILN_TEST(swa22_comes_up_refusing_heat_before_any_conversion)
 
     sup_input_t in = {};
     in.chamber_valid = false;
+    in.diag_ok       = true;      /* isolate what this test is about */
     sup_step(&s, &in, 0.1f);
     CHECK(!s.permit);
 }
@@ -516,4 +518,121 @@ KILN_TEST(swa22_a_reported_fault_latches_even_before_a_first_reading)
     run_for(&s, &faulted, SUP_FAULT_GRACE_S + 0.2f);
     CHECK(s.tripped);
     CHECK_EQ_INT(s.reason, SUP_TRIP_TC_FAULT);
+}
+
+/*
+ * @relation(SWR-SAF-36, scope=function)
+ */
+KILN_TEST(swrsaf36_a_failed_diagnostic_withholds_heat_immediately)
+{
+    sup_t s;
+    sup_init(&s, true);
+
+    /* Establish a healthy cycle first, so the test shows the diagnostic taking
+     * permission away rather than never having granted it. */
+    const sup_input_t good = ok_at(500.0f);
+    sup_step(&s, &good, 0.1f);
+    CHECK(s.permit);
+
+    sup_input_t bad = good;
+    bad.diag_ok = false;
+    sup_step(&s, &bad, 0.1f);
+    CHECK(!s.permit);
+    CHECK(s.tripped);
+    CHECK_EQ_INT(s.reason, SUP_TRIP_SELF_TEST);
+}
+
+/*
+ * @relation(SWR-SAF-36, scope=function)
+ */
+KILN_TEST(swrsaf36_a_failed_diagnostic_is_not_clearable_by_the_button)
+{
+    /* The distinction from every other trip. An operator can acknowledge an
+     * open thermocouple because they can see it and deal with it. A supervisor
+     * whose RAM or program sequence has failed cannot be trusted to evaluate
+     * the condition they would be acknowledging. */
+    sup_t s;
+    sup_init(&s, true);
+
+    sup_input_t bad = ok_at(500.0f);
+    bad.diag_ok = false;
+    sup_step(&s, &bad, 0.1f);
+    CHECK(s.tripped);
+
+    /* Release, then hold the button well past the hold time, on a now-healthy
+     * reading. It must not clear. */
+    sup_input_t good = ok_at(500.0f);
+    sup_step(&s, &good, 0.1f);
+    good.clear_pressed = true;
+    run_for(&s, &good, SUP_CLEAR_HOLD_S * 4.0f);
+
+    CHECK(s.tripped);
+    CHECK(!s.permit);
+    CHECK_EQ_INT(s.reason, SUP_TRIP_SELF_TEST);
+
+    /* And directly, which is the path a test may take that an operator cannot. */
+    sup_clear(&s);
+    CHECK(s.tripped);
+}
+
+/*
+ * @relation(SWR-SAF-36, scope=function)
+ */
+KILN_TEST(swrsaf36_a_diagnostic_failure_does_not_unlatch_when_it_passes_again)
+{
+    /* An intermittent RAM fault that reads correctly on the next pass is still
+     * a RAM fault. Nothing about a later healthy cycle makes the earlier one
+     * trustworthy. */
+    sup_t s;
+    sup_init(&s, true);
+
+    sup_input_t bad = ok_at(400.0f);
+    bad.diag_ok = false;
+    sup_step(&s, &bad, 0.1f);
+    CHECK(s.tripped);
+
+    const sup_input_t good = ok_at(400.0f);
+    run_for(&s, &good, 10.0f);
+    CHECK(s.tripped);
+    CHECK(!s.permit);
+    CHECK_EQ_INT(s.reason, SUP_TRIP_SELF_TEST);
+}
+
+/*
+ * @relation(SWR-SAF-36, scope=function)
+ */
+KILN_TEST(swrsaf36_a_zero_initialised_input_withholds_heat)
+{
+    /* The reason diag_ok is positive logic. A caller that forgets the field
+     * gets the safe answer, which is the same convention chamber_valid uses. */
+    sup_t s;
+    sup_init(&s, true);
+
+    sup_input_t forgotten = {};
+    forgotten.chamber_c     = 500.0f;
+    forgotten.chamber_valid = true;
+    /* diag_ok deliberately not set */
+    sup_step(&s, &forgotten, 0.1f);
+    CHECK(!s.permit);
+    CHECK_EQ_INT(s.reason, SUP_TRIP_SELF_TEST);
+}
+
+/*
+ * @relation(SWR-SAF-36, scope=function)
+ */
+KILN_TEST(swrsaf36_a_diagnostic_failure_outranks_a_thermocouple_fault)
+{
+    /* Both wrong at once. The diagnostic is reported, because it is the more
+     * serious of the two and because it may well be what produced the other. */
+    sup_t s;
+    sup_init(&s, true);
+
+    sup_input_t both = ok_at(500.0f);
+    both.diag_ok    = false;
+    both.fault_bits = 1u;
+    run_for(&s, &both, SUP_FAULT_GRACE_S * 3.0f);
+
+    CHECK(s.tripped);
+    CHECK(!s.permit);
+    CHECK_EQ_INT(s.reason, SUP_TRIP_SELF_TEST);
 }

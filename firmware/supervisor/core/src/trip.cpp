@@ -56,6 +56,19 @@ void sup_step(sup_t *s, const sup_input_t *in, float dt_s)
         latch(s, SUP_TRIP_OVERTEMP);
     }
 
+    /* SWR-SAF-36: a failed diagnostic is the one condition that revokes the
+     * self-test rather than merely tripping on it. Clearing selftest_ok is what
+     * makes it unclearable, because sup_clear refuses to act without it, and
+     * what keeps permit false for good: permit is conjunctive on selftest_ok.
+     *
+     * Ordered before the fault handling below so that a cycle which has both a
+     * diagnostic failure and a thermocouple fault latches the diagnostic, which
+     * is the more serious of the two and the one that explains the other. */
+    if (!in->diag_ok) {
+        s->selftest_ok = false;
+        latch(s, SUP_TRIP_SELF_TEST);
+    }
+
     /* A reported fault and an unusable reading are different causes with the
      * same consequence, and are reported separately so the ESP32 can say which
      * it was. */

@@ -56,6 +56,18 @@ typedef struct {
     bool     chamber_valid; /* a conversion completed and was in range        */
     uint16_t fault_bits;    /* KILN_TC_FAULT_*, 0 for none                    */
     bool     clear_pressed; /* the local clear button, debounced by the cycle */
+    /* SWR-SAF-36: every self-diagnostic passed this cycle.
+     *
+     * POSITIVE logic, so that a zero-initialised input means "not proven
+     * healthy" and withholds heat. That is the same convention chamber_valid
+     * uses and for the same reason: the safe state has to be the one you get
+     * by forgetting to set a field.
+     *
+     * A false here is heavier than a thermocouple fault. It clears selftest_ok,
+     * which makes the trip unclearable by the button, because a supervisor
+     * whose RAM, stack or program sequence has failed cannot be trusted to
+     * evaluate the condition the operator would be acknowledging. */
+    bool     diag_ok;
 } sup_input_t;
 
 typedef struct {
