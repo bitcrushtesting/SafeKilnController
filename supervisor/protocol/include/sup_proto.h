@@ -61,6 +61,28 @@ typedef enum {
 /* uint32_t, not the uint8_t field they live in: a narrower constant promotes
  * to *int* before a bitwise operator, so composing a mask would be signed
  * arithmetic.  Same reasoning as the KILN_TC_FAULT_* masks in kiln/types.h. */
+/* The values the fault_bits field carries.
+ *
+ * These were previously named only in a comment pointing at KILN_TC_FAULT_* in
+ * kiln/types.h, which is the one kind of coupling a wire format must not have:
+ * a field whose meaning is written down on one side of a link and referred to
+ * from the other eventually disagrees across it, and the disagreement is a
+ * misreported fault rather than a build error.
+ *
+ * So they are declared here, in the header both sides already share, and
+ * kiln_core/suplink.cpp static_asserts that each one equals its KILN_TC_FAULT_*
+ * counterpart. The agreement is now the compiler's to check.
+ *
+ * uint32_t for the same reason as the flags below: a narrower constant promotes
+ * to int before a bitwise operator. */
+constexpr uint32_t SUP_TC_FAULT_OPEN      = 1u << 0u; /* open circuit          */
+constexpr uint32_t SUP_TC_FAULT_SHORT_VCC = 1u << 1u; /* short to supply       */
+constexpr uint32_t SUP_TC_FAULT_SHORT_GND = 1u << 2u; /* short to ground       */
+constexpr uint32_t SUP_TC_FAULT_CJ_RANGE  = 1u << 3u; /* cold junction range   */
+constexpr uint32_t SUP_TC_FAULT_TC_RANGE  = 1u << 4u; /* thermocouple range    */
+constexpr uint32_t SUP_TC_FAULT_OVUV      = 1u << 5u; /* over/under voltage    */
+constexpr uint32_t SUP_TC_FAULT_COMMS     = 1u << 6u; /* front end silent      */
+
 constexpr uint32_t SUP_FLAG_PERMIT      = 1u << 0u; /* permitting heat now     */
 constexpr uint32_t SUP_FLAG_TRIPPED     = 1u << 1u; /* latched; local clear    */
 constexpr uint32_t SUP_FLAG_TC_VALID    = 1u << 2u; /* reading is usable       */

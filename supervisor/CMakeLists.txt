@@ -19,6 +19,7 @@ add_executable(supervisor.elf
     src/main.cpp
     board/startup.cpp
     core/src/trip.cpp
+    core/src/max31856.cpp
     protocol/src/sup_proto.cpp)
 
 target_include_directories(supervisor.elf PRIVATE

@@ -5,6 +5,18 @@
 
 #include "kiln_core/suplink.h"
 
+/* AD-22's link carries fault_bits across a boundary that shares no code beyond
+ * the wire header, so the two names for each bit have to be the same number.
+ * A comment saying so was the previous arrangement; this is the version that
+ * fails the build instead of misreporting a fault at runtime. */
+static_assert(SUP_TC_FAULT_OPEN      == KILN_TC_FAULT_OPEN);
+static_assert(SUP_TC_FAULT_SHORT_VCC == KILN_TC_FAULT_SHORT_VCC);
+static_assert(SUP_TC_FAULT_SHORT_GND == KILN_TC_FAULT_SHORT_GND);
+static_assert(SUP_TC_FAULT_CJ_RANGE  == KILN_TC_FAULT_CJ_RANGE);
+static_assert(SUP_TC_FAULT_TC_RANGE  == KILN_TC_FAULT_TC_RANGE);
+static_assert(SUP_TC_FAULT_OVUV      == KILN_TC_FAULT_OVUV);
+static_assert(SUP_TC_FAULT_COMMS     == KILN_TC_FAULT_COMMS);
+
 namespace {
 
 /* port_tc::configure.

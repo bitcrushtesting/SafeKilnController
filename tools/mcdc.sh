@@ -77,8 +77,9 @@ if [[ $(uname) == Darwin ]] && command -v xcrun >/dev/null 2>&1; then
     FLAGS+=(-isysroot "$(xcrun --show-sdk-path)")
 fi
 
-UNDER=(supervisor/core/src/trip.cpp supervisor/protocol/src/sup_proto.cpp)
-for suite in test_trip test_proto; do
+UNDER=(supervisor/core/src/trip.cpp supervisor/core/src/max31856.cpp
+       supervisor/protocol/src/sup_proto.cpp)
+for suite in test_trip test_proto test_max31856; do
     "$CLANGXX" "${FLAGS[@]}" "${UNDER[@]}" \
         firmware/test/host/support/kiln_check.cpp \
         "supervisor/test/host/$suite.cpp" -o "$OUT/$suite"

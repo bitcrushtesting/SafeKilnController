@@ -137,16 +137,32 @@ it is anybody's recollection.
 
 ## What is done, and what is not
 
-**Done and tested:** the trip logic (14 tests) and the wire format (10 tests).
-Between them that is the entire safety function and the entire interface, and
-neither needs hardware to exercise.
+**Done and tested:** the trip logic (14 tests), the wire format (10 tests) and
+the MAX31856 register decode (9 tests). Between them that is the entire safety
+function, the entire interface and the arithmetic that turns six register bytes
+into a temperature, and none of it needs hardware to exercise. MC/DC is measured
+over all three and is at 100 % against an 80 % floor (`tools/mcdc.sh`).
+
+The decode is in `sup_core` rather than beside the SPI code on purpose. Two's
+complement reassembled across three registers and shifted back with a
+sign-extending shift is not something to get right by inspection: a logical
+shift there reads -1 degC as +524287, which is above the backstop, so a cold
+kiln would trip. Its test vectors were produced by encoding known temperatures
+from the datasheet's register layout, not by recording what the decoder
+returned.
 
 **Written but never run on silicon:** the peripheral bring-up in `main.cpp` and
 the alternate-function numbers in `board/pins.h`. The register addresses are
 ST's, but the AF mappings live in the datasheet rather than the SVD and are
-marked `(confirm)` where they are assumed. The MAX31856 driver is a stub that
-returns "not configured", which makes the start-up self-test fail closed, which
-is the correct behaviour for a supervisor that cannot read its sensor.
+marked `(confirm)` where they are assumed. What is unverified is now the
+*transport* rather than the logic: the SPI configuration, the chip-select
+timing, the SysTick period and the USART bring-up. Each is a small separate
+function so it can be brought up and checked one at a time on a bench.
 
-In other words: this will build, flash and refuse to permit heat. That is the
-right order to be incomplete in.
+The start-up self-test is real rather than a stub returning "not configured". It
+writes MASK, CR1 and CR0, reads CR1 back to tell a configured part from a dead
+bus, and then waits for a conversion to actually complete before the trip logic
+is allowed to run at all. That last step is not ceremony: before the first
+conversion the temperature registers read zero, and zero decodes as a
+plausible, in-range, fault-free 0 degC. It is the one reading that would permit
+heat on a kiln whose temperature is not yet known.
