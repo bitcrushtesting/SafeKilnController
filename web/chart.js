@@ -1,14 +1,14 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * A self-contained canvas chart -- FR-WEB-06, FR-WEB-07, FR-WEB-08, FR-WEB-10.
+ * A self-contained canvas chart -- SWR-WEB-06, SWR-WEB-07, SWR-WEB-08, SWR-WEB-10.
  *
  * Hand-written rather than a library, which resolves OQ-04: the requirement is
  * two axes and a handful of series, and a dependency would cost more than the
  * entire asset budget of architecture 12.4 and bring a licence to audit with it.
  *
  * It draws the min/max band for the measured trace rather than a single line,
- * because that is the whole point of FR-LOG-11's extrema-preserving decimation:
+ * because that is the whole point of SWR-LOG-11's extrema-preserving decimation:
  * at 800 points for a 24 h firing, a brief overshoot exists in the data and has
  * to be visible in the picture.
  */
@@ -44,7 +44,7 @@ export class Chart {
 
     this.cols = null;      // column-name -> index, from the API response
     this.rows = [];
-    this.plan = [];        // FR-WEB-08: the intended remainder
+    this.plan = [];        // SWR-WEB-08: the intended remainder
     this.vis = { sp: true, plan: true, duty: false, cur: false, case: false };
 
     this.view = null;      // {t0,t1} when zoomed, else null for "everything"
@@ -296,7 +296,7 @@ export class Chart {
       ctx.setLineDash([]);
     };
 
-    /* FR-WEB-08: the planned remainder, dashed, behind the actual trace. */
+    /* SWR-WEB-08: the planned remainder, dashed, behind the actual trace. */
     if (this.vis.plan && this.plan.length > 1) {
       ctx.beginPath();
       this.plan.forEach((p, i) => {
@@ -320,7 +320,7 @@ export class Chart {
     band('kiln_min_c', 'kiln_max_c', col.acc + '44');
     line('kiln_max_c', col.acc, 1.8);
 
-    /* FR-WEB-10: a readout at the cursor. */
+    /* SWR-WEB-10: a readout at the cursor. */
     if (this.cursor !== null && visible.length) {
       const t = t0 + (this.cursor - px.l) / plotW * (t1 - t0);
       let best = null, bd = Infinity;

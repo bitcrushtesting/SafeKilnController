@@ -5,7 +5,7 @@
  * loop at 10 Hz that reads, decides and reports.
  *
  * Everything that *decides* is in sup_core and is tested on the host.  What is
- * here is the part that needs the silicon, which is the same split AD-01 makes
+ * here is the part that needs the silicon, which is the same split SWA-01 makes
  * on the other side of the link and for the same reason.
  *
  * ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ constexpr uint32_t CYCLE_HZ    = 10u;
  * reaching zero, so the period is RVR + 1 ticks: the reload holds one less than
  * the count.
  *
- * This is the whole of what used to be a calibrated nop loop.  FR-ACQ-03 gives
+ * This is the whole of what used to be a calibrated nop loop.  SWR-ACQ-03 gives
  * the cycle period a +/-10 % tolerance, and a spin loop cannot hold one: it
  * drifts with the compiler, the optimisation level and anything added to the
  * loop body, and it is wrong by construction the moment the body does more work
@@ -214,7 +214,7 @@ void board_watchdog_init()
      *   It must be comfortably LONGER than one cycle (100 ms) or the
      *   supervisor resets itself for being busy.
      *
-     *   It must be comfortably SHORTER than NFR-04's 500 ms, because a hung
+     *   It must be comfortably SHORTER than SWR-NFR-04's 500 ms, because a hung
      *   supervisor stops feeding the watchdog, and the reset is what drops the
      *   permit line (startup.cpp does it before .data is copied).  The
      *   watchdog period is therefore the worst-case time from "the supervisor
@@ -225,7 +225,7 @@ void board_watchdog_init()
      * RLR = 175 gives 350 ms: three and a half cycles of margin below, and
      * 150 ms of margin above, which holds even if the LSI is 10 % off in
      * either direction.  The 1 s this was first written with would have missed
-     * NFR-04 outright. */
+     * SWR-NFR-04 outright. */
     IWDG_KR  = 0x0000CCCCu;                     /* start                     */
     IWDG_KR  = 0x00005555u;                     /* enable register access    */
     IWDG_PR  = 4u;                              /* LSI / 64 -> 2 ms per tick */

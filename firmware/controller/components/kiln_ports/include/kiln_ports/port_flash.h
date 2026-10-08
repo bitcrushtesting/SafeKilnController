@@ -1,12 +1,12 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Raw access to a flash partition -- the substrate AD-08's circular log ring is
+ * Raw access to a flash partition -- the substrate SWA-08's circular log ring is
  * built on.
  *
  * Why this exists rather than the ring living in the adapter, as architecture
  * 5.2 originally had it: the ring's interesting behaviour is all *decision*
- * logic with failure modes that FR-LOG-06 and FR-LOG-08 name explicitly --
+ * logic with failure modes that SWR-LOG-06 and SWR-LOG-08 name explicitly --
  * head discovery across 512 sector headers, erase-immediately-before-write
  * ordering so that a power cut cannot destroy data the index still claims
  * exists, and terminating a sector scan at a torn record.  None of that is
@@ -20,7 +20,7 @@
  *   - a write may only clear bits, so a region must be erased before it can be
  *     written with anything other than what it already holds
  *   - a write interrupted by power loss leaves its target bytes undefined,
- *     which is precisely what the per-record CRC of FR-LOG-08 is for
+ *     which is precisely what the per-record CRC of SWR-LOG-08 is for
  */
 #ifndef KILN_PORT_FLASH_H
 #define KILN_PORT_FLASH_H

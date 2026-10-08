@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Relay autotune -- architecture section 7.4, FR-TUN-01..FR-TUN-11.
+ * Relay autotune -- architecture section 7.4, SWR-TUN-01..SWR-TUN-11.
  *
  * Astrom-Haegglund: drive a bounded on/off limit cycle about a tuning setpoint,
  * measure its amplitude and period, and read the ultimate gain off the
@@ -11,7 +11,7 @@
  *
  * with d the relay half amplitude in percent duty and a the half amplitude of
  * the resulting temperature oscillation in degC.  Gains then follow from a
- * published rule (FR-TUN-06).
+ * published rule (SWR-TUN-06).
  *
  * This component only ever *requests* a duty; safety supervision applies
  * throughout, exactly as during a normal firing.
@@ -44,13 +44,13 @@ typedef struct { float kp, ki, kd; } kiln_gains_t;
 
 typedef struct {
     float    setpoint_c;
-    /* SR-23 requires *every* temperature setpoint, program target and tuning
+    /* SWR-SAF-23 requires *every* temperature setpoint, program target and tuning
      * setpoint to be clamped to the configured maximum -- not only to the
      * compile-time ceiling.  It arrives here rather than being left to the
      * caller by comment, so that it is enforced where it cannot be forgotten. */
     float    max_temp_c;
-    uint16_t amplitude_permille;   /* d: FR-TUN-04, 100..1000, default 500 */
-    float    hysteresis_c;         /* FR-TUN-04, 0.1..20, default 1        */
+    uint16_t amplitude_permille;   /* d: SWR-TUN-04, 100..1000, default 500 */
+    float    hysteresis_c;         /* SWR-TUN-04, 0.1..20, default 1        */
 
     /* Peak detection's confirmation threshold, independent of the relay band.
      *
@@ -63,7 +63,7 @@ typedef struct {
      *    so Ku comes out exact whatever the threshold.
      *  - What the threshold actually buys is noise immunity, and it is not
      *    optional: with 0.5 degC of sensor noise a threshold of 0.25 degC lets
-     *    noise manufacture extrema, cycles never agree within FR-TUN-05's
+     *    noise manufacture extrema, cycles never agree within SWR-TUN-05's
      *    tolerances, and the procedure fails on its timeout having learned
      *    nothing.
      *  - Noise that does get through inflates the measured half-amplitude (peak
@@ -75,11 +75,11 @@ typedef struct {
      * in the safe direction.  0 means "use hysteresis_c". */
     float    peak_threshold_c;
 
-    float    timeout_s;            /* FR-TUN-07, 600..28800, default 7200  */
-    uint8_t  required_cycles;      /* FR-TUN-05, default 3 (after the first
+    float    timeout_s;            /* SWR-TUN-07, 600..28800, default 7200  */
+    uint8_t  required_cycles;      /* SWR-TUN-05, default 3 (after the first
                                     * is discarded)                        */
-    float    period_tol;           /* FR-TUN-05, default 0.15              */
-    float    amplitude_tol;        /* FR-TUN-05, default 0.20              */
+    float    period_tol;           /* SWR-TUN-05, default 0.15              */
+    float    amplitude_tol;        /* SWR-TUN-05, default 0.20              */
     float    settle_rate_c_per_h;  /* considered settled below this        */
     float    settle_max_s;         /* give up settling after this          */
 } kiln_tune_cfg_t;
@@ -114,7 +114,7 @@ typedef struct {
     kiln_tune_cycle_t cycles[KILN_TUNE_MAX_CYCLES];
     uint8_t           cycle_count;   /* recorded, including the discarded first */
 
-    uint32_t bad_calls;              /* NFR-17: contract violations by the caller */
+    uint32_t bad_calls;              /* SWR-NFR-17: contract violations by the caller */
 
     /* results */
     float ku, tu;
@@ -122,8 +122,8 @@ typedef struct {
     kiln_fault_t fail_reason;
 } kiln_autotune_t;
 
-/* SR-23 is enforced here: setpoint_c is clamped to cfg->max_temp_c and to the
- * compile-time ceiling.  FR-TUN-03's "ambient + 50 degC" lower bound still
+/* SWR-SAF-23 is enforced here: setpoint_c is clamped to cfg->max_temp_c and to the
+ * compile-time ceiling.  SWR-TUN-03's "ambient + 50 degC" lower bound still
  * belongs to the caller, which is the only party that knows ambient.
  *
  * Returns KILN_ERR_RANGE when the tuning setpoint had to be clamped: the

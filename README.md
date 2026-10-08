@@ -9,7 +9,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 [![Coverage gate](https://img.shields.io/badge/coverage%20gate-%E2%89%A5%2090%25%20lines-blue?style=flat-square)](.github/workflows/ci.yml)
 [![MC/DC gate](https://img.shields.io/badge/MC%2FDC%20gate-%E2%89%A5%2080%25-blue?style=flat-square)](tools/mcdc.sh)
 [![clang-tidy](https://img.shields.io/badge/clang--tidy-host%20%2B%20target-blue?style=flat-square)](.clang-tidy)
-[![Requirements](https://img.shields.io/badge/requirements-StrictDoc%20validated-blue?style=flat-square)](docs/requirements.sdoc)
+[![Requirements](https://img.shields.io/badge/requirements-StrictDoc%20validated-blue?style=flat-square)](docs/03_software_req.sdoc)
 [![Licence](https://img.shields.io/badge/licence-GPL--3.0--or--later-blue?style=flat-square)](LICENSE)
 
 An open-source PID controller for electric ceramic and glass kilns, built on the
@@ -45,7 +45,7 @@ clean on host and target, the `esp32s3` image builds with zero warnings at
 | `kiln_hal_esp32s3`: MAX31856, SSD1306, encoder, SSR outputs, CT front end, WiFi | Implemented, **not yet run against hardware** |
 | `kiln_web`: REST API, JSON, log streaming, read-only enforcement | Implemented, host-tested; HTTP transport on target, **browser assets not yet embedded** |
 | `kiln_hmi`: the local display and encoder | Implemented and host-tested, **not yet run against hardware**; the only way to start a firing |
-| Firmware update | **Removed from the network** (FR-UPD-01); no local path specified yet |
+| Firmware update | **Removed from the network** (SWR-UPD-01); no local path specified yet |
 
 You can watch a complete firing, and break it in a dozen ways, without any
 hardware at all, see [`docs/simulation.md`](docs/simulation.md):
@@ -99,19 +99,23 @@ fix can take; closing it as well would make a unit permanently unfixable.
 
 | Document | Contents |
 |---|---|
-| [`docs/requirements.sdoc`](docs/requirements.sdoc) | Requirements specification, functional, safety, non-functional, hardware-interface and testability requirements, each with an identifier and a verification method. |
+| [`docs/v-model-process.md`](docs/v-model-process.md) | The development process: the V-model levels, which document holds each, the relations between them, and an honest record of which levels exist and which do not. |
+| [`docs/01_user_req.sdoc`](docs/01_user_req.sdoc) | User requirements: the target markets (the European Union), the regulatory framework that follows from them with instrument numbers and editions, the user needs with their acceptance criteria, and the project constraints. |
+| [`docs/02_system_req.sdoc`](docs/02_system_req.sdoc) | System requirements: the hardware interface, the four safety requirements that hardware discharges, and the assumptions about the environment the system is placed in. |
+| [`docs/03_software_req.sdoc`](docs/03_software_req.sdoc) | Software requirements: the functional, safety, non-functional and testability requirements, each with an identifier and a verification method. |
+| [`docs/04_software_arch.sdoc`](docs/04_software_arch.sdoc) | Software architecture: the 22 decisions the design rests on, each with the requirement that drove it and the cost it carries. |
 | [`docs/safety.sdoc`](docs/safety.sdoc) | Hazards, safety goals and residual risks, each with an identifier, and the chain between them as checked relations: which hazards a goal mitigates, which requirements realise it, and which risk its layers leave. |
 | [`docs/safety.md`](docs/safety.md) | Safety concept: the system boundary, the layered protection concept and the independence claimed between layers, detection coverage and timing, the reaction and recovery sequence, and the obligations on the installer and on anyone changing the design. |
 | [`docs/security.sdoc`](docs/security.sdoc) | Assets, adversaries, threats, security goals, residual risks and open questions, each with an identifier, and the chain between them as checked relations: which asset a threat is aimed at, which safety hazard it reaches, which goal answers it, and what each goal's implementation status actually is. |
 | [`docs/security.md`](docs/security.md) | Security concept: scope, the attack surface and trust boundaries, why a security compromise here is a safety event, what the implementation already gets right, the obligations on the owner and on whoever implements the HTTP transport, and the verification status. |
-| [`docs/architecture.md`](docs/architecture.md) | Software architecture, key decisions, component decomposition, task and timing design, control and safety algorithms, persistence and flash-endurance design, REST API, and the build and test architecture. |
+| [`docs/architecture.md`](docs/architecture.md) | Architecture prose: component decomposition, task and timing design, control and safety algorithms, persistence and flash-endurance design, REST API, and the build and test architecture. |
 | [`docs/test-concept.md`](docs/test-concept.md) | How the product is verified: unit, integration, system and hardware-in-the-loop, what each level can and cannot prove, the HIL fixture design, and an honest status against every testability requirement. |
-| [`docs/safety-supervisor.md`](docs/safety-supervisor.md) | The independent safety supervisor (`AD-22`): a second microcontroller holding the absolute over-temperature, thermocouple-fault and lid trips, what moves and what stays, the link, the failure modes, and the questions still open. |
+| [`docs/safety-supervisor.md`](docs/safety-supervisor.md) | The independent safety supervisor (`SWA-22`): a second microcontroller holding the absolute over-temperature, thermocouple-fault and lid trips, what moves and what stays, the link, the failure modes, and the questions still open. |
 | [`docs/bom-optimisation.md`](docs/bom-optimisation.md) | Parts the design might do without or do more cheaply, each worked through to a recommendation with the requirements a change would touch. Candidates, not decisions. |
 | [`docs/simulation.md`](docs/simulation.md) | Running the firmware against a simulated kiln, on the host and under QEMU, including fault injection. |
 | [`tasklist.md`](tasklist.md) | Outstanding work, by priority. |
 
-Start with [`docs/requirements.sdoc`](docs/requirements.sdoc); the architecture
+Start with [`docs/03_software_req.sdoc`](docs/03_software_req.sdoc); the architecture
 document cites it throughout.
 
 ## Repository layout
@@ -145,7 +149,7 @@ three-phase kiln, so it is out of scope rather than partially supported.
 | Connectivity | WiFi station with access-point fallback, `kiln.local` via mDNS |
 
 Details and rationale are in
-[requirements §6](docs/requirements.sdoc).
+[requirements §6](docs/03_software_req.sdoc).
 
 ## Credit
 
@@ -166,7 +170,7 @@ Mains wiring must be carried out by a competent person in accordance with local 
 
 The hazards, the layered protection concept and the risk that remains are
 set out in [`docs/safety.md`](docs/safety.md); the requirements it derives from
-are [requirements §5](docs/requirements.sdoc).
+are [requirements §5](docs/03_software_req.sdoc).
 
 Safe Kiln Controller is designed for a **trusted local network** and must not be exposed
 to the internet. The threat model, the controls and what is still only specified are in [`docs/security.md`](docs/security.md).

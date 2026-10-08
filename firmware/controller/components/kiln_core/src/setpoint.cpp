@@ -7,7 +7,7 @@
 #include "kiln_core/profile.h"
 
 /* Upper bound on a predicted duration: a program is capped at 168 h by
- * FR-PRG-05, so 200 h cannot be exceeded by a valid program and bounds the
+ * SWR-PRG-05, so 200 h cannot be exceeded by a valid program and bounds the
  * answer for an invalid one. */
 constexpr uint32_t PREDICT_MAX_S = 200u * 3600u;
 
@@ -17,7 +17,7 @@ namespace {
  * heat_allowed and by the duration prediction, because the three disagreeing is
  * a real defect: comparing an *unclamped* target against the segment start made
  * heat_allowed report true while the executor was ramping the clamped setpoint
- * downward -- a cooling ramp that FR-CTL-13 should have made passive, driven at
+ * downward -- a cooling ramp that SWR-CTL-13 should have made passive, driven at
  * full duty instead. */
 float seg_target_c(const kiln_setpoint_t *st, uint8_t seg)
 {
@@ -78,7 +78,7 @@ kiln_err_t kiln_setpoint_start(kiln_setpoint_t *st,
     st->cfg  = *cfg;
     st->prog = *prog;
 
-    /* SR-23 binds regardless of what the caller configured. */
+    /* SWR-SAF-23 binds regardless of what the caller configured. */
     st->cfg.max_temp_c = kiln_clampf(st->cfg.max_temp_c, 0.0f, KILN_TEMP_CEILING_C);
     if (st->cfg.dwell_tol_c <= 0.0f) {
         st->cfg.dwell_tol_c = 5.0f;
@@ -114,7 +114,7 @@ kiln_err_t kiln_setpoint_tick(kiln_setpoint_t *st, float pv_c, float dt_s)
         return KILN_ERR_STATE; /* frozen */
     }
 
-    /* FR-CTL-11: while the kiln is outside the hold-back band, neither the
+    /* SWR-CTL-11: while the kiln is outside the hold-back band, neither the
      * setpoint nor the segment timer advances, so a slow kiln cannot silently
      * fall behind its curve. */
     if (st->cfg.holdback_band_c > 0.0f) {
@@ -134,7 +134,7 @@ kiln_err_t kiln_setpoint_tick(kiln_setpoint_t *st, float pv_c, float dt_s)
     switch (st->phase) {
     case KILN_SP_PHASE_RAMP:
         if (s->rate_c_per_h == 0) {
-            st->sp_c = target;              /* FR-CTL-10 */
+            st->sp_c = target;              /* SWR-CTL-10 */
         } else {
             const float step = (float)s->rate_c_per_h * dt_s / 3600.0f;
             st->sp_c = move_toward(st->sp_c, target, step);
@@ -146,7 +146,7 @@ kiln_err_t kiln_setpoint_tick(kiln_setpoint_t *st, float pv_c, float dt_s)
         break;
 
     case KILN_SP_PHASE_DWELL: {
-        /* FR-CTL-12: dwell time only accrues while the kiln is actually within
+        /* SWR-CTL-12: dwell time only accrues while the kiln is actually within
          * tolerance of the target. */
         const float err = pv_c > target ? pv_c - target : target - pv_c;
         if (err <= st->cfg.dwell_tol_c) {
@@ -154,7 +154,7 @@ kiln_err_t kiln_setpoint_tick(kiln_setpoint_t *st, float pv_c, float dt_s)
         }
         if (st->seg_elapsed_s >= (float)s->dwell_min * 60.0f) {
             if ((s->flags & KILN_SEG_FLAG_REQUIRE_ACK) != 0u) {
-                st->phase = KILN_SP_PHASE_AWAIT_ACK;    /* FR-PRG-03 */
+                st->phase = KILN_SP_PHASE_AWAIT_ACK;    /* SWR-PRG-03 */
             }
             else {
                 advance_segment(st);
@@ -194,7 +194,7 @@ kiln_err_t kiln_setpoint_replace_remaining(kiln_setpoint_t *st,
         return KILN_ERR_STATE;
     }
 
-    /* The running segment and everything before it are history: FR-PRG-10
+    /* The running segment and everything before it are history: SWR-PRG-10
      * permits editing only what has not started. */
     if (updated->segment_count <= st->seg) {
         return KILN_ERR_STATE;
@@ -211,7 +211,7 @@ kiln_err_t kiln_setpoint_replace_remaining(kiln_setpoint_t *st,
         return KILN_ERR_RANGE;
     }
 
-    /* The whole program is taken, name and description included -- FR-PRG-10
+    /* The whole program is taken, name and description included -- SWR-PRG-10
      * permits editing anything that has not started, and the identity of a
      * program is as editable as its tail.  Execution state is untouched. */
     st->prog = *updated;
@@ -227,7 +227,7 @@ bool kiln_setpoint_heat_allowed(const kiln_setpoint_t *st)
         return true; /* a soak needs heat */
     }
 
-    /* FR-CTL-13: a ramp whose target is below where the segment started is a
+    /* SWR-CTL-13: a ramp whose target is below where the segment started is a
      * cooling ramp, and is executed passively.  The *clamped* target, which is
      * what the executor is actually ramping toward. */
     return !(seg_target_c(st, st->seg) < st->seg_start_c);
@@ -244,7 +244,7 @@ namespace {
 uint32_t ramp_s(float from_c, float to_c, uint16_t rate_c_per_h)
 {
     if (rate_c_per_h == 0) {
-        return 1u; /* FR-CTL-10: steps to target */
+        return 1u; /* SWR-CTL-10: steps to target */
     }
 
     const float step_per_s = (float)rate_c_per_h / 3600.0f;
@@ -279,7 +279,7 @@ uint32_t dwell_s(uint16_t dwell_min, float already_s)
 }
 
 /* Closed-form equivalent of running the generator forward with the kiln tracking
- * perfectly, which is the assumption FR-PRG-06 and FR-RUN-05 state.  Hold-back
+ * perfectly, which is the assumption SWR-PRG-06 and SWR-RUN-05 state.  Hold-back
  * and dwell tolerance therefore never trigger, which is what makes the
  * arithmetic closed. */
 uint32_t predict_s(const kiln_setpoint_t *st, bool stop_at_segment_end)
@@ -313,7 +313,7 @@ uint32_t predict_s(const kiln_setpoint_t *st, bool stop_at_segment_end)
         phase   = KILN_SP_PHASE_RAMP;
         elapsed = 0.0f;
 
-        /* FR-PRG-03: the schedule stops at a segment that waits on a human. */
+        /* SWR-PRG-03: the schedule stops at a segment that waits on a human. */
         if ((s->flags & KILN_SEG_FLAG_REQUIRE_ACK) != 0u) {
             break;
         }

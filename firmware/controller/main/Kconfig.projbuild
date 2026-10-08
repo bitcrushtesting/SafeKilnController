@@ -12,7 +12,7 @@ config KILN_PLANT_SIM
 
         This is how the firmware runs under QEMU, whose esp32s3 model provides
         a CPU, memory, flash and a UART but no SPI thermocouple front end, no
-        I2C display and no ADC.  Substituting at the port boundary (AD-01) means
+        I2C display and no ADC.  Substituting at the port boundary (SWA-01) means
         the control and safety path under test is the real one; only the
         hardware edges are replaced.
 
@@ -34,7 +34,7 @@ config KILN_SIM_TIME_ACCEL
 
         The 10 ms output window and the current-measurement settle and burst
         timings are deliberately NOT accelerated: those are real hardware
-        timings, and leaving them real is what makes the gating of AD-17
+        timings, and leaving them real is what makes the gating of SWA-17
         meaningful here.
 
 config KILN_SIM_AUTOSTART

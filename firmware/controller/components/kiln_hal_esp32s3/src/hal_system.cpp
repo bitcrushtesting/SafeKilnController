@@ -1,8 +1,8 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * port_system: reset cause, firmware identity, the task watchdog -- NFR-15,
- * SR-14, SR-15, FR-UPD-06, NFR-11.
+ * port_system: reset cause, firmware identity, the task watchdog -- SWR-NFR-15,
+ * SWR-SAF-14, SWR-SAF-15, SWR-UPD-06, SWR-NFR-11.
  */
 
 #include <stdio.h>
@@ -22,7 +22,7 @@ namespace {
 
 const char *TAG = "hal_sys";
 
-/* NFR-15 / SR-14 / SR-15: the vendor's reset reason, mapped to the enum the core
+/* SWR-NFR-15 / SWR-SAF-14 / SWR-SAF-15: the vendor's reset reason, mapped to the enum the core
  * decides on.  The mapping lives here so that kiln_core/runstate never sees an
  * esp_reset_reason_t -- and so that a vendor renumbering is one edit. */
 kiln_reset_cause_t sys_reset_cause(void *ctx)
@@ -50,14 +50,14 @@ kiln_err_t sys_fw_info(void *ctx, kiln_fw_info_t *out)
     }
     memset(out, 0, sizeof(*out));
 
-    /* FR-UPD-06: version, build time and git revision, which the build already
+    /* SWR-UPD-06: version, build time and git revision, which the build already
      * embeds in the app descriptor.
      *
      * Copied with an explicit precision rather than a bare %s: the descriptor's
      * fields are longer than the ones here, so the compiler is right that this
      * truncates.  Truncation is the intended behaviour -- these are display
      * strings -- but it has to be stated rather than risked.  That is also why
-     * the returns are discarded explicitly (cert-err33-c, NFR-17): the value
+     * the returns are discarded explicitly (cert-err33-c, SWR-NFR-17): the value
      * these report is the truncation this asked for. */
     const esp_app_desc_t *d = esp_app_get_description();
     if (d != nullptr) {
@@ -82,7 +82,7 @@ kiln_err_t sys_fw_info(void *ctx, kiln_fw_info_t *out)
     return KILN_OK;
 }
 
-/* FR-PROD-02.  The block is cached by hal_prod at init, so this cannot touch
+/* SWR-PROD-02.  The block is cached by hal_prod at init, so this cannot touch
  * flash and cannot delay a caller. */
 kiln_err_t sys_prod_info(void *ctx, kiln_prod_info_t *out)
 {
@@ -100,7 +100,7 @@ kiln_err_t sys_stats(void *ctx, kiln_sys_stats_t *out)
 
     out->uptime_s = (uint32_t)(esp_timer_get_time() / 1000000);
     out->heap_free = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-    /* NFR-11/NFR-12: the minimum ever seen is the figure the soak test watches;
+    /* SWR-NFR-11/SWR-NFR-12: the minimum ever seen is the figure the soak test watches;
      * the instantaneous free heap says nothing about the worst moment. */
     out->heap_min_free = (uint32_t)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
     out->stack_min_free = (uint32_t)uxTaskGetStackHighWaterMark(NULL);
@@ -110,7 +110,7 @@ kiln_err_t sys_stats(void *ctx, kiln_sys_stats_t *out)
 kiln_err_t sys_wdt_subscribe(void *ctx)
 {
     (void)ctx;
-    /* SR-14: the calling task joins the task watchdog.  Already-subscribed is
+    /* SWR-SAF-14: the calling task joins the task watchdog.  Already-subscribed is
      * success, so a task that is restarted does not fail here. */
     const esp_err_t e = esp_task_wdt_add(NULL);
     if (e == ESP_OK || e == ESP_ERR_INVALID_ARG) {

@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * The JSON writer and reader -- NFR-11, NFR-19, FR-WEB-20.
+ * The JSON writer and reader -- SWR-NFR-11, SWR-NFR-19, SWR-WEB-20.
  *
  * The reader parses request bodies, so it is the firmware's largest piece of
  * untrusted-input surface after the log codec. Its job is to reject, never to
@@ -63,7 +63,7 @@ KILN_TEST(nested_objects_and_arrays_are_comma_separated_correctly)
         "{\"segments\":[{\"target_c\":100},{\"target_c\":200}],\"count\":2}");
 }
 
-KILN_TEST(nfr11_overflow_is_sticky_and_never_writes_past_the_buffer)
+KILN_TEST(swrnfr11_overflow_is_sticky_and_never_writes_past_the_buffer)
 {
     /* The pattern the handlers rely on: write the whole response without
      * checking each call, then check once.  That only works if a failed write
@@ -197,7 +197,7 @@ KILN_TEST(only_direct_members_are_found_so_a_nested_key_cannot_shadow_one)
     CHECK_NEAR(d, 1100.0, 0.001);
 }
 
-KILN_TEST(nfr19_a_number_must_be_a_number_all_the_way_through)
+KILN_TEST(swrnfr19_a_number_must_be_a_number_all_the_way_through)
 {
     /* Accepting the prefix of `1.2.3` is how a malformed body becomes a
      * plausible configuration value. */
@@ -212,7 +212,7 @@ KILN_TEST(nfr19_a_number_must_be_a_number_all_the_way_through)
     }
 }
 
-KILN_TEST(nfr19_malformed_documents_are_rejected_not_half_parsed)
+KILN_TEST(swrnfr19_malformed_documents_are_rejected_not_half_parsed)
 {
     const char *bad[] = {
         "{",                      /* truncated         */
@@ -245,7 +245,7 @@ KILN_TEST(running_out_of_tokens_is_reported_rather_than_overrunning)
     CHECK_EQ_INT(kiln_json_parse(js, strlen(js), t, 8), -2);
 }
 
-KILN_TEST(nfr19_a_string_that_does_not_fit_is_refused_not_truncated)
+KILN_TEST(swrnfr19_a_string_that_does_not_fit_is_refused_not_truncated)
 {
     /* Half a program name is worse than a rejected request, and a silently
      * shortened WiFi password produces a network that cannot be joined with no

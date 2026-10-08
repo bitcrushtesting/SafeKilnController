@@ -3,9 +3,9 @@
  *
  * port_clock over esp_timer and the system wall clock.
  *
- * AD-02 keeps the core away from both: time arrives as a dt argument or through
+ * SWA-02 keeps the core away from both: time arrives as a dt argument or through
  * this port, which is what lets a 168 h firing simulate in milliseconds.  The
- * two clocks are deliberately separate -- FR-NET-08 requires the monotonic one
+ * two clocks are deliberately separate -- SWR-NET-08 requires the monotonic one
  * never to be stepped by an SNTP correction, and a run whose elapsed time jumped
  * backwards would take its dwell timers with it.
  */
@@ -26,7 +26,7 @@ namespace {
 uint64_t clk_mono_us(void *ctx)
 {
     (void)ctx;
-    /* Monotonic since boot, 64-bit, never stepped (FR-NET-08). */
+    /* Monotonic since boot, 64-bit, never stepped (SWR-NET-08). */
     return (uint64_t)esp_timer_get_time();
 }
 
@@ -42,7 +42,7 @@ uint64_t clk_wall_s(void *ctx)
 
 bool clk_wall_valid(void *ctx)
 {
-    /* FR-LOG-12: records logged before time sync are marked as such, so this has
+    /* SWR-LOG-12: records logged before time sync are marked as such, so this has
      * to answer honestly rather than returning a number that looks like a date. */
     return clk_wall_s(ctx) >= WALL_PLAUSIBLE_AFTER;
 }

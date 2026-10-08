@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * program_store and run_index driven over the real flash-backed file store
- * rather than a RAM fake -- AD-10, FR-PRG-04, FR-PRG-09, FR-LOG-09, FR-RUN-08.
+ * rather than a RAM fake -- SWA-10, SWR-PRG-04, SWR-PRG-09, SWR-LOG-09, SWR-RUN-08.
  *
  * test_stores covers what the two stores decide.  This covers the stack they
  * now sit on: the same calls, over kiln_fileslots, over a flash fake that
@@ -56,7 +56,7 @@ static kiln_program_t named(const char *name, uint16_t top_c)
     return p;
 }
 
-KILN_TEST(ad10_the_seeded_examples_survive_a_reboot_on_flash)
+KILN_TEST(swa10_the_seeded_examples_survive_a_reboot_on_flash)
 {
     rig_t *r = &g_rig;
     power_up_fresh(r);
@@ -70,7 +70,7 @@ KILN_TEST(ad10_the_seeded_examples_survive_a_reboot_on_flash)
     boot(r);    /* reboot */
     CHECK_EQ_UINT(kiln_program_store_count(&r->store), seeded);
 
-    /* Seeding is idempotent (FR-PRG-09), including across the reboot. */
+    /* Seeding is idempotent (SWR-PRG-09), including across the reboot. */
     CHECK_OK(kiln_program_store_seed(&r->store));
     CHECK_EQ_UINT(kiln_program_store_count(&r->store), seeded);
 }

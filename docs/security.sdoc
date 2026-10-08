@@ -168,7 +168,7 @@ each threat, and the risk that remains.
 
 These were five markdown tables in [`security.md`](security.md), promoted here
 for the reason the architecture decisions and the hazards went to
-[`architecture.sdoc`](architecture.sdoc) and [`safety.sdoc`](safety.sdoc): they
+[`04_software_arch.sdoc`](04_software_arch.sdoc) and [`safety.sdoc`](safety.sdoc): they
 are the part of the concept that has identity. Forty-eight stable IDs with a
 chain between them that was previously kept by hand in an appendix.
 
@@ -252,7 +252,7 @@ STATEMENT: >>>
 **The latched-fault state.**
 <<<
 WHY_IT_MATTERS: >>>
-A latched fault is the mechanism that keeps a failed kiln off ([LINK: SR-17]). Clearing one remotely re-arms a kiln that something has already gone wrong with.
+A latched fault is the mechanism that keeps a failed kiln off ([LINK: SWR-SAF-17]). Clearing one remotely re-arms a kiln that something has already gone wrong with.
 <<<
 
 [ASSET]
@@ -306,7 +306,7 @@ CAPABILITY: >>>
 Full IP access to the device; no credentials.
 <<<
 REALISTIC: >>>
-**Yes.** This is the normal case and the one [LINK: ASM-05] quietly assumes away.
+**Yes.** This is the normal case and the one [LINK: SYS-ASM-05] quietly assumes away.
 <<<
 
 [ADVERSARY]
@@ -366,7 +366,7 @@ CAPABILITY: >>>
 Code execution in the image.
 <<<
 REALISTIC: >>>
-Low: no package manager at build time, assets vendored ([LINK: CON-04]), dependencies are ESP-IDF itself.
+Low: no package manager at build time, assets vendored ([LINK: UR-CON-04]), dependencies are ESP-IDF itself.
 <<<
 
 [[/SECTION]]
@@ -395,7 +395,7 @@ Would have been direct control of the heater.
 SAFETY_RELEVANT: Closed
 STATUS: Resolved
 COMMENT: >>>
-**Closed by [LINK: FR-WEB-26].** No network route can start a firing, abort one or command manual duty; the handlers are deleted, not disabled.
+**Closed by [LINK: SWR-WEB-26].** No network route can start a firing, abort one or command manual duty; the handlers are deleted, not disabled.
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -405,7 +405,7 @@ RELATIONS:
   VALUE: HZ-12
   ROLE: Reaches
 - TYPE: Child
-  VALUE: FR-WEB-26
+  VALUE: SWR-WEB-26
   ROLE: Closed by
 
 [THREAT]
@@ -419,7 +419,7 @@ Would have removed the layer that stops a runaway rather than starting one.
 SAFETY_RELEVANT: Closed
 STATUS: Resolved
 COMMENT: >>>
-**Closed by [LINK: FR-WEB-26].** `/api/config` is read-only; the maximum temperature and every safety threshold are writable only at the kiln. [LINK: SR-22] and [LINK: SR-23] bounded the damage even before that, which is the point section 7 of [`security.md`](security.md) makes about bounds doing security work.
+**Closed by [LINK: SWR-WEB-26].** `/api/config` is read-only; the maximum temperature and every safety threshold are writable only at the kiln. [LINK: SWR-SAF-22] and [LINK: SWR-SAF-23] bounded the damage even before that, which is the point section 7 of [`security.md`](security.md) makes about bounds doing security work.
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -432,7 +432,7 @@ RELATIONS:
   VALUE: HZ-10
   ROLE: Reaches
 - TYPE: Child
-  VALUE: FR-WEB-26
+  VALUE: SWR-WEB-26
   ROLE: Closed by
 
 [THREAT]
@@ -446,7 +446,7 @@ Would have re-armed a kiln that something had already gone wrong with.
 SAFETY_RELEVANT: Closed
 STATUS: Resolved
 COMMENT: >>>
-**Closed by [LINK: FR-WEB-26].** Acknowledgement happens in front of the kiln. The fault stays readable, which is what the banner needs. [LINK: SR-18] blunted it regardless: a fault cannot be cleared while its condition is still observably true, so an attacker could clear a stale fault but not a live one.
+**Closed by [LINK: SWR-WEB-26].** Acknowledgement happens in front of the kiln. The fault stays readable, which is what the banner needs. [LINK: SWR-SAF-18] blunted it regardless: a fault cannot be cleared while its condition is still observably true, so an attacker could clear a stale fault but not a live one.
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -456,7 +456,7 @@ RELATIONS:
   VALUE: HZ-08
   ROLE: Reaches
 - TYPE: Child
-  VALUE: FR-WEB-26
+  VALUE: SWR-WEB-26
   ROLE: Closed by
 
 [THREAT]
@@ -470,7 +470,7 @@ Would have been total and persistent control of the heater.
 SAFETY_RELEVANT: Closed
 STATUS: Resolved
 COMMENT: >>>
-**Closed by [LINK: FR-UPD-01].** No image is accepted over the network. Note the cost: the device now has **no field update path at all** ([LINK: OQ-08]), so a security fix needs a physical visit. Carried as [LINK: SRR-11], which blocks release.
+**Closed by [LINK: SWR-UPD-01].** No image is accepted over the network. Note the cost: the device now has **no field update path at all** ([LINK: OQ-08]), so a security fix needs a physical visit. Carried as [LINK: SRR-11], which blocks release.
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -480,7 +480,7 @@ RELATIONS:
   VALUE: HZ-01
   ROLE: Reaches
 - TYPE: Child
-  VALUE: FR-UPD-01
+  VALUE: SWR-UPD-01
   ROLE: Closed by
 
 [THREAT]
@@ -588,7 +588,7 @@ VIA: >>>
 Boundaries `B-2` and `B-4`; see section 3 of [`security.md`](security.md).
 <<<
 CONSEQUENCE: >>>
-Loss of the web interface. Crucially **not** loss of control: the safety supervisor is a separate task on the other core ([LINK: AD-15]), and [LINK: NFR-02] bounds non-safety interference at 50 ms.
+Loss of the web interface. Crucially **not** loss of control: the safety supervisor is a separate task on the other core ([LINK: SWA-15]), and [LINK: SWR-NFR-02] bounds non-safety interference at 50 ms.
 <<<
 SAFETY_RELEVANT: No
 STATUS: Active
@@ -623,7 +623,7 @@ STATEMENT: >>>
 **Open provisioning access point.**
 <<<
 VIA: >>>
-[LINK: FR-NET-02] AP fallback; if `net.ap_pass` is empty the AP is open.
+[LINK: SWR-NET-02] AP fallback; if `net.ap_pass` is empty the AP is open.
 <<<
 CONSEQUENCE: >>>
 Anyone in radio range reaches the provisioning page and can supply their own credentials.
@@ -655,7 +655,7 @@ The simulator build exposes fault injection and direct commands.
 SAFETY_RELEVANT: Yes
 STATUS: Active
 COMMENT: >>>
-On a simulator build only: the console is compile-gated behind `CONFIG_KILN_PLANT_SIM` and is not in a production image. [LINK: NFR-24] is the requirement behind that.
+On a simulator build only: the console is compile-gated behind `CONFIG_KILN_PLANT_SIM` and is not in a production image. [LINK: SWR-NFR-24] is the requirement behind that.
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -674,7 +674,7 @@ STATEMENT: >>>
 **mDNS and network reconnaissance.**
 <<<
 VIA: >>>
-`kiln.local` advertised on the LAN ([LINK: FR-NET-05]).
+`kiln.local` advertised on the LAN ([LINK: SWR-NET-05]).
 <<<
 CONSEQUENCE: >>>
 Makes the device trivially discoverable; a precondition for the rest rather than a threat alone.
@@ -682,7 +682,7 @@ Makes the device trivially discoverable; a precondition for the rest rather than
 SAFETY_RELEVANT: No
 STATUS: Active
 COMMENT: >>>
-**Has no security goal, and never had one.** Discoverability is accepted: the device is meant to be found by its operator, and `FR-NET-05` asks for exactly that. Recorded so the acceptance is explicit rather than an omission.
+**Has no security goal, and never had one.** Discoverability is accepted: the device is meant to be found by its operator, and `SWR-NET-05` asks for exactly that. Recorded so the acceptance is explicit rather than an omission.
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -741,7 +741,7 @@ RELATIONS:
   VALUE: TH-05
   ROLE: Addresses
 - TYPE: Child
-  VALUE: FR-WEB-26
+  VALUE: SWR-WEB-26
   ROLE: Realised by
 
 [SECURITY_GOAL]
@@ -780,7 +780,7 @@ RELATIONS:
   VALUE: TH-06
   ROLE: Addresses
 - TYPE: Child
-  VALUE: FR-CFG-07
+  VALUE: SWR-CFG-07
   ROLE: Realised by
 
 [SECURITY_GOAL]
@@ -798,7 +798,7 @@ RELATIONS:
   VALUE: TH-09
   ROLE: Addresses
 - TYPE: Child
-  VALUE: NFR-19
+  VALUE: SWR-NFR-19
   ROLE: Realised by
 
 [SECURITY_GOAL]
@@ -831,16 +831,16 @@ RELATIONS:
   VALUE: TH-04
   ROLE: Addresses
 - TYPE: Child
-  VALUE: FR-UPD-02
+  VALUE: SWR-UPD-02
   ROLE: Realised by
 - TYPE: Child
-  VALUE: FR-UPD-03
+  VALUE: SWR-UPD-03
   ROLE: Realised by
 - TYPE: Child
-  VALUE: FR-UPD-04
+  VALUE: SWR-UPD-04
   ROLE: Realised by
 - TYPE: Child
-  VALUE: FR-UPD-08
+  VALUE: SWR-UPD-08
   ROLE: Realised by
 
 [SECURITY_GOAL]
@@ -855,10 +855,10 @@ Structurally: there is no cloud client, no telemetry, no analytics and no outbou
 <<<
 RELATIONS:
 - TYPE: Child
-  VALUE: NFR-21
+  VALUE: SWR-NFR-21
   ROLE: Realised by
 - TYPE: Child
-  VALUE: CON-03
+  VALUE: UR-CON-03
   ROLE: Realised by
 
 [SECURITY_GOAL]
@@ -869,14 +869,14 @@ No hidden access.
 IMPLEMENTATION: Built
 STATUS: Active
 COMMENT: >>>
-No hardcoded credentials, no undocumented ports, no default-enabled remote access. Built by inspection; [LINK: AD-16] reinforces it, because the UI uses only the public API, so there is no privileged back channel to find.
+No hardcoded credentials, no undocumented ports, no default-enabled remote access. Built by inspection; [LINK: SWA-16] reinforces it, because the UI uses only the public API, so there is no privileged back channel to find.
 <<<
 RELATIONS:
 - TYPE: Parent
   VALUE: TH-10
   ROLE: Addresses
 - TYPE: Child
-  VALUE: NFR-22
+  VALUE: SWR-NFR-22
   ROLE: Realised by
 
 [SECURITY_GOAL]
@@ -887,23 +887,23 @@ A compromised or overloaded web stack cannot affect control.
 IMPLEMENTATION: Built
 STATUS: Active
 COMMENT: >>>
-[LINK: AD-15] pins control and safety to core 1 and networking to core 0; [LINK: AD-13] uses queues and immutable snapshots with no mutex on the control path; [LINK: NFR-02] bounds interference at 50 ms; [LINK: AD-04] keeps heat authority in the safety supervisor alone. This is the strongest security property the design has, and it came from the safety work.
+[LINK: SWA-15] pins control and safety to core 1 and networking to core 0; [LINK: SWA-13] uses queues and immutable snapshots with no mutex on the control path; [LINK: SWR-NFR-02] bounds interference at 50 ms; [LINK: SWA-04] keeps heat authority in the safety supervisor alone. This is the strongest security property the design has, and it came from the safety work.
 <<<
 RELATIONS:
 - TYPE: Parent
   VALUE: TH-09
   ROLE: Addresses
 - TYPE: Child
-  VALUE: NFR-02
+  VALUE: SWR-NFR-02
   ROLE: Realised by
 - TYPE: Child
-  VALUE: AD-13
+  VALUE: SWA-13
   ROLE: Realised by
 - TYPE: Child
-  VALUE: AD-15
+  VALUE: SWA-15
   ROLE: Realised by
 - TYPE: Child
-  VALUE: AD-04
+  VALUE: SWA-04
   ROLE: Realised by
 
 [SECURITY_GOAL]
@@ -947,14 +947,14 @@ Traffic is confidential and integrity-protected in transit.
 IMPLEMENTATION: Absent
 STATUS: Active
 COMMENT: >>>
-Absent **by decision, not oversight**: see [LINK: SRR-03] for the trade. [LINK: NFR-20]'s "trusted LAN only" is what stands in its place.
+Absent **by decision, not oversight**: see [LINK: SRR-03] for the trade. [LINK: SWR-NFR-20]'s "trusted LAN only" is what stands in its place.
 <<<
 RELATIONS:
 - TYPE: Parent
   VALUE: TH-07
   ROLE: Addresses
 - TYPE: Child
-  VALUE: NFR-20
+  VALUE: SWR-NFR-20
   ROLE: Realised by
 
 [[/SECTION]]
@@ -1016,10 +1016,10 @@ WHY_IT_STANDS: >>>
 A self-signed certificate on a `.local` name trains users to click through browser warnings, costs flash and RAM against a 2 MB OTA slot, and still cannot be verified. The honest trade was plaintext on a network already assumed trusted.
 <<<
 CARRIED_BY: >>>
-The owner of the network ([LINK: ASM-05]).
+The owner of the network ([LINK: SYS-ASM-05]).
 <<<
 MITIGATION: >>>
-[LINK: NFR-20]'s "trusted LAN only", stated in the README, in [`safety.md`](safety.md) and here. It is a real limitation, not a solved problem.
+[LINK: SWR-NFR-20]'s "trusted LAN only", stated in the README, in [`safety.md`](safety.md) and here. It is a real limitation, not a solved problem.
 <<<
 STATUS: Active
 RELATIONS:
@@ -1030,7 +1030,7 @@ RELATIONS:
 [SECURITY_RESIDUAL_RISK]
 UID: SRR-04
 STATEMENT: >>>
-**Firmware images are validated but not authenticated.** [LINK: FR-UPD-03] requires checking an image is *valid for this target*; no requirement anywhere asks for a **signature**, and secure boot is not enabled.
+**Firmware images are validated but not authenticated.** [LINK: SWR-UPD-03] requires checking an image is *valid for this target*; no requirement anywhere asks for a **signature**, and secure boot is not enabled.
 <<<
 WHY_IT_STANDS: >>>
 Signing was never specified.
@@ -1039,7 +1039,7 @@ CARRIED_BY: >>>
 The project.
 <<<
 MITIGATION: >>>
-Only [LINK: FR-UPD-08]'s authentication stands between an attacker and [LINK: TH-04], and that is specification only. With secure boot absent, physical reflash ([LINK: ADV-3]) bypasses it entirely. Open as [LINK: OQ-S2].
+Only [LINK: SWR-UPD-08]'s authentication stands between an attacker and [LINK: TH-04], and that is specification only. With secure boot absent, physical reflash ([LINK: ADV-3]) bypasses it entirely. Open as [LINK: OQ-S2].
 <<<
 STATUS: Active
 RELATIONS:
@@ -1110,7 +1110,7 @@ RELATIONS:
 [SECURITY_RESIDUAL_RISK]
 UID: SRR-08
 STATEMENT: >>>
-**The AP fallback may be open.** [LINK: FR-NET-02] starts an access point with a provisioning page; nothing requires `net.ap_pass` to be non-empty.
+**The AP fallback may be open.** [LINK: SWR-NET-02] starts an access point with a provisioning page; nothing requires `net.ap_pass` to be non-empty.
 <<<
 WHY_IT_STANDS: >>>
 No minimum-passphrase rule exists.
@@ -1130,7 +1130,7 @@ RELATIONS:
 [SECURITY_RESIDUAL_RISK]
 UID: SRR-09
 STATEMENT: >>>
-**[LINK: ASM-05] is the assumption everything rests on, and it is usually false.** Home and studio LANs routinely carry compromised IoT devices and guest traffic.
+**[LINK: SYS-ASM-05] is the assumption everything rests on, and it is usually false.** Home and studio LANs routinely carry compromised IoT devices and guest traffic.
 <<<
 WHY_IT_STANDS: >>>
 A single-purpose controller cannot police its own network.
@@ -1153,7 +1153,7 @@ STATEMENT: >>>
 **No field update path.** Removing OTA closed [LINK: TH-04] completely and left the device with no way to receive a fix, including a security fix, without physical access.
 <<<
 WHY_IT_STANDS: >>>
-[LINK: FR-UPD-01] was inverted deliberately; the replacement is [LINK: OQ-08] and is not yet specified.
+[LINK: SWR-UPD-01] was inverted deliberately; the replacement is [LINK: OQ-08] and is not yet specified.
 <<<
 CARRIED_BY: >>>
 The project. **This blocks release**, not merely an open question.
@@ -1198,7 +1198,7 @@ RELATIONS:
 [OPEN_QUESTION]
 UID: OQ-S2
 STATEMENT: >>>
-Should firmware images be **signed** ([LINK: FR-UPD-03] requires validity, not authenticity), and should secure boot be enabled?
+Should firmware images be **signed** ([LINK: SWR-UPD-03] requires validity, not authenticity), and should secure boot be enabled?
 <<<
 STATUS: Active
 COMMENT: >>>

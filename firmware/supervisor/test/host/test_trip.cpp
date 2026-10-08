@@ -31,7 +31,7 @@ void run_for(sup_t *s, const sup_input_t *in, float seconds)
 
 }  // namespace
 
-KILN_TEST(ad22_comes_up_refusing_heat_before_any_conversion)
+KILN_TEST(swa22_comes_up_refusing_heat_before_any_conversion)
 {
     /* Absence of evidence must not be permission.  This is the defect K1
      * records about the discrete chain, which is closed when the front end is
@@ -47,7 +47,7 @@ KILN_TEST(ad22_comes_up_refusing_heat_before_any_conversion)
     CHECK(!s.permit);
 }
 
-KILN_TEST(ad22_permits_heat_once_a_good_reading_arrives)
+KILN_TEST(swa22_permits_heat_once_a_good_reading_arrives)
 {
     sup_t s;
     sup_init(&s, true);
@@ -58,7 +58,7 @@ KILN_TEST(ad22_permits_heat_once_a_good_reading_arrives)
     CHECK_EQ_INT(s.reason, SUP_TRIP_NONE);
 }
 
-KILN_TEST(sr23_latches_above_the_backstop_without_waiting)
+KILN_TEST(swrsaf23_latches_above_the_backstop_without_waiting)
 {
     /* A backstop does not have a grace period. */
     sup_t s;
@@ -70,7 +70,7 @@ KILN_TEST(sr23_latches_above_the_backstop_without_waiting)
     CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);
 }
 
-KILN_TEST(sr23_does_not_trip_at_the_ceiling_or_just_below_the_backstop)
+KILN_TEST(swrsaf23_does_not_trip_at_the_ceiling_or_just_below_the_backstop)
 {
     /* 1300 is the configurable ceiling and must remain reachable: a backstop
      * that fires at the top of the usable range is a broken product. */
@@ -87,7 +87,7 @@ KILN_TEST(sr23_does_not_trip_at_the_ceiling_or_just_below_the_backstop)
     CHECK(!s.tripped);
 }
 
-KILN_TEST(sr23_overtemp_does_not_unlatch_when_it_cools)
+KILN_TEST(swrsaf23_overtemp_does_not_unlatch_when_it_cools)
 {
     sup_t s;
     sup_init(&s, true);
@@ -102,7 +102,7 @@ KILN_TEST(sr23_overtemp_does_not_unlatch_when_it_cools)
     CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);
 }
 
-KILN_TEST(sr04_withholds_heat_at_once_on_a_fault_and_latches_after_the_grace)
+KILN_TEST(swrsaf04_withholds_heat_at_once_on_a_fault_and_latches_after_the_grace)
 {
     sup_t s;
     sup_init(&s, true);
@@ -121,7 +121,7 @@ KILN_TEST(sr04_withholds_heat_at_once_on_a_fault_and_latches_after_the_grace)
     CHECK_EQ_INT(s.reason, SUP_TRIP_TC_FAULT);
 }
 
-KILN_TEST(sr04_a_transient_fault_shorter_than_the_grace_does_not_latch)
+KILN_TEST(swrsaf04_a_transient_fault_shorter_than_the_grace_does_not_latch)
 {
     sup_t s;
     sup_init(&s, true);
@@ -139,7 +139,7 @@ KILN_TEST(sr04_a_transient_fault_shorter_than_the_grace_does_not_latch)
     CHECK(!s.tripped);
 }
 
-KILN_TEST(ad22_an_unusable_reading_latches_as_stale_not_as_a_fault)
+KILN_TEST(swa22_an_unusable_reading_latches_as_stale_not_as_a_fault)
 {
     /* Different cause, same consequence, reported separately so the other side
      * can say which it was.  A good reading first, so this is staleness and
@@ -156,7 +156,7 @@ KILN_TEST(ad22_an_unusable_reading_latches_as_stale_not_as_a_fault)
     CHECK_EQ_INT(s.reason, SUP_TRIP_SENSOR_STALE);
 }
 
-KILN_TEST(ad22_a_nan_reading_is_stale_and_never_permits)
+KILN_TEST(swa22_a_nan_reading_is_stale_and_never_permits)
 {
     /* The comparison against the backstop is false for a NaN whichever way it
      * is written, so a non-finite reading must be caught by validity and not
@@ -171,7 +171,7 @@ KILN_TEST(ad22_a_nan_reading_is_stale_and_never_permits)
     CHECK(!(nan_in.chamber_c <= SUP_OVERTEMP_C));
 }
 
-KILN_TEST(ad22_a_failed_selftest_never_permits_and_cannot_be_cleared)
+KILN_TEST(swa22_a_failed_selftest_never_permits_and_cannot_be_cleared)
 {
     sup_t s;
     sup_init(&s, false);
@@ -187,7 +187,7 @@ KILN_TEST(ad22_a_failed_selftest_never_permits_and_cannot_be_cleared)
     CHECK_EQ_INT(s.reason, SUP_TRIP_SELF_TEST);
 }
 
-KILN_TEST(ad22_clearing_a_trip_does_not_permit_until_conditions_are_re_established)
+KILN_TEST(swa22_clearing_a_trip_does_not_permit_until_conditions_are_re_established)
 {
     sup_t s;
     sup_init(&s, true);
@@ -210,7 +210,7 @@ KILN_TEST(ad22_clearing_a_trip_does_not_permit_until_conditions_are_re_establish
     CHECK(s.permit);
 }
 
-KILN_TEST(ad22_flags_describe_what_the_supervisor_is_doing)
+KILN_TEST(swa22_flags_describe_what_the_supervisor_is_doing)
 {
     sup_t s;
     sup_init(&s, true);
@@ -223,7 +223,7 @@ KILN_TEST(ad22_flags_describe_what_the_supervisor_is_doing)
     CHECK((f & SUP_FLAG_TRIPPED) == 0u);
 }
 
-KILN_TEST(nfr17_null_and_negative_time_are_refused_not_faulted)
+KILN_TEST(swrnfr17_null_and_negative_time_are_refused_not_faulted)
 {
     sup_t s;
     sup_init(&s, true);
@@ -370,9 +370,9 @@ KILN_TEST(r4_the_button_cannot_clear_a_condition_that_still_holds)
 
 /* --- the lid is not the supervisor's concern ---------------------------- */
 
-KILN_TEST(hr21_the_supervisor_has_no_lid_input_so_loading_cold_cannot_trip_it)
+KILN_TEST(syshw21_the_supervisor_has_no_lid_input_so_loading_cold_cannot_trip_it)
 {
-    /* The lid breaks the coil in hardware and SR-31's latch is the ESP32's,
+    /* The lid breaks the coil in hardware and SWR-SAF-31's latch is the ESP32's,
      * which knows whether a firing is running.  A supervisor that latched on
      * lid open regardless would trip on every cold load, which is the nuisance
      * trip HZ-10 warns about.  There is nothing here to latch on, and this
@@ -388,7 +388,7 @@ KILN_TEST(hr21_the_supervisor_has_no_lid_input_so_loading_cold_cannot_trip_it)
 
 /* --- bringing the front end up ----------------------------------------- */
 
-KILN_TEST(ad22_a_front_end_still_starting_up_withholds_heat_without_latching)
+KILN_TEST(swa22_a_front_end_still_starting_up_withholds_heat_without_latching)
 {
     /* Boot: no conversion has arrived yet.  The supervisor must not permit,
      * and must not latch either, or a front end whose first conversion takes
@@ -412,7 +412,7 @@ KILN_TEST(ad22_a_front_end_still_starting_up_withholds_heat_without_latching)
     CHECK(s.seen_valid);
 }
 
-KILN_TEST(ad22_a_reading_that_was_working_and_stopped_does_latch)
+KILN_TEST(swa22_a_reading_that_was_working_and_stopped_does_latch)
 {
     /* The other half: once a reading has been seen, losing it is a fault to
      * acknowledge rather than a slow start. */
@@ -433,7 +433,7 @@ KILN_TEST(ad22_a_reading_that_was_working_and_stopped_does_latch)
     CHECK_EQ_INT(s.reason, SUP_TRIP_SENSOR_STALE);
 }
 
-KILN_TEST(ad22_a_reported_fault_latches_even_before_a_first_reading)
+KILN_TEST(swa22_a_reported_fault_latches_even_before_a_first_reading)
 {
     /* A front end actively reporting a fault is not "still starting up": it is
      * telling us something is wrong, and that latches whether or not a good

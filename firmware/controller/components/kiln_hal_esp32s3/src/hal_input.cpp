@@ -1,16 +1,16 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Rotary encoder with push button (HR-05, FR-HMI-09).
+ * Rotary encoder with push button (SYS-HW-05, SWR-HMI-09).
  *
- * HR-05 requires the encoder to be read **by hardware** -- the pulse counter
+ * SYS-HW-05 requires the encoder to be read **by hardware** -- the pulse counter
  * unit -- rather than polled in software.  That is not a performance
  * preference: a detent turned while the control task is busy would be lost by
  * a polling reader, and an operator who turns the knob and sees nothing turns
  * it further, which is how a setpoint ends up somewhere nobody intended.  PCNT
  * counts the edges whether or not anybody is looking.
  *
- * The button is read in software, which HR-05 permits: a press is tens of
+ * The button is read in software, which SYS-HW-05 permits: a press is tens of
  * milliseconds wide and the debounce has to be in software anyway.
  */
 #include "driver/gpio.h"
@@ -32,7 +32,7 @@ const char *TAG = "hal_input";
  * event, which is what the operator means by one click. */
 constexpr int ENC_COUNTS_PER_DETENT = 4;
 
-/* FR-HMI-09 and port_input.h: a long press is 400 ms. */
+/* SWR-HMI-09 and port_input.h: a long press is 400 ms. */
 constexpr int64_t BTN_LONG_PRESS_US = (400 * 1000);
 /* Contact bounce on a panel encoder is a few milliseconds; 20 ms is generous
  * and still far below the shortest press a person can make. */
@@ -153,7 +153,7 @@ kiln_err_t kiln_hal_input_init(kiln_port_input_t *out)
         return KILN_ERR_IO;
     }
 
-    /* Glitch filter in hardware, which is the other half of why HR-05 wants
+    /* Glitch filter in hardware, which is the other half of why SYS-HW-05 wants
      * PCNT: contact bounce on the quadrature lines is filtered before it can
      * be counted, rather than after it has already moved a setpoint. */
     pcnt_glitch_filter_config_t filt = {};

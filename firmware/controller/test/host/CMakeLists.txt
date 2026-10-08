@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Host test build (architecture section 14.2).  No ESP-IDF involved: the core is
-# plain C++20, so it builds in seconds and runs under a debugger, ASan/UBSan (TR-20)
-# and gcov (TR-19).
+# plain C++20, so it builds in seconds and runs under a debugger, ASan/UBSan (SWR-TST-20)
+# and gcov (SWR-TST-19).
 #
 #   cmake -B build-host -S firmware/controller/test/host -DENABLE_COVERAGE=ON -DENABLE_ASAN=ON
 #   cmake --build build-host && ctest --test-dir build-host
@@ -14,10 +14,10 @@ project(kiln_host_tests CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-option(ENABLE_COVERAGE "Build with gcov instrumentation (TR-19)" OFF)
-option(ENABLE_ASAN     "Build with AddressSanitizer + UBSan (TR-20)" OFF)
+option(ENABLE_COVERAGE "Build with gcov instrumentation (SWR-TST-19)" OFF)
+option(ENABLE_ASAN     "Build with AddressSanitizer + UBSan (SWR-TST-20)" OFF)
 
-# NFR-25: warnings are errors here, where the logic lives.
+# SWR-NFR-25: warnings are errors here, where the logic lives.
 add_compile_options(-Wall -Wextra -Werror -Wshadow)
 
 if(ENABLE_COVERAGE)

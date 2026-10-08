@@ -64,7 +64,7 @@ kiln_err_t claim_sector(kiln_logring_t *r, uint32_t sector, uint32_t seq,
 
 /* First erased slot in a sector, which is where appending resumes.  A torn or
  * corrupt record terminates the scan: everything beyond it in this sector is
- * unreachable anyway, because a reader stops there too (FR-LOG-08). */
+ * unreachable anyway, because a reader stops there too (SWR-LOG-08). */
 kiln_err_t scan_sector_head(kiln_logring_t *r, uint32_t sector,
                                    uint32_t *slot_out, uint32_t *valid_out)
 {
@@ -217,7 +217,7 @@ kiln_err_t kiln_logring_begin_run(kiln_logring_t *r, uint32_t run_id)
 
     /* A run starts on its own sector.  That is what lets iterate() select by run
      * from the sector headers alone, with no index to keep consistent -- and an
-     * index that can disagree with the data is the failure mode AD-08 exists to
+     * index that can disagree with the data is the failure mode SWA-08 exists to
      * avoid. */
     const uint32_t sector = (r->head_seq == 0 && r->head_slot == 0)
                           ? r->head_sector
@@ -262,8 +262,8 @@ kiln_err_t kiln_logring_append(kiln_logring_t *r,
         if (sector == r->tail_sector) {
             r->tail_sector = next_sector(r, sector);
             r->wrapped     = true;
-            /* FR-LOG-06: the oldest data is gone, which is the contract, and the
-             * run it belonged to is marked truncated by run_index (FR-LOG-09). */
+            /* SWR-LOG-06: the oldest data is gone, which is the contract, and the
+             * run it belonged to is marked truncated by run_index (SWR-LOG-09). */
             if (r->records_stored >= r->recs_per_sector) {
                 r->records_stored -= r->recs_per_sector;
             } else {
@@ -279,7 +279,7 @@ kiln_err_t kiln_logring_append(kiln_logring_t *r,
                                          slot_offset(r, r->head_sector, r->head_slot),
                                          rec, KILN_LOG_RECORD_BYTES);
     if (e != KILN_OK) {
-        /* FR-LOG-14: counted, reported, and never fatal to a firing. */
+        /* SWR-LOG-14: counted, reported, and never fatal to a firing. */
         r->write_errors++;
         return e;
     }

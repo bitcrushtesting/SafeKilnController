@@ -2,9 +2,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * The real core and application against the plant simulator -- architecture
- * section 14.4's integration level, and the fault-injection suite of TR-27.
+ * section 14.4's integration level, and the fault-injection suite of SWR-TST-27.
  *
- * AD-02's injected clock is what makes these possible: a four-hour firing, a
+ * SWA-02's injected clock is what makes these possible: a four-hour firing, a
  * 15 min runaway timer and a 30 s fail-off window are all simulated in
  * milliseconds of wall time, with no clock being read anywhere in the core.
  */
@@ -150,7 +150,7 @@ KILN_TEST(a_program_runs_closed_loop_against_the_simulator)
     CHECK_EQ_INT(r.app.state, KILN_STATE_RUNNING);
 
     /* 20 -> 300 degC at 3600 degC/h is 280 s, plus a minute of dwell -- which
-     * FR-CTL-12 only accrues while the kiln is actually within tolerance, so
+     * SWR-CTL-12 only accrues while the kiln is actually within tolerance, so
      * reaching Complete at all is the substance of the test. */
     CHECK(rig_run_until_not_running(&r, 1200.0));
 
@@ -187,14 +187,14 @@ KILN_TEST(the_setpoint_is_tracked_through_the_ramp_not_just_at_the_end)
     CHECK_MSG(worst < 25.0f, "worst tracking error was %.1f degC", (double)worst);
 }
 
-KILN_TEST(frcur08_a_reference_current_is_learned_during_the_cold_climb)
+KILN_TEST(swrcur08_a_reference_current_is_learned_during_the_cold_climb)
 {
     rig_t r;
     rig_init(&r, 20.0f);
     rig_run(&r, 2.0);
 
     /* Rate 0 means full duty while it climbs, which is the cold full-on
-     * condition FR-CUR-08 learns from. */
+     * condition SWR-CUR-08 learns from. */
     const kiln_program_t p = simple_program(600, 0, 1);
     CHECK_OK(kiln_app_start(&r.app, &p));
     rig_run(&r, 120.0);
@@ -204,11 +204,11 @@ KILN_TEST(frcur08_a_reference_current_is_learned_during_the_cold_climb)
     CHECK_NEAR(kiln_current_ref(&r.app.cur), 30.0f, 2.5f);
     CHECK_NEAR(r.app.record.current_ref_a, kiln_current_ref(&r.app.cur), 0.001f);
 
-    /* FR-CUR-07: energy accumulated while it was heating. */
+    /* SWR-CUR-07: energy accumulated while it was heating. */
     CHECK(kiln_current_energy_wh(&r.app.cur) > 0.0);
 }
 
-KILN_TEST(frcur04_measurements_are_gated_to_the_commanded_window)
+KILN_TEST(swrcur04_measurements_are_gated_to_the_commanded_window)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -236,18 +236,18 @@ KILN_TEST(frcur04_measurements_are_gated_to_the_commanded_window)
             break;
         }
     }
-    /* Both kinds of window get measured, which is the whole point of AD-17: a
+    /* Both kinds of window get measured, which is the whole point of SWA-17: a
      * blind average would read a few percent of full current and say nothing. */
     CHECK(conduction > 20);
     CHECK(leakage > 20);
 }
 
-/* --- electrical fault injection, TR-27 ---------------------------------- */
+/* --- electrical fault injection, SWR-TST-27 ---------------------------------- */
 
-KILN_TEST(sr25_a_relay_stuck_on_cannot_pass_current_while_the_contactor_is_open)
+KILN_TEST(swrsaf25_a_relay_stuck_on_cannot_pass_current_while_the_contactor_is_open)
 {
     /* Worth asserting rather than assuming: at idle the contactor is open, so a
-     * stuck SSR passes nothing and there is nothing for SR-25 to find -- and
+     * stuck SSR passes nothing and there is nothing for SWR-SAF-25 to find -- and
      * nothing unsafe either, because the same open contactor is what stops the
      * kiln heating.  This is the defence in depth of architecture section 8.1:
      * two interrupting devices in series, and one of them is enough. */
@@ -263,11 +263,11 @@ KILN_TEST(sr25_a_relay_stuck_on_cannot_pass_current_while_the_contactor_is_open)
     CHECK_NEAR(kiln_sim_temperature(&r.sim), 20.0f, 1.0f);
 }
 
-KILN_TEST(sr25_a_relay_stuck_on_is_caught_during_a_firing)
+KILN_TEST(swrsaf25_a_relay_stuck_on_is_caught_during_a_firing)
 {
     /* The case that matters: the contactor is closed because the kiln is meant
-     * to be firing, and the SSR has stopped modulating.  SR-25 sees amps in a
-     * commanded-off window; SR-08 would be waiting on five degrees of rise over
+     * to be firing, and the SSR has stopped modulating.  SWR-SAF-25 sees amps in a
+     * commanded-off window; SWR-SAF-08 would be waiting on five degrees of rise over
      * three minutes, and only once duty had been zero for a full minute. */
     rig_t r;
     rig_init(&r, 20.0f);
@@ -286,15 +286,15 @@ KILN_TEST(sr25_a_relay_stuck_on_is_caught_during_a_firing)
 
     /* Either verdict is right for this injection: the simulator's fail-on is an
      * SSR that conducts, and whether dropping the contactor clears it is exactly
-     * what SR-27 goes on to establish. */
+     * what SWR-SAF-27 goes on to establish. */
     CHECK_MSG(f == KILN_FAULT_UNCOMMANDED_CURRENT || f == KILN_FAULT_CONTACTOR_WELDED,
               "got fault %u", (unsigned)f);
-    CHECK_MSG(took < 15.0, "SR-25 took %.1f s", took);
+    CHECK_MSG(took < 15.0, "SWR-SAF-25 took %.1f s", took);
     CHECK_EQ_INT(r.app.state, KILN_STATE_FAULT);
     CHECK(!r.app.heat_authorised);
 }
 
-KILN_TEST(sr27_discriminates_a_welded_contactor_from_a_shorted_ssr)
+KILN_TEST(swrsaf27_discriminates_a_welded_contactor_from_a_shorted_ssr)
 {
     /* The same symptom, two very different instructions to the operator. */
     rig_t ssr, weld;
@@ -303,7 +303,7 @@ KILN_TEST(sr27_discriminates_a_welded_contactor_from_a_shorted_ssr)
     rig_run(&ssr, 2.0);
     {
         /* The contactor has to be closed for a shorted SSR to pass anything, so
-         * the kiln has to be firing.  FR-CTL-08's quantiser preserves a
+         * the kiln has to be firing.  SWR-CTL-08's quantiser preserves a
          * measurable off interval even at saturation precisely so that the
          * leakage measurement still exists here. */
         const kiln_program_t p = simple_program(600, 0, 10);
@@ -322,13 +322,13 @@ KILN_TEST(sr27_discriminates_a_welded_contactor_from_a_shorted_ssr)
     /* And here it did not, which is what the sequence found out. */
     CHECK(kiln_sim_contactor(&weld.sim));
 
-    /* SR-27's fault is not clearable, so the operator cannot acknowledge their
+    /* SWR-SAF-27's fault is not clearable, so the operator cannot acknowledge their
      * way back to a running kiln. */
     CHECK_ERR(kiln_app_clear_fault(&weld.app), KILN_ERR_STATE);
     CHECK_EQ_INT(weld.app.fault, KILN_FAULT_CONTACTOR_WELDED);
 }
 
-KILN_TEST(sr26_relay_fail_off_is_caught_long_before_the_thermal_backstop)
+KILN_TEST(swrsaf26_relay_fail_off_is_caught_long_before_the_thermal_backstop)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -345,12 +345,12 @@ KILN_TEST(sr26_relay_fail_off_is_caught_long_before_the_thermal_backstop)
     const double took = r.t_s - t0;
 
     CHECK_EQ_INT(f, KILN_FAULT_NO_HEATER_CURRENT);
-    /* SR-26's 30 s window against SR-07's 15 min: the electrical rule is the
+    /* SWR-SAF-26's 30 s window against SWR-SAF-07's 15 min: the electrical rule is the
      * reason requirements section 5.2 calls it the primary detection. */
-    CHECK_MSG(took < 60.0, "SR-26 took %.1f s", took);
+    CHECK_MSG(took < 60.0, "SWR-SAF-26 took %.1f s", took);
 }
 
-KILN_TEST(sr26_also_catches_fully_open_elements)
+KILN_TEST(swrsaf26_also_catches_fully_open_elements)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -363,7 +363,7 @@ KILN_TEST(sr26_also_catches_fully_open_elements)
     CHECK_EQ_INT(rig_run_until_fault(&r, 300.0), KILN_FAULT_NO_HEATER_CURRENT);
 }
 
-KILN_TEST(sr29_overcurrent_is_caught)
+KILN_TEST(swrsaf29_overcurrent_is_caught)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -377,7 +377,7 @@ KILN_TEST(sr29_overcurrent_is_caught)
     CHECK_EQ_INT(rig_run_until_fault(&r, 60.0), KILN_FAULT_OVERCURRENT);
 }
 
-KILN_TEST(frcur11_a_disconnected_transformer_is_detected_and_refuses_a_start)
+KILN_TEST(swrcur11_a_disconnected_transformer_is_detected_and_refuses_a_start)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -385,7 +385,7 @@ KILN_TEST(frcur11_a_disconnected_transformer_is_detected_and_refuses_a_start)
 
     kiln_sim_inject(&r.sim, KILN_INJ_CT_DISCONNECTED);
 
-    /* FR-CUR-12: no firing starts without the monitoring it is configured for. */
+    /* SWR-CUR-12: no firing starts without the monitoring it is configured for. */
     const kiln_program_t p = simple_program(600, 600, 0);
     CHECK_ERR(kiln_app_start(&r.app, &p), KILN_ERR_STATE);
 
@@ -396,7 +396,7 @@ KILN_TEST(frcur11_a_disconnected_transformer_is_detected_and_refuses_a_start)
     CHECK(!(r.app.warnings & KILN_WARN_BIT(KILN_WARN_CURRENT_OFF)));
 }
 
-KILN_TEST(frcur12_a_run_may_start_without_monitoring_when_it_is_disabled)
+KILN_TEST(swrcur12_a_run_may_start_without_monitoring_when_it_is_disabled)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -418,7 +418,7 @@ KILN_TEST(frcur12_a_run_may_start_without_monitoring_when_it_is_disabled)
     CHECK_EQ_INT(r.app.fault, KILN_FAULT_NONE);
 }
 
-KILN_TEST(sr28_partial_element_failure_shows_up_in_the_current)
+KILN_TEST(swrsaf28_partial_element_failure_shows_up_in_the_current)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -453,7 +453,7 @@ KILN_TEST(sr28_partial_element_failure_shows_up_in_the_current)
 
 /* --- sensing and thermal injections ------------------------------------ */
 
-KILN_TEST(sr04_an_open_thermocouple_latches_after_the_grace_period)
+KILN_TEST(swrsaf04_an_open_thermocouple_latches_after_the_grace_period)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -467,7 +467,7 @@ KILN_TEST(sr04_an_open_thermocouple_latches_after_the_grace_period)
     CHECK_EQ_INT(rig_run_until_fault(&r, 30.0), KILN_FAULT_TC_OPEN);
     CHECK(!r.app.heat_authorised);
 
-    /* SR-18: not clearable while the front end is still reporting it. */
+    /* SWR-SAF-18: not clearable while the front end is still reporting it. */
     CHECK_ERR(kiln_app_clear_fault(&r.app), KILN_ERR_STATE);
     kiln_sim_clear(&r.sim, KILN_INJ_TC_OPEN);
     rig_run(&r, 1.0);
@@ -475,7 +475,7 @@ KILN_TEST(sr04_an_open_thermocouple_latches_after_the_grace_period)
     CHECK_EQ_INT(r.app.state, KILN_STATE_IDLE);
 }
 
-KILN_TEST(sr05_a_reversed_thermocouple_is_caught)
+KILN_TEST(swrsaf05_a_reversed_thermocouple_is_caught)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -494,7 +494,7 @@ KILN_TEST(sr05_a_reversed_thermocouple_is_caught)
     CHECK_EQ_INT(rig_run_until_fault(&r, 600.0), KILN_FAULT_TC_REVERSED);
 }
 
-KILN_TEST(sr11_an_over_hot_enclosure_stops_the_firing)
+KILN_TEST(swrsaf11_an_over_hot_enclosure_stops_the_firing)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -506,11 +506,11 @@ KILN_TEST(sr11_an_over_hot_enclosure_stops_the_firing)
 
     kiln_sim_inject(&r.sim, KILN_INJ_CASE_HEATING);
     /* The enclosure's time constant is four times the chamber's, so this takes a
-     * while in simulated time -- and nothing in wall time (AD-02). */
+     * while in simulated time -- and nothing in wall time (SWA-02). */
     CHECK_EQ_INT(rig_run_until_fault(&r, 6000.0), KILN_FAULT_CASE_OVERTEMP);
 }
 
-KILN_TEST(sr09_the_configured_maximum_is_not_exceeded_by_the_margin)
+KILN_TEST(swrsaf09_the_configured_maximum_is_not_exceeded_by_the_margin)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -544,7 +544,7 @@ KILN_TEST(sr09_the_configured_maximum_is_not_exceeded_by_the_margin)
 
 /* --- run control -------------------------------------------------------- */
 
-KILN_TEST(frrun03_pause_freezes_the_program_and_stops_the_heat)
+KILN_TEST(swrrun03_pause_freezes_the_program_and_stops_the_heat)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -568,7 +568,7 @@ KILN_TEST(frrun03_pause_freezes_the_program_and_stops_the_heat)
     CHECK(kiln_setpoint_value(&r.app.sp) > sp);
 }
 
-KILN_TEST(frrun04_abort_de_energises_promptly_from_any_state)
+KILN_TEST(swrrun04_abort_de_energises_promptly_from_any_state)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -580,7 +580,7 @@ KILN_TEST(frrun04_abort_de_energises_promptly_from_any_state)
     CHECK(r.app.heat_authorised);
 
     CHECK_OK(kiln_app_abort(&r.app));
-    /* FR-RUN-04 allows 1 s; the authority is withdrawn in the call itself. */
+    /* SWR-RUN-04 allows 1 s; the authority is withdrawn in the call itself. */
     CHECK(!r.app.heat_authorised);
     CHECK_EQ_UINT(r.app.duty_request, 0u);
     CHECK_EQ_INT(r.app.state, KILN_STATE_IDLE);
@@ -590,7 +590,7 @@ KILN_TEST(frrun04_abort_de_energises_promptly_from_any_state)
     CHECK(!kiln_sim_contactor(&r.sim));
 }
 
-KILN_TEST(frrun10_a_run_is_refused_while_a_fault_is_latched)
+KILN_TEST(swrrun10_a_run_is_refused_while_a_fault_is_latched)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -605,7 +605,7 @@ KILN_TEST(frrun10_a_run_is_refused_while_a_fault_is_latched)
     CHECK_ERR(kiln_app_autotune(&r.app, 600.0f), KILN_ERR_STATE);
 }
 
-KILN_TEST(frrun02_a_run_is_refused_while_the_chamber_channel_is_silent)
+KILN_TEST(swrrun02_a_run_is_refused_while_the_chamber_channel_is_silent)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -616,7 +616,7 @@ KILN_TEST(frrun02_a_run_is_refused_while_the_chamber_channel_is_silent)
     CHECK_ERR(kiln_app_start(&r.app, &p), KILN_ERR_STATE);
 }
 
-KILN_TEST(frprg05_an_invalid_program_is_refused_at_the_start_gate)
+KILN_TEST(swrprg05_an_invalid_program_is_refused_at_the_start_gate)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -631,7 +631,7 @@ KILN_TEST(frprg05_an_invalid_program_is_refused_at_the_start_gate)
     CHECK_ERR(kiln_app_start(&r.app, &p), KILN_ERR_RANGE);
 }
 
-KILN_TEST(frctl13_a_cooling_segment_is_executed_passively)
+KILN_TEST(swrctl13_a_cooling_segment_is_executed_passively)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -663,7 +663,7 @@ KILN_TEST(frctl13_a_cooling_segment_is_executed_passively)
     CHECK(saw_cooling);
 }
 
-KILN_TEST(frcur13_switching_operations_are_counted_across_a_firing)
+KILN_TEST(swrcur13_switching_operations_are_counted_across_a_firing)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -677,12 +677,12 @@ KILN_TEST(frcur13_switching_operations_are_counted_across_a_firing)
     CHECK_OK(r.ports.counters.load(r.ports.counters.ctx, &c));
     CHECK(c.ssr_ops[0] > 10u);
 
-    /* And the figure reaches the run record (FR-RUN-07). */
+    /* And the figure reaches the run record (SWR-RUN-07). */
     CHECK_OK(kiln_app_abort(&r.app));
     CHECK(r.app.record.ssr_ops[0] > 0u);
 }
 
-KILN_TEST(frrun06_completion_sounds_the_alarm_for_its_configured_duration)
+KILN_TEST(swrrun06_completion_sounds_the_alarm_for_its_configured_duration)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -703,14 +703,14 @@ KILN_TEST(frrun06_completion_sounds_the_alarm_for_its_configured_duration)
     CHECK_OK(kiln_app_idle(&r.app));
 }
 
-KILN_TEST(ad05_a_stopped_safety_cycle_releases_the_contactor)
+KILN_TEST(swa05_a_stopped_safety_cycle_releases_the_contactor)
 {
     /* The central safety property of the whole design: the coil is held up by a
      * *repeated* call into the charge pump, so a crashed, hung or deadlocked
      * safety task releases it with no code involved.  The simulator models the
      * decay as a timeout -- whether the real circuit reaches the contactor's
-     * drop-out voltage inside NFR-04's one second is a question about resistors,
-     * and belongs on the HIL jig (TR-17, tasklist A7). */
+     * drop-out voltage inside SWR-NFR-04's one second is a question about resistors,
+     * and belongs on the HIL jig (SWR-TST-17, tasklist A7). */
     rig_t r;
     rig_init(&r, 20.0f);
     rig_run(&r, 2.0);
@@ -733,7 +733,7 @@ KILN_TEST(ad05_a_stopped_safety_cycle_releases_the_contactor)
     CHECK_NEAR(kiln_sim_current(&r.sim), 0.0f, 0.05f);
 }
 
-KILN_TEST(sr16_withdrawing_authority_de_energises_without_waiting_for_a_window_edge)
+KILN_TEST(swrsaf16_withdrawing_authority_de_energises_without_waiting_for_a_window_edge)
 {
     rig_t r;
     rig_init(&r, 20.0f);
@@ -750,7 +750,7 @@ KILN_TEST(sr16_withdrawing_authority_de_energises_without_waiting_for_a_window_e
     CHECK_NEAR(kiln_sim_current(&r.sim), 0.0f, 0.05f);
 }
 
-KILN_TEST(frcfg08_safety_configuration_cannot_change_during_a_firing)
+KILN_TEST(swrcfg08_safety_configuration_cannot_change_during_a_firing)
 {
     rig_t r;
     rig_init(&r, 20.0f);

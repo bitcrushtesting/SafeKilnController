@@ -1,8 +1,8 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Configuration and latched-fault persistence -- FR-CFG-05, SR-17,
- * architecture 10 and AD-10 (configuration in NVS, because it is small, typed,
+ * Configuration and latched-fault persistence -- SWR-CFG-05, SWR-SAF-17,
+ * architecture 10 and SWA-10 (configuration in NVS, because it is small, typed,
  * and benefits from the wear levelling).
  *
  * The schema, validation and migration all live in kiln_core/configmodel; this
@@ -26,7 +26,7 @@
  *   KILN_ERR_NOT_FOUND   nothing stored: first boot, *cfg is defaults
  *   KILN_ERR_UNSUPPORTED migrated from an older schema or repaired; *cfg is
  *                        usable and the caller should write it back
- *   KILN_ERR_CORRUPT     unreadable: *cfg is defaults and FR-CFG-05 wants a
+ *   KILN_ERR_CORRUPT     unreadable: *cfg is defaults and SWR-CFG-05 wants a
  *                        warning raised (fault 20 if storage itself failed)
  *
  * *cfg is left usable in every case, because there is no state in which the
@@ -35,9 +35,9 @@ kiln_err_t kiln_settings_load(const kiln_port_kvstore_t *kv, kiln_config_t *cfg)
 
 kiln_err_t kiln_settings_save(const kiln_port_kvstore_t *kv, const kiln_config_t *cfg);
 
-/* --- the latched fault (SR-17) ------------------------------------------ */
+/* --- the latched fault (SWR-SAF-17) ------------------------------------------ */
 
-/* SR-17 requires a latched fault to be written with its code, a snapshot and a
+/* SWR-SAF-17 requires a latched fault to be written with its code, a snapshot and a
  * timestamp *before the alarm sounds*, so that an immediate power loss cannot
  * lose it.  The snapshot is what makes it diagnosable afterwards: a bare code
  * tells the operator something stopped the firing, not what the kiln was doing

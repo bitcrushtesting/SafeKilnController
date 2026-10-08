@@ -90,7 +90,7 @@ namespace {
 
 /* Escape per RFC 8259.  Control characters below 0x20 must be escaped or the
  * document is invalid -- and a program name arrives from the network, so this is
- * not a theoretical case (NFR-19). */
+ * not a theoretical case (SWR-NFR-19). */
 void put_escaped(kiln_json_t *j, const char *s)
 {
     putc_(j, '"');

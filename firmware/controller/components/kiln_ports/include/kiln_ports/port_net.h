@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
- * Connectivity status for the HMI and the API (FR-NET-09).
+ * Connectivity status for the HMI and the API (SWR-NET-09).
  */
 #ifndef KILN_PORT_NET_H
 #define KILN_PORT_NET_H
@@ -12,7 +12,7 @@ typedef enum {
     KILN_NET_DOWN = 0,
     KILN_NET_CONNECTING,
     KILN_NET_STA_CONNECTED,
-    KILN_NET_AP_FALLBACK,      /* FR-NET-02 */
+    KILN_NET_AP_FALLBACK,      /* SWR-NET-02 */
 } kiln_net_state_t;
 
 typedef struct {

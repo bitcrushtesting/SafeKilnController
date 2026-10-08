@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * The REST API of architecture 12.1 against the real application and a simulated
- * kiln -- FR-WEB-13, FR-WEB-19, FR-WEB-20, FR-WEB-23, FR-LOG-10, FR-WEB-18,
+ * kiln -- SWR-WEB-13, SWR-WEB-19, SWR-WEB-20, SWR-WEB-23, SWR-LOG-10, SWR-WEB-18,
  * and the request-handling rules of 12.2.
  *
  * This is the "API suite green" half of M6's exit criterion. It runs on the host
@@ -116,7 +116,7 @@ static void rig_run(rig_t *r, double seconds)
     }
 }
 
-/* FR-WEB-26: the web interface cannot start a firing, heat the kiln, change
+/* SWR-WEB-26: the web interface cannot start a firing, heat the kiln, change
  * configuration or acknowledge a fault, so a test that needs any of those sets
  * it up the way the local HMI does -- through kiln_app, not over HTTP.  That is
  * not a workaround for the restriction; it is the restriction, expressed as the
@@ -172,7 +172,7 @@ static kiln_err_t local_set_cfg(rig_t *r, const char *key, double value)
 }
 
 /* One request.  Always authenticated unless a test says otherwise, because
- * FR-WEB-23 is tested on its own and every other test is about the handler. */
+ * SWR-WEB-23 is tested on its own and every other test is about the handler. */
 static kiln_api_resp_t call(rig_t *r, kiln_http_method_t m, const char *path,
                             const char *query, const char *body)
 {
@@ -235,7 +235,7 @@ static void str_of(const kiln_api_resp_t *resp, int n, const char *key,
               "no string member %s in %.200s", key, resp->body);
 }
 
-/* FR-WEB-20: every error is {"error":{"code","message"}}. */
+/* SWR-WEB-20: every error is {"error":{"code","message"}}. */
 /* By value, so `expect_error(call(...))` reads naturally. */
 static void expect_error(kiln_api_resp_t r, int status, const char *code)
 {
@@ -259,9 +259,9 @@ static void expect_error(kiln_api_resp_t r, int status, const char *code)
     CHECK_MSG(strlen(msg) > 10, "the message was too terse: \"%s\"", msg);
 }
 
-/* --- status, info (FR-RUN-05, FR-UPD-06) ------------------------------- */
+/* --- status, info (SWR-RUN-05, SWR-UPD-06) ------------------------------- */
 
-KILN_TEST(frrun05_status_exposes_everything_the_requirement_lists)
+KILN_TEST(swrrun05_status_exposes_everything_the_requirement_lists)
 {
     static rig_t r;
     rig_init(&r);
@@ -275,7 +275,7 @@ KILN_TEST(frrun05_status_exposes_everything_the_requirement_lists)
     str_of(&resp, n, "state", state, sizeof(state));
     CHECK_STR_EQ(state, "IDLE");
 
-    /* FR-RUN-05's list. */
+    /* SWR-RUN-05's list. */
     (void)num_of(&resp, n, "kiln_c");
     (void)num_of(&resp, n, "setpoint_c");
     (void)num_of(&resp, n, "duty_permille");
@@ -290,7 +290,7 @@ KILN_TEST(frrun05_status_exposes_everything_the_requirement_lists)
     CHECK(kiln_json_find(resp.body, g_toks, n, 0, "fault") > 0);
 }
 
-KILN_TEST(frweb25_validity_travels_with_the_value_so_stale_is_distinguishable)
+KILN_TEST(swrweb25_validity_travels_with_the_value_so_stale_is_distinguishable)
 {
     static rig_t r;
     rig_init(&r);
@@ -312,7 +312,7 @@ KILN_TEST(frweb25_validity_travels_with_the_value_so_stale_is_distinguishable)
     CHECK(!valid);
 }
 
-KILN_TEST(frupd06_info_reports_identity_and_gain_provenance)
+KILN_TEST(swrupd06_info_reports_identity_and_gain_provenance)
 {
     static rig_t r;
     rig_init(&r);
@@ -324,7 +324,7 @@ KILN_TEST(frupd06_info_reports_identity_and_gain_provenance)
     CHECK(kiln_json_find(resp.body, g_toks, n, 0, "version") > 0);
     CHECK(kiln_json_find(resp.body, g_toks, n, 0, "target") > 0);
 
-    /* FR-TUN-11: factory defaults are not gains for *this* kiln, and the UI has
+    /* SWR-TUN-11: factory defaults are not gains for *this* kiln, and the UI has
      * to be able to say so. */
     const int g = kiln_json_find(resp.body, g_toks, n, 0, "gains");
     CHECK(g > 0);
@@ -335,7 +335,7 @@ KILN_TEST(frupd06_info_reports_identity_and_gain_provenance)
     CHECK(kiln_json_get_bool(resp.body, g_toks, n, g, "tuned", &tuned));
 }
 
-/* --- the production data block (FR-PROD-03) ----------------------------- */
+/* --- the production data block (SWR-PROD-03) ----------------------------- */
 
 namespace {
 
@@ -365,7 +365,7 @@ kiln_err_t fake_prod_blank(void *ctx, kiln_prod_info_t *out)
 
 }  // namespace
 
-KILN_TEST(fprod03_info_reports_the_production_block_when_programmed)
+KILN_TEST(swrprod03_info_reports_the_production_block_when_programmed)
 {
     static rig_t r;
     rig_init(&r);
@@ -395,7 +395,7 @@ KILN_TEST(fprod03_info_reports_the_production_block_when_programmed)
     CHECK_STR_EQ(buf, "2026-10-07");
 }
 
-KILN_TEST(fprod04_an_unprogrammed_unit_says_so_rather_than_omitting_the_block)
+KILN_TEST(swrprod04_an_unprogrammed_unit_says_so_rather_than_omitting_the_block)
 {
     static rig_t r;
     rig_init(&r);
@@ -418,7 +418,7 @@ KILN_TEST(fprod04_an_unprogrammed_unit_says_so_rather_than_omitting_the_block)
     CHECK(!programmed);
 }
 
-KILN_TEST(fprod04_a_port_without_prod_info_still_answers_with_the_block)
+KILN_TEST(swrprod04_a_port_without_prod_info_still_answers_with_the_block)
 {
     static rig_t r;
     rig_init(&r);
@@ -436,9 +436,9 @@ KILN_TEST(fprod04_a_port_without_prod_info_still_answers_with_the_block)
     CHECK(!programmed);
 }
 
-/* --- configuration (FR-CFG, FR-WEB-17) --------------------------------- */
+/* --- configuration (FR-CFG, SWR-WEB-17) --------------------------------- */
 
-KILN_TEST(frweb17_config_is_generated_from_the_schema_with_units_and_ranges)
+KILN_TEST(swrweb17_config_is_generated_from_the_schema_with_units_and_ranges)
 {
     static rig_t r;
     rig_init(&r);
@@ -465,7 +465,7 @@ KILN_TEST(frweb17_config_is_generated_from_the_schema_with_units_and_ranges)
     CHECK(kiln_json_find(resp.body, g_toks, n, first, "locked_while_running") > 0);
 }
 
-KILN_TEST(frcfg07_a_secret_is_never_returned_only_whether_it_is_set)
+KILN_TEST(swrcfg07_a_secret_is_never_returned_only_whether_it_is_set)
 {
     static rig_t r;
     rig_init(&r);
@@ -501,11 +501,11 @@ KILN_TEST(frcfg07_a_secret_is_never_returned_only_whether_it_is_set)
     CHECK(found);
 }
 
-KILN_TEST(frweb26_configuration_cannot_be_written_over_the_api)
+KILN_TEST(swrweb26_configuration_cannot_be_written_over_the_api)
 {
     /* The configured maximum temperature and the safety thresholds live here,
      * so this is "adjusting the temperature" by the most direct route there is.
-     * FR-CFG-03's atomicity and FR-CFG-08's locking are properties of the
+     * SWR-CFG-03's atomicity and SWR-CFG-08's locking are properties of the
      * config model and are tested in test_configmodel; what is tested here is
      * that neither is reachable from the network. */
     static rig_t r;
@@ -521,10 +521,10 @@ KILN_TEST(frweb26_configuration_cannot_be_written_over_the_api)
     CHECK_EQ_INT(call(&r, KILN_HTTP_GET, "/api/config", NULL, NULL).status, 200);
 }
 
-KILN_TEST(frcfg08_a_safety_item_is_still_refused_while_running_locally)
+KILN_TEST(swrcfg08_a_safety_item_is_still_refused_while_running_locally)
 {
     /* The restriction did not move with the interface: applying config at the
-     * kiln is bounded by FR-CFG-08 exactly as it was through the API. */
+     * kiln is bounded by SWR-CFG-08 exactly as it was through the API. */
     static rig_t r;
     rig_init(&r);
     rig_run(&r, 2.0);
@@ -541,7 +541,7 @@ KILN_TEST(an_unknown_configuration_key_is_not_found)
     CHECK_ERR(local_set_cfg(&r, "safety.make_it_hotter", 1.0), KILN_ERR_NOT_FOUND);
 }
 
-KILN_TEST(frcfg05_configuration_written_locally_is_persisted)
+KILN_TEST(swrcfg05_configuration_written_locally_is_persisted)
 {
     static rig_t r;
     rig_init(&r);
@@ -554,9 +554,9 @@ KILN_TEST(frcfg05_configuration_written_locally_is_persisted)
     CHECK_EQ_UINT(stored.log_interval_s, 42u);
 }
 
-/* --- programs (FR-PRG-07, FR-WEB-12, FR-WEB-13) ------------------------ */
+/* --- programs (SWR-PRG-07, SWR-WEB-12, SWR-WEB-13) ------------------------ */
 
-KILN_TEST(frprg09_the_examples_are_listed_and_marked_readonly)
+KILN_TEST(swrprg09_the_examples_are_listed_and_marked_readonly)
 {
     static rig_t r;
     rig_init(&r);
@@ -578,7 +578,7 @@ KILN_TEST(frprg09_the_examples_are_listed_and_marked_readonly)
     CHECK(kiln_json_find(resp.body, g_toks, n, first, "peak_c") > 0);
 }
 
-KILN_TEST(frweb26_an_unknown_program_slot_is_404_and_not_an_empty_list)
+KILN_TEST(swrweb26_an_unknown_program_slot_is_404_and_not_an_empty_list)
 {
     /* Asking for a program that is not there is a different mistake from
      * asking what programs exist, and the status has to say which. */
@@ -588,7 +588,7 @@ KILN_TEST(frweb26_an_unknown_program_slot_is_404_and_not_an_empty_list)
     expect_error(missing, 404, "not_found");
 }
 
-KILN_TEST(frweb26_programs_are_readable_and_nothing_more)
+KILN_TEST(swrweb26_programs_are_readable_and_nothing_more)
 {
     /* Authoring went the way of the other writes on 2026-10-06: the password
      * that would have guarded it could not be set from anywhere, and an
@@ -611,9 +611,9 @@ KILN_TEST(frweb26_programs_are_readable_and_nothing_more)
     expect_read_only(&r, KILN_HTTP_POST,   "/api/programs/1/copy", NULL);
 }
 
-KILN_TEST(frprg09_a_read_only_example_is_marked_as_such)
+KILN_TEST(swrprg09_a_read_only_example_is_marked_as_such)
 {
-    /* FR-PRG-09's protection is now moot over the API, since nothing can be
+    /* SWR-PRG-09's protection is now moot over the API, since nothing can be
      * edited at all, but the flag still has to reach a client so the local
      * interface can show it. */
     static rig_t r;
@@ -623,7 +623,7 @@ KILN_TEST(frprg09_a_read_only_example_is_marked_as_such)
     CHECK(strstr(list.body, "readonly") != NULL);
 }
 
-KILN_TEST(frweb26_a_body_on_a_read_only_route_changes_nothing)
+KILN_TEST(swrweb26_a_body_on_a_read_only_route_changes_nothing)
 {
     /* There is no parser left to confuse: the method is refused before the
      * body is looked at, which is also why an oversized or malformed body on
@@ -638,9 +638,9 @@ KILN_TEST(frweb26_a_body_on_a_read_only_route_changes_nothing)
 
 /* --- run control (FR-RUN) ---------------------------------------------- */
 
-KILN_TEST(frweb26_run_control_is_not_reachable_from_the_api)
+KILN_TEST(swrweb26_run_control_is_not_reachable_from_the_api)
 {
-    /* FR-WEB-26.  The lifecycle itself is unchanged and still tested -- at the
+    /* SWR-WEB-26.  The lifecycle itself is unchanged and still tested -- at the
      * app layer, in test_integration -- but no part of it is reachable over
      * HTTP.  Start, pause, resume and abort happen at the kiln. */
     static rig_t r;
@@ -666,9 +666,9 @@ KILN_TEST(frweb26_run_control_is_not_reachable_from_the_api)
     CHECK_EQ_INT(call(&r, KILN_HTTP_GET, "/api/status", NULL, NULL).status, 200);
 }
 
-KILN_TEST(frweb26_a_latched_fault_cannot_be_acknowledged_over_the_api)
+KILN_TEST(swrweb26_a_latched_fault_cannot_be_acknowledged_over_the_api)
 {
-    /* SR-17 and FR-WEB-26 pull the same way: clearing a fault re-arms a kiln
+    /* SWR-SAF-17 and SWR-WEB-26 pull the same way: clearing a fault re-arms a kiln
      * that has already failed, and the operator should be in front of it. */
     static rig_t r;
     rig_init(&r);
@@ -682,19 +682,19 @@ KILN_TEST(frweb26_a_latched_fault_cannot_be_acknowledged_over_the_api)
     expect_read_only(&r, KILN_HTTP_POST, "/api/fault/ack", NULL);
     CHECK_MSG(r.app.fault != KILN_FAULT_NONE, "the fault must still be latched");
 
-    /* The fault is still *readable*, which is what the FR-WEB-24 banner needs. */
+    /* The fault is still *readable*, which is what the SWR-WEB-24 banner needs. */
     const kiln_api_resp_t st = call(&r, KILN_HTTP_GET, "/api/status", NULL, NULL);
     CHECK_EQ_INT(st.status, 200);
     CHECK(strstr(st.body, "fault") != NULL);
 
-    /* And it clears locally, once the condition has gone (SR-18). */
+    /* And it clears locally, once the condition has gone (SWR-SAF-18). */
     kiln_sim_clear(&r.sim, KILN_INJ_TC_OPEN);
     rig_run(&r, 1.0);
     CHECK_OK(kiln_app_clear_fault(&r.app));
     CHECK_EQ_INT(r.app.fault, KILN_FAULT_NONE);
 }
 
-KILN_TEST(frweb24_the_banner_data_carries_the_operator_text)
+KILN_TEST(swrweb24_the_banner_data_carries_the_operator_text)
 {
     static rig_t r;
     rig_init(&r);
@@ -718,9 +718,9 @@ KILN_TEST(frweb24_the_banner_data_carries_the_operator_text)
     CHECK(strlen(msg) > 30);
 }
 
-KILN_TEST(frweb26_the_running_program_cannot_be_edited_from_the_api)
+KILN_TEST(swrweb26_the_running_program_cannot_be_edited_from_the_api)
 {
-    /* FR-PRG-10 let the remaining segments of a running program be adjusted.
+    /* SWR-PRG-10 let the remaining segments of a running program be adjusted.
      * That is "adjust the temperature" of a kiln that is already hot, so it is
      * withdrawn from the web with the rest of run control. */
     static rig_t r;
@@ -734,10 +734,10 @@ KILN_TEST(frweb26_the_running_program_cannot_be_edited_from_the_api)
     CHECK_EQ_INT(r.app.state, KILN_STATE_RUNNING);
 }
 
-KILN_TEST(frweb26_manual_heating_is_not_reachable_from_the_api)
+KILN_TEST(swrweb26_manual_heating_is_not_reachable_from_the_api)
 {
     /* Manual mode puts duty straight into the elements; it is the most direct
-     * "make the kiln hot" there is.  The bounding of FR-CTL-14 is unchanged and
+     * "make the kiln hot" there is.  The bounding of SWR-CTL-14 is unchanged and
      * tested at the app layer -- it is simply no longer reachable from here. */
     static rig_t r;
     rig_init(&r);
@@ -754,9 +754,9 @@ KILN_TEST(frweb26_manual_heating_is_not_reachable_from_the_api)
     CHECK_ERR(kiln_app_manual(&r.app, 5000u), KILN_ERR_RANGE);
 }
 
-/* --- tuning (FR-TUN-09, FR-TUN-10) ------------------------------------- */
+/* --- tuning (SWR-TUN-09, SWR-TUN-10) ------------------------------------- */
 
-KILN_TEST(frtun10_tuning_progress_and_candidates_are_exposed)
+KILN_TEST(swrtun10_tuning_progress_and_candidates_are_exposed)
 {
     static rig_t r;
     rig_init(&r);
@@ -774,7 +774,7 @@ KILN_TEST(frtun10_tuning_progress_and_candidates_are_exposed)
     CHECK_STR_EQ(phase, "approach");
     CHECK(kiln_json_find(resp.body, g_toks, n, 0, "candidates") > 0);
 
-    /* FR-TUN-09: nothing is stored until a rule is accepted, so accepting with
+    /* SWR-TUN-09: nothing is stored until a rule is accepted, so accepting with
      * no result is refused rather than writing zeros over the gains. */
     /* Accepting a gain set and cancelling are both commands, so both are gone
      * from the API even while the tune itself remains readable. */
@@ -782,7 +782,7 @@ KILN_TEST(frtun10_tuning_progress_and_candidates_are_exposed)
     expect_read_only(&r, KILN_HTTP_POST, "/api/tune/cancel", NULL);
 }
 
-KILN_TEST(frweb26_autotune_cannot_be_started_from_the_api)
+KILN_TEST(swrweb26_autotune_cannot_be_started_from_the_api)
 {
     /* Autotune drives the kiln through relay oscillation at its setpoint: it is
      * firing by another name, so it goes the same way as /api/run. */
@@ -795,7 +795,7 @@ KILN_TEST(frweb26_autotune_cannot_be_started_from_the_api)
     expect_read_only(&r, KILN_HTTP_POST, "/api/tune/cancel", NULL);
     CHECK_MSG(r.app.state == KILN_STATE_IDLE, "the refusal must not have started tuning");
 
-    /* SR-23 is a property of the command, not of the transport, and still
+    /* SWR-SAF-23 is a property of the command, not of the transport, and still
      * holds on the path that remains.  KILN_ERR_RANGE here means "running, but
      * clamped below what was asked" -- the tune starts at the configured
      * maximum and says so, rather than silently tuning somewhere else. */
@@ -823,24 +823,24 @@ KILN_TEST(frcur_the_current_endpoint_reports_measurement_and_wear)
     (void)num_of(&resp, n, "apparent_va");
     (void)num_of(&resp, n, "energy_wh");
 
-    /* FR-CUR-07 requires the resistive-load assumption to be stated wherever the
+    /* SWR-CUR-07 requires the resistive-load assumption to be stated wherever the
      * figure is presented, so it travels with it. */
     char basis[80];
     str_of(&resp, n, "power_basis", basis, sizeof(basis));
     CHECK(strstr(basis, "resistive") != NULL);
 
-    /* FR-CUR-13 */
+    /* SWR-CUR-13 */
     const int sw = kiln_json_find(resp.body, g_toks, n, 0, "switching");
     CHECK(sw > 0);
     CHECK(kiln_json_find(resp.body, g_toks, n, sw, "contactor_ops") > 0);
     CHECK(kiln_json_find(resp.body, g_toks, n, sw, "ssr_ops") > 0);
 
-    /* FR-WEB-26: the calibration reference feeds SR-28's deviation bands, so it
-     * is set at the kiln.  FR-CUR-06's own refusal is tested in test_current. */
+    /* SWR-WEB-26: the calibration reference feeds SWR-SAF-28's deviation bands, so it
+     * is set at the kiln.  SWR-CUR-06's own refusal is tested in test_current. */
     expect_read_only(&r, KILN_HTTP_POST, "/api/current/calibrate", "{\"known_a\":0}");
 }
 
-KILN_TEST(frlog15_storage_health_is_reported)
+KILN_TEST(swrlog15_storage_health_is_reported)
 {
     static rig_t r;
     rig_init(&r);
@@ -862,7 +862,7 @@ KILN_TEST(frlog15_storage_health_is_reported)
     CHECK(kiln_json_find(resp.body, g_toks, n, log, "write_errors") > 0);
 }
 
-KILN_TEST(frlog09_the_run_list_is_newest_first_and_marks_truncation)
+KILN_TEST(swrlog09_the_run_list_is_newest_first_and_marks_truncation)
 {
     static rig_t r;
     rig_init(&r);
@@ -894,7 +894,7 @@ KILN_TEST(frlog09_the_run_list_is_newest_first_and_marks_truncation)
     CHECK(strstr(resp.body, "samples_truncated") != NULL);
 }
 
-/* --- the log stream (FR-LOG-10, FR-LOG-11, FR-WEB-11, FR-WEB-18) ------- */
+/* --- the log stream (SWR-LOG-10, SWR-LOG-11, SWR-WEB-11, SWR-WEB-18) ------- */
 
 typedef struct { char buf[262144]; size_t len; bool fail_after; size_t fail_at; } sink_t;
 
@@ -942,7 +942,7 @@ static uint32_t seed_a_run(rig_t *r)
     return run_id;
 }
 
-KILN_TEST(frlog10_a_log_query_decimates_to_the_requested_point_count)
+KILN_TEST(swrlog10_a_log_query_decimates_to_the_requested_point_count)
 {
     static rig_t r;
     rig_init(&r);
@@ -975,7 +975,7 @@ KILN_TEST(frlog10_a_log_query_decimates_to_the_requested_point_count)
     CHECK(kiln_json_find(g_sink.buf, g_toks, n, 0, "columns") > 0);
 }
 
-KILN_TEST(frlog11_decimation_preserves_a_brief_excursion)
+KILN_TEST(swrlog11_decimation_preserves_a_brief_excursion)
 {
     /* The property the whole chart rests on: a short spike must not be averaged
      * away, or a firing that overshot looks clean. */
@@ -1002,7 +1002,7 @@ KILN_TEST(frlog11_decimation_preserves_a_brief_excursion)
               "the excursion was averaged away: %.400s", g_sink.buf);
 }
 
-KILN_TEST(frweb18_csv_is_offered_with_a_header_row)
+KILN_TEST(swrweb18_csv_is_offered_with_a_header_row)
 {
     static rig_t r;
     rig_init(&r);
@@ -1027,9 +1027,9 @@ KILN_TEST(frweb18_csv_is_offered_with_a_header_row)
     CHECK(rows <= 21);
 }
 
-KILN_TEST(frweb11_a_24_hour_run_is_served_as_a_few_hundred_points)
+KILN_TEST(swrweb11_a_24_hour_run_is_served_as_a_few_hundred_points)
 {
-    /* FR-WEB-11 gives a mid-range phone 2 s to render a 24 h run, which is only
+    /* SWR-WEB-11 gives a mid-range phone 2 s to render a 24 h run, which is only
      * possible if the device does the decimating.  8640 samples in, 800 out. */
     static rig_t r;
     rig_init(&r);
@@ -1069,7 +1069,7 @@ KILN_TEST(an_empty_or_absent_run_streams_an_empty_result_not_an_error)
     rig_init(&r);
     rig_run(&r, 1.0);
 
-    /* FR-LOG-09: a run whose samples the ring overwrote is a real case, and the
+    /* SWR-LOG-09: a run whose samples the ring overwrote is a real case, and the
      * chart has to be able to tell it from a failure. */
     const kiln_api_resp_t resp = stream_log(&r, "run=4242");
     CHECK_EQ_INT(resp.status, 200);
@@ -1119,7 +1119,7 @@ KILN_TEST(a_client_that_disconnects_stops_the_scan)
     CHECK(g_sink.len < 2000);
 }
 
-KILN_TEST(frlog13_the_log_can_be_erased)
+KILN_TEST(swrlog13_the_log_can_be_erased)
 {
     static rig_t r;
     rig_init(&r);
@@ -1138,7 +1138,7 @@ KILN_TEST(frlog13_the_log_can_be_erased)
 
 /* --- 12.2's request-handling rules ------------------------------------- */
 
-KILN_TEST(frweb23_state_changing_endpoints_require_authentication)
+KILN_TEST(swrweb23_state_changing_endpoints_require_authentication)
 {
     static rig_t r;
     rig_init(&r);
@@ -1192,7 +1192,7 @@ KILN_TEST(frweb23_state_changing_endpoints_require_authentication)
     CHECK(!kiln_api_needs_auth(&rd));
 }
 
-KILN_TEST(nfr19_an_oversized_body_is_refused_before_it_is_parsed)
+KILN_TEST(swrnfr19_an_oversized_body_is_refused_before_it_is_parsed)
 {
     static rig_t r;
     rig_init(&r);
@@ -1219,7 +1219,7 @@ KILN_TEST(nfr19_an_oversized_body_is_refused_before_it_is_parsed)
     expect_error(resp, 413, "body_too_large");
 }
 
-KILN_TEST(frweb20_unknown_routes_and_methods_use_the_error_envelope)
+KILN_TEST(swrweb20_unknown_routes_and_methods_use_the_error_envelope)
 {
     static rig_t r;
     rig_init(&r);
@@ -1274,7 +1274,7 @@ KILN_TEST(query_parameters_are_decoded_and_bounded)
     CHECK(!kiln_api_query_uint("max_points=", "max_points", &n));
 }
 
-KILN_TEST(frweb05_the_telemetry_event_matches_the_status_shape)
+KILN_TEST(swrweb05_the_telemetry_event_matches_the_status_shape)
 {
     /* One shape, so the UI has one parser for the stream and the one-shot. */
     static rig_t r;

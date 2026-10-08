@@ -1,17 +1,17 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Persisted switching-operation counters (FR-CUR-13, feeding SR-30).
+ * Persisted switching-operation counters (SWR-CUR-13, feeding SWR-SAF-30).
  *
  * The port's shape is the design: `add` is cheap and `flush` is not, because
  * the write pattern is the problem rather than the storage.  A 2 s window at
  * 50 % duty switches 1800 times an hour, and committing each one would spend
- * the NFR-14 endurance budget on telemetry.  So this accumulates in RAM and
+ * the SWR-NFR-14 endurance budget on telemetry.  So this accumulates in RAM and
  * commits on a coarse boundary, and `add` never touches flash -- it is called
  * from the 10 ms window tick.
  *
  * NVS rather than the log partition: these are a handful of counters that want
- * wear levelling and a named key, which is exactly AD-10's reasoning for
+ * wear levelling and a named key, which is exactly SWA-10's reasoning for
  * putting configuration there.
  */
 #include <string.h>
@@ -64,7 +64,7 @@ kiln_err_t ctr_load(void *ctx, kiln_switch_counters_t *out)
     nvs_handle_t h;
     if (nvs_open(CTR_NAMESPACE, NVS_READONLY, &h) != ESP_OK) {
         /* No namespace yet is a first boot, not a failure: a new contactor has
-         * done no operations.  Reporting an error here would make SR-30
+         * done no operations.  Reporting an error here would make SWR-SAF-30
          * unavailable on every device until something had written once. */
         memset(&s->live, 0, sizeof(s->live));
         s->committed = s->live;
@@ -140,7 +140,7 @@ kiln_err_t ctr_reset(void *ctx, const kiln_switch_counters_t *to)
     if ((s == nullptr) || (to == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
-    /* For a replaced contactor or SSR: SR-30's life limit is about one physical
+    /* For a replaced contactor or SSR: SWR-SAF-30's life limit is about one physical
      * part, so fitting a new one has to be able to zero its count. */
     s->live   = *to;
     s->loaded = true;

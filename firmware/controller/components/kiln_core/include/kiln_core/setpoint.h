@@ -3,13 +3,13 @@
  *
  * Setpoint generator -- architecture section 7.1.
  *
- * AD-06: this is deliberately separate from the PID.  The program produces a
+ * SWA-06: this is deliberately separate from the PID.  The program produces a
  * moving setpoint; the PID only ever tracks the setpoint it is handed.  That
  * split is what makes curve execution and loop tuning independently testable.
  *
- * Implements FR-CTL-09 (interpolated ramp, not a step), FR-CTL-10 (rate 0 =
- * as fast as the kiln allows), FR-CTL-11 (hold-back), FR-CTL-12 (dwell
- * tolerance), FR-CTL-13 (cooling segments are passive) and FR-PRG-03 (per
+ * Implements SWR-CTL-09 (interpolated ramp, not a step), SWR-CTL-10 (rate 0 =
+ * as fast as the kiln allows), SWR-CTL-11 (hold-back), SWR-CTL-12 (dwell
+ * tolerance), SWR-CTL-13 (cooling segments are passive) and SWR-PRG-03 (per
  * segment operator acknowledgement).
  */
 #ifndef KILN_CORE_SETPOINT_H
@@ -26,16 +26,16 @@ typedef enum {
 } kiln_sp_phase_t;
 
 typedef struct {
-    float holdback_band_c;   /* FR-CTL-11: 0 .. 200, 0 disables */
-    float dwell_tol_c;       /* FR-CTL-12: 0.5 .. 50            */
+    float holdback_band_c;   /* SWR-CTL-11: 0 .. 200, 0 disables */
+    float dwell_tol_c;       /* SWR-CTL-12: 0.5 .. 50            */
     float max_temp_c;        /* configured kiln maximum         */
 } kiln_setpoint_cfg_t;
 
 typedef struct {
     kiln_setpoint_cfg_t cfg;
 
-    /* A private copy of the program.  Two reasons: FR-PRG-11 wants the program
-     * as executed preserved against later edits, and FR-PRG-10 edits must not
+    /* A private copy of the program.  Two reasons: SWR-PRG-11 wants the program
+     * as executed preserved against later edits, and SWR-PRG-10 edits must not
      * be able to mutate the segment currently running. */
     kiln_program_t prog;
 
@@ -60,35 +60,35 @@ kiln_err_t kiln_setpoint_start(kiln_setpoint_t *st,
 
 /* One control cycle.
  *
- * NFR-17: returns KILN_ERR_INVALID_ARG for a NULL generator, a non-positive or
+ * SWR-NFR-17: returns KILN_ERR_INVALID_ARG for a NULL generator, a non-positive or
  * non-finite dt_s or a non-finite pv_c, and KILN_ERR_STATE when there is nothing
  * to advance (not started, finished, or frozen awaiting an acknowledgement).
  * Previously all of these returned silently, so a stalled clock looked exactly
  * like a program running correctly. */
 kiln_err_t kiln_setpoint_tick(kiln_setpoint_t *st, float pv_c, float dt_s);
 
-/* FR-PRG-03: release a segment that is waiting for the operator. */
+/* SWR-PRG-03: release a segment that is waiting for the operator. */
 kiln_err_t kiln_setpoint_ack(kiln_setpoint_t *st);
 
-/* FR-PRG-10: replace the not-yet-started segments.  Rejects any change to the
+/* SWR-PRG-10: replace the not-yet-started segments.  Rejects any change to the
  * current or completed segments, and any program that fails validation. */
 kiln_err_t kiln_setpoint_replace_remaining(kiln_setpoint_t *st,
                                            const kiln_program_t *updated);
 
-/* FR-PRG-06 / FR-RUN-05: seconds still to run, assuming the kiln keeps up.
+/* SWR-PRG-06 / SWR-RUN-05: seconds still to run, assuming the kiln keeps up.
  *
  * Closed form.  These are display and API calls, served from the HMI and web
  * tasks, and the arithmetic is a sum of ramp spans over rates plus dwell times --
  * so simulating it a second at a time, up to 720 000 iterations over a ~440 byte
  * stack copy of the whole generator, bought agreement with the executor at the
- * price of a multi-millisecond blocking loop against NFR-02's 50 ms ceiling.
+ * price of a multi-millisecond blocking loop against SWR-NFR-02's 50 ms ceiling.
  *
  * Agreement is instead maintained by test: the host suite runs the generator
  * forward as an oracle and asserts the closed form matches it, which is the same
  * guarantee without the cost.  Expect agreement to within one second per
  * segment; the ramp count is a ceiling over a float accumulation.
  *
- * The estimate is optimistic through a cooling segment, because FR-CTL-13 makes
+ * The estimate is optimistic through a cooling segment, because SWR-CTL-13 makes
  * cooling passive -- a real kiln cools as fast as it cools, not at the rate the
  * program names.  Stated here and in the API documentation (tasklist D4). */
 uint32_t kiln_setpoint_remaining_s(const kiln_setpoint_t *st);
@@ -96,7 +96,7 @@ uint32_t kiln_setpoint_remaining_s(const kiln_setpoint_t *st);
 /* Seconds remaining in the current segment, same assumption. */
 uint32_t kiln_setpoint_segment_remaining_s(const kiln_setpoint_t *st);
 
-/* FR-CTL-13: false while a cooling ramp is in progress, so the caller holds
+/* SWR-CTL-13: false while a cooling ramp is in progress, so the caller holds
  * duty at zero rather than relying on the sign of the PID error. */
 bool kiln_setpoint_heat_allowed(const kiln_setpoint_t *st);
 

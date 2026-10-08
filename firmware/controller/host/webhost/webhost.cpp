@@ -4,7 +4,7 @@
  * A development harness: the real firmware logic, a simulated kiln, and enough
  * HTTP to drive the web interface from a browser with no device involved.
  *
- * This exists because AD-01 makes it almost free.  kiln_core is platform-free,
+ * This exists because SWA-01 makes it almost free.  kiln_core is platform-free,
  * kiln_app already runs against kiln_sim, and kiln_web's API layer has no
  * transport in it -- so the only thing missing was a socket.  What the browser
  * talks to here is the same handler code the device runs; only the bytes arrive
@@ -367,7 +367,7 @@ void handle_request(client_t *c)
         body_len = c->in_len - (size_t)(body - c->in);
     }
 
-    /* FR-WEB-05: the SSE stream. */
+    /* SWR-WEB-05: the SSE stream. */
     if (strcmp(target, "/api/events") == 0 && m == KILN_HTTP_GET) {
         send_headers(c->fd, 200, "text/event-stream", -1,
                      "X-Accel-Buffering: no\r\n");
@@ -383,7 +383,7 @@ void handle_request(client_t *c)
         req.body     = body;
         req.body_len = body_len;
         /* No password is configured in the harness, so everything is permitted.
-         * FR-WEB-23's enforcement is the transport's job and is tested in the
+         * SWR-WEB-23's enforcement is the transport's job and is tested in the
          * API suite rather than here. */
         req.authenticated = true;
 

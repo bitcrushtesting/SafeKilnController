@@ -1,9 +1,9 @@
 # SPDX-FileCopyrightText: 2026 Bitcrush Testing
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Per TR-24, everything here blocks merge.  Architecture 14.6 describes six
+# Per SWR-TST-24, everything here blocks merge.  Architecture 14.6 describes six
 # parallel jobs; the web asset budget arrives with the component it checks
-# (tasklist C8).  Static analysis (NFR-25) is the `tidy` job below.
+# (tasklist C8).  Static analysis (SWR-NFR-25) is the `tidy` job below.
 
 name: CI
 
@@ -48,9 +48,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: kiln_core has no platform dependency (TR-01, AD-14)
+      - name: kiln_core has no platform dependency (SWR-TST-01, SWA-14)
         run: |
-          # The property AD-14 rests on, and the one that erodes first: one
+          # The property SWA-14 rests on, and the one that erodes first: one
           # esp_*/freertos include in the core and the host tests stop building,
           # which is how a testability driver gets quietly dropped.  The full
           # check over preprocessor output is tasklist C5; a grep already catches
@@ -70,7 +70,7 @@ jobs:
           fi
           echo "clean"
 
-      - name: SPDX header on every source file (NFR-18, CON-04)
+      - name: SPDX header on every source file (SWR-NFR-18, UR-CON-04)
         run: |
           missing=0
           while IFS= read -r f; do
@@ -107,7 +107,7 @@ jobs:
       - name: Test
         run: ctest --test-dir build-host --output-on-failure
 
-  # --- NFR-25 / TR-24: static analysis -----------------------------------
+  # --- SWR-NFR-25 / SWR-TST-24: static analysis -----------------------------------
   #
   # Fully blocking: WarningsAsErrors is '*' in .clang-tidy and there is no
   # suppressions baseline.  Every check that fires today was either fixed or
@@ -147,7 +147,7 @@ jobs:
       - name: Analyse
         run: tools/tidy.sh
 
-  # --- NFR-25 / TR-24: static analysis, target side (tasklist F1b) --------
+  # --- SWR-NFR-25 / SWR-TST-24: static analysis, target side (tasklist F1b) --------
   #
   # kiln_hal_esp32s3 cannot be analysed from the host database -- it needs the
   # ESP-IDF and xtensa headers -- so it is driven from the database idf.py
@@ -194,16 +194,16 @@ jobs:
             cd "$GITHUB_WORKSPACE"
             tools/tidy-target.sh
 
-  # TR-19.  The line floor is enforced; measured at 97.5 % on kiln_core when
+  # SWR-TST-19.  The line floor is enforced; measured at 97.5 % on kiln_core when
   # this was written, so 90 % is a floor with room above it rather than a
   # number chosen to match whatever the code happened to do.
   #
-  # Still outstanding (tasklist C10): TR-19 also wants *100 % of safety decision
+  # Still outstanding (tasklist C10): SWR-TST-19 also wants *100 % of safety decision
   # branches*, and branch coverage is around 83 % overall.  Reported here so the
   # gap is visible; gating it needs the remaining branches either covered or
   # individually justified, which is work rather than a flag.
   coverage:
-    name: Coverage (TR-19)
+    name: Coverage (SWR-TST-19)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -235,7 +235,7 @@ jobs:
         if: always()
         run: |
           {
-            echo '### kiln_core coverage (TR-19)'
+            echo '### kiln_core coverage (SWR-TST-19)'
             echo
             echo '```'
             cat coverage/summary.txt 2>/dev/null || echo 'not produced'
@@ -304,7 +304,7 @@ jobs:
           {
             echo '### Supervisor coverage'
             echo
-            echo 'TR-29: at least 80 % MC/DC on the trip logic and the link format.'
+            echo 'SWR-TST-29: at least 80 % MC/DC on the trip logic and the link format.'
             echo '```'
             tools/mcdc.sh 2>&1 | tail -12 || true
             echo '```'
@@ -312,11 +312,11 @@ jobs:
 
   # --- the requirements document ----------------------------------------
   #
-  # docs/requirements.sdoc is the specification, and StrictDoc is what makes it
+  # docs/03_software_req.sdoc is the specification, and StrictDoc is what makes it
   # more than prose: it refuses to build a document with two nodes sharing a
   # UID, or an inline reference to a requirement that does not exist.  Both of
-  # those were real defects in the markdown this replaced -- FR-WEB-26 was
-  # defined twice, and SR-31 had been orphaned by a blank line in the middle of
+  # those were real defects in the markdown this replaced -- SWR-WEB-26 was
+  # defined twice, and SWR-SAF-31 had been orphaned by a blank line in the middle of
   # its table -- and neither was findable by reading.
   #
   # So this job is a gate first and a publisher second: `strictdoc export`
@@ -350,22 +350,28 @@ jobs:
             echo '### Requirements specification'
             echo
             if [ -d build-docs/html ]; then
-              echo "StrictDoc validated \`requirements.sdoc\`, \`architecture.sdoc\`, \`safety.sdoc\` and \`security.sdoc\`, and exported them."
+              echo "StrictDoc validated \`03_software_req.sdoc\`, \`04_software_arch.sdoc\`, \`safety.sdoc\` and \`security.sdoc\`, and exported them."
               echo
               echo '```'
-              printf 'requirements   %s\n' \
-                "$(grep -c '^\[REQUIREMENT\]' docs/requirements.sdoc)"
+              printf 'user reqs      %s, %s markets, %s regulations\n' \
+                "$(grep -c '^\[REQUIREMENT\]' docs/01_user_req.sdoc)" \
+                "$(grep -c '^\[MARKET\]' docs/01_user_req.sdoc)" \
+                "$(grep -c '^\[REGULATION\]' docs/01_user_req.sdoc)"
+              printf 'system reqs    %s\n' \
+                "$(grep -c '^\[REQUIREMENT\]' docs/02_system_req.sdoc)"
+              printf 'software reqs  %s\n' \
+                "$(grep -c '^\[REQUIREMENT\]' docs/03_software_req.sdoc)"
               printf 'constraints    %s\n' \
-                "$(grep -c '^\[CONSTRAINT\]' docs/requirements.sdoc)"
+                "$(grep -c '^\[CONSTRAINT\]' docs/03_software_req.sdoc)"
               printf 'assumptions    %s\n' \
-                "$(grep -c '^\[ASSUMPTION\]' docs/requirements.sdoc)"
+                "$(grep -c '^\[ASSUMPTION\]' docs/03_software_req.sdoc)"
               printf 'open questions %s\n' \
-                "$(grep -c '^\[QUESTION\]' docs/requirements.sdoc)"
+                "$(grep -c '^\[QUESTION\]' docs/03_software_req.sdoc)"
               printf 'cross-refs     %s validated [LINK:] references\n' \
-                "$(grep -co '\[LINK: ' docs/requirements.sdoc)"
+                "$(grep -co '\[LINK: ' docs/03_software_req.sdoc)"
               printf 'decisions      %s, with %s Satisfies relations\n' \
-                "$(grep -c '^\[DECISION\]' docs/architecture.sdoc)" \
-                "$(grep -c '^- TYPE: Parent' docs/architecture.sdoc)"
+                "$(grep -c '^\[DECISION\]' docs/04_software_arch.sdoc)" \
+                "$(grep -c '^- TYPE: Parent' docs/04_software_arch.sdoc)"
               printf 'hazards        %s\n' \
                 "$(grep -c '^\[HAZARD\]' docs/safety.sdoc)"
               printf 'safety goals   %s, with %s Mitigates and %s Realised by relations\n' \
@@ -431,7 +437,7 @@ jobs:
           {
             echo '### Image size'
             echo
-            echo 'NFR-13: the application must fit a 2 MB OTA slot.'
+            echo 'SWR-NFR-13: the application must fit a 2 MB OTA slot.'
             echo '```'
             cat firmware/controller/build/size.txt
             echo '```'

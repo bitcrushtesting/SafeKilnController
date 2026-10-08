@@ -35,13 +35,13 @@ sup_tc_sample_t decode(const uint8_t (&regs)[SUP_TC_BURST_BYTES])
 
 }  // namespace
 
-KILN_TEST(fracq02_the_config_is_type_k_with_open_circuit_detect_and_50hz)
+KILN_TEST(swracq02_the_config_is_type_k_with_open_circuit_detect_and_50hz)
 {
-    /* FR-ACQ-02 fixes the type, and the supervisor has no receive path to be
+    /* SWR-ACQ-02 fixes the type, and the supervisor has no receive path to be
      * told another one, so this is a compile-time fact rather than a setting. */
     CHECK_EQ_UINT(SUP_TC_CR1_VALUE & 0x03u, SUP_TC_CR1_TYPE_K);
 
-    /* The bit that makes SR-04 work at all: without OCFAULT the part never
+    /* The bit that makes SWR-SAF-04 work at all: without OCFAULT the part never
      * reports an open couple, and a backstop whose sensor can fall off
      * silently is not a backstop. */
     CHECK((SUP_TC_CR0_VALUE & SUP_TC_CR0_OCFAULT_1) != 0u);
@@ -52,7 +52,7 @@ KILN_TEST(fracq02_the_config_is_type_k_with_open_circuit_detect_and_50hz)
     CHECK_EQ_UINT(SUP_TC_MASK_VALUE, 0u);
 }
 
-KILN_TEST(fracq02_cr1_readback_rejects_an_absent_part)
+KILN_TEST(swracq02_cr1_readback_rejects_an_absent_part)
 {
     CHECK(sup_tc_cr1_ok(SUP_TC_CR1_VALUE));
     /* The two ways a missing part reads, depending on which way the bus
@@ -63,7 +63,7 @@ KILN_TEST(fracq02_cr1_readback_rejects_an_absent_part)
     CHECK(!sup_tc_cr1_ok(SUP_TC_CR1_VALUE ^ 0x01u));   /* wrong type */
 }
 
-KILN_TEST(fracq04_known_temperatures_decode_to_the_values_they_encode)
+KILN_TEST(swracq04_known_temperatures_decode_to_the_values_they_encode)
 {
     static const vector v[] = {
         { { 0x19, 0x00, 0x00, 0x00, 0x00, 0x00 },    0.0f, 25.0f },
@@ -80,14 +80,14 @@ KILN_TEST(fracq04_known_temperatures_decode_to_the_values_they_encode)
     }
 }
 
-KILN_TEST(sr05_a_negative_reading_stays_negative)
+KILN_TEST(swrsaf05_a_negative_reading_stays_negative)
 {
     /* The reason the shift in the decoder is signed. A logical shift would read
      * -1 degC as +524287, which is above SUP_OVERTEMP_C, so the supervisor
      * would latch an over-temperature on a cold kiln: a nuisance trip, and
      * HZ-10 is about what nuisance trips lead people to do.
      *
-     * It also matters the other way: SR-05 detects a reversed couple by the
+     * It also matters the other way: SWR-SAF-05 detects a reversed couple by the
      * reading falling, which it cannot do if negative is unrepresentable. */
     static const vector v[] = {
         { { 0xFB, 0x00, 0xFF, 0x38, 0x00, 0x00 }, -12.5f, -5.0f },
@@ -102,7 +102,7 @@ KILN_TEST(sr05_a_negative_reading_stays_negative)
     }
 }
 
-KILN_TEST(sr04_a_silent_front_end_is_a_comms_fault_not_a_reading_of_zero)
+KILN_TEST(swrsaf04_a_silent_front_end_is_a_comms_fault_not_a_reading_of_zero)
 {
     /* All zeros decodes arithmetically to 0 degC with no fault bits set, which
      * is a plausible, in-range, and entirely wrong reading for a kiln. The
@@ -120,7 +120,7 @@ KILN_TEST(sr04_a_silent_front_end_is_a_comms_fault_not_a_reading_of_zero)
     CHECK_EQ_UINT(o.fault_bits, (unsigned)SUP_TC_FAULT_COMMS);
 }
 
-KILN_TEST(sr04_a_null_burst_is_a_comms_fault_and_never_a_reading)
+KILN_TEST(swrsaf04_a_null_burst_is_a_comms_fault_and_never_a_reading)
 {
     sup_tc_sample_t s = {};
     s.valid = true;                 /* must be overwritten, not left alone */
@@ -131,7 +131,7 @@ KILN_TEST(sr04_a_null_burst_is_a_comms_fault_and_never_a_reading)
     sup_tc_decode(nullptr, nullptr);    /* must not fault */
 }
 
-KILN_TEST(fracq10_every_status_bit_maps_to_its_fault)
+KILN_TEST(swracq10_every_status_bit_maps_to_its_fault)
 {
     CHECK_EQ_UINT(sup_tc_faults(0u), 0u);
     CHECK_EQ_UINT(sup_tc_faults(SUP_TC_SR_OPEN), (unsigned)SUP_TC_FAULT_OPEN);
@@ -152,7 +152,7 @@ KILN_TEST(fracq10_every_status_bit_maps_to_its_fault)
                   (unsigned)(SUP_TC_FAULT_OPEN | SUP_TC_FAULT_TC_RANGE));
 }
 
-KILN_TEST(sr04_a_fault_bit_makes_the_reading_unusable_however_plausible_it_is)
+KILN_TEST(swrsaf04_a_fault_bit_makes_the_reading_unusable_however_plausible_it_is)
 {
     /* 1000 degC is a perfectly reasonable number. With OPEN asserted it is
      * still not a measurement, and valid has to say so: the permit is
@@ -168,7 +168,7 @@ KILN_TEST(sr04_a_fault_bit_makes_the_reading_unusable_however_plausible_it_is)
     CHECK_NEAR(s.chamber_c, 1000.0f, 0.01);
 }
 
-KILN_TEST(ad22_a_decoded_reading_drives_the_trip_logic_end_to_end)
+KILN_TEST(swa22_a_decoded_reading_drives_the_trip_logic_end_to_end)
 {
     /* The two halves joined: bytes off the bus, through the decode, into the
      * trip logic, and out as a permit decision. Neither half is interesting on

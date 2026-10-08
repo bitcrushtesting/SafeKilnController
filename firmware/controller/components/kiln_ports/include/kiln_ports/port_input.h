@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
- * Rotary encoder with push button (HR-05, FR-HMI-09).
+ * Rotary encoder with push button (SYS-HW-05, SWR-HMI-09).
  */
 #ifndef KILN_PORT_INPUT_H
 #define KILN_PORT_INPUT_H

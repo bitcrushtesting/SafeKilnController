@@ -1,15 +1,15 @@
 # SPDX-FileCopyrightText: 2026 Bitcrush Testing
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Architecture section 10.1, for an 8 MB device (NFR-13).  A 16 MB device
+# Architecture section 10.1, for an 8 MB device (SWR-NFR-13).  A 16 MB device
 # enlarges only `kilnlog`.
 #
-# `kilnlog` is a custom data partition, not a filesystem: AD-08 wants a raw
+# `kilnlog` is a custom data partition, not a filesystem: SWA-08 wants a raw
 # circular array of fixed 20 byte records whose wear pattern is provable, and a
 # filesystem would add metadata writes and a torn-write mode across structures we
 # do not control.  Type 0x40 / subtype 0x00 is in the application-defined range.
 #
-# `kilnfs` is the same decision applied to programs and run records (AD-10): a
+# `kilnfs` is the same decision applied to programs and run records (SWA-10): a
 # fixed array of two-sector regions, one file each, alternating between the two
 # so the copy being replaced is never the copy being erased.  512K is 64 regions
 # against the 40 that 20 programs and 20 run records need.  Subtype 0x01.
@@ -25,13 +25,13 @@ kilnlog,    0x40, 0x00,     0x4A0000, 2M,
 prod,       data, nvs,      0x6A0000, 16K,
 # ~1.4 MB beyond 0x6A4000 is deliberately unallocated headroom.
 #
-# `prod` (FR-PROD-01) is the production data block: manufacturer, model, board
+# `prod` (SWR-PROD-01) is the production data block: manufacturer, model, board
 # revision, serial number and production date, written once by
 # tools/prod-data.py at manufacture and opened NVS_READONLY by the firmware.
 #
 # It is a partition of its own rather than a namespace in `nvs` for one reason:
 # hal_kvstore calls nvs_flash_erase() when NVS reports no free pages or a format
-# change, which is the right answer for configuration (FR-CFG-05: defaults beat
+# change, which is the right answer for configuration (SWR-CFG-05: defaults beat
 # refusing to boot) and the wrong one for a serial number. A separate partition
 # cannot be collateral damage of that path. It is placed after `kilnlog` so no
 # existing offset moves, and 16K is the smallest useful NVS (4 sectors against a

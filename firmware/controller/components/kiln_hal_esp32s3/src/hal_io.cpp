@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * The small discrete adapters: lid interlock sense and buzzer
- * (SR-31, HR-21, HR-09, SR-20).
+ * (SWR-SAF-31, SYS-HW-21, SYS-HW-09, SWR-SAF-20).
  *
  * Grouped because each is a handful of lines around one pin, and three files of
  * twenty lines would be three files to find rather than one.
@@ -18,15 +18,15 @@ namespace {
 
 const char *TAG = "hal_io";
 
-/* --- lid interlock (SR-31, HR-21) --------------------------------------- */
+/* --- lid interlock (SWR-SAF-31, SYS-HW-21) --------------------------------------- */
 /*
- * What this pin reads is not the switch: HR-21 puts the contacts in the coil
+ * What this pin reads is not the switch: SYS-HW-21 puts the contacts in the coil
  * circuit, and R30/R31 divide the node *after* them.  So a high level means
  * "the coil supply is live", which is true exactly when the lid is shut.
  *
  * That has a consequence worth stating.  The sense is downstream of the
  * contacts, so it reports the state of the interlock chain rather than of the
- * switch alone: a blown coil fuse would also read as "open".  For SR-31 that
+ * switch alone: a blown coil fuse would also read as "open".  For SWR-SAF-31 that
  * is the right answer -- the rule asks whether heat can reach the kiln -- but
  * the fault text says "door", and an installer chasing a fuse should know the
  * input cannot tell them apart.
@@ -80,10 +80,10 @@ void kiln_hal_door_init(kiln_port_door_t *out, bool interlock_fitted)
 
 namespace {
 
-/* --- buzzer (HR-09, SR-20) ---------------------------------------------- */
+/* --- buzzer (SYS-HW-09, SWR-SAF-20) ---------------------------------------------- */
 /*
- * SR-20 wants fault and completion audibly distinguishable, so this is a
- * pattern and not a level.  A 5 V active buzzer makes its own tone (HR-09), so
+ * SWR-SAF-20 wants fault and completion audibly distinguishable, so this is a
+ * pattern and not a level.  A 5 V active buzzer makes its own tone (SYS-HW-09), so
  * all that is needed is gating it on and off:
  *
  *   fault      200 ms on, 200 ms off   urgent, and continues until acknowledged

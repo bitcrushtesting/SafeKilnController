@@ -4,7 +4,7 @@
  * Decode over arbitrary bytes -- architecture section 14.4's fuzz level.
  *
  * A deterministic sweep rather than a coverage-guided fuzzer, so it runs in CI
- * on every push without a corpus to maintain.  Under ASan and UBSan (TR-20) this
+ * on every push without a corpus to maintain.  Under ASan and UBSan (SWR-TST-20) this
  * is what catches an out-of-bounds read or a signed-overflow in the codec; the
  * property being asserted is simply that *no* input of the right length can make
  * the decoder do anything but succeed or return an error.
@@ -120,7 +120,7 @@ KILN_TEST(header_decode_survives_arbitrary_bytes)
 
 KILN_TEST(decimation_survives_arbitrary_samples)
 {
-    /* FR-LOG-10's decimator now folds buckets as a run grows, which is new index
+    /* SWR-LOG-10's decimator now folds buckets as a run grows, which is new index
      * arithmetic over caller-supplied storage -- exactly the thing a sweep under
      * ASan should be pointed at. */
     for (int iter = 0; iter < 2000; iter++) {

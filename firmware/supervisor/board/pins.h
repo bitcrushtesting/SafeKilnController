@@ -8,7 +8,7 @@
  * (db/mcu/STM32G031K(4-6-8)Tx.xml and the GPIO modes file for
  * STM32G03x_gpio_v1_0), and the register bit positions in stm32g031.h come
  * from the CMSIS-SVD.  Both ship with ST's tools, so neither is a build-time
- * fetch (CON-04).
+ * fetch (UR-CON-04).
  *
  * ---------------------------------------------------------------------------
  * Three properties this assignment holds on purpose
@@ -24,7 +24,7 @@
  *    map should not depend on a remap bit being right.
  *
  * 3. THE UART's RECEIVE PIN IS NEVER CONFIGURED.  The link is simplex
- *    (FR-ACQ-02 fixed the thermocouple type, so there is nothing to send the
+ *    (SWR-ACQ-02 fixed the thermocouple type, so there is nothing to send the
  *    supervisor).  USART2_RX would be PA3, and PA3 is used as a plain input
  *    instead, so the receiver is not merely unused, it is unwired.
  */

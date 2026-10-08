@@ -7,7 +7,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 **Outstanding work only.** An item leaves this file when it is done; what was
 done and why is in the commit that did it, not here. Checked against
-[`docs/requirements.sdoc`](docs/requirements.sdoc),
+[`docs/03_software_req.sdoc`](docs/03_software_req.sdoc),
 [`docs/architecture.md`](docs/architecture.md), [`docs/safety.md`](docs/safety.md)
 and [`docs/security.md`](docs/security.md).
 
@@ -60,40 +60,40 @@ reused: gaps in the numbering are items that have been closed.
   are open-drain and have no pull-up anywhere in the netlist. `TC1_DRDY`
   (U3.7 → U1 IO14) and `TC2_DRDY` (U4.7 → U1 IO21) therefore float between
   assertions, so acquisition timing is undefined. Add 10 k to +3V3 on
-  `TC1_DRDY`, `TC2_DRDY`, `TC1_FAULT`, `TC2_FAULT`. Affects FR-ACQ-03,
-  FR-ACQ-10, SR-04.
+  `TC1_DRDY`, `TC2_DRDY`, `TC1_FAULT`, `TC2_FAULT`. Affects SWR-ACQ-03,
+  SWR-ACQ-10, SWR-SAF-04.
 
 - [ ] **A3. Bypass `VBIAS`.** R24/R25 (10 k/10 k off +3V3) present ~5 kΩ of
   source impedance, and the CT secondary returns into that node through J10.2.
   The "mid-rail" reference is therefore modulated by the signal it is supposed
-  to reference. Add 10 µF ∥ 100 nF from `VBIAS` to GND. HR-17.
+  to reference. Add 10 µF ∥ 100 nF from `VBIAS` to GND. SYS-HW-17.
 
 - [ ] **A4. Fix the CT anti-alias filter.** R26 (1 k) + C25 (220 nF) gives
-  f<sub>c</sub> ≈ 723 Hz. FR-CUR-03 specifies sampling at ≥ 1 kHz, whose Nyquist
+  f<sub>c</sub> ≈ 723 Hz. SWR-CUR-03 specifies sampling at ≥ 1 kHz, whose Nyquist
   frequency is 500 Hz, the filter corner sits *above* Nyquist and does not
   anti-alias. Either raise the sample rate (4–8 kHz) and keep a corner near
   300 Hz, or lower the corner to ~200 Hz for a 1 kHz rate. Pick the sample rate
-  first, then the filter. HR-17, FR-CUR-03.
+  first, then the filter. SYS-HW-17, SWR-CUR-03.
 
 - [ ] **A5. Rescale the CT front end for the specified range.** J10 is annotated
-  "CT 30A/1V" but FR-CUR-02 requires 0–60 A. At 60 A a 30 A/1 V CT delivers
+  "CT 30A/1V" but SWR-CUR-02 requires 0–60 A. At 60 A a 30 A/1 V CT delivers
   2 V<sub>rms</sub> = ±2.83 V<sub>pk</sub> about the 1.65 V bias, which D9 clamps , 
   the reading saturates across the whole upper half of the required range. Even
   at 30 A the swing is 0.24 V to 3.06 V, in the region where the ESP32-S3 ADC is
   least linear. Specify a CT ratio (or add an attenuator) that puts full-scale
   current at roughly 0.5 V<sub>rms</sub>, and record the resulting LSB against
-  FR-CUR-02's 0.1 A resolution.
+  SWR-CUR-02's 0.1 A resolution.
 
 - [ ] **A6. Define `CURR_SENSE` when the CT is absent.** With J10 open there is
   no DC path to the node; it is held only by C25 and diode leakage, so it
-  drifts. FR-CUR-11 requires distinguishing "CT disconnected" from "genuinely
-  zero current", and FR-CUR-12 requires refusing to start a run when monitoring
+  drifts. SWR-CUR-11 requires distinguishing "CT disconnected" from "genuinely
+  zero current", and SWR-CUR-12 requires refusing to start a run when monitoring
   is unavailable. Add a defined bias (e.g. a high-value resistor to a level the
   CT winding cannot produce) so an open input is electrically recognisable, and
   write down the detection rule the firmware will use.
 
 - [ ] **A7. Work out the charge-pump release threshold properly.** This is the
-  circuit the whole SR-02 / HR-07 safety property rests on, and architecture
+  circuit the whole SYS-SAF-02 / SYS-HW-07 safety property rests on, and architecture
   §16 already flags it as the design's most fragile idea.
   `HEAT_EN` → R19 → C23 (10 µF) → D5 (BAT54S) → `HEAT_EN_DC` → C24 (3.3 µF) ∥
   R20 (47 k) → Q3 gate. Two things need numbers rather than intent:
@@ -101,28 +101,28 @@ reused: gaps in the numbering are items that have been closed.
     4.5 V at which the AO3400A's R<sub>DS(on)</sub> is characterised.
   - Decay is τ = 47 k × 3.3 µF ≈ 155 ms through a MOSFET threshold, so release
     is a slow slide through the linear region, not an edge. Establish that the
-    contactor's drop-out voltage is reached inside NFR-04's 1 s, that Q3 does not
+    contactor's drop-out voltage is reached inside SWR-NFR-04's 1 s, that Q3 does not
     dissipate meaningfully on the way through, and that the contactor cannot sit
     partially closed.
 
   If the margin is thin, a comparator or a retriggerable monostable gives a crisp
   threshold for a few cents. Verify on the HIL jig by halting the safety task
-  (TR-17, SR-02, NFR-04).
+  (SWR-TST-17, SYS-SAF-02, SWR-NFR-04).
 
 - [ ] **A8. Budget the +5 V rail and protect the MCU from coil inrush.** J8 feeds
   the contactor coil from the same +5 V node as the LDO, behind the 1.5 A PTC
   (F1). Add up ESP32-S3 WiFi peaks, the LDO's input current, the coil's holding
   and inrush current, both SSR inputs and the buzzer, then confirm F1 and the
-  external supply (HR-14 requires MCU + display + coil simultaneously). C1 is
+  external supply (SYS-HW-14 requires MCU + display + coil simultaneously). C1 is
   only 100 µF; coil energisation will sag the rail that the MCU brownout detector
   watches. Consider feeding J8 from `V_FUSED` ahead of D1 so coil transients
-  cannot pull the MCU rail down. HR-14, NFR-15, SR-15.
+  cannot pull the MCU rail down. SYS-HW-14, SWR-NFR-15, SWR-SAF-15.
 
 - [ ] **A9. Confirm the 5 V contactor coil is a real part choice.** Mains
   contactors are commonly 24 V AC/DC or 230 V AC coils; pinning J8 to 5 V narrows
   the field sharply. Either name a specific 5 V-coil contactor in the BOM, or
   change the interface to drive an intermediate relay / a higher coil voltage.
-  HR-07, SR-03.
+  SYS-HW-07, SYS-SAF-03.
 
 ### A.2 Required before fabrication (P2)
 
@@ -141,7 +141,7 @@ reused: gaps in the numbering are items that have been closed.
   from J2 to the ESP32-S3 native USB pins with no clamping. Add a low-capacitance
   array (USBLC6-2SC6 class) at the connector.
 
-- [ ] **A13. Clamp the thermocouple inputs.** HR-15 requires the TC inputs to be
+- [ ] **A13. Clamp the thermocouple inputs.** SYS-HW-15 requires the TC inputs to be
   *filtered and protected*. The filtering is there (R4/R5 100 R, C8 10 nF
   differential, C9/C10 100 pF common-mode; same for TC2) but there is no
   clamping. A thermocouple is a multi-metre unshielded pair routed beside a
@@ -160,7 +160,7 @@ reused: gaps in the numbering are items that have been closed.
 - [ ] **A16. Check the AMS1117's dropout and thermal margin.** Worst case the LDO
   sees USB VBUS at 4.75 V minus D2's forward drop ≈ 4.3 V, against a 1.1–1.3 V
   dropout at ESP32-S3 WiFi peaks, close to falling out of regulation.
-  Dissipation is ~0.5–0.7 W in SOT-223, roughly +40 °C over ambient; with SR-11
+  Dissipation is ~0.5–0.7 W in SOT-223, roughly +40 °C over ambient; with SWR-SAF-11
   permitting a 70 °C enclosure, the junction has little headroom and the LDO sits
   on the same board as the cold-junction reference. Either move to a low-dropout
   part with better thermals or a small buck, or document the measured rise and
@@ -172,24 +172,24 @@ reused: gaps in the numbering are items that have been closed.
   `V_IN`.
 
 - [ ] **A18. Resolve the "(opt)" annotations.** J10 is labelled "CT 30A/1V (opt)",
-  but HR-11 makes the current transformer mandatory and FR-CUR-12 makes a run
+  but SYS-HW-11 makes the current transformer mandatory and SWR-CUR-12 makes a run
   refuse to start without it. Re-label, and keep J7 "SSR2 CTRL (opt)" which
-  genuinely is optional (HR-12).
+  genuinely is optional (SYS-HW-12).
 
-- [ ] **A19. Put HR-16 on the schematic as a note.** The CT must be a
+- [ ] **A19. Put SYS-HW-16 on the schematic as a note.** The CT must be a
   voltage-output type with an integral burden resistor; a current-output CT whose
   burden can be disconnected develops dangerous voltages on an open secondary.
   That is a hard BOM constraint and a safety one, it belongs on the sheet next
-  to J10, not only in the requirements. Same for HR-18: state the required CT
+  to J10, not only in the requirements. Same for SYS-HW-18: state the required CT
   insulation rating, since the CT is the only galvanic isolation in the design.
 
 - [ ] **A20. Review the encoder input network.** R10–R12 (10 k) with C20–C22
   (100 nF) gives a ~1 ms edge into non-Schmitt ESP32-S3 GPIOs feeding the pulse
-  counter (HR-05). Slow edges dwelling near V<sub>IH</sub> can double-count.
+  counter (SYS-HW-05). Slow edges dwelling near V<sub>IH</sub> can double-count.
   Either lower to ~4.7 k/10 nF and lean on the PCNT glitch filter, or verify the
   current values on hardware before committing.
 
-- [ ] **A21. Create the single pin-map artefact HR-10 requires.** Pin assignments
+- [ ] **A21. Create the single pin-map artefact SYS-HW-10 requires.** Pin assignments
   exist only as schematic net names; there is no `hardware/pinmap.*` and no
   firmware header. One file per board variant, referenced by both.
 
@@ -218,7 +218,7 @@ reused: gaps in the numbering are items that have been closed.
 
 - [ ] **C5. `tools/layercheck`.** CI-blocking check that `kiln_core` references no
   IDF or RTOS header and that the component graph is acyclic and layered
-  (TR-01, TR-07, AD-14).
+  (SWR-TST-01, SWR-TST-07, SWA-14).
 
 - [ ] **C6. Requirement-to-test traceability.** *Superseded in approach:* see
   section 7 of [`docs/test-concept.md`](docs/test-concept.md). The recommendation
@@ -230,14 +230,14 @@ reused: gaps in the numbering are items that have been closed.
   **`tools/trace`.** Requirement-ID traceability from `docs/` to test
   names; fails on an untraced mandatory requirement, on a test naming a
   nonexistent ID, and on any `SR-*` without an automated test
-  (TR-22, TR-23, TR-26).
+  (SWR-TST-22, SWR-TST-23, SWR-TST-26).
 
 - [ ] **C7. `tools/logdump`.** Decode a log partition dump to CSV, also the
   cross-check for the `logrec` codec.
 
 - [ ] **C9. Vendor the web assets into the firmware.** `web/` is no longer empty:
   it carries the UI, read-only and translated. What is missing is the build step
-  that gzips it into `kiln_web/assets` so `AD-11` holds and the assets ship
+  that gzips it into `kiln_web/assets` so `SWA-11` holds and the assets ship
   inside the image, within the budget of architecture §12.4.
 
 - [ ] **C11. `main.cpp` and `httpd.cpp` are analysed by nothing.** Found while
@@ -262,8 +262,8 @@ reused: gaps in the numbering are items that have been closed.
   commit rather than a detour inside another one.
 
 - [ ] **C12. Build the HIL fixture.** Designed in section 5 of
-  [`docs/test-concept.md`](docs/test-concept.md), which closes `TR-17` and
-  `TR-28` on paper and nothing in hardware. The shape: the plant model is
+  [`docs/test-concept.md`](docs/test-concept.md), which closes `SWR-TST-17` and
+  `SWR-TST-28` on paper and nothing in hardware. The shape: the plant model is
   `kiln_sim` running on a host, so an L4 scenario can be the same scenario as
   an L2 test with the same seed, and a disagreement isolates to the adapters
   and the electricals. The I/O board is close to dumb but timestamps in
@@ -274,7 +274,7 @@ reused: gaps in the numbering are items that have been closed.
   simulator has to *subtract* the cold-junction compensation the MAX31856 adds,
   and the loop closes itself because the supervisor already reports `cj_c` ten
   times a second. And the current side needs a fixture-controlled bypass across
-  the load, not a signal generator, because `SR-27` discriminates a shorted SSR
+  the load, not a signal generator, because `SWR-SAF-27` discriminates a shorted SSR
   from a welded contactor by dropping the contactor and re-measuring, and that
   needs real contacts behaving both ways.
 
@@ -285,22 +285,22 @@ reused: gaps in the numbering are items that have been closed.
 
 - [ ] **C13. Make three architecture decisions structural.** Each holds today
   by discipline alone and is cheap to enforce, per section 6 of the test
-  concept. `AD-18`, the 20-byte log record, has no `static_assert` anywhere,
-  and it guards a persisted format. `AD-03`, no globals in the core, is true
+  concept. `SWA-18`, the 20-byte log record, has no `static_assert` anywhere,
+  and it guards a persisted format. `SWA-03`, no globals in the core, is true
   (zero mutable file-scope objects in `kiln_core`) with
-  `cppcoreguidelines-avoid-non-const-global-variables` switched off. `AD-02`,
+  `cppcoreguidelines-avoid-non-const-global-variables` switched off. `SWA-02`,
   time is injected, is true (zero direct clock reads in the core) and is a
   grep. Three decisions that are currently claims.
 
 - [ ] **C10. Coverage gate.** 90 % lines on control, safety, setpoint, program and
-  autotune is enforced; 100 % of safety decision branches (`TR-19`) is not.
+  autotune is enforced; 100 % of safety decision branches (`SWR-TST-19`) is not.
   Branch coverage was around 83 % when last measured.
 
 ---
 
 ## D. Documentation and open questions
 
-- [ ] **D5. Write the documentation NFR-26 lists:** assembly and wiring, mains
+- [ ] **D5. Write the documentation SWR-NFR-26 lists:** assembly and wiring, mains
   safety, commissioning, autotuning, program authoring, the REST API, the log
   record format, and current-transformer fitting and calibration. The CT
   commissioning procedure is called out in architecture §16 as the mitigation for
@@ -324,13 +324,13 @@ question is whether it is worth its cost.
 
   **The C-callability half is settled: the port layer is not C-callable.**
   There is no `extern "C"` anywhere in the firmware except `app_main`, which
-  ESP-IDF requires. So `AD-01`'s boundary is a C++ boundary already, and that
+  ESP-IDF requires. So `SWA-01`'s boundary is a C++ boundary already, and that
   is no longer a reason not to do this.
 
   What remains is not a technical blocker but a cost. The enumerator names are
-  the project's vocabulary: `KILN_FAULT_DOOR_OPEN` is greppable from `SR-31`
+  the project's vocabulary: `KILN_FAULT_DOOR_OPEN` is greppable from `SWR-SAF-31`
   in the requirements, and `tools/trace` parses test names on the same
-  convention (`TR-22`, `TR-23`). Scoping renames all 223 of them. The
+  convention (`SWR-TST-22`, `SWR-TST-23`). Scoping renames all 223 of them. The
   transform is compiler-verified -- every unconverted site is a hard error --
   but the naming choice (`kiln_fault_t::DOOR_OPEN`, idiomatic but breaks the
   greps, versus `kiln_fault_t::KILN_FAULT_DOOR_OPEN`, redundant but traceable)
@@ -347,14 +347,14 @@ question is whether it is worth its cost.
 
 ---
 
-## G. Door interlock, SR-31
+## G. Door interlock, SWR-SAF-31
 
 - [ ] **G2. HIL: confirm the series contact actually breaks the coil.** As with
   the charge pump (M4), the claim that matters is a hardware one and cannot be
   verified in simulation. Open the door on the bench jig with the safety task
   halted, and observe the contactor.
 
-- [ ] **G3. Decide whether the interlock should be mandatory.** `HR-21` is a
+- [ ] **G3. Decide whether the interlock should be mandatory.** `SYS-HW-21` is a
   *should* because many existing kilns have no door furniture to take a switch,
   and making it a *shall* would make the controller unfittable to them. The
   consequence is RR-10: a kiln without one has nothing at all against HZ-13.
@@ -363,14 +363,14 @@ question is whether it is worth its cost.
 
 - [ ] **G4. Expose the door state in the API and on the display.** The
   supervisor knows; `/api/status` and the OLED do not yet say. Wanted for
-  FR-WEB-04 and the default screen, and it is the cheap half of making
+  SWR-WEB-04 and the default screen, and it is the cheap half of making
   warning 113 actually visible.
 
 ---
 
 ## H. Field update and local control
 
-- [ ] **H2. There is no field update path at all.** `FR-UPD-01` was inverted:
+- [ ] **H2. There is no field update path at all.** `SWR-UPD-01` was inverted:
   no firmware image is accepted over the network. That closes TH-04 completely
   and leaves no way to ship a fix without physical access, including a
   security fix. `OQ-08` asks what replaces it (USB/serial via `esptool`, or an
@@ -391,15 +391,15 @@ question is whether it is worth its cost.
 
 ## I. Current measurement
 
-- [ ] **I3. Real power, not apparent.** `FR-CUR-07` says apparent power and
-  assumes a resistive load (`ASM-09`), which for a kiln element is very nearly
+- [ ] **I3. Real power, not apparent.** `SWR-CUR-07` says apparent power and
+  assumes a resistive load (`SYS-ASM-09`), which for a kiln element is very nearly
   true. Measuring real power would need a voltage channel, which the design
   does not have and probably should not grow. Worth closing explicitly rather
   than leaving as an implied limitation.
 
 ---
 
-## J. German translation, NFR-23
+## J. German translation, SWR-NFR-23
 
 - [ ] **J1. The OLED font and encoding are unverified.** The labels avoid
   umlauts for that reason, but nobody has yet confirmed what the SSD1306 font
@@ -429,13 +429,13 @@ question is whether it is worth its cost.
   documentation now says so.** The `FAULT` outputs are open-drain: an unpowered
   or absent front end leaves the path closed. The MAX31856 also detects an open
   circuit only once its fault mask is configured, so out of reset the interlock
-  does not act. It covers faults the device actively reports; `SR-04` in
+  does not act. It covers faults the device actively reports; `SWR-SAF-04` in
   firmware remains the cover for a dead or unconfigured front end. The lid
   contact has no such caveat.
 
 - [ ] **K2. Should an enclosure thermocouple fault really stop the kiln?**
   Both front ends are in the chain, because the request said fault pins. But
-  `SR-11` (enclosure over-temperature) is a backstop, and a failed enclosure
+  `SWR-SAF-11` (enclosure over-temperature) is a backstop, and a failed enclosure
   probe killing a firing mid-glaze is a nuisance trip, which `HZ-10` says is
   how protections get disabled. Consider a fitted-by-default `0R` in `Q5`'s
   drain so the enclosure branch can be depopulated without cutting a track.
@@ -446,7 +446,7 @@ question is whether it is worth its cost.
   MAX31856 on the enclosure channel has nothing left to justify it, since it is
   bought for its `FAULT` pin rather than for measuring 40 to 90 degC. That
   document's preferred option removes the channel entirely, using the chamber
-  front end's own cold-junction reading for `SR-11` and a bimetallic cutout in
+  front end's own cold-junction reading for `SWR-SAF-11` and a bimetallic cutout in
   the coil for a hardware trip.
 
 - [ ] **K3. `D7` is an unwired LED.** Pre-existing, not from this change: the
@@ -511,8 +511,8 @@ question is whether it is worth its cost.
 
 ## O. WiFi, FR-NET
 
-- [ ] **O1. `FR-NET-04` (mDNS, `kiln.local`) is not implemented.** mDNS left
-  the ESP-IDF tree for the component manager, and `CON-04` forbids a
+- [ ] **O1. `SWR-NET-04` (mDNS, `kiln.local`) is not implemented.** mDNS left
+  the ESP-IDF tree for the component manager, and `UR-CON-04` forbids a
   build-time fetch from an unpinned source. `E7` met the same constraint over
   the file store and resolved it by not needing the dependency at all; mDNS has
   no such escape, since the protocol is the feature. Adding a managed
@@ -522,7 +522,7 @@ question is whether it is worth its cost.
   where an operator would look anyway.
 
 - [ ] **O2. The image grew by 540 kB.** WiFi takes it from 292 kB to 831 kB,
-  which is 60.4 % of the OTA slot still free, so `NFR-13` holds comfortably.
+  which is 60.4 % of the OTA slot still free, so `SWR-NFR-13` holds comfortably.
   Worth watching once the web assets are embedded (`C9`): that budget is
   architecture 12.4's and it has not been measured against a real asset build.
 
@@ -537,10 +537,10 @@ question is whether it is worth its cost.
 - [ ] **P1. The UI is not served.** The transport answers `/api/*` and nothing
   else: `C9`'s asset embedding is not done, so there is no `index.html` in the
   image and a browser at the device's address gets a 404. The API is usable
-  with `curl` today. `AD-11` wants the assets gzipped into the image, which
+  with `curl` today. `SWA-11` wants the assets gzipped into the image, which
   also needs the budget of architecture 12.4 measured for the first time.
 
-- [ ] **P2. Server-Sent Events are not implemented.** `FR-WEB-05` wants live
+- [ ] **P2. Server-Sent Events are not implemented.** `SWR-WEB-05` wants live
   values pushed at least once a second, and `kiln_api_telemetry_event()` is
   written and tested for exactly that, but the transport has no `/api/events`
   handler. The UI falls back to nothing: it reads `/api/status` on a timer
@@ -549,7 +549,7 @@ question is whether it is worth its cost.
 - [ ] **P3. Where do firing programs come from now?** Recorded as `OQ-09`.
   Authoring is gone from the web and there is no local editor, so a user
   cannot create a curve of their own: they get the seeded examples of
-  `FR-PRG-09` and nothing else. This is a real functional gap and the most
+  `SWR-PRG-09` and nothing else. This is a real functional gap and the most
   likely thing to make somebody reverse the read-only decision. A file import
   at provisioning time is probably the cheapest answer.
 
@@ -561,7 +561,7 @@ question is whether it is worth its cost.
 
 ---
 
-## Q. The file store, AD-21
+## Q. The file store, SWA-21
 
 - [ ] **Q1. The store has never seen a worn sector.** Every test runs on a fake
   that writes what it is told. A real NOR sector near the end of its life fails
@@ -606,7 +606,7 @@ question is whether it is worth its cost.
 
 ---
 
-## R. The independent safety supervisor, AD-22
+## R. The independent safety supervisor, SWA-22
 
 Designed in [`docs/safety-supervisor.md`](docs/safety-supervisor.md). Nothing
 below can start until `R1` to `R4` are answered, because each of them changes
@@ -615,17 +615,17 @@ either the supervisor's pin count or a requirement.
 - [ ] **R9. Retire `sense.tc_type` from the chamber channel.** The reason is
   now in the code: `kiln_suplink`'s `configure` returns
   `KILN_ERR_UNSUPPORTED`, because the ESP32 no longer owns that front end.
-  The config item is therefore dead on this side. `FR-ACQ-02` now
-  fixes the chamber couple as type K, and after `AD-22` the ESP32 does not
+  The config item is therefore dead on this side. `SWR-ACQ-02` now
+  fixes the chamber couple as type K, and after `SWA-22` the ESP32 does not
   configure that front end at all, so the config item is meaningless on this
   side. Removing it is a schema change (`KILN_CFG_SCHEMA_VERSION`,
-  `FR-CFG-05` migration), so do it in the same commit as the rest of the
+  `SWR-CFG-05` migration), so do it in the same commit as the rest of the
   supervisor's firmware work rather than bumping the schema twice.
 
 - [ ] **R5. Write the requirement deltas.** Six new requirements and nine
-  changed ones, listed in section 11 of the design. `SR-23` and `FR-ACQ-02` are
-  done; still to do are `FR-ACQ-01`, `HR-02`, `HR-24` superseded, `AD-04`,
-  `AD-05`, `SG-01`, `SG-03` and `safety.md` sections 5 and 6.
+  changed ones, listed in section 11 of the design. `SWR-SAF-23` and `SWR-ACQ-02` are
+  done; still to do are `SWR-ACQ-01`, `SYS-HW-02`, `SYS-HW-24` superseded, `SWA-04`,
+  `SWA-05`, `SG-01`, `SG-03` and `safety.md` sections 5 and 6.
 
   With `R3` and `R4` settled, §6's independence table is now writable and says
   three specific things. A new row for the supervisor against the ESP32 that
@@ -637,7 +637,7 @@ either the supervisor's pin count or a requirement.
   defence in depth to **load-bearing**, because with one couple the CT is the
   only physically independent detection channel left in the system.
 
-  `SR-17` also needs a sentence: the supervisor's latch does not survive a
+  `SWR-SAF-17` also needs a sentence: the supervisor's latch does not survive a
   power cycle by design, and the system-level obligation is met by the ESP32's
   persisted fault. Section 3 of the design states the gap that leaves.
 
@@ -647,7 +647,7 @@ either the supervisor's pin count or a requirement.
   physical: the button itself, its position relative to the HMI, and whether it
   is labelled as clearing the *supervisor* or clearing *a fault*, which are not
   the same thing and the operator cannot see the difference. The ESP32's own
-  latched fault still needs its own acknowledgement (`SR-17`), so there are two
+  latched fault still needs its own acknowledgement (`SWR-SAF-17`), so there are two
   acknowledgements and the panel should not imply there is one.
 
 - [ ] **R6. Draw the supervisor.** The part and the pin map are settled:
@@ -667,16 +667,16 @@ either the supervisor's pin count or a requirement.
   the console and must not be used.
 
 - [ ] **R7. Remove what the supervisor supersedes.** `Q5`, `Q6` and `R28` to
-  `R31` of section K, and `HR-24` rewritten rather than deleted, because the
+  `R31` of section K, and `SYS-HW-24` rewritten rather than deleted, because the
   property it reached for is now delivered differently. Keep the lid's series
-  contact (`HR-21`): it depends on no firmware at all and costs nothing. `K1`
+  contact (`SYS-HW-21`): it depends on no firmware at all and costs nothing. `K1`
   is answered by this change and `K2` dissolves, the enclosure channel not
   being in the supervisor's remit.
 
   The lid is likewise not in it. Its switch breaks the coil in hardware, which
-  is already safe without firmware, and `SR-31`'s latch is gated on a heating
+  is already safe without firmware, and `SWR-SAF-31`'s latch is gated on a heating
   state only the ESP32 knows; a supervisor latching on it regardless would trip
-  on every cold load. So `SR-31` and `HR-21` are unchanged, the lid sense stays
+  on every cold load. So `SWR-SAF-31` and `SYS-HW-21` are unchanged, the lid sense stays
   on the ESP32, and `Q5`'s branch is the only one section K loses.
 
 - [ ] **R10. Consider making the supervisor integer-only.** It currently uses
@@ -691,5 +691,5 @@ either the supervisor's pin count or a requirement.
 - [ ] **R8. The supervisor's firmware, and its own test strategy.** Small
   enough to read in one sitting, which is a design constraint and not an
   aspiration. It needs its own host-testable core on the same argument as
-  `AD-01`, and the link needs a test that proves the ESP32 withholds heat on
+  `SWA-01`, and the link needs a test that proves the ESP32 withholds heat on
   silence and on a stale sequence number, which are different failures.

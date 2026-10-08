@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Calibration, filtering and rate of change -- FR-ACQ-07, FR-ACQ-08, FR-ACQ-11.
+ * Calibration, filtering and rate of change -- SWR-ACQ-07, SWR-ACQ-08, SWR-ACQ-11.
  *
  * The rate window can be 300 s and acquisition runs at 4 Hz, which would be
  * 1200 samples.  Rate is therefore regressed over samples decimated to 1 Hz:
@@ -17,16 +17,16 @@
  * Deriving the point count from both keeps the two units apart: they happen to
  * be numerically equal at 1 Hz, which is exactly the kind of coincidence that
  * turns into a bug the first time the decimation rate changes. */
-constexpr uint16_t KILN_RATE_WINDOW_MAX_S = 300;  /* FR-ACQ-11 maximum */
-constexpr uint16_t KILN_RATE_WINDOW_MIN_S = 10;   /* FR-ACQ-11 minimum */
+constexpr uint16_t KILN_RATE_WINDOW_MAX_S = 300;  /* SWR-ACQ-11 maximum */
+constexpr uint16_t KILN_RATE_WINDOW_MIN_S = 10;   /* SWR-ACQ-11 minimum */
 constexpr uint16_t KILN_DECIM_HZ          = 1;
 constexpr uint16_t KILN_RATE_MAX_POINTS   = KILN_RATE_WINDOW_MAX_S * KILN_DECIM_HZ;
 
 typedef struct {
-    float    offset_c;        /* FR-ACQ-08: -50 .. +50   */
-    float    gain;            /* FR-ACQ-08: 0.90 .. 1.10 */
-    float    filter_tau_s;    /* FR-ACQ-07: 0 disables   */
-    uint16_t rate_window_s;   /* FR-ACQ-11: 10 .. 300    */
+    float    offset_c;        /* SWR-ACQ-08: -50 .. +50   */
+    float    gain;            /* SWR-ACQ-08: 0.90 .. 1.10 */
+    float    filter_tau_s;    /* SWR-ACQ-07: 0 disables   */
+    uint16_t rate_window_s;   /* SWR-ACQ-11: 10 .. 300    */
 } kiln_tempfilt_cfg_t;
 
 typedef struct {
@@ -44,7 +44,7 @@ typedef struct {
     float    prev_filt_c;     /* value at the previous push, for interpolation */
 
     float rate_c_per_h;
-    uint32_t rejected;        /* non-finite samples refused (NFR-17) */
+    uint32_t rejected;        /* non-finite samples refused (SWR-NFR-17) */
 } kiln_tempfilt_t;
 
 void  kiln_tempfilt_init(kiln_tempfilt_t *f, const kiln_tempfilt_cfg_t *cfg);
@@ -54,7 +54,7 @@ void  kiln_tempfilt_reset(kiln_tempfilt_t *f);
 /* Feed one acquisition.  raw_sensor_c is what the front end reported.
  *
  * Returns false, leaving every piece of state untouched, for a non-finite
- * sample.  This is the acquisition boundary of SR-01 and NFR-17: filt_c is
+ * sample.  This is the acquisition boundary of SYS-SAF-01 and SWR-NFR-17: filt_c is
  * persistent state, so one NaN admitted here would poison the filter, the rate
  * regression and every rule downstream of them for the rest of the run.  A false
  * return is a front-end fault and the caller must treat it as one. */

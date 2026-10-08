@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
- * kiln_core/window -- FR-CTL-07, FR-CTL-08, SR-16, and the FR-CUR-04 interaction.
+ * kiln_core/window -- SWR-CTL-07, SWR-CTL-08, SWR-SAF-16, and the SWR-CUR-04 interaction.
  */
 
 #include "kiln_check.h"
@@ -10,7 +10,7 @@ static kiln_window_cfg_t base(void)
 {
     kiln_window_cfg_t c;
     kiln_window_cfg_defaults(&c);
-    c.preserve_off_window = false;     /* the plain FR-CTL-08 behaviour */
+    c.preserve_off_window = false;     /* the plain SWR-CTL-08 behaviour */
     return c;
 }
 
@@ -32,7 +32,7 @@ static float on_fraction(kiln_window_t *w, uint16_t duty)
     return (float)on / (float)w->ticks_per_window;
 }
 
-KILN_TEST(frctl07_realises_the_requested_duty_over_a_window)
+KILN_TEST(swrctl07_realises_the_requested_duty_over_a_window)
 {
     kiln_window_cfg_t c = base();
     c.min_on_ms = c.min_off_ms = 0;
@@ -49,7 +49,7 @@ KILN_TEST(frctl07_realises_the_requested_duty_over_a_window)
     }
 }
 
-KILN_TEST(frctl07_rejects_a_window_that_is_not_a_whole_number_of_ticks)
+KILN_TEST(swrctl07_rejects_a_window_that_is_not_a_whole_number_of_ticks)
 {
     /* ticks_per_window is an integer division, so 2505 ms at a 10 ms tick used to
      * become 2500 ms silently and every duty computed against it was 0.2 % out. */
@@ -65,7 +65,7 @@ KILN_TEST(frctl07_rejects_a_window_that_is_not_a_whole_number_of_ticks)
     CHECK_OK(kiln_window_init(&w, &c));
 }
 
-KILN_TEST(frctl07_bounds_the_window_period)
+KILN_TEST(swrctl07_bounds_the_window_period)
 {
     kiln_window_cfg_t c = base();
     kiln_window_t w;
@@ -82,7 +82,7 @@ KILN_TEST(frctl07_bounds_the_window_period)
     CHECK_ERR(kiln_window_init(&w, NULL), KILN_ERR_INVALID_ARG);
 }
 
-KILN_TEST(frctl08_quantises_away_an_unrealisable_on_time)
+KILN_TEST(swrctl08_quantises_away_an_unrealisable_on_time)
 {
     kiln_window_cfg_t c = base();
     c.min_on_ms  = 100;
@@ -98,11 +98,11 @@ KILN_TEST(frctl08_quantises_away_an_unrealisable_on_time)
     CHECK_EQ_UINT(kiln_window_quantise(&w, 500), 500u);
 }
 
-KILN_TEST(frcur04_a_measurable_off_interval_survives_quantisation)
+KILN_TEST(swrcur04_a_measurable_off_interval_survives_quantisation)
 {
     /* The interaction worth writing down: promoting a near-full duty to 100 %
-     * deletes the commanded-off interval that SR-25 needs to see a stuck relay,
-     * and SR-25 is the *primary* relay detection per requirements section 5.2. */
+     * deletes the commanded-off interval that SWR-SAF-25 needs to see a stuck relay,
+     * and SWR-SAF-25 is the *primary* relay detection per requirements section 5.2. */
     kiln_window_cfg_t c = base();
     c.preserve_off_window = true;
     c.min_measure_off_ms  = 100;
@@ -133,7 +133,7 @@ KILN_TEST(the_reserved_off_interval_must_be_realisable)
     CHECK_EQ_UINT(w.cfg.min_measure_off_ms, 200u);
 }
 
-KILN_TEST(sr16_withdrawing_authority_takes_effect_without_waiting_for_an_edge)
+KILN_TEST(swrsaf16_withdrawing_authority_takes_effect_without_waiting_for_an_edge)
 {
     kiln_window_cfg_t c = base();
     c.min_on_ms  = 1000;            /* a long minimum on-time, deliberately  */
@@ -147,7 +147,7 @@ KILN_TEST(sr16_withdrawing_authority_takes_effect_without_waiting_for_an_edge)
     CHECK(!w.on);
 }
 
-KILN_TEST(frctl08_minimum_dwell_stops_the_ssr_chattering)
+KILN_TEST(swrctl08_minimum_dwell_stops_the_ssr_chattering)
 {
     kiln_window_cfg_t c = base();
     c.min_on_ms = c.min_off_ms = 150;
@@ -168,7 +168,7 @@ KILN_TEST(frctl08_minimum_dwell_stops_the_ssr_chattering)
     CHECK(changes <= 11u);
 }
 
-KILN_TEST(frcur05_level_remaining_tells_the_sampler_what_it_needs)
+KILN_TEST(swrcur05_level_remaining_tells_the_sampler_what_it_needs)
 {
     kiln_window_cfg_t c = base();
     c.min_on_ms = c.min_off_ms = 0;
@@ -188,7 +188,7 @@ KILN_TEST(frcur05_level_remaining_tells_the_sampler_what_it_needs)
     CHECK_EQ_UINT(kiln_window_level_remaining_ms(&w, 500), 1000u);
 }
 
-KILN_TEST(frcur13_on_transitions_are_counted)
+KILN_TEST(swrcur13_on_transitions_are_counted)
 {
     kiln_window_cfg_t c = base();
     c.min_on_ms = c.min_off_ms = 0;

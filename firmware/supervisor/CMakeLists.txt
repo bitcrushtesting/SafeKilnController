@@ -26,7 +26,7 @@ target_include_directories(supervisor.elf PRIVATE
     board core/include protocol/include)
 
 # Freestanding and bounded: no exceptions, no RTTI, no heap, and -Wall -Wextra
-# -Werror as everywhere else in this repository.  AD-20's profile applies here
+# -Werror as everywhere else in this repository.  SWA-20's profile applies here
 # too; the supervisor is held to the same standard as the code it supervises.
 target_compile_options(supervisor.elf PRIVATE
     -mcpu=cortex-m0plus -mthumb

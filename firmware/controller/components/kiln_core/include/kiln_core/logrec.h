@@ -3,9 +3,9 @@
  *
  * Log record codec and decimation -- architecture sections 10.2, 10.5.
  *
- * Fixed 20 byte records (AD-18), 4 byte aligned so the flash driver never needs
+ * Fixed 20 byte records (SWA-18), 4 byte aligned so the flash driver never needs
  * a read-modify-write, with a CRC8 per record so a power cut damages at most the
- * record in flight (FR-LOG-08).
+ * record in flight (SWR-LOG-08).
  */
 #ifndef KILN_CORE_LOGREC_H
 #define KILN_CORE_LOGREC_H
@@ -24,14 +24,14 @@ constexpr uint32_t KILN_LOGF_SATURATED  = 1u << 5u;
 constexpr uint32_t KILN_LOGF_TC_FAULT   = 1u << 6u;
 constexpr uint32_t KILN_LOGF_WALL_VALID = 1u << 7u;
 
-/* FR-LOG-04: besides the periodic sample, a record is written out of band on
+/* SWR-LOG-04: besides the periodic sample, a record is written out of band on
  * every state transition, fault, warning, configuration change and operator
  * action.  The code says which, so the log can be read as a narrative rather
  * than as a temperature series with unexplained steps in it -- and it costs
- * nothing: it occupies the byte AD-18's layout was already carrying as
+ * nothing: it occupies the byte SWA-18's layout was already carrying as
  * reserved. */
 typedef enum {
-    KILN_LOGE_SAMPLE = 0,       /* the periodic sample of FR-LOG-03 */
+    KILN_LOGE_SAMPLE = 0,       /* the periodic sample of SWR-LOG-03 */
     KILN_LOGE_RUN_START,
     KILN_LOGE_RUN_END,
     KILN_LOGE_STATE_CHANGE,
@@ -48,13 +48,13 @@ typedef struct {
     float    kiln_filt_c;
     float    setpoint_c;
     float    case_c;
-    float    current_a;     /* FR-CUR-09 */
+    float    current_a;     /* SWR-CUR-09 */
     uint16_t duty_permille;
     uint8_t  segment;       /* KILN_SEG_NONE when not applicable */
     uint8_t  state;         /* kiln_state_t */
     uint8_t  flags;         /* KILN_LOGF_* (high nibble semantics) */
     uint8_t  current_flags; /* KILN_CURF_* */
-    uint8_t  event;         /* kiln_log_event_t (FR-LOG-04) */
+    uint8_t  event;         /* kiln_log_event_t (SWR-LOG-04) */
 } kiln_log_sample_t;
 
 /* Encode / decode one record.
@@ -86,11 +86,11 @@ uint8_t  kiln_crc8(const uint8_t *data, size_t len);
 uint16_t kiln_crc16(const uint8_t *data, size_t len);
 uint16_t kiln_crc16_update(uint16_t crc, const uint8_t *data, size_t len);
 
-/* --- decimation (FR-LOG-10, FR-LOG-11) ---------------------------------- */
+/* --- decimation (SWR-LOG-10, SWR-LOG-11) ---------------------------------- */
 
 /* One output bucket.  Min and max are carried for every series so that a brief
  * excursion survives downsampling instead of being averaged away -- which is
- * the whole point of FR-LOG-11. */
+ * the whole point of SWR-LOG-11. */
 typedef struct {
     uint32_t t_rel_ms;          /* first sample in the bucket */
     float    kiln_min_c, kiln_max_c;
@@ -123,10 +123,10 @@ typedef struct {
  * together as it goes.  That costs one O(capacity) pass per doubling, which is
  * about seventeen passes for a 10 h run, and in exchange an open-ended query
  * returns a downsampled view of the whole run instead of the first N samples of
- * it -- which is what FR-LOG-10 asks for and what a chart needs.
+ * it -- which is what SWR-LOG-10 asks for and what a chart needs.
  *
  * Extrema survive folding: a bucket's min and max are the min and max of the two
- * it was built from, so the brief excursion FR-LOG-11 cares about is still there
+ * it was built from, so the brief excursion SWR-LOG-11 cares about is still there
  * at any zoom level.
  *
  * Zeroes `storage` for `max_points` buckets, so the caller may pass ordinary

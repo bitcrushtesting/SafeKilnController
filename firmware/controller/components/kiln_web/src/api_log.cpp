@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * GET /api/log -- FR-LOG-10, FR-LOG-11, FR-WEB-11, FR-WEB-18.
+ * GET /api/log -- SWR-LOG-10, SWR-LOG-11, SWR-WEB-11, SWR-WEB-18.
  *
  * Decimation happens as the records stream past, emitting each bucket the moment
  * the next sample crosses out of it, so the memory cost is one bucket rather than
@@ -9,7 +9,7 @@
  * pass to find it: two cheap scans of flash against 38 kB of buffer is not a
  * close call on a device with no PSRAM.
  *
- * FR-LOG-11 is why the bucket carries min *and* max for every series: a brief
+ * SWR-LOG-11 is why the bucket carries min *and* max for every series: a brief
  * excursion has to survive downsampling, which is the entire reason a chart of a
  * 24 h firing can be trusted.
  */
@@ -152,7 +152,7 @@ void emit_bucket(emit_ctx_t *e)
     const kiln_log_bucket_t *b = &e->bucket;
 
     if (e->csv) {
-        /* FR-WEB-18.  One row per bucket, with the extrema of each series, so a
+        /* SWR-WEB-18.  One row per bucket, with the extrema of each series, so a
          * spreadsheet shows the same excursions the chart does. */
         sink_fmt(e->sink,
                  "%u,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.2f,%.2f,%u,%u,%u,%u\n",
@@ -165,7 +165,7 @@ void emit_bucket(emit_ctx_t *e)
                  (unsigned)b->state,    (unsigned)b->count);
     } else {
         /* Arrays rather than objects: the key names would otherwise be about
-         * two thirds of the payload, and FR-WEB-11 gives the whole response 2 s
+         * two thirds of the payload, and SWR-WEB-11 gives the whole response 2 s
          * on a phone.  The order is documented by the "columns" field. */
         sink_fmt(e->sink, "%s[%u,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.2f,%.2f,%u,%u,%u]",
                  (e->emitted != 0u) ? "," : "", (unsigned)b->t_rel_ms, (double)b->kiln_min_c,
@@ -346,7 +346,7 @@ kiln_err_t kiln_api_log_stream(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
 
     if (!span.any) {
         /* An empty result, not an error: a run whose samples the ring has
-         * overwritten is a real and expected case (FR-LOG-09). */
+         * overwritten is a real and expected case (SWR-LOG-09). */
         if (csv) {
             sink_str(&sink, "t_rel_ms,kiln_min_c,kiln_max_c,sp_min_c,sp_max_c,"
                             "case_min_c,case_max_c,cur_min_a,cur_max_a,"

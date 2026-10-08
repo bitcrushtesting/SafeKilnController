@@ -48,11 +48,11 @@ run|all)
 
  The firing starts by itself.  Keys (press 'h' for the full list):
    s start   a abort   p pause   r resume   c clear fault   i idle
-   1 relay fail-on (SR-25/SR-27)     2 relay fail-off (SR-26)
-   3 welded contactor (SR-27)        4 partial element loss (SR-28)
-   5 over-current (SR-29)            6 CT disconnected (FR-CUR-11)
-   7 SSR shorted (SR-08/SR-25)       8 thermocouple open (SR-04)
-   9 thermocouple stuck (SR-06)      0 lid open (SR-07)
+   1 relay fail-on (SWR-SAF-25/SWR-SAF-27)     2 relay fail-off (SWR-SAF-26)
+   3 welded contactor (SWR-SAF-27)        4 partial element loss (SWR-SAF-28)
+   5 over-current (SWR-SAF-29)            6 CT disconnected (SWR-CUR-11)
+   7 SSR shorted (SWR-SAF-08/SWR-SAF-25)       8 thermocouple open (SWR-SAF-04)
+   9 thermocouple stuck (SWR-SAF-06)      0 lid open (SWR-SAF-07)
    x clear all injections
 
  Simulated time runs 60x by default (CONFIG_KILN_SIM_TIME_ACCEL),

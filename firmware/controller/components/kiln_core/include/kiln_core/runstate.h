@@ -1,18 +1,18 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Run records and power-loss recovery -- FR-RUN-07, FR-RUN-08, FR-RUN-09,
- * SR-12's baseline, architecture section 5.1 and AD-09.
+ * Run records and power-loss recovery -- SWR-RUN-07, SWR-RUN-08, SWR-RUN-09,
+ * SWR-SAF-12's baseline, architecture section 5.1 and SWA-09.
  *
- * AD-09: the sample log is also the power-loss journal.  Recovery state is
+ * SWA-09: the sample log is also the power-loss journal.  Recovery state is
  * reconstructed from the log tail rather than from a separate periodic write,
  * which removes a 60 000-write-per-run NVS hot spot and costs nothing, because
  * the data was already being written.  Recovery granularity therefore equals the
- * log sample interval (default 10 s), well inside FR-RUN-08's tolerance.
+ * log sample interval (default 10 s), well inside SWR-RUN-08's tolerance.
  *
  * The decision itself is here, as a pure function of the tail plus the policy, so
  * that "would this kiln resume?" is a host test and not a bench experiment with a
- * mains plug (TR-23's power-loss-at-a-random-instant suite).
+ * mains plug (SWR-TST-23's power-loss-at-a-random-instant suite).
  */
 #ifndef KILN_CORE_RUNSTATE_H
 #define KILN_CORE_RUNSTATE_H
@@ -28,14 +28,14 @@
 /* Why a run ended.  Recorded in the run record, and shown to the operator. */
 typedef enum {
     KILN_END_UNKNOWN = 0,
-    KILN_END_COMPLETE,          /* FR-RUN-06            */
-    KILN_END_OPERATOR_ABORT,    /* FR-RUN-04            */
+    KILN_END_COMPLETE,          /* SWR-RUN-06            */
+    KILN_END_OPERATOR_ABORT,    /* SWR-RUN-04            */
     KILN_END_FAULT,             /* the fault is carried */
     KILN_END_POWER_LOSS,        /* never closed out     */
     KILN_END_COUNT,
 } kiln_run_end_t;
 
-/* FR-LOG-09: the run records of the 20 most recent runs are kept even once
+/* SWR-LOG-09: the run records of the 20 most recent runs are kept even once
  * their samples have been overwritten by the ring, and such a run is *marked* --
  * otherwise a chart with no data in it is indistinguishable from a run that
  * never logged, and the operator is left wondering which. */
@@ -43,13 +43,13 @@ constexpr uint32_t KILN_RUN_FLAG_TRUNCATED = 1u << 0u;
 /* The run was still open when the controller lost power or reset. */
 constexpr uint32_t KILN_RUN_FLAG_INTERRUPTED = 1u << 1u;
 
-/* FR-RUN-07 */
+/* SWR-RUN-07 */
 typedef struct {
     uint32_t       run_id;
     uint64_t       start_wall_utc_s;    /* 0 when the clock was unsynced   */
     uint64_t       end_wall_utc_s;
     uint32_t       duration_s;          /* monotonic, always meaningful    */
-    kiln_program_t program;             /* as executed (FR-PRG-11)         */
+    kiln_program_t program;             /* as executed (SWR-PRG-11)         */
     kiln_gains_t   gains;
     char           gain_set_name[KILN_CFG_GAINSET_LEN];
     uint8_t        end_reason;          /* kiln_run_end_t                  */
@@ -57,16 +57,16 @@ typedef struct {
     uint8_t        flags;               /* KILN_RUN_FLAG_*                 */
     uint32_t       log_first_ms, log_last_ms;   /* log extent              */
     float          peak_c;
-    float          current_ref_a;       /* FR-CUR-08, required by FR-RUN-07 */
-    float          energy_wh;           /* FR-CUR-07                       */
-    uint32_t       band_duty_s[KILN_INSUL_BANDS];   /* SR-12              */
-    uint32_t       contactor_ops;       /* FR-CUR-13, at run end           */
+    float          current_ref_a;       /* SWR-CUR-08, required by SWR-RUN-07 */
+    float          energy_wh;           /* SWR-CUR-07                       */
+    uint32_t       band_duty_s[KILN_INSUL_BANDS];   /* SWR-SAF-12              */
+    uint32_t       contactor_ops;       /* SWR-CUR-13, at run end           */
     uint32_t       ssr_ops[KILN_HEAT_CHANNELS];
 } kiln_run_record_t;
 
 void kiln_runstate_record_init(kiln_run_record_t *r, uint32_t run_id);
 
-/* --- power-loss recovery (FR-RUN-08) ------------------------------------ */
+/* --- power-loss recovery (SWR-RUN-08) ------------------------------------ */
 
 typedef struct {
     uint8_t  policy;                /* kiln_recovery_policy_t              */
@@ -100,7 +100,7 @@ typedef struct {
  *   outage_s    how long power was off, if the wall clock can say; pass a
  *               negative value when it cannot, which is treated as "longer than
  *               the limit" -- an unknown outage is not a short one
- *   cause       NFR-15 / SR-14: an abnormal reset is never resumed, whatever the
+ *   cause       SWR-NFR-15 / SWR-SAF-14: an abnormal reset is never resumed, whatever the
  *               policy says, because the firmware's own state is in question
  */
 kiln_recovery_decision_t kiln_runstate_decide(const kiln_recovery_cfg_t *cfg,
@@ -109,7 +109,7 @@ kiln_recovery_decision_t kiln_runstate_decide(const kiln_recovery_cfg_t *cfg,
                                               float outage_s,
                                               kiln_reset_cause_t cause);
 
-/* --- SR-12 baseline ----------------------------------------------------- */
+/* --- SWR-SAF-12 baseline ----------------------------------------------------- */
 
 /* The median duty-seconds needed to pass each 100 degC boundary across previous
  * runs.  Median rather than mean: one aborted run that never reached 900 degC, or

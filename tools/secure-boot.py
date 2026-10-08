@@ -189,7 +189,7 @@ def key_fingerprint(digest_bytes):
 def tool(name):
     """Locate esptool's companions.
 
-    They ship with ESP-IDF, so this is not a network fetch (CON-04). Preference
+    They ship with ESP-IDF, so this is not a network fetch (UR-CON-04). Preference
     goes to whatever the active IDF exports, which keeps the signing tool and
     the build at one version.
     """

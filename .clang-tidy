@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Bitcrush Testing
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Static analysis configuration (NFR-25, TR-24).  CI runs this and a finding
+# Static analysis configuration (SWR-NFR-25, SWR-TST-24).  CI runs this and a finding
 # fails the build -- there is no suppressions baseline, by choice: a baseline
 # records violations as accepted, and the ones here were either fixed or the
 # check was switched off for a stated reason you can read below.
@@ -38,10 +38,10 @@
 #   avoid-c-arrays ............. The firmware has no heap (zero malloc/free, by
 #                                design).  Fixed C arrays in the port structs
 #                                are deliberate and ABI-visible; std::array
-#                                would churn the boundary AD-01 depends on.
+#                                would churn the boundary SWA-01 depends on.
 #   pro-bounds-* ............... Wants gsl::at() and forbids the pointer walking
 #                                the log ring and codec are built on.  No GSL
-#                                dependency (CON-04 vendoring rules).
+#                                dependency (UR-CON-04 vendoring rules).
 #   pro-type-vararg ............ printf-family in diagnostics only.
 #   macro-usage ................ Header guards and SPDX.
 #   use-enum-class ............. DEFERRED, 31 enums / 223 enumerators / 2 530
@@ -138,7 +138,7 @@ CheckOptions:
   # const-correctness analyses local variables, not signatures.
   #
   # With parameters included it demands `const void *ctx` on every port adapter
-  # that only reads -- and `void *ctx` is the ports-and-adapters boundary AD-01
+  # that only reads -- and `void *ctx` is the ports-and-adapters boundary SWA-01
   # rests on, the same signature for every slot in a vtable whether that slot
   # mutates or not.  The check cannot tell a vtable slot from an ordinary
   # helper, and it also wants `const char **argv` on main(), which is not a

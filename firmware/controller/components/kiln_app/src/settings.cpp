@@ -146,7 +146,7 @@ kiln_err_t kiln_settings_save_fault(const kiln_port_kvstore_t *kv,
         return e;
     }
 
-    /* SR-17 says before the alarm sounds, which means before this returns: an
+    /* SWR-SAF-17 says before the alarm sounds, which means before this returns: an
      * uncommitted fault is one a power loss in the next second loses. */
     if (kv->commit != nullptr) {
         return kv->commit(kv->ctx, KILN_NVS_NAMESPACE);

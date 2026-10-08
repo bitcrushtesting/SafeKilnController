@@ -1,8 +1,8 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Configuration, program and run-record persistence -- FR-CFG-05, SR-17,
- * FR-PRG-04, FR-PRG-09, FR-RUN-07, FR-LOG-09.
+ * Configuration, program and run-record persistence -- SWR-CFG-05, SWR-SAF-17,
+ * SWR-PRG-04, SWR-PRG-09, SWR-RUN-07, SWR-LOG-09.
  */
 
 #include <string.h>
@@ -13,9 +13,9 @@
 #include "kiln_core/profile.h"
 #include "kiln_hal_host/hal_host.h"
 
-/* --- configuration (FR-CFG-05) ------------------------------------------ */
+/* --- configuration (SWR-CFG-05) ------------------------------------------ */
 
-KILN_TEST(frcfg05_a_saved_configuration_comes_back)
+KILN_TEST(swrcfg05_a_saved_configuration_comes_back)
 {
     kiln_host_kv_t kv;
     kiln_port_kvstore_t port;
@@ -44,7 +44,7 @@ KILN_TEST(frcfg05_a_saved_configuration_comes_back)
     CHECK(kv.commits > 0u);
 }
 
-KILN_TEST(frcfg05_storage_that_will_not_answer_leaves_defaults_in_place)
+KILN_TEST(swrcfg05_storage_that_will_not_answer_leaves_defaults_in_place)
 {
     kiln_host_kv_t kv;
     kiln_port_kvstore_t port;
@@ -63,7 +63,7 @@ KILN_TEST(frcfg05_storage_that_will_not_answer_leaves_defaults_in_place)
     CHECK_NEAR(out.max_temp_c, 1280.0f, 0.01f);
 }
 
-KILN_TEST(frcfg05_a_write_failure_is_reported_rather_than_silently_lost)
+KILN_TEST(swrcfg05_a_write_failure_is_reported_rather_than_silently_lost)
 {
     kiln_host_kv_t kv;
     kiln_port_kvstore_t port;
@@ -76,9 +76,9 @@ KILN_TEST(frcfg05_a_write_failure_is_reported_rather_than_silently_lost)
     CHECK_ERR(kiln_settings_save(&port, &cfg), KILN_ERR_IO);
 }
 
-/* --- the latched fault (SR-17) ------------------------------------------ */
+/* --- the latched fault (SWR-SAF-17) ------------------------------------------ */
 
-KILN_TEST(sr17_a_latched_fault_survives_a_power_loss_with_its_snapshot)
+KILN_TEST(swrsaf17_a_latched_fault_survives_a_power_loss_with_its_snapshot)
 {
     kiln_host_kv_t kv;
     kiln_port_kvstore_t port;
@@ -117,12 +117,12 @@ KILN_TEST(sr17_a_latched_fault_survives_a_power_loss_with_its_snapshot)
     CHECK_EQ_UINT(out.duty_permille, 650u);
     CHECK_EQ_UINT(out.warnings, KILN_WARN_BIT(KILN_WARN_RELAY_SUSPECT));
 
-    /* SR-18's acknowledgement path clears it, and then it stays cleared. */
+    /* SWR-SAF-18's acknowledgement path clears it, and then it stays cleared. */
     CHECK_OK(kiln_settings_clear_fault(&port));
     CHECK_ERR(kiln_settings_load_fault(&port, &out), KILN_ERR_NOT_FOUND);
 }
 
-KILN_TEST(sr17_a_corrupt_stored_fault_is_not_believed)
+KILN_TEST(swrsaf17_a_corrupt_stored_fault_is_not_believed)
 {
     kiln_host_kv_t kv;
     kiln_port_kvstore_t port;
@@ -160,7 +160,7 @@ static kiln_program_t named(const char *name, uint16_t target)
     return p;
 }
 
-KILN_TEST(frprg09_the_examples_are_seeded_once_and_are_read_only)
+KILN_TEST(swrprg09_the_examples_are_seeded_once_and_are_read_only)
 {
     kiln_host_fs_t fs;
     kiln_port_filestore_t port;
@@ -180,7 +180,7 @@ KILN_TEST(frprg09_the_examples_are_seeded_once_and_are_read_only)
     kiln_program_t example;
     CHECK_OK(kiln_profile_example(0, &example));
 
-    /* FR-PRG-09: neither overwritable nor deletable, so the operator always has
+    /* SWR-PRG-09: neither overwritable nor deletable, so the operator always has
      * a known-good program to fall back to. */
     kiln_program_t edited = example;
     edited.segments[0].target_c = 500;
@@ -215,7 +215,7 @@ KILN_TEST(frprg_programs_round_trip_and_replace_by_name)
     CHECK_ERR(kiln_program_store_delete(&port, "my firing"), KILN_ERR_NOT_FOUND);
 }
 
-KILN_TEST(frprg05_an_invalid_program_never_reaches_storage)
+KILN_TEST(swrprg05_an_invalid_program_never_reaches_storage)
 {
     kiln_host_fs_t fs;
     kiln_port_filestore_t port;
@@ -231,7 +231,7 @@ KILN_TEST(frprg05_an_invalid_program_never_reaches_storage)
     CHECK_EQ_UINT(fs.writes, 0u);
 }
 
-KILN_TEST(frprg04_the_store_holds_twenty_programs_and_then_says_no)
+KILN_TEST(swrprg04_the_store_holds_twenty_programs_and_then_says_no)
 {
     kiln_host_fs_t fs;
     kiln_port_filestore_t port;
@@ -256,7 +256,7 @@ KILN_TEST(frprg04_the_store_holds_twenty_programs_and_then_says_no)
     CHECK_OK(kiln_program_store_save(&port, &replace, 1280.0f));
 }
 
-KILN_TEST(nfr19_a_stored_program_is_treated_as_untrusted_on_the_way_back_in)
+KILN_TEST(swrnfr19_a_stored_program_is_treated_as_untrusted_on_the_way_back_in)
 {
     kiln_host_fs_t fs;
     kiln_port_filestore_t port;
@@ -303,7 +303,7 @@ KILN_TEST(a_corrupt_program_file_is_skipped_not_returned)
     CHECK_OK(kiln_program_store_load(&port, "also good", &out));
 }
 
-/* --- run records (FR-RUN-07, FR-LOG-09) -------------------------------- */
+/* --- run records (SWR-RUN-07, SWR-LOG-09) -------------------------------- */
 
 static kiln_run_record_t run(uint32_t id, kiln_run_end_t reason)
 {
@@ -318,7 +318,7 @@ static kiln_run_record_t run(uint32_t id, kiln_run_end_t reason)
     return r;
 }
 
-KILN_TEST(frrun07_a_run_record_round_trips_with_everything_the_requirement_lists)
+KILN_TEST(swrrun07_a_run_record_round_trips_with_everything_the_requirement_lists)
 {
     kiln_host_fs_t fs;
     kiln_port_filestore_t port;
@@ -341,14 +341,14 @@ KILN_TEST(frrun07_a_run_record_round_trips_with_everything_the_requirement_lists
     CHECK_EQ_INT(out.end_reason, KILN_END_COMPLETE);
     CHECK_STR_EQ(out.program.name, "fired");           /* program as executed */
     CHECK_NEAR(out.gains.kp, 2.5f, 0.001f);            /* gains used */
-    CHECK_NEAR(out.current_ref_a, 29.5f, 0.001f);      /* FR-CUR-08 reference */
-    CHECK_EQ_UINT(out.band_duty_s[5], 1234u);          /* SR-12 bands */
-    CHECK_EQ_UINT(out.contactor_ops, 777u);            /* FR-CUR-13 */
+    CHECK_NEAR(out.current_ref_a, 29.5f, 0.001f);      /* SWR-CUR-08 reference */
+    CHECK_EQ_UINT(out.band_duty_s[5], 1234u);          /* SWR-SAF-12 bands */
+    CHECK_EQ_UINT(out.contactor_ops, 777u);            /* SWR-CUR-13 */
     CHECK_EQ_UINT(out.start_wall_utc_s, 1767225600ull);
     CHECK_NEAR(out.peak_c, 901.0f, 0.001f);
 }
 
-KILN_TEST(frlog09_twenty_runs_are_retained_and_the_oldest_is_evicted)
+KILN_TEST(swrlog09_twenty_runs_are_retained_and_the_oldest_is_evicted)
 {
     kiln_host_fs_t fs;
     kiln_port_filestore_t port;
@@ -360,7 +360,7 @@ KILN_TEST(frlog09_twenty_runs_are_retained_and_the_oldest_is_evicted)
         CHECK_OK(kiln_run_index_append(&port, &r));
     }
     CHECK_EQ_UINT(kiln_run_index_count(&port), KILN_RUN_SLOTS);
-    CHECK(KILN_RUN_SLOTS >= 20u);              /* FR-LOG-09's floor */
+    CHECK(KILN_RUN_SLOTS >= 20u);              /* SWR-LOG-09's floor */
 
     /* The 21st evicts run 1 and nothing else. */
     const kiln_run_record_t extra = run(KILN_RUN_SLOTS + 1u, KILN_END_COMPLETE);
@@ -373,7 +373,7 @@ KILN_TEST(frlog09_twenty_runs_are_retained_and_the_oldest_is_evicted)
     CHECK_OK(kiln_run_index_find(&port, KILN_RUN_SLOTS + 1u, &out));
 }
 
-KILN_TEST(frlog09_a_run_whose_samples_are_gone_is_marked_truncated)
+KILN_TEST(swrlog09_a_run_whose_samples_are_gone_is_marked_truncated)
 {
     /* Otherwise a chart with no data in it is indistinguishable from a run that
      * never logged, and the operator is left guessing which. */
@@ -424,7 +424,7 @@ KILN_TEST(run_numbering_continues_across_a_reboot)
     CHECK_EQ_UINT(kiln_run_index_next_run_id(&port), 6u);
 }
 
-KILN_TEST(sr12_the_baseline_comes_from_the_stored_run_history)
+KILN_TEST(swrsaf12_the_baseline_comes_from_the_stored_run_history)
 {
     kiln_host_fs_t fs;
     kiln_port_filestore_t port;

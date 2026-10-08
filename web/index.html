@@ -3,7 +3,7 @@
 SPDX-FileCopyrightText: 2026 Bitcrush Testing
 SPDX-License-Identifier: GPL-3.0-or-later
 
-FR-WEB-02: every asset is served from the device.  No CDN, no external fonts, no
+SWR-WEB-02: every asset is served from the device.  No CDN, no external fonts, no
 telemetry, nothing that reaches off the box.
 -->
 <html lang="en">
@@ -27,7 +27,7 @@ telemetry, nothing that reaches off the box.
   </div>
 </header>
 
-<!-- FR-WEB-24: a persistent banner whenever a fault is latched or a warning is
+<!-- SWR-WEB-24: a persistent banner whenever a fault is latched or a warning is
      active.  Lives above the views so it cannot be scrolled away from. -->
 <div id="banner" class="banner" hidden></div>
 
@@ -94,7 +94,7 @@ telemetry, nothing that reaches off the box.
       <div class="hint">Drag to pan, scroll or pinch to zoom.</div>
     </div>
 
-    <!-- FR-WEB-26: this interface observes; it does not command.  Starting,
+    <!-- SWR-WEB-26: this interface observes; it does not command.  Starting,
          pausing and aborting a firing, manual heating and acknowledging a
          fault all happen at the kiln.  There are no buttons here because the
          API would refuse them, and a button that always errors is worse than
@@ -137,7 +137,7 @@ telemetry, nothing that reaches off the box.
 
   <p id="programs-readonly-note" class="readonly-note">
     <strong>Display only.</strong> Firing programs are shown here but are
-    authored at the kiln, not over the network (FR-WEB-26).
+    authored at the kiln, not over the network (SWR-WEB-26).
   </p>
 
   <!-- History -->
@@ -159,7 +159,7 @@ telemetry, nothing that reaches off the box.
     <div id="cfg-groups"></div>
     <p class="readonly-note">
       <strong>Display only.</strong> Configuration holds the maximum temperature
-      and the safety thresholds, so it is changed at the kiln (FR-WEB-26).
+      and the safety thresholds, so it is changed at the kiln (SWR-WEB-26).
     </p>
     <div id="cfg-msg" class="note" hidden></div>
 

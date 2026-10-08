@@ -27,7 +27,7 @@ sup_report_t sample()
 
 }  // namespace
 
-KILN_TEST(ad22_crc16_matches_the_log_records_vector)
+KILN_TEST(swa22_crc16_matches_the_log_records_vector)
 {
     /* CCITT-FALSE.  The supervisor carries its own implementation so it
      * depends on nothing of kiln_core's; this vector is the contract between
@@ -37,7 +37,7 @@ KILN_TEST(ad22_crc16_matches_the_log_records_vector)
     CHECK_EQ_UINT(sup_crc16(nullptr, 4u), 0xFFFFu);
 }
 
-KILN_TEST(ad22_a_frame_round_trips)
+KILN_TEST(swa22_a_frame_round_trips)
 {
     const sup_report_t in = sample();
     uint8_t buf[SUP_FRAME_BYTES];
@@ -55,7 +55,7 @@ KILN_TEST(ad22_a_frame_round_trips)
     CHECK_EQ_INT(out.trip_reason, SUP_TRIP_NONE);
 }
 
-KILN_TEST(ad22_the_frame_is_the_declared_length_and_starts_with_the_sof)
+KILN_TEST(swa22_the_frame_is_the_declared_length_and_starts_with_the_sof)
 {
     const sup_report_t in = sample();
     uint8_t buf[32];
@@ -66,7 +66,7 @@ KILN_TEST(ad22_the_frame_is_the_declared_length_and_starts_with_the_sof)
     CHECK_EQ_UINT(buf[1], SUP_VERSION);
 }
 
-KILN_TEST(ad22_a_single_flipped_bit_anywhere_is_rejected)
+KILN_TEST(swa22_a_single_flipped_bit_anywhere_is_rejected)
 {
     const sup_report_t in = sample();
     uint8_t good[SUP_FRAME_BYTES];
@@ -91,7 +91,7 @@ KILN_TEST(ad22_a_single_flipped_bit_anywhere_is_rejected)
     }
 }
 
-KILN_TEST(ad22_resyncs_past_line_noise_and_reports_what_to_discard)
+KILN_TEST(swa22_resyncs_past_line_noise_and_reports_what_to_discard)
 {
     /* The receiver must recover from a partial frame or a burst of noise
      * without an escape scheme, because the supervisor never retransmits. */
@@ -109,7 +109,7 @@ KILN_TEST(ad22_resyncs_past_line_noise_and_reports_what_to_discard)
     CHECK_EQ_UINT(out.seq, 42u);
 }
 
-KILN_TEST(ad22_a_partial_frame_consumes_nothing_and_keeps_the_tail)
+KILN_TEST(swa22_a_partial_frame_consumes_nothing_and_keeps_the_tail)
 {
     const sup_report_t in = sample();
     uint8_t buf[SUP_FRAME_BYTES];
@@ -122,7 +122,7 @@ KILN_TEST(ad22_a_partial_frame_consumes_nothing_and_keeps_the_tail)
     CHECK_EQ_UINT(skip, 0u);
 }
 
-KILN_TEST(ad22_a_buffer_of_pure_noise_is_eventually_discardable)
+KILN_TEST(swa22_a_buffer_of_pure_noise_is_eventually_discardable)
 {
     /* Otherwise a receiver wedges on a buffer that can never contain a frame. */
     uint8_t noise[64];
@@ -135,7 +135,7 @@ KILN_TEST(ad22_a_buffer_of_pure_noise_is_eventually_discardable)
     CHECK_EQ_UINT(skip, sizeof(noise) - (SUP_FRAME_BYTES - 1u));
 }
 
-KILN_TEST(ad22_temperatures_saturate_rather_than_wrap_and_survive_a_nan)
+KILN_TEST(swa22_temperatures_saturate_rather_than_wrap_and_survive_a_nan)
 {
     sup_report_t r = sample();
     uint8_t buf[SUP_FRAME_BYTES];
@@ -157,7 +157,7 @@ KILN_TEST(ad22_temperatures_saturate_rather_than_wrap_and_survive_a_nan)
     CHECK_NEAR(out.chamber_c, 0.0f, 0.05);   /* a defined value, not garbage */
 }
 
-KILN_TEST(ad22_a_trip_is_still_reported_so_the_other_side_can_say_why)
+KILN_TEST(swa22_a_trip_is_still_reported_so_the_other_side_can_say_why)
 {
     sup_report_t r = sample();
     r.flags = (uint8_t)(SUP_FLAG_TRIPPED | SUP_FLAG_TC_VALID | SUP_FLAG_SELFTEST_OK);
@@ -173,7 +173,7 @@ KILN_TEST(ad22_a_trip_is_still_reported_so_the_other_side_can_say_why)
     CHECK_EQ_INT(out.trip_reason, SUP_TRIP_OVERTEMP);
 }
 
-KILN_TEST(ad22_decode_tolerates_a_caller_that_does_not_want_the_skip_count)
+KILN_TEST(swa22_decode_tolerates_a_caller_that_does_not_want_the_skip_count)
 {
     /* The resync path has to work for a caller passing nullptr for skip, not
      * only for the tests that inspect it.  MC/DC found this: the condition had
@@ -186,7 +186,7 @@ KILN_TEST(ad22_decode_tolerates_a_caller_that_does_not_want_the_skip_count)
     CHECK_EQ_UINT(sup_decode(noise, sizeof(noise), &out, nullptr), 0u);
 }
 
-KILN_TEST(nfr17_encode_and_decode_refuse_bad_arguments)
+KILN_TEST(swrnfr17_encode_and_decode_refuse_bad_arguments)
 {
     const sup_report_t r = sample();
     uint8_t buf[SUP_FRAME_BYTES];

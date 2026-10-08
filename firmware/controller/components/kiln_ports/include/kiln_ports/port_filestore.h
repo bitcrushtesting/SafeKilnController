@@ -3,7 +3,7 @@
  * Named blobs: programs and run records.  A write must be atomic, so that a
  * power cut cannot leave a half-written program.
  *
- * Provided by kiln_core/fileslots over a raw flash partition (AD-21), which
+ * Provided by kiln_core/fileslots over a raw flash partition (SWA-21), which
  * gets the atomicity from alternating between two copies rather than from a
  * rename.  There is no filesystem behind this on the target, and nothing above
  * it needs one: both callers address a fixed set of numbered slots.

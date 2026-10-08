@@ -54,7 +54,7 @@ void kiln_api_error(kiln_api_resp_t *resp, int status, const char *code,
     resp->streaming    = false;
     kiln_json_init(&j, resp->body, resp->body_cap);
 
-    /* FR-WEB-20: a machine-readable code and a human-readable message. */
+    /* SWR-WEB-20: a machine-readable code and a human-readable message. */
     kiln_json_obj_open(&j);
     kiln_json_key(&j, "error");
     kiln_json_obj_open(&j);
@@ -222,17 +222,17 @@ bool kiln_api_needs_auth(const kiln_api_req_t *req)
     if (req == nullptr) {
         return true;
     }
-    /* FR-WEB-23 says state-changing endpoints.  Decided by method rather than by
+    /* SWR-WEB-23 says state-changing endpoints.  Decided by method rather than by
      * an enumerated list, so a route added later is protected by default rather
      * than by remembering to add it. */
     return req->method != KILN_HTTP_GET;
 }
 
-/* --- GET /api/status (FR-RUN-05) --------------------------------------- */
+/* --- GET /api/status (SWR-RUN-05) --------------------------------------- */
 
 namespace {
 
-/* FR-WEB-26: the web interface is an observation surface.  Nothing reachable
+/* SWR-WEB-26: the web interface is an observation surface.  Nothing reachable
  * over the network may put heat into the kiln.
  *
  * 403 and not 405.  405 means "wrong verb for this URL" and invites a client to
@@ -266,7 +266,7 @@ void write_warnings(kiln_json_t *j, uint32_t mask, kiln_lang_t lang)
             continue;
         }
         kiln_json_obj_open(j);
-        /* NFR-23: the code is the stable thing a client should key on; the
+        /* SWR-NFR-23: the code is the stable thing a client should key on; the
          * text is a courtesy, rendered in the configured language. */
         kiln_json_kv_uint(j, "code", kiln_warn_code((kiln_warn_bit_t)b));
         kiln_json_kv_str(j, "label", kiln_warn_label_in((kiln_warn_bit_t)b, lang));
@@ -287,7 +287,7 @@ void write_status(kiln_api_ctx_t *ctx, kiln_json_t *j)
     kiln_json_kv_str(j, "state", kiln_state_label((kiln_state_t)s.state));
     kiln_json_kv_uint(j, "state_code", s.state);
 
-    /* AD-22.  Reported whenever a supervisor is fitted, not only when it has
+    /* SWA-22.  Reported whenever a supervisor is fitted, not only when it has
      * tripped: "no supervisor" is a thing a client needs to be able to see,
      * and it is the absence of the backstop rather than its action. */
     if (a->ports.supervisor != nullptr && a->ports.supervisor->status != nullptr) {
@@ -310,7 +310,7 @@ void write_status(kiln_api_ctx_t *ctx, kiln_json_t *j)
         kiln_json_obj_close(j);
     }
 
-    /* FR-WEB-25 depends on the client being able to tell stale from current, so
+    /* SWR-WEB-25 depends on the client being able to tell stale from current, so
      * validity travels with the value rather than being inferred from it. */
     kiln_json_key(j, "kiln_c");
     if (s.kiln_valid) {
@@ -350,7 +350,7 @@ void write_status(kiln_api_ctx_t *ctx, kiln_json_t *j)
     kiln_json_kv_uint(j, "run_id", a->record.run_id);
     kiln_json_kv_str(j, "program", a->sp.started ? a->sp.prog.name : "");
 
-    /* FR-WEB-24: the banner needs the fault and its operator text in one place. */
+    /* SWR-WEB-24: the banner needs the fault and its operator text in one place. */
     kiln_json_key(j, "fault");
     if (a->fault == KILN_FAULT_NONE) {
         kiln_json_null(j);
@@ -367,13 +367,13 @@ void write_status(kiln_api_ctx_t *ctx, kiln_json_t *j)
     kiln_json_obj_close(j);
 }
 
-/* --- GET /api/info (FR-UPD-06) ----------------------------------------- */
+/* --- GET /api/info (SWR-UPD-06) ----------------------------------------- */
 
 void write_info(kiln_api_ctx_t *ctx, kiln_json_t *j)
 {
     kiln_json_obj_open(j);
 
-    /* NFR-23: what language the device is rendering in, so the client can
+    /* SWR-NFR-23: what language the device is rendering in, so the client can
      * match it and set the document language for a screen reader. */
     kiln_json_kv_str(j, "language", kiln_lang_tag((kiln_lang_t)ctx->app->cfg.language));
 
@@ -387,7 +387,7 @@ void write_info(kiln_api_ctx_t *ctx, kiln_json_t *j)
     kiln_json_kv_str(j, "target", (fw.target[0] != 0) ? fw.target : "host");
     kiln_json_kv_str(j, "idf_version", fw.idf_version);
 
-    /* FR-PROD-03: who made this unit and which one it is.  Always present as an
+    /* SWR-PROD-03: who made this unit and which one it is.  Always present as an
      * object, with `programmed` saying whether the rest means anything, so a
      * client never has to distinguish "absent key" from "absent data". */
     kiln_json_key(j, "production");
@@ -412,7 +412,7 @@ void write_info(kiln_api_ctx_t *ctx, kiln_json_t *j)
     kiln_json_kv_uint(j, "heap_free", st.heap_free);
     kiln_json_kv_uint(j, "heap_min_free", st.heap_min_free);
 
-    /* FR-TUN-11: gains, and where they came from -- factory defaults are not
+    /* SWR-TUN-11: gains, and where they came from -- factory defaults are not
      * gains for *this* kiln, and the UI has to be able to say so. */
     kiln_json_key(j, "gains");
     kiln_json_obj_open(j);
@@ -425,14 +425,14 @@ void write_info(kiln_api_ctx_t *ctx, kiln_json_t *j)
     kiln_json_obj_close(j);
 
     /* Both limits, never one: the configurable ceiling is meaningless without
-     * the backstop above it (AD-22, SR-23). */
+     * the backstop above it (SWA-22, SWR-SAF-23). */
     kiln_json_kv_uint(j, "temp_ceiling_c", (unsigned long long)KILN_TEMP_CEILING_C);
     kiln_json_kv_uint(j, "supervisor_trip_c",
                       (unsigned long long)KILN_SUPERVISOR_TRIP_C);
     kiln_json_obj_close(j);
 }
 
-/* --- /api/config (FR-CFG-01..08, FR-WEB-17) ---------------------------- */
+/* --- /api/config (SWR-CFG-01..08, SWR-WEB-17) ---------------------------- */
 
 /* The whole point of configmodel's table: the API projection is generated from
  * it, so an item cannot exist in the firmware and be missing from the UI. */
@@ -452,7 +452,7 @@ void write_config(kiln_api_ctx_t *ctx, kiln_json_t *j)
         if (it->type == KILN_CFG_T_STRING) {
             kiln_json_kv_str(j, "type", "string");
             kiln_json_kv_uint(j, "max_len", it->str_cap - 1u);
-            /* FR-CFG-07: a secret is never serialised outward, only whether it
+            /* SWR-CFG-07: a secret is never serialised outward, only whether it
              * is set.  There is no mode in which this endpoint returns one. */
             if ((it->flags & KILN_CFG_F_SECRET) != 0u) {
                 const char *v = NULL;
@@ -495,7 +495,7 @@ void write_config(kiln_api_ctx_t *ctx, kiln_json_t *j)
             }
         }
 
-        /* FR-CFG-04 and FR-CFG-08, so the UI can mark and disable rather than
+        /* SWR-CFG-04 and SWR-CFG-08, so the UI can mark and disable rather than
          * letting the operator discover a refusal after pressing save. */
         kiln_json_kv_bool(j, "reboot_required", (it->flags & KILN_CFG_F_REBOOT) != 0);
         kiln_json_kv_bool(j, "locked_while_running",
@@ -508,7 +508,7 @@ void write_config(kiln_api_ctx_t *ctx, kiln_json_t *j)
 }
 
 
-/* --- /api/programs (FR-PRG-07, FR-WEB-12, FR-WEB-13) ------------------- */
+/* --- /api/programs (SWR-PRG-07, SWR-WEB-12, SWR-WEB-13) ------------------- */
 
 void write_program(kiln_json_t *j, const kiln_program_t *p, uint8_t id,
                           float max_temp_c)
@@ -569,14 +569,14 @@ kiln_err_t handle_tune(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
 {
     const kiln_autotune_t *at = &ctx->app->tune;
 
-    /* FR-WEB-26: watching a tune converge is reading; starting one heats the
+    /* SWR-WEB-26: watching a tune converge is reading; starting one heats the
      * kiln to its relay-oscillation amplitude, which is firing by another name. */
     if (req->method != KILN_HTTP_GET) {
         return reject_read_only(resp, "starting or cancelling automatic tuning");
     }
 
     if (req->method == KILN_HTTP_GET && path_is(tail, "")) {
-        /* FR-TUN-10: phase, cycles and the candidate gain sets, so the operator
+        /* SWR-TUN-10: phase, cycles and the candidate gain sets, so the operator
          * can watch it converge rather than waiting in the dark. */
         kiln_json_t j;
         resp_begin(resp, &j);
@@ -631,7 +631,7 @@ kiln_err_t handle_tune(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
         kiln_json_obj_open(&j);
         kiln_json_kv_bool(&j, "ok", true);
         /* KILN_ERR_RANGE here means it is running, but clamped below what was
-         * asked for (SR-23).  Silently tuning somewhere else would be worse. */
+         * asked for (SWR-SAF-23).  Silently tuning somewhere else would be worse. */
         kiln_json_kv_num(&j, "setpoint_c", ctx->app->tune.cfg.setpoint_c, 1);
         kiln_json_kv_bool(&j, "clamped", e == KILN_ERR_RANGE);
         kiln_json_obj_close(&j);
@@ -645,7 +645,7 @@ kiln_err_t handle_tune(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
     }
 
     if (path_is(tail, "accept")) {
-        /* FR-TUN-09: nothing is stored until the operator picks a rule. */
+        /* SWR-TUN-09: nothing is stored until the operator picks a rule. */
         if (!kiln_autotune_succeeded(at)) {
             kiln_api_error(resp, 409, "no_result", "there is no tuning result to accept");
             return KILN_ERR_STATE;
@@ -687,7 +687,7 @@ kiln_err_t handle_tune(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
 
 /* --- /api/runs, /api/current, /api/storage, /api/net ------------------- */
 
-/* FR-PRG-07: the stored programs, read only. */
+/* SWR-PRG-07: the stored programs, read only. */
 kiln_err_t handle_program_list(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
 {
     if (ctx->filestore == nullptr) {
@@ -777,7 +777,7 @@ kiln_err_t handle_runs(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
         if (r->fault != KILN_FAULT_NONE) {
             kiln_json_kv_str(&j, "fault", kiln_fault_label((kiln_fault_t)r->fault));
         }
-        /* FR-LOG-09: say so, rather than letting an empty chart look like a bug. */
+        /* SWR-LOG-09: say so, rather than letting an empty chart look like a bug. */
         kiln_json_kv_bool(&j, "samples_truncated",
                           (r->flags & KILN_RUN_FLAG_TRUNCATED) != 0);
         kiln_json_obj_close(&j);
@@ -806,7 +806,7 @@ kiln_err_t handle_current(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
         kiln_json_kv_bool(&j, "reference_rejected", c->ref_rejected);
         kiln_json_kv_uint(&j, "flags", kiln_current_flags(c));
 
-        /* FR-CUR-07, with the assumption stated as the requirement demands. */
+        /* SWR-CUR-07, with the assumption stated as the requirement demands. */
         kiln_json_kv_num(&j, "apparent_va", kiln_app_apparent_va(app), 0);
         kiln_json_kv_num(&j, "energy_wh", kiln_app_energy_wh(app), 1);
         kiln_json_kv_str(&j, "power_basis",
@@ -823,7 +823,7 @@ kiln_err_t handle_current(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
             kiln_json_null(&j);
         }
 
-        /* FR-CUR-13 */
+        /* SWR-CUR-13 */
         kiln_json_key(&j, "switching");
         kiln_json_obj_open(&j);
         kiln_json_kv_uint(&j, "contactor_ops", ctx->app->counters.contactor_ops);
@@ -842,7 +842,7 @@ kiln_err_t handle_current(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
     }
 
     if (path_is(tail, "calibrate")) {
-        /* FR-WEB-26: the calibration reference feeds SR-28's deviation bands. */
+        /* SWR-WEB-26: the calibration reference feeds SWR-SAF-28's deviation bands. */
         return reject_read_only(resp, "calibrating the current transformer");
     }
 
@@ -856,7 +856,7 @@ kiln_err_t handle_storage(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
     resp_begin(resp, &j);
     kiln_json_obj_open(&j);
 
-    /* FR-LOG-15 */
+    /* SWR-LOG-15 */
     kiln_json_key(&j, "log");
     kiln_json_obj_open(&j);
     kiln_logstore_stats_t st = {};
@@ -934,7 +934,7 @@ kiln_err_t handle_net(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
 
 } // namespace
 
-/* --- telemetry (FR-WEB-05) --------------------------------------------- */
+/* --- telemetry (SWR-WEB-05) --------------------------------------------- */
 
 size_t kiln_api_telemetry_event(kiln_api_ctx_t *ctx, char *buf, size_t cap)
 {
@@ -970,7 +970,7 @@ kiln_err_t kiln_api_handle(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
         return KILN_ERR_NO_SPACE;
     }
 
-    /* FR-WEB-23.  Checked here so a new state-changing route is protected by
+    /* SWR-WEB-23.  Checked here so a new state-changing route is protected by
      * default rather than by the author remembering. */
     if (kiln_api_needs_auth(req) && !req->authenticated) {
         kiln_api_error(resp, 401, "unauthorized", "authentication is required");
@@ -1011,7 +1011,7 @@ kiln_err_t kiln_api_handle(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
     if (path_is(p, "/api/config/defaults")) {
         return reject_read_only(resp, "resetting configuration to defaults");
     }
-    /* FR-WEB-26: stored programs are readable and nothing more.  Authoring
+    /* SWR-WEB-26: stored programs are readable and nothing more.  Authoring
      * went the way of the rest of the writes once it was clear the password
      * guarding it could not be set from anywhere. */
     if (path_is(p, "/api/programs")) {
@@ -1026,7 +1026,7 @@ kiln_err_t kiln_api_handle(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
         }
         return handle_program_one(ctx, id, resp);
     }
-    /* FR-WEB-26.  Run *state* is readable at /api/status; run *control* is not
+    /* SWR-WEB-26.  Run *state* is readable at /api/status; run *control* is not
      * reachable from here at all. */
     if (path_is(p, "/api/run") || strncmp(p, "/api/run/", 9) == 0) {
         return reject_read_only(resp, "starting, pausing, resuming or aborting a firing");
@@ -1034,10 +1034,10 @@ kiln_err_t kiln_api_handle(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
     if (path_is(p, "/api/manual")) {
         return reject_read_only(resp, "manual heating");
     }
-    /* FR-WEB-26 and SR-17 pulling the same way: acknowledging a fault re-arms a
+    /* SWR-WEB-26 and SWR-SAF-17 pulling the same way: acknowledging a fault re-arms a
      * kiln that has already failed once, and the operator should be looking at
      * it when they do.  Reading the latched fault stays available at
-     * /api/status, which is what the FR-WEB-24 banner needs. */
+     * /api/status, which is what the SWR-WEB-24 banner needs. */
     if (path_is(p, "/api/fault/ack")) {
         return reject_read_only(resp, "acknowledging a fault");
     }
@@ -1077,7 +1077,7 @@ kiln_err_t kiln_api_handle(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
                 kiln_api_error(resp, 503, "no_storage", "the log store is unavailable");
                 return KILN_ERR_IO;
             }
-            /* FR-LOG-13: irreversible, and the UI is required to say so before
+            /* SWR-LOG-13: irreversible, and the UI is required to say so before
              * it gets here. */
             const kiln_err_t e = kiln_logring_erase_all(ctx->ring);
             if (e != KILN_OK) { resp_from_err(resp, e, "the log could not be erased"); return e; }

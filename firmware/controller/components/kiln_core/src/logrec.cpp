@@ -116,7 +116,7 @@ void kiln_logrec_encode(const kiln_log_sample_t *s, uint8_t out[KILN_LOG_RECORD_
     put_i16(&out[8],  enc_temp(s->setpoint_c));
     put_i16(&out[10], enc_temp(s->case_c));
 
-    /* Current in 10 mA steps: 0 .. 655.35 A, comfortably beyond FR-CUR-02's
+    /* Current in 10 mA steps: 0 .. 655.35 A, comfortably beyond SWR-CUR-02's
      * 60 A range and finer than its 0.1 A resolution requirement. */
     /* kiln_clampf() rather than the two comparisons: a NaN current slipped
      * past those and into an undefined cast, and here the floor IS the
@@ -135,7 +135,7 @@ void kiln_logrec_encode(const kiln_log_sample_t *s, uint8_t out[KILN_LOG_RECORD_
     out[15] = s->segment;
     out[16] = (uint8_t)((s->state & 0x0Fu) | (s->flags & 0xF0u));
     out[17] = s->current_flags;
-    /* FR-LOG-04.  This was AD-18's reserved byte; an event code is what it was
+    /* SWR-LOG-04.  This was SWA-18's reserved byte; an event code is what it was
      * being reserved for. */
     out[18] = (s->event < (uint8_t)KILN_LOGE_COUNT) ? s->event : (uint8_t)KILN_LOGE_SAMPLE;
     out[19] = kiln_crc8(out, KILN_LOG_RECORD_BYTES - 1);
@@ -274,7 +274,7 @@ void bucket_merge(kiln_log_bucket_t *dst, const kiln_log_bucket_t *src)
         return;
     }
     /* The earlier bucket's timestamp wins; the extrema of both survive, which is
-     * the property FR-LOG-11 needs to hold at every zoom level. */
+     * the property SWR-LOG-11 needs to hold at every zoom level. */
     if (src->kiln_min_c < dst->kiln_min_c) {
         dst->kiln_min_c = src->kiln_min_c;
     }

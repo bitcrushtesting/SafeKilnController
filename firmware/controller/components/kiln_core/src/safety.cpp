@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * One static function per rule, each with its own accumulator, so that each row
- * of architecture section 8.2 maps to exactly one host test (TR-23).
+ * of architecture section 8.2 maps to exactly one host test (SWR-TST-23).
  */
 
 #include <math.h>
@@ -13,41 +13,41 @@ void kiln_safety_cfg_defaults(kiln_safety_cfg_t *cfg)
 {
     const kiln_safety_cfg_t d = {
         .max_temp_c               = 1280.0f,
-        .overtemp_margin_c        = 10.0f,   /* SR-09 */
-        .max_case_temp_c          = 70.0f,   /* SR-11 */
-        .tc_grace_s               = 5.0f,    /* FR-ACQ-12 */
+        .overtemp_margin_c        = 10.0f,   /* SWR-SAF-09 */
+        .max_case_temp_c          = 70.0f,   /* SWR-SAF-11 */
+        .tc_grace_s               = 5.0f,    /* SWR-ACQ-12 */
 
-        .reversed_duty_permille   = 500,     /* SR-05 */
+        .reversed_duty_permille   = 500,     /* SWR-SAF-05 */
         .reversed_drop_c          = 5.0f,
         .reversed_window_s        = 120.0f,
         .reversed_confirm_s       = 30.0f,
 
-        .stuck_delta_c            = 2.0f,    /* SR-06 */
+        .stuck_delta_c            = 2.0f,    /* SWR-SAF-06 */
         .stuck_duty_permille      = 500,
         .stuck_window_s           = 600.0f,
 
-        .runaway_duty_permille    = 800,     /* SR-07 */
+        .runaway_duty_permille    = 800,     /* SWR-SAF-07 */
         .runaway_window_s         = 900.0f,
         .runaway_min_rate_c_per_h = 10.0f,
 
-        .uncommanded_rise_c       = 5.0f,    /* SR-08 */
+        .uncommanded_rise_c       = 5.0f,    /* SWR-SAF-08 */
         .uncommanded_window_s     = 180.0f,
         .uncommanded_settle_s     = 60.0f,
 
-        .excursion_band_c         = 50.0f,   /* SR-10 */
+        .excursion_band_c         = 50.0f,   /* SWR-SAF-10 */
         .excursion_window_s       = 120.0f,
 
-        .door_confirm_s           = 0.2f,    /* SR-31 */
+        .door_confirm_s           = 0.2f,    /* SWR-SAF-31 */
 
-        .insulation_factor        = 1.3f,    /* SR-12 */
+        .insulation_factor        = 1.3f,    /* SWR-SAF-12 */
         .saturated_warn_s         = 600.0f,  /* warning 107 */
 
-        .ct_fault_window_s        = 5.0f,    /* FR-CUR-11 */
+        .ct_fault_window_s        = 5.0f,    /* SWR-CUR-11 */
 
-        .fail_on_threshold_a      = 0.5f,    /* SR-25 */
+        .fail_on_threshold_a      = 0.5f,    /* SWR-SAF-25 */
         .fail_on_windows          = 2,
 
-        .fail_off_fraction        = 0.20f,   /* SR-26 */
+        .fail_off_fraction        = 0.20f,   /* SWR-SAF-26 */
         /* Derived from the nominal current by the call below; named here
          * because C++ -Wmissing-field-initializers will not let a designated
          * initialiser leave a member to be zero-filled silently, and a safety
@@ -56,19 +56,19 @@ void kiln_safety_cfg_defaults(kiln_safety_cfg_t *cfg)
         .fail_off_window_s        = 30.0f,
         .fail_off_min_windows     = 3,
 
-        /* SR-27 / NFR-27: 2 s for the contactor to drop, 3 s total to a verdict. */
+        /* SWR-SAF-27 / SWR-NFR-27: 2 s for the contactor to drop, 3 s total to a verdict. */
         .weld_wait_s              = 2.0f,
         .weld_verdict_s           = 3.0f,
 
-        .deviation_warn_frac      = 0.10f,   /* SR-28 */
+        .deviation_warn_frac      = 0.10f,   /* SWR-SAF-28 */
         .deviation_fault_frac     = 0.25f,
         .deviation_window_s       = 30.0f,
         .deviation_min_windows    = 3,
 
         .overcurrent_a            = 0.0f,    /* derived, as fail_off_min_a */
-        .overcurrent_windows      = 2,       /* SR-29 */
+        .overcurrent_windows      = 2,       /* SWR-SAF-29 */
 
-        .contactor_life_ops       = 100000u, /* SR-30 */
+        .contactor_life_ops       = 100000u, /* SWR-SAF-30 */
         .ssr_life_ops             = 10000000u,
         .mismatch_episodes_warn   = 3,
     };
@@ -85,22 +85,22 @@ void kiln_safety_cfg_set_nominal_current(kiln_safety_cfg_t *cfg, float nominal_a
     }
     const float nom = kiln_clampf(nominal_a, 0.0f, 200.0f);
 
-    /* SR-29: 120 % of nominal. */
+    /* SWR-SAF-29: 120 % of nominal. */
     cfg->overcurrent_a = nom * 1.20f;
-    /* SR-26's floor before FR-CUR-08's reference exists: the same 20 % fraction
+    /* SWR-SAF-26's floor before SWR-CUR-08's reference exists: the same 20 % fraction
      * applied to the nominal, so the rule has teeth from the first on-window. */
     cfg->fail_off_min_a = nom * cfg->fail_off_fraction;
 }
 
 namespace {
 
-/* Bound the configuration and report whether anything had to be moved (NFR-17:
+/* Bound the configuration and report whether anything had to be moved (SWR-NFR-17:
  * a silently corrected safety threshold is a defect, not a convenience). */
 bool clamp_cfg(kiln_safety_cfg_t *c)
 {
     bool moved = false;
 
-    /* SR-23 binds whatever was configured. */
+    /* SWR-SAF-23 binds whatever was configured. */
     moved |= kiln_clampf_moved(&c->max_temp_c, 0.0f, KILN_TEMP_CEILING_C);
 
     if (c->fail_on_windows == 0) {
@@ -111,9 +111,9 @@ bool clamp_cfg(kiln_safety_cfg_t *c)
         c->overcurrent_windows = 1;
         moved                  = true;
     }
-    /* SR-22: bounded, and the lower bound is not zero-with-an-escape -- 0 s is
+    /* SWR-SAF-22: bounded, and the lower bound is not zero-with-an-escape -- 0 s is
      * a legitimate setting here (latch on the first open sample) and the upper
-     * bound keeps the latch inside NFR-04's 500 ms whatever is configured. */
+     * bound keeps the latch inside SWR-NFR-04's 500 ms whatever is configured. */
     moved |= kiln_clampf_moved(&c->door_confirm_s, 0.0f, 0.5f);
     moved |= kiln_clampf_moved(&c->fail_off_fraction, 0.0f, 1.0f);
     moved |= kiln_clampf_moved(&c->weld_wait_s, 0.1f, 10.0f);
@@ -193,7 +193,7 @@ void kiln_safety_begin_run(kiln_safety_t *s, const kiln_insulation_baseline_t *b
     }
 }
 
-/* --- SR-04: thermocouple and front end faults --------------------------- */
+/* --- SWR-SAF-04: thermocouple and front end faults --------------------------- */
 
 namespace {
 
@@ -221,7 +221,7 @@ kiln_fault_t map_tc_fault(uint16_t bits, bool is_case)
     return KILN_FAULT_NONE;
 }
 
-/* FR-ACQ-12: a transient glitch is tolerated for the grace period; a fault that
+/* SWR-ACQ-12: a transient glitch is tolerated for the grace period; a fault that
  * outlives it is real. */
 kiln_fault_t rule_tc(kiln_rule_state_t *st, const kiln_safety_cfg_t *cfg,
                             uint16_t bits, bool is_case, float dt_s)
@@ -237,14 +237,14 @@ kiln_fault_t rule_tc(kiln_rule_state_t *st, const kiln_safety_cfg_t *cfg,
     return KILN_FAULT_NONE;
 }
 
-/* --- SR-05: reversed thermocouple --------------------------------------- */
+/* --- SWR-SAF-05: reversed thermocouple --------------------------------------- */
 
 /* The temperature rules take `valid`, and every one of them *holds* on an
- * invalid reading rather than resetting: the reading inside an FR-ACQ-12 grace
+ * invalid reading rather than resetting: the reading inside an SWR-ACQ-12 grace
  * window is not a measurement, so it must neither be compared against nor
  * recorded as the extreme of a window.  Resetting instead would let a sensor
  * that glitches once per grace period keep a 10 min window permanently at zero,
- * which is how SR-06 gets quietly disabled. */
+ * which is how SWR-SAF-06 gets quietly disabled. */
 
 kiln_fault_t rule_reversed(kiln_rule_state_t *st, const kiln_safety_cfg_t *cfg,
                                   const kiln_safety_input_t *in, bool valid, float dt_s)
@@ -291,7 +291,7 @@ kiln_fault_t rule_reversed(kiln_rule_state_t *st, const kiln_safety_cfg_t *cfg,
     return KILN_FAULT_NONE;
 }
 
-/* --- SR-06: stuck sensor ------------------------------------------------ */
+/* --- SWR-SAF-06: stuck sensor ------------------------------------------------ */
 
 kiln_fault_t rule_stuck(kiln_rule_state_t *st, const kiln_safety_cfg_t *cfg,
                                const kiln_safety_input_t *in, bool valid, float dt_s)
@@ -331,7 +331,7 @@ kiln_fault_t rule_stuck(kiln_rule_state_t *st, const kiln_safety_cfg_t *cfg,
     return KILN_FAULT_NONE;
 }
 
-/* --- SR-07: thermal runaway / heating failure --------------------------- */
+/* --- SWR-SAF-07: thermal runaway / heating failure --------------------------- */
 
 kiln_fault_t rule_runaway(kiln_rule_state_t *st, const kiln_safety_cfg_t *cfg,
                                  const kiln_safety_input_t *in, bool valid, float dt_s)
@@ -360,7 +360,7 @@ kiln_fault_t rule_runaway(kiln_rule_state_t *st, const kiln_safety_cfg_t *cfg,
     return KILN_FAULT_NONE;
 }
 
-/* --- SR-08: uncommanded heating (shorted SSR) --------------------------- */
+/* --- SWR-SAF-08: uncommanded heating (shorted SSR) --------------------------- */
 
 kiln_fault_t rule_uncommanded(kiln_rule_state_t *st, const kiln_safety_cfg_t *cfg,
                                      const kiln_safety_input_t *in, bool valid, float dt_s)
@@ -408,7 +408,7 @@ kiln_fault_t rule_uncommanded(kiln_rule_state_t *st, const kiln_safety_cfg_t *cf
     return KILN_FAULT_NONE;
 }
 
-/* --- SR-10: setpoint excursion ----------------------------------------- */
+/* --- SWR-SAF-10: setpoint excursion ----------------------------------------- */
 
 kiln_fault_t rule_excursion(kiln_rule_state_t *st, const kiln_safety_cfg_t *cfg,
                                    const kiln_safety_input_t *in, bool valid, float dt_s)
@@ -433,7 +433,7 @@ kiln_fault_t rule_excursion(kiln_rule_state_t *st, const kiln_safety_cfg_t *cfg,
     return KILN_FAULT_NONE;
 }
 
-/* --- SR-12: insulation degradation (warning only) ---------------------- */
+/* --- SWR-SAF-12: insulation degradation (warning only) ---------------------- */
 
 void rule_insulation(kiln_safety_t *s, const kiln_safety_input_t *in,
                             bool valid, float dt_s)
@@ -484,7 +484,7 @@ bool cur_is_conduction(const kiln_safety_input_t *in)
     return cur_usable(in) && (in->current_flags & KILN_CURF_CONDUCTION) != 0;
 }
 
-/* FR-CUR-11.  Graced like SR-04: one burst spoiled by the switching transient of
+/* SWR-CUR-11.  Graced like SWR-SAF-04: one burst spoiled by the switching transient of
  * a multi-kilowatt load is not a missing transformer. */
 kiln_fault_t rule_ct_fault(kiln_safety_t *s, const kiln_safety_input_t *in, float dt_s)
 {
@@ -497,7 +497,7 @@ kiln_fault_t rule_ct_fault(kiln_safety_t *s, const kiln_safety_input_t *in, floa
                                                            : KILN_FAULT_NONE;
 }
 
-/* SR-29.  Counted in measurement windows rather than latched on one sample: the
+/* SWR-SAF-29.  Counted in measurement windows rather than latched on one sample: the
  * CT sits on a conductor carrying a switched multi-kilowatt load, and a single
  * burst caught across a turn-on transient should not end a firing. */
 kiln_fault_t rule_overcurrent(kiln_safety_t *s, const kiln_safety_input_t *in)
@@ -522,12 +522,12 @@ kiln_fault_t rule_overcurrent(kiln_safety_t *s, const kiln_safety_input_t *in)
     return KILN_FAULT_NONE;
 }
 
-/* SR-25 and SR-27, which are one mechanism: detect current in an off-window,
+/* SWR-SAF-25 and SWR-SAF-27, which are one mechanism: detect current in an off-window,
  * then find out *which* device failed by opening the contactor and looking again.
  *
  * Until the verdict, heat is withheld and no fault is latched -- latching 21
  * early would name the SSR before the test that distinguishes it from the far
- * more serious welded contactor of SR-27.  NFR-27 bounds the whole sequence:
+ * more serious welded contactor of SWR-SAF-27.  SWR-NFR-27 bounds the whole sequence:
  * de-energise within 1 s of the offending window, verdict within a further 3 s.
  */
 kiln_fault_t rule_fail_on_and_weld(kiln_safety_t *s, const kiln_safety_input_t *in,
@@ -561,7 +561,7 @@ kiln_fault_t rule_fail_on_and_weld(kiln_safety_t *s, const kiln_safety_input_t *
                 return s->weld_fault;
             }
             if (s->weld_timer_s >= s->cfg.weld_verdict_s) {
-                /* No measurement inside NFR-27's budget.  Take the more severe
+                /* No measurement inside SWR-NFR-27's budget.  Take the more severe
                  * verdict: a fail-safe decision must not fail open, and the cost
                  * of being wrong here is an operator who isolates a kiln that
                  * only had a shorted SSR. */
@@ -584,7 +584,7 @@ kiln_fault_t rule_fail_on_and_weld(kiln_safety_t *s, const kiln_safety_input_t *
         s->fail_on_episode_open = true;
 
         if (s->fail_on_count >= s->cfg.fail_on_windows) {
-            /* NFR-27: heat comes off now, in the same cycle as the offending
+            /* SWR-NFR-27: heat comes off now, in the same cycle as the offending
              * measurement.  The verdict follows. */
             v->heat_permitted       = false;
             v->drop_contactor       = true;
@@ -596,7 +596,7 @@ kiln_fault_t rule_fail_on_and_weld(kiln_safety_t *s, const kiln_safety_input_t *
         return KILN_FAULT_NONE;
     }
 
-    /* Below threshold again having been above it: SR-30's intermittent mismatch,
+    /* Below threshold again having been above it: SWR-SAF-30's intermittent mismatch,
      * the early sign that a relay is becoming defective before it fails. */
     if (s->fail_on_episode_open) {
         if (s->mismatch_episodes < 0xFFFFu) {
@@ -608,7 +608,7 @@ kiln_fault_t rule_fail_on_and_weld(kiln_safety_t *s, const kiln_safety_input_t *
     return KILN_FAULT_NONE;
 }
 
-/* SR-26.  Acts long before SR-07's 15 min thermal window: a failed SSR, an open
+/* SWR-SAF-26.  Acts long before SWR-SAF-07's 15 min thermal window: a failed SSR, an open
  * contactor, an open safety chain, a blown heater fuse or fully open elements all
  * show up as no amps in an on-window. */
 kiln_fault_t rule_fail_off(kiln_safety_t *s, const kiln_safety_input_t *in, float dt_s)
@@ -626,7 +626,7 @@ kiln_fault_t rule_fail_off(kiln_safety_t *s, const kiln_safety_input_t *in, floa
         return KILN_FAULT_NONE;
     }
 
-    /* FR-CUR-08's reference once it exists, the nominal-derived floor before. */
+    /* SWR-CUR-08's reference once it exists, the nominal-derived floor before. */
     const float threshold = (in->current_ref_a > 0.0f)
                           ? s->cfg.fail_off_fraction * in->current_ref_a
                           : s->cfg.fail_off_min_a;
@@ -659,7 +659,7 @@ kiln_fault_t rule_fail_off(kiln_safety_t *s, const kiln_safety_input_t *in, floa
         return KILN_FAULT_NONE;
     }
 
-    /* The elapsed time is tracked on wall time -- FR-CUR-05 skips short windows,
+    /* The elapsed time is tracked on wall time -- SWR-CUR-05 skips short windows,
      * and a low duty would otherwise stretch "30 s" into an hour -- but the
      * verdict needs both that *and* a run of low measurements.  See
      * fail_off_min_windows for why one of the two is not enough. */
@@ -672,7 +672,7 @@ kiln_fault_t rule_fail_off(kiln_safety_t *s, const kiln_safety_input_t *in, floa
     return KILN_FAULT_NONE;
 }
 
-/* SR-28.  Losing one of several element groups is a step change of a known
+/* SWR-SAF-28.  Losing one of several element groups is a step change of a known
  * fraction -- a third of the current for one of three groups -- so the
  * interesting signal is the size of the step, not its direction. */
 kiln_fault_t rule_deviation(kiln_safety_t *s, const kiln_safety_input_t *in,
@@ -694,7 +694,7 @@ kiln_fault_t rule_deviation(kiln_safety_t *s, const kiln_safety_input_t *in,
             s->deviation_windows++;
         }
         s->deviation_timer_s += dt_s;
-        /* Both, as for SR-26. */
+        /* Both, as for SWR-SAF-26. */
         if (s->deviation_timer_s >= s->cfg.deviation_window_s &&
             s->deviation_windows >= s->cfg.deviation_min_windows) {
             return KILN_FAULT_CURRENT_DEVIATION;
@@ -706,7 +706,7 @@ kiln_fault_t rule_deviation(kiln_safety_t *s, const kiln_safety_input_t *in,
     return KILN_FAULT_NONE;
 }
 
-/* SR-30.  Warnings only: a relay at its life limit still works, and an
+/* SWR-SAF-30.  Warnings only: a relay at its life limit still works, and an
  * intermittent mismatch is a prediction rather than a failure. */
 void rule_relay_wear(kiln_safety_t *s, const kiln_safety_input_t *in,
                             uint32_t *warnings)
@@ -742,7 +742,7 @@ kiln_err_t kiln_safety_eval_checked(kiln_safety_t *s,
         return KILN_ERR_INVALID_ARG;
     }
     if (!kiln_is_finite(dt_s) || dt_s < 0.0f) {
-        /* Fail safe, and say what was actually wrong rather than blaming SR-13. */
+        /* Fail safe, and say what was actually wrong rather than blaming SWR-SAF-13. */
         out->heat_permitted = false;
         out->drop_contactor = false;
         out->fault          = KILN_FAULT_NONE;
@@ -755,14 +755,14 @@ kiln_err_t kiln_safety_eval_checked(kiln_safety_t *s,
 
 namespace {
 
-/* SR-31: door / lid interlock.
+/* SWR-SAF-31: door / lid interlock.
  *
  * The one rule in the table that needs no history, no timer and no trust in
  * any other reading -- which is why kiln_safety_eval runs it first, ahead even
- * of SR-13.  A door that is open is a fact; everything else here is an
+ * of SWR-SAF-13.  A door that is open is a fact; everything else here is an
  * inference from a measurement.
  *
- * Two tiers, as SR-09 has:
+ * Two tiers, as SWR-SAF-09 has:
  *   - heat is withheld and the contactor dropped on the FIRST open sample, with
  *     no delay, because that is the whole point of a door switch;
  *   - the fault latches only once the door has read open for door_confirm_s,
@@ -810,7 +810,7 @@ kiln_safety_verdict_t kiln_safety_eval(kiln_safety_t *s,
     uint32_t warnings = 0;
 
     if ((s == nullptr) || (in == nullptr) || !kiln_is_finite(dt_s) || dt_s < 0.0f) {
-        /* Fail safe, but do not call it SR-13: fault 14 means the safety
+        /* Fail safe, but do not call it SWR-SAF-13: fault 14 means the safety
          * supervisor missed its deadline, and reporting it for a NULL pointer or
          * a negative dt sends whoever reads the fault log looking at the
          * scheduler instead of at the caller.  The verdict withholds heat; a
@@ -820,14 +820,14 @@ kiln_safety_verdict_t kiln_safety_eval(kiln_safety_t *s,
         return v;
     }
 
-    /* FR-ACQ-12 plus NFR-17: a reading is believable when the acquisition layer
+    /* SWR-ACQ-12 plus SWR-NFR-17: a reading is believable when the acquisition layer
      * says so *and* it is a number.  A non-finite value reaching here is a defect
      * upstream, and is treated as an invalid reading rather than propagated. */
     const bool kiln_ok = in->kiln_valid && kiln_is_finite(in->kiln_c) &&
                          kiln_is_finite(in->rate_c_per_h);
     const bool case_ok = in->case_valid && kiln_is_finite(in->case_c);
 
-    /* SR-31 before everything, including SR-13.  A door switch is a direct
+    /* SWR-SAF-31 before everything, including SWR-SAF-13.  A door switch is a direct
      * physical signal: it does not depend on the loop having met its deadline,
      * on a reading being believable, or on any timer having run.  If the door
      * is open the kiln must not be heating, whatever else is also wrong. */
@@ -841,13 +841,13 @@ kiln_safety_verdict_t kiln_safety_eval(kiln_safety_t *s,
     /* Heat already withheld by tier one; keep evaluating so a door left open
      * does not mask a fault that also wants latching. */
 
-    /* SR-13: if the loop timing itself is broken, nothing downstream can
+    /* SWR-SAF-13: if the loop timing itself is broken, nothing downstream can
      * be trusted. */
     if (in->safety_deadline_missed)  { v.heat_permitted = false; v.fault = KILN_FAULT_SAFETY_DEADLINE;  goto done; }
     if (in->control_deadline_missed) { v.heat_permitted = false; v.fault = KILN_FAULT_CONTROL_DEADLINE; goto done; }
 
-    /* SR-25/SR-27 next, and before the sensor rules: the sequence is already
-     * holding heat off and is inside a 3 s verdict budget (NFR-27), so nothing
+    /* SWR-SAF-25/SWR-SAF-27 next, and before the sensor rules: the sequence is already
+     * holding heat off and is inside a 3 s verdict budget (SWR-NFR-27), so nothing
      * else may pre-empt it. */
     {
         const kiln_fault_t f = rule_fail_on_and_weld(s, in, &v, dt_s);
@@ -857,7 +857,7 @@ kiln_safety_verdict_t kiln_safety_eval(kiln_safety_t *s,
         }
     }
 
-    /* SR-04, both channels. */
+    /* SWR-SAF-04, both channels. */
     {
         const kiln_fault_t f = rule_tc(&s->tc_grace, &s->cfg, in->tc_fault_bits, false, dt_s);
         if (f != KILN_FAULT_NONE) { v.heat_permitted = false; v.fault = f; goto done; }
@@ -867,13 +867,13 @@ kiln_safety_verdict_t kiln_safety_eval(kiln_safety_t *s,
         if (f != KILN_FAULT_NONE) { v.heat_permitted = false; v.fault = f; goto done; }
     }
 
-    /* FR-CUR-11 */
+    /* SWR-CUR-11 */
     {
         const kiln_fault_t f = rule_ct_fault(s, in, dt_s);
         if (f != KILN_FAULT_NONE) { v.heat_permitted = false; v.fault = f; goto done; }
     }
 
-    /* SR-29 */
+    /* SWR-SAF-29 */
     {
         const kiln_fault_t f = rule_overcurrent(s, in);
         if (f != KILN_FAULT_NONE) { v.heat_permitted = false; v.fault = f; goto done; }
@@ -881,12 +881,12 @@ kiln_safety_verdict_t kiln_safety_eval(kiln_safety_t *s,
 
     /* No trustworthy chamber reading: withhold heat for the duration of the
      * grace period rather than control on a number the front end has disowned.
-     * No fault -- that is SR-04's decision, and it has its own timer. */
+     * No fault -- that is SWR-SAF-04's decision, and it has its own timer. */
     if (!kiln_ok) {
         v.heat_permitted = false;
     }
 
-    /* SR-09.  Exceeding the limit withholds heat at once; exceeding it by the
+    /* SWR-SAF-09.  Exceeding the limit withholds heat at once; exceeding it by the
      * margin is a latching fault. */
     if (kiln_ok && in->kiln_c > s->cfg.max_temp_c) {
         v.heat_permitted = false;
@@ -896,29 +896,29 @@ kiln_safety_verdict_t kiln_safety_eval(kiln_safety_t *s,
         }
     }
 
-    /* SR-11 */
+    /* SWR-SAF-11 */
     if (in->case_present && case_ok && in->case_c > s->cfg.max_case_temp_c) {
         v.heat_permitted = false;
         v.fault = KILN_FAULT_CASE_OVERTEMP;
         goto done;
     }
 
-    /* SR-08 runs in every state: a shorted SSR is most likely to be noticed
-     * while the controller believes it is idle.  SR-25 sees the same failure in
+    /* SWR-SAF-08 runs in every state: a shorted SSR is most likely to be noticed
+     * while the controller believes it is idle.  SWR-SAF-25 sees the same failure in
      * amps rather than degrees, and far sooner; this is the backstop for a kiln
-     * whose current monitoring is off or whose CT has failed (FR-CUR-12). */
+     * whose current monitoring is off or whose CT has failed (SWR-CUR-12). */
     {
         const kiln_fault_t f = rule_uncommanded(&s->uncommanded, &s->cfg, in, kiln_ok, dt_s);
         if (f != KILN_FAULT_NONE) { v.heat_permitted = false; v.fault = f; goto done; }
     }
 
-    /* SR-26 */
+    /* SWR-SAF-26 */
     {
         const kiln_fault_t f = rule_fail_off(s, in, dt_s);
         if (f != KILN_FAULT_NONE) { v.heat_permitted = false; v.fault = f; goto done; }
     }
 
-    /* SR-28 */
+    /* SWR-SAF-28 */
     {
         const kiln_fault_t f = rule_deviation(s, in, &warnings, dt_s);
         if (f != KILN_FAULT_NONE) { v.heat_permitted = false; v.fault = f; goto done; }
@@ -945,7 +945,7 @@ kiln_safety_verdict_t kiln_safety_eval(kiln_safety_t *s,
     if (in->heating_active) {
         rule_insulation(s, in, kiln_ok, dt_s);
 
-        /* FR-CTL-15 / warning 107.  Live, not sticky: once duty comes off the
+        /* SWR-CTL-15 / warning 107.  Live, not sticky: once duty comes off the
          * ceiling the kiln is keeping up again, and Appendix A defines a warning
          * as non-latching. */
         if (in->duty_permille >= KILN_DUTY_MAX) {
@@ -961,7 +961,7 @@ kiln_safety_verdict_t kiln_safety_eval(kiln_safety_t *s,
     rule_relay_wear(s, in, &warnings);
 
 done:
-    /* FR-CUR-12: a persistent warning for as long as monitoring is off, because
+    /* SWR-CUR-12: a persistent warning for as long as monitoring is off, because
      * relay failure can then only be inferred from temperature. */
     if (!in->current_monitoring) {
         warnings |= KILN_WARN_BIT(KILN_WARN_CURRENT_OFF);
@@ -979,7 +979,7 @@ bool kiln_safety_can_clear(const kiln_safety_cfg_t *cfg,
         return false;
     }
 
-    /* An allow-list, not a deny-list.  SR-17/SR-18 are a fail-safe decision, and
+    /* An allow-list, not a deny-list.  SWR-SAF-17/SWR-SAF-18 are a fail-safe decision, and
      * a fail-safe decision must not fail open: the previous `default: return
      * true` made KILN_FAULT_CONTACTOR_WELDED -- the one fault whose instruction
      * is "isolate the kiln, the controller can no longer interrupt the current"
@@ -999,7 +999,7 @@ bool kiln_safety_can_clear(const kiln_safety_cfg_t *cfg,
     case KILN_FAULT_CASE_TC:
         return in->case_fault_bits == 0;
 
-    /* SR-31: clearable once the door is shut again, and not before.  Reuses the
+    /* SWR-SAF-31: clearable once the door is shut again, and not before.  Reuses the
      * input the detector reads, so the two cannot disagree. */
     case KILN_FAULT_DOOR_OPEN:
         return !in->door_monitoring || !in->door_open;
@@ -1010,16 +1010,16 @@ bool kiln_safety_can_clear(const kiln_safety_cfg_t *cfg,
     case KILN_FAULT_CASE_OVERTEMP:
         return in->case_c <= cfg->max_case_temp_c;
 
-    /* SR-08: refuse while the temperature is still climbing with heating
+    /* SWR-SAF-08: refuse while the temperature is still climbing with heating
      * commanded off. */
     case KILN_FAULT_UNCOMMANDED_HEAT:
         return in->duty_permille != 0 || in->rate_c_per_h <= 0.0f;
 
-    /* FR-CUR-11: clearable once a transformer is answering again. */
+    /* SWR-CUR-11: clearable once a transformer is answering again. */
     case KILN_FAULT_CT_FAULT:
         return (in->current_flags & KILN_CURF_CT_FAULT) == 0u;
 
-    /* SR-25: the SSR is shorted.  Clearable only once an off-window measures no
+    /* SWR-SAF-25: the SSR is shorted.  Clearable only once an off-window measures no
      * current -- which, since the fault means the SSR passes current whenever the
      * contactor is closed, in practice means after the SSR has been replaced. */
     case KILN_FAULT_UNCOMMANDED_CURRENT:
@@ -1027,7 +1027,7 @@ bool kiln_safety_can_clear(const kiln_safety_cfg_t *cfg,
                ((in->current_flags & (KILN_CURF_CT_FAULT | KILN_CURF_STALE)) == 0u) &&
                in->current_a <= cfg->fail_on_threshold_a;
 
-    /* SR-29: clearable once current is back inside the limit. */
+    /* SWR-SAF-29: clearable once current is back inside the limit. */
     case KILN_FAULT_OVERCURRENT:
         return in->current_a <= cfg->overcurrent_a;
 
@@ -1035,10 +1035,10 @@ bool kiln_safety_can_clear(const kiln_safety_cfg_t *cfg,
      * investigated.  Each is listed deliberately. */
     case KILN_FAULT_TC_REVERSED:        /* rewire the probe            */
     case KILN_FAULT_TC_STUCK:           /* replace the probe           */
-    case KILN_FAULT_RUNAWAY:            /* SR-07, element/contactor    */
-    case KILN_FAULT_SP_EXCURSION:       /* SR-10, retune               */
-    case KILN_FAULT_NO_HEATER_CURRENT:  /* SR-26, element/SSR/fuse     */
-    case KILN_FAULT_CURRENT_DEVIATION:  /* SR-28, element group        */
+    case KILN_FAULT_RUNAWAY:            /* SWR-SAF-07, element/contactor    */
+    case KILN_FAULT_SP_EXCURSION:       /* SWR-SAF-10, retune               */
+    case KILN_FAULT_NO_HEATER_CURRENT:  /* SWR-SAF-26, element/SSR/fuse     */
+    case KILN_FAULT_CURRENT_DEVIATION:  /* SWR-SAF-28, element group        */
     case KILN_FAULT_CONTROL_DEADLINE:
     case KILN_FAULT_SAFETY_DEADLINE:
     case KILN_FAULT_WATCHDOG:
@@ -1048,7 +1048,7 @@ bool kiln_safety_can_clear(const kiln_safety_cfg_t *cfg,
     case KILN_FAULT_CONFIG_STORAGE:
         return true;
 
-    /* SR-27.  Never clearable from the interface: the controller has no
+    /* SWR-SAF-27.  Never clearable from the interface: the controller has no
      * remaining means of interrupting the current, so there is nothing an
      * acknowledgement could make safe.  It is cleared by a power cycle, after
      * the contactor has been replaced. */

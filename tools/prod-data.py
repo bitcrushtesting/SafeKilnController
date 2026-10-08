@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Bitcrush Testing
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Build and flash the production data block (FR-PROD-01).
+# Build and flash the production data block (SWR-PROD-01).
 #
 #   tools/prod-data.py generate --serial SK1-2026-000042 -o prod.bin
 #   tools/prod-data.py flash    --serial SK1-2026-000042 --port /dev/ttyUSB0
@@ -25,7 +25,7 @@
 #   duplicated across a batch.
 #
 # esptool and the NVS partition generator both ship with ESP-IDF, so this is not
-# a network fetch (CON-04). `generate` needs only the generator; `flash` and
+# a network fetch (UR-CON-04). `generate` needs only the generator; `flash` and
 # `read` need esptool and a board.
 import argparse
 import csv

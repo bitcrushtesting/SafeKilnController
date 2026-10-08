@@ -21,12 +21,12 @@ void kiln_runstate_recovery_defaults(kiln_recovery_cfg_t *cfg)
     if (cfg == nullptr) {
         return;
     }
-    cfg->policy         = KILN_RECOVERY_ABORT;   /* FR-RUN-08 default */
+    cfg->policy         = KILN_RECOVERY_ABORT;   /* SWR-RUN-08 default */
     cfg->max_outage_min = 15;
     cfg->band_c         = 50.0f;
 }
 
-/* --- FR-RUN-08 ---------------------------------------------------------- */
+/* --- SWR-RUN-08 ---------------------------------------------------------- */
 
 namespace {
 
@@ -69,7 +69,7 @@ kiln_recovery_decision_t kiln_runstate_decide(const kiln_recovery_cfg_t *cfg,
     d.kiln_c     = tail->kiln_filt_c;
     d.t_rel_ms   = tail->t_rel_ms;
 
-    /* SR-14 / NFR-15.  A watchdog, panic or brownout reset means the firmware's
+    /* SWR-SAF-14 / SWR-NFR-15.  A watchdog, panic or brownout reset means the firmware's
      * own state was in question at the moment it died; the run is ended and the
      * cause recorded, whatever the recovery policy would otherwise allow. */
     if (kiln_reset_was_abnormal(cause)) {
@@ -128,7 +128,7 @@ kiln_recovery_decision_t kiln_runstate_decide(const kiln_recovery_cfg_t *cfg,
     return d;
 }
 
-/* --- SR-12 baseline ----------------------------------------------------- */
+/* --- SWR-SAF-12 baseline ----------------------------------------------------- */
 
 namespace {
 

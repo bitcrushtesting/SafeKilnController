@@ -7,7 +7,7 @@
  * about itself: everything that *decides* anything is platform-free and tested
  * on the host, and what is left on the board is the part that needs silicon.
  * Turning six register bytes into a temperature and a fault word is arithmetic,
- * and arithmetic nobody can check by reading is exactly what AD-01 says to put
+ * and arithmetic nobody can check by reading is exactly what SWA-01 says to put
  * where a test can reach it. Two's-complement reassembly across three bytes
  * with a sign-extending shift is not something to get right by inspection.
  *
@@ -16,7 +16,7 @@
  *
  * The numbers here are the MAX31856 datasheet's (Maxim/ADI 19-100116, tables 2
  * to 6), and the decode deliberately matches the ESP32's own adapter in
- * kiln_hal_esp32s3/src/hal_tc.cpp bit for bit. That is NOT shared code: AD-22
+ * kiln_hal_esp32s3/src/hal_tc.cpp bit for bit. That is NOT shared code: SWA-22
  * wants two independent implementations of the safety function, and it gets
  * them. What it does not want is two different readings of the same part, so
  * the register decode agrees on purpose while the decisions made from it do
@@ -55,13 +55,13 @@
  * whose sensor can fall off without saying so is not a backstop. */
 #define SUP_TC_CR0_CMODE_AUTO   0x80u
 #define SUP_TC_CR0_OCFAULT_1    0x10u   /* open-circuit detect, < 5 kohm      */
-#define SUP_TC_CR0_FILTER_50    0x01u   /* 0 = 60 Hz, 1 = 50 Hz (FR-ACQ-06)   */
+#define SUP_TC_CR0_FILTER_50    0x01u   /* 0 = 60 Hz, 1 = 50 Hz (SWR-ACQ-06)   */
 #define SUP_TC_CR0_VALUE \
     (SUP_TC_CR0_CMODE_AUTO | SUP_TC_CR0_OCFAULT_1 | SUP_TC_CR0_FILTER_50)
 
 /* CR1: 4-sample averaging and type K.
  *
- * Type K is fixed, not configured: FR-ACQ-02 settles the thermocouple type, and
+ * Type K is fixed, not configured: SWR-ACQ-02 settles the thermocouple type, and
  * the supervisor has no receive path to be told a different one. That is the
  * same reason the link is simplex. */
 #define SUP_TC_CR1_AVG_4        0x20u

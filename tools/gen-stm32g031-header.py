@@ -6,7 +6,7 @@
 #
 #   tools/gen-stm32g031-header.py [path/to/STM32G031.svd]
 #
-# The SVD ships with STM32CubeCLT, so this is not a network fetch (CON-04).
+# The SVD ships with STM32CubeCLT, so this is not a network fetch (UR-CON-04).
 # Run it rather than editing the header: the point of generating it is that no
 # address in it is anybody's recollection.
 import sys, pathlib, xml.etree.ElementTree as ET
@@ -39,8 +39,8 @@ HEADER = '''/* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  *
  * Only the peripherals the supervisor touches are here.  A vendored CMSIS
  * header would be ~10 000 lines of a part this firmware uses a dozen
- * registers of, and AD-22's whole argument is that this firmware can be read
- * in one sitting.  CON-04's vendoring rules are satisfied the same way: no
+ * registers of, and SWA-22's whole argument is that this firmware can be read
+ * in one sitting.  UR-CON-04's vendoring rules are satisfied the same way: no
  * build-time fetch, and what is checked in is small enough to review.
  */
 #ifndef STM32G031_H

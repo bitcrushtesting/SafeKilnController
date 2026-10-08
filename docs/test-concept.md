@@ -6,8 +6,8 @@ SPDX-License-Identifier: GPL-3.0-or-later
 # Test concept
 
 How this product is verified, at four levels, and what each one can and cannot
-prove. The testability requirements it answers are `TR-01` to `TR-28` in
-[`requirements.sdoc`](requirements.sdoc); section 10 states plainly which of
+prove. The testability requirements it answers are `SWR-TST-01` to `SWR-TST-28` in
+[`03_software_req.sdoc`](03_software_req.sdoc); section 10 states plainly which of
 them are met today and which are not.
 
 The organising idea is that each level exists to prove something the level
@@ -25,7 +25,7 @@ that the kiln will stop heating when the probe falls out.
 | **L4** | HIL | The board, with a fixture | The adapters, the electrical detections, timing under load, and the hardware interlocks that are the whole safety case | Nothing below it, which is why it is last and not instead |
 
 Two independent firmwares are tested, not one: the ESP32 application and the
-STM32 supervisor of [`AD-22`](architecture.sdoc). They share no product code,
+STM32 supervisor of [`SWA-22`](04_software_arch.sdoc). They share no product code,
 so they have separate unit suites, and they first meet each other at L4.
 
 ## 2. L1, unit tests
@@ -34,10 +34,10 @@ so they have separate unit suites, and they first meet each other at L4.
 `firmware/supervisor/test/host/` (33 tests). Plain CMake, no ESP-IDF, no ARM toolchain,
 about four seconds for the lot.
 
-This level is cheap because of `AD-01` to `AD-03`, and those decisions exist
-mostly to make it cheap: logic components take an explicit context (`TR-04`),
-reach hardware only through port interfaces (`TR-02`), and never read a clock
-(`TR-03`). A 168-hour firing, a 15-minute runaway timer and a two-hour autotune
+This level is cheap because of `SWA-01` to `SWA-03`, and those decisions exist
+mostly to make it cheap: logic components take an explicit context (`SWR-TST-04`),
+reach hardware only through port interfaces (`SWR-TST-02`), and never read a clock
+(`SWR-TST-03`). A 168-hour firing, a 15-minute runaway timer and a two-hour autotune
 are therefore all exercised in milliseconds of wall time, because time is an
 argument.
 
@@ -46,7 +46,7 @@ validation, the log codec, the configuration model, the JSON parser, the trip
 logic and wire format of the supervisor. What does not: anything needing two
 components to be connected.
 
-Run under ASan and UBSan as well as plain (`TR-20`), because an arithmetic
+Run under ASan and UBSan as well as plain (`SWR-TST-20`), because an arithmetic
 rule that is correct and also reads past an array is not correct.
 
 **The supervisor is held to a different coverage bar, and the reason is
@@ -60,7 +60,7 @@ permit = selftest_ok && !tripped && chamber_valid
 One test with every term true and one with every term false gives 100 % line
 *and* 100 % branch coverage of that line, and demonstrates almost nothing: not
 that a missing reading alone withholds heat, nor that a reported fault alone
-does. `TR-29` therefore requires **80 % modified condition/decision coverage**
+does. `SWR-TST-29` therefore requires **80 % modified condition/decision coverage**
 of the trip logic and the wire format, which is the criterion that makes each
 condition prove it can change the outcome by itself. A five-term decision needs
 at least six cases that differ in the right way.
@@ -94,22 +94,22 @@ that makes no sense.
 against the plant simulator and the fake ports of `kiln_hal_host`.
 
 This is where the real control, setpoint, safety and autotune code runs
-closed-loop against a thermal model (`TR-14`), and where the properties that
+closed-loop against a thermal model (`SWR-TST-14`), and where the properties that
 only emerge from interaction get tested:
 
 - **A firing, end to end.** Programs execute, setpoints advance, hold-back
   suspends them, dwells complete, the log fills.
 - **Power loss.** The fake flash can be told to lose power at the *n*th write,
-  which is how `AD-09`'s claim that the log is the recovery journal gets
+  which is how `SWA-09`'s claim that the log is the recovery journal gets
   tested rather than asserted.
 - **The API's answers**, route by route, without a socket in sight.
-- **Fault injection.** `kiln_sim` carries the `KILN_INJ_*` faults of `TR-11`
-  and `TR-27`: open element, shorted SSR, welded contactor, disconnected CT,
-  reversed or stuck thermocouple, open lid. `TR-09` requires every fault
+- **Fault injection.** `kiln_sim` carries the `KILN_INJ_*` faults of `SWR-TST-11`
+  and `SWR-TST-27`: open element, shorted SSR, welded contactor, disconnected CT,
+  reversed or stuck thermocouple, open lid. `SWR-TST-09` requires every fault
   condition to be reachable without hardware, and this is where that is
   satisfied.
 
-The simulator is deterministic from a seed (`TR-12`), so a failure can be
+The simulator is deterministic from a seed (`SWR-TST-12`), so a failure can be
 replayed rather than reproduced.
 
 ## 4. L3, system tests
@@ -126,7 +126,7 @@ no fault latched.
 
 **`host/webhost`** runs the real firmware logic behind a real POSIX socket
 server with the plant simulated and time accelerated. This is where the HTTP
-interface is exercised as a client sees it (`TR-16`): URI splitting, chunked
+interface is exercised as a client sees it (`SWR-TST-16`): URI splitting, chunked
 log streaming, the four-session limit, a slow client holding a buffer.
 Tasklist `P4` records that this is not yet done; the harness exists and the
 tests do not.
@@ -144,19 +144,19 @@ The central claims of this product are not about software.
 
 - That the supervisor's series element opens the contactor coil.
 - That a hung ESP32 stops toggling `HEAT_EN` and the charge pump drops the
-  contactor within about a second (`AD-05`).
+  contactor within about a second (`SWA-05`).
 - That the lid switch breaks the coil in hardware with no firmware involved
-  (`HR-21`).
+  (`SYS-HW-21`).
 - That a thermocouple pulled out of its terminals is detected as an open
   circuit by a real MAX31856, and that its `~FAULT` output asserts.
-- That `SR-27` can tell a shorted SSR from a welded contactor by dropping the
+- That `SWR-SAF-27` can tell a shorted SSR from a welded contactor by dropping the
   contactor and re-measuring real current.
-- That the loop meets `NFR-01` to `NFR-04` on real silicon under HTTP and WiFi
-  load (`TR-18`).
+- That the loop meets `SWR-NFR-01` to `SWR-NFR-04` on real silicon under HTTP and WiFi
+  load (`SWR-TST-18`).
 
 None of those is testable in simulation, and all of them are load-bearing.
-`TR-17` requires a documented HIL procedure with a low-power resistive load
-and a thermocouple simulator; `TR-28` requires the jig to present a known
+`SWR-TST-17` requires a documented HIL procedure with a low-power resistive load
+and a thermocouple simulator; `SWR-TST-28` requires the jig to present a known
 current and emulate a welded contactor. This section is that design.
 
 ### 5.2 The fixture, in one idea
@@ -251,12 +251,12 @@ datasheet.
 
 | Relay | Presents | Verifies |
 |---|---|---|
-| Open both leads | Open circuit | `SR-04`, the MAX31856's open-circuit detect, `~FAULT` asserting |
-| Short the pair | Shorted couple | `SR-04` |
-| Lead to 3V3 | Short to supply | `SR-04`, front-end `OVUV` |
-| Lead to ground | Short to ground | `SR-04` |
-| Swap the pair | Reversed polarity | `SR-05`, which detects a reading that falls while heat is commanded |
-| Hold the DAC | Stuck sensor | `SR-06` |
+| Open both leads | Open circuit | `SWR-SAF-04`, the MAX31856's open-circuit detect, `~FAULT` asserting |
+| Short the pair | Shorted couple | `SWR-SAF-04` |
+| Lead to 3V3 | Short to supply | `SWR-SAF-04`, front-end `OVUV` |
+| Lead to ground | Short to ground | `SWR-SAF-04` |
+| Swap the pair | Reversed polarity | `SWR-SAF-05`, which detects a reading that falls while heat is commanded |
+| Hold the DAC | Stuck sensor | `SWR-SAF-06` |
 
 Reversal is worth having as a relay rather than as a negative DAC output,
 because reversing the *leads* is the failure that actually happens in the
@@ -264,13 +264,13 @@ field.
 
 ### 5.4 Simulating heater current
 
-`TR-28` asks for a known current presented to the transformer, and the word
+`SWR-TST-28` asks for a known current presented to the transformer, and the word
 *transformer* is load-bearing: injecting a voltage into the CT's burden would
 test the firmware's arithmetic while leaving the CT, the burden and the
 anti-alias network untested.
 
 So: a **low-power resistive load** on the SSR output with the clip-on CT around
-that conductor (`TR-17`), and a separate, fixture-controlled **bypass path**
+that conductor (`SWR-TST-17`), and a separate, fixture-controlled **bypass path**
 across it.
 
 The bypass is the important part, because the fixture must be able to present
@@ -278,13 +278,13 @@ current the DUT did not ask for, and withhold current the DUT did ask for:
 
 | Fixture does | DUT commands | Emulates | Verifies |
 |---|---|---|---|
-| Energise bypass | Off | Shorted SSR or welded contactor | `SR-08`, `SR-25` |
-| Open the load | On | Open element | `SR-26` |
-| Partial load | On | Degraded element | `SR-28` |
-| Bypass, then watch the contactor drop | Off | Welded contactor | `SR-27`'s discrimination sequence, which is the one `TR-28` names |
-| Remove the CT | Either | CT unfitted or fallen off | `FR-CUR-11`, `FR-CUR-12` |
+| Energise bypass | Off | Shorted SSR or welded contactor | `SWR-SAF-08`, `SWR-SAF-25` |
+| Open the load | On | Open element | `SWR-SAF-26` |
+| Partial load | On | Degraded element | `SWR-SAF-28` |
+| Bypass, then watch the contactor drop | Off | Welded contactor | `SWR-SAF-27`'s discrimination sequence, which is the one `SWR-TST-28` names |
+| Remove the CT | Either | CT unfitted or fallen off | `SWR-CUR-11`, `SWR-CUR-12` |
 
-`SR-27` is the reason this cannot be a signal generator. The discrimination
+`SWR-SAF-27` is the reason this cannot be a signal generator. The discrimination
 works by dropping the contactor and re-measuring: if current stops, the SSR was
 shorted; if it persists, the contactor is welded. The fixture has to make a
 real contactor's real contacts behave both ways.
@@ -292,7 +292,7 @@ real contactor's real contacts behave both ways.
 ### 5.5 Discrete inputs
 
 The lid switch is a contact closure, so the fixture closes a contact. It must
-be driven on **both** paths independently, because `HR-21` wires it to a
+be driven on **both** paths independently, because `SYS-HW-21` wires it to a
 controller input *and* in series with the coil, and a fixture that drives only
 the sense line would let a broken series contact pass. Opening the series path
 with the sense line still closed is a specific, testable fault.
@@ -313,16 +313,16 @@ timestamps.
 
 | Observed | Resolution | For |
 |---|---|---|
-| `SSR1`, `SSR2` gates | microseconds | Window period, min-on and min-off (`FR-CTL-07`, `FR-CTL-08`, `AD-07`) |
-| `HEAT_EN` | microseconds | That it is a *square wave* and not a level, and its frequency (`AD-05`) |
-| `COIL_DRV`, and coil current | milliseconds | That the contactor actually closed, and when it dropped (`NFR-04`'s 1 s) |
+| `SSR1`, `SSR2` gates | microseconds | Window period, min-on and min-off (`SWR-CTL-07`, `SWR-CTL-08`, `SWA-07`) |
+| `HEAT_EN` | microseconds | That it is a *square wave* and not a level, and its frequency (`SWA-05`) |
+| `COIL_DRV`, and coil current | milliseconds | That the contactor actually closed, and when it dropped (`SWR-NFR-04`'s 1 s) |
 | The supervisor's permit line | microseconds | Its trip latency, independently of what it reports |
 | The supervisor's UART frames | per frame | Decoded with the same `sup_proto` codec the firmware uses, so the fixture cannot disagree about the format |
-| Alarm output | milliseconds | `SR-20` patterns |
+| Alarm output | milliseconds | `SWR-SAF-20` patterns |
 | Current through the load | per mains cycle | The DUT's own measurement against the fixture's, which is the only way to check calibration |
 
 Two of these deserve emphasis. **The supervisor's permit line is observed
-separately from its reports**, because the whole point of `AD-22` is that the
+separately from its reports**, because the whole point of `SWA-22` is that the
 line does not depend on the firmware that describes it; a test that believed
 the frame would be testing the wrong thing. And **the fixture links the real
 `sup_proto.cpp`**, so a protocol change cannot make the fixture and the
@@ -354,38 +354,38 @@ calibrated reference is still wanted, once, to establish the mapping.
 
 ## 6. Verifying the architecture, not just the behaviour
 
-[`architecture.sdoc`](architecture.sdoc) holds 22 decisions, and most of them
+[`04_software_arch.sdoc`](04_software_arch.sdoc) holds 22 decisions, and most of them
 are **structural claims rather than behavioural ones**. They are verified by
 assertions at build time, which is cheaper and much harder to fool than a
 runtime test.
 
 | How | Decisions |
 |---|---|
-| Static: grep, AST, `nm`, `static_assert`, link | `AD-01`, `AD-02`, `AD-03`, `AD-08`, `AD-10`, `AD-11`, `AD-13`, `AD-14`, `AD-16`, `AD-18`, `AD-19`, `AD-20`, `AD-21` |
-| Runtime, in process (L2) | `AD-04`, `AD-06`, `AD-07`, `AD-09`, `AD-12`, `AD-17` |
-| HIL only (L4) | `AD-05`, `AD-15`, `AD-22` |
-| Nothing to assert | `AD-10`'s storage trade-off has no requirement behind it |
+| Static: grep, AST, `nm`, `static_assert`, link | `SWA-01`, `SWA-02`, `SWA-03`, `SWA-08`, `SWA-10`, `SWA-11`, `SWA-13`, `SWA-14`, `SWA-16`, `SWA-18`, `SWA-19`, `SWA-20`, `SWA-21` |
+| Runtime, in process (L2) | `SWA-04`, `SWA-06`, `SWA-07`, `SWA-09`, `SWA-12`, `SWA-17` |
+| HIL only (L4) | `SWA-05`, `SWA-15`, `SWA-22` |
+| Nothing to assert | `SWA-10`'s storage trade-off has no requirement behind it |
 
 Several already have checks that nobody can see, because the link did not exist
-until recently: `AD-01` and `AD-14` are the `checks` CI job, `AD-20` is the
-`tidy` jobs, `AD-09` and `AD-17` are covered by `test_persistence` and
+until recently: `SWA-01` and `SWA-14` are the `checks` CI job, `SWA-20` is the
+`tidy` jobs, `SWA-09` and `SWA-17` are covered by `test_persistence` and
 `test_current`. Connecting those to the decisions they verify is tracked work,
 not new work.
 
 Three decisions hold today **by discipline alone** and are cheap to make
 structural, which is the most valuable unclaimed work at this level:
 
-- `AD-18`, that the log record is 20 bytes, has no `static_assert` anywhere.
-- `AD-03`, no globals in the core, is true (zero mutable file-scope objects in
+- `SWA-18`, that the log record is 20 bytes, has no `static_assert` anywhere.
+- `SWA-03`, no globals in the core, is true (zero mutable file-scope objects in
   `kiln_core`) and unenforced, because
   `cppcoreguidelines-avoid-non-const-global-variables` is switched off.
-- `AD-02`, time is injected, is true (zero direct clock reads in the core) and
+- `SWA-02`, time is injected, is true (zero direct clock reads in the core) and
   unenforced. It is a grep.
 
 ## 7. Traceability
 
-`TR-22` requires every requirement to trace to a verification artefact and
-`TR-26` requires test names to carry the requirement identifiers. The
+`SWR-TST-22` requires every requirement to trace to a verification artefact and
+`SWR-TST-26` requires test names to carry the requirement identifiers. The
 convention exists and has decayed: **28 of 268 requirements** appear in a test
 function name, and **147 appear nowhere in any test file at all**. The tool
 that was to enforce it, `tools/trace`, was never built.
@@ -394,7 +394,7 @@ The recommendation is to stop building it. StrictDoc, which now owns the
 requirements, has source traceability: an annotation of the form
 
 ```
-/* @relation(SR-25, scope=function) */
+/* @relation(SWR-SAF-25, scope=function) */
 ```
 
 ties a test to a requirement, and the existing `requirements` CI job can
@@ -410,13 +410,13 @@ split. For those 76, the evidence belongs in the requirements document as a
 child node citing the artefact or the commit, so that "verified by inspection"
 stops being an unbacked assertion.
 
-`TR-23` is stricter and worth keeping: every requirement in section 5, the
+`SWR-TST-23` is stricter and worth keeping: every requirement in section 5, the
 safety requirements, needs an **automated** test. Inspection is not sufficient
 there.
 
 ## 8. Coverage
 
-`TR-19` wants 90 % line coverage of the control and safety components and 100 %
+`SWR-TST-19` wants 90 % line coverage of the control and safety components and 100 %
 of safety decision branches. The line floor is enforced in CI and was measured
 at 97.5 % on `kiln_core`. Branch coverage is around 83 % and is **not** gated,
 which tasklist `C10` records.
@@ -426,7 +426,7 @@ line coverage and no test for the case where its input is absent is covered and
 wrong, which is why section 5 of this document exists.
 
 The supervisor is the exception, and deliberately measured differently:
-`TR-29` holds it to 80 % MC/DC, enforced by `tools/mcdc.sh`, for the reason
+`SWR-TST-29` holds it to 80 % MC/DC, enforced by `tools/mcdc.sh`, for the reason
 given in section 2. Two criteria rather than one because the components differ:
 `kiln_core` is large and its risk is breadth, so a line floor across it is the
 useful number; the supervisor is small and its risk is a single unevaluated
@@ -435,36 +435,36 @@ both would be the wrong number for one of them.
 
 ## 9. What is deliberately not tested
 
-- **The external over-temperature cutout** (`HR-13`). It is outside the product
+- **The external over-temperature cutout** (`SYS-HW-13`). It is outside the product
   and mandatory; the project tests that it is not relied upon, not that it
   works.
-- **Mains-voltage behaviour of the installation.** `ASM-04` assumes competent
+- **Mains-voltage behaviour of the installation.** `SYS-ASM-04` assumes competent
   installation.
 - **Real firings, as a gate.** A kiln takes a day. Long-duration behaviour is
-  verified by accelerated simulation and a soak test (`TR-21`), not by waiting.
+  verified by accelerated simulation and a soak test (`SWR-TST-21`), not by waiting.
 
 ## 10. Status against the testability requirements
 
 | | Requirement | Status |
 |---|---|---|
-| `TR-01`–`TR-08` | Testable structure | **Met**, and enforced by the `checks` job for the layering parts |
-| `TR-09` | Every fault reachable without hardware | **Met** via `kiln_sim`'s injections |
-| `TR-10` | Test interfaces compiled out of production | **Not verified** by a build check |
-| `TR-11`, `TR-12`, `TR-27` | Plant simulator, deterministic, models current | **Met** |
-| `TR-13` | Host unit tests, one command | **Met**, 335 across two firmwares |
-| `TR-14` | Closed-loop integration tests | **Met**, 92 |
-| `TR-15` | On-target HAL tests | **Not met**. No adapter has run on hardware (`L2`) |
-| `TR-16` | API tests end to end | **Partly**. Route behaviour yes, socket half no (`P4`) |
-| `TR-17`, `TR-28` | HIL procedure and jig | **Not met**. Designed in section 5, not built |
-| `TR-18` | Timing measured on target | **Not met** |
-| `TR-19` | Coverage | **Partly**. Line floor gated, branch not (`C10`) |
-| `TR-20` | Sanitisers | **Met** |
-| `TR-29` | Supervisor MC/DC at least 80 % | **Met**, at 100 %, gated in CI |
-| `TR-21` | Soak and accelerated long-duration | **Not met** |
-| `TR-22`, `TR-26` | Traceability, test names carry IDs | **Not met**. 28 of 268; see section 7 |
-| `TR-23` | Every safety requirement automated | **Unverified**, because the traceability to check it against does not exist |
-| `TR-24` | CI does all of it on every push | **Met** for what exists |
-| `TR-25` | A fix comes with a regression test | **Met** by practice, not enforced |
+| `SWR-TST-01`–`SWR-TST-08` | Testable structure | **Met**, and enforced by the `checks` job for the layering parts |
+| `SWR-TST-09` | Every fault reachable without hardware | **Met** via `kiln_sim`'s injections |
+| `SWR-TST-10` | Test interfaces compiled out of production | **Not verified** by a build check |
+| `SWR-TST-11`, `SWR-TST-12`, `SWR-TST-27` | Plant simulator, deterministic, models current | **Met** |
+| `SWR-TST-13` | Host unit tests, one command | **Met**, 335 across two firmwares |
+| `SWR-TST-14` | Closed-loop integration tests | **Met**, 92 |
+| `SWR-TST-15` | On-target HAL tests | **Not met**. No adapter has run on hardware (`L2`) |
+| `SWR-TST-16` | API tests end to end | **Partly**. Route behaviour yes, socket half no (`P4`) |
+| `SWR-TST-17`, `SWR-TST-28` | HIL procedure and jig | **Not met**. Designed in section 5, not built |
+| `SWR-TST-18` | Timing measured on target | **Not met** |
+| `SWR-TST-19` | Coverage | **Partly**. Line floor gated, branch not (`C10`) |
+| `SWR-TST-20` | Sanitisers | **Met** |
+| `SWR-TST-29` | Supervisor MC/DC at least 80 % | **Met**, at 100 %, gated in CI |
+| `SWR-TST-21` | Soak and accelerated long-duration | **Not met** |
+| `SWR-TST-22`, `SWR-TST-26` | Traceability, test names carry IDs | **Not met**. 28 of 268; see section 7 |
+| `SWR-TST-23` | Every safety requirement automated | **Unverified**, because the traceability to check it against does not exist |
+| `SWR-TST-24` | CI does all of it on every push | **Met** for what exists |
+| `SWR-TST-25` | A fix comes with a regression test | **Met** by practice, not enforced |
 
 The pattern is worth naming: everything that can be done on a development host
 is done, and almost nothing that needs hardware is. That is a reasonable place

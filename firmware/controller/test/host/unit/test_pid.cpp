@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
- * kiln_core/pid -- FR-CTL-03..FR-CTL-06, FR-CTL-16, NFR-17.
+ * kiln_core/pid -- SWR-CTL-03..SWR-CTL-06, SWR-CTL-16, SWR-NFR-17.
  */
 
 #include "kiln_check.h"
@@ -15,7 +15,7 @@ static kiln_pid_t make(float kp, float ki, float kd)
     return p;
 }
 
-KILN_TEST(frctl03_proportional_term_is_percent_duty_per_degc)
+KILN_TEST(swrctl03_proportional_term_is_percent_duty_per_degc)
 {
     kiln_pid_t p = make(2.0f, 0.0f, 0.0f);
     /* 10 degC of error at 2 %/degC is 20 % duty, which is 200 per mille. */
@@ -23,7 +23,7 @@ KILN_TEST(frctl03_proportional_term_is_percent_duty_per_degc)
     CHECK_NEAR(p.p_pct, 20.0f, 0.001f);
 }
 
-KILN_TEST(frctl03_integral_term_accumulates_in_percent_per_degc_second)
+KILN_TEST(swrctl03_integral_term_accumulates_in_percent_per_degc_second)
 {
     kiln_pid_t p = make(0.0f, 0.5f, 0.0f);
     /* 1 degC for 2 s at 0.5 %/(degC.s) is 1 % duty. */
@@ -31,7 +31,7 @@ KILN_TEST(frctl03_integral_term_accumulates_in_percent_per_degc_second)
     CHECK_EQ_UINT(kiln_pid_update(&p, 101.0f, 100.0f, 1.0f), 10u);
 }
 
-KILN_TEST(frctl04_derivative_is_on_the_measurement_so_a_setpoint_step_does_not_kick)
+KILN_TEST(swrctl04_derivative_is_on_the_measurement_so_a_setpoint_step_does_not_kick)
 {
     kiln_pid_t p = make(1.0f, 0.0f, 10.0f);
     (void)kiln_pid_update(&p, 100.0f, 100.0f, 1.0f);   /* primes pv history */
@@ -45,7 +45,7 @@ KILN_TEST(frctl04_derivative_is_on_the_measurement_so_a_setpoint_step_does_not_k
     CHECK_NEAR(p.d_pct, -20.0f, 0.001f);
 }
 
-KILN_TEST(frctl05_integral_does_not_wind_up_while_the_output_is_saturated)
+KILN_TEST(swrctl05_integral_does_not_wind_up_while_the_output_is_saturated)
 {
     kiln_pid_t p = make(10.0f, 1.0f, 0.0f);
 
@@ -66,7 +66,7 @@ KILN_TEST(frctl05_integral_does_not_wind_up_while_the_output_is_saturated)
     CHECK(cycles < 50);
 }
 
-KILN_TEST(frctl16_duty_ceiling_is_honoured_and_has_one_range)
+KILN_TEST(swrctl16_duty_ceiling_is_honoured_and_has_one_range)
 {
     /* pid.h documents 100..1000, and both the initialiser and the setter now
      * accept exactly that -- a gain set loaded from NVS cannot carry a ceiling
@@ -90,7 +90,7 @@ KILN_TEST(frctl16_duty_ceiling_is_honoured_and_has_one_range)
     CHECK_EQ_UINT(p.cfg.duty_max_permille, KILN_DUTY_MAX);
 }
 
-KILN_TEST(frctl06_bumpless_transfer_continues_from_the_present_output)
+KILN_TEST(swrctl06_bumpless_transfer_continues_from_the_present_output)
 {
     kiln_pid_t p = make(1.0f, 0.1f, 0.0f);
 
@@ -100,7 +100,7 @@ KILN_TEST(frctl06_bumpless_transfer_continues_from_the_present_output)
     CHECK_NEAR((float)kiln_pid_update(&p, 110.0f, 100.0f, 0.0001f), 400.0f, 1.0f);
 }
 
-KILN_TEST(frctl06_bumpless_reports_a_transfer_it_cannot_make_bumplessly)
+KILN_TEST(swrctl06_bumpless_reports_a_transfer_it_cannot_make_bumplessly)
 {
     /* The integral the present output implies is negative, and an integral below
      * zero is a wind-up the anti-windup logic exists to prevent -- so it is
@@ -114,7 +114,7 @@ KILN_TEST(frctl06_bumpless_reports_a_transfer_it_cannot_make_bumplessly)
     CHECK(!kiln_pid_bumpless(&p, 500, 100.0f, 100.0f + 100.0f));
 }
 
-KILN_TEST(nfr17_a_non_finite_input_produces_no_heat_and_no_persistent_damage)
+KILN_TEST(swrnfr17_a_non_finite_input_produces_no_heat_and_no_persistent_damage)
 {
     kiln_pid_t p = make(2.0f, 0.1f, 5.0f);
 

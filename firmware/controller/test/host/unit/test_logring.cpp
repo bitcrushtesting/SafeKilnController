@@ -1,12 +1,12 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * The circular sample log -- AD-08, architecture 10.3 and 10.4,
- * FR-LOG-05..FR-LOG-09, FR-LOG-14, FR-LOG-15.
+ * The circular sample log -- SWA-08, architecture 10.3 and 10.4,
+ * SWR-LOG-05..SWR-LOG-09, SWR-LOG-14, SWR-LOG-15.
  *
  * Driven through a flash fake that enforces NOR semantics and can cut power
  * part-way through a write, which is the one thing a real device does that a
- * test otherwise cannot ask for -- and the entire subject of FR-LOG-08.
+ * test otherwise cannot ask for -- and the entire subject of SWR-LOG-08.
  */
 
 #include <string.h>
@@ -89,7 +89,7 @@ static count_ctx_t count_all(rig_t *r, uint32_t run_id)
 
 /* --- mount and format --------------------------------------------------- */
 
-KILN_TEST(frlog05_an_erased_partition_mounts_as_empty_and_is_usable)
+KILN_TEST(swrlog05_an_erased_partition_mounts_as_empty_and_is_usable)
 {
     rig_t r;
     rig_init(&r);
@@ -105,7 +105,7 @@ KILN_TEST(frlog05_an_erased_partition_mounts_as_empty_and_is_usable)
     CHECK_EQ_UINT(count_all(&r, 0).count, 1u);
 }
 
-KILN_TEST(frlog02_records_round_trip_through_the_ring)
+KILN_TEST(swrlog02_records_round_trip_through_the_ring)
 {
     rig_t r;
     rig_init(&r);
@@ -151,9 +151,9 @@ KILN_TEST(head_discovery_resumes_where_the_previous_boot_stopped)
     CHECK_EQ_UINT(count_all(&r, 0).count, 31u);
 }
 
-/* --- FR-LOG-06: wrap ---------------------------------------------------- */
+/* --- SWR-LOG-06: wrap ---------------------------------------------------- */
 
-KILN_TEST(frlog06_the_oldest_data_is_overwritten_and_the_run_never_fails)
+KILN_TEST(swrlog06_the_oldest_data_is_overwritten_and_the_run_never_fails)
 {
     rig_t r;
     rig_init(&r);
@@ -162,7 +162,7 @@ KILN_TEST(frlog06_the_oldest_data_is_overwritten_and_the_run_never_fails)
 
     const uint32_t capacity = kiln_logring_capacity(&r.ring);
 
-    /* One and a half times round.  Every append must succeed: FR-LOG-06 is
+    /* One and a half times round.  Every append must succeed: SWR-LOG-06 is
      * explicit that a full log never fails a run. */
     for (uint32_t i = 0; i < capacity + capacity / 2u; i++) {
         CHECK_OK(append(&r, i, 100.0f));
@@ -199,9 +199,9 @@ KILN_TEST(wrap_erases_immediately_before_writing_and_never_in_advance)
     CHECK_EQ_UINT(r.flash.erases, after_begin + 1u);
 }
 
-/* --- FR-LOG-08: torn records -------------------------------------------- */
+/* --- SWR-LOG-08: torn records -------------------------------------------- */
 
-KILN_TEST(frlog08_a_torn_record_costs_only_itself)
+KILN_TEST(swrlog08_a_torn_record_costs_only_itself)
 {
     rig_t r;
     rig_init(&r);
@@ -236,7 +236,7 @@ KILN_TEST(frlog08_a_torn_record_costs_only_itself)
     CHECK_EQ_UINT(fresh.head_slot, 20u);
 }
 
-KILN_TEST(frlog08_a_single_bit_rot_is_skipped_by_readers)
+KILN_TEST(swrlog08_a_single_bit_rot_is_skipped_by_readers)
 {
     rig_t r;
     rig_init(&r);
@@ -278,9 +278,9 @@ KILN_TEST(iteration_can_select_a_single_run)
     CHECK_EQ_UINT(count_all(&r, 99).count, 0u);
 }
 
-KILN_TEST(ad09_the_log_tail_is_the_power_loss_journal)
+KILN_TEST(swa09_the_log_tail_is_the_power_loss_journal)
 {
-    /* The whole of AD-09: recovery state is read back out of the log rather than
+    /* The whole of SWA-09: recovery state is read back out of the log rather than
      * written separately, because the data was already going there. */
     rig_t r;
     rig_init(&r);
@@ -303,7 +303,7 @@ KILN_TEST(ad09_the_log_tail_is_the_power_loss_journal)
     CHECK_ERR(kiln_logring_last_record(&r.ring, 99, rec), KILN_ERR_NOT_FOUND);
 }
 
-KILN_TEST(ad09_the_tail_survives_a_power_cut_mid_run)
+KILN_TEST(swa09_the_tail_survives_a_power_cut_mid_run)
 {
     rig_t r;
     rig_init(&r);
@@ -327,9 +327,9 @@ KILN_TEST(ad09_the_tail_survives_a_power_cut_mid_run)
     CHECK_EQ_UINT(s.t_rel_ms, 39u * 10000u);
 }
 
-/* --- FR-LOG-13, FR-LOG-14, FR-LOG-15 ----------------------------------- */
+/* --- SWR-LOG-13, SWR-LOG-14, SWR-LOG-15 ----------------------------------- */
 
-KILN_TEST(frlog13_erase_all_leaves_an_empty_store)
+KILN_TEST(swrlog13_erase_all_leaves_an_empty_store)
 {
     rig_t r;
     rig_init(&r);
@@ -350,7 +350,7 @@ KILN_TEST(frlog13_erase_all_leaves_an_empty_store)
     CHECK_EQ_UINT(count_all(&r, 0).count, 1u);
 }
 
-KILN_TEST(frlog14_a_write_failure_is_counted_and_not_fatal)
+KILN_TEST(swrlog14_a_write_failure_is_counted_and_not_fatal)
 {
     rig_t r;
     rig_init(&r);
@@ -369,7 +369,7 @@ KILN_TEST(frlog14_a_write_failure_is_counted_and_not_fatal)
     CHECK_OK(append(&r, 100, 100.0f));
 }
 
-KILN_TEST(frlog15_stats_report_store_health)
+KILN_TEST(swrlog15_stats_report_store_health)
 {
     rig_t r;
     rig_init(&r);
@@ -399,7 +399,7 @@ KILN_TEST(a_dead_flash_mounts_unavailable_rather_than_pretending)
     CHECK_ERR(kiln_logring_mount(&r.ring, &r.port), KILN_ERR_IO);
     CHECK(!r.ring.available);
 
-    /* FR-LOG-14: the caller carries on and warns.  Every entry point says no
+    /* SWR-LOG-14: the caller carries on and warns.  Every entry point says no
      * rather than writing somewhere undefined. */
     CHECK_ERR(kiln_logring_begin_run(&r.ring, 1), KILN_ERR_IO);
     CHECK_ERR(append(&r, 0, 100.0f), KILN_ERR_IO);
@@ -422,12 +422,12 @@ KILN_TEST(the_ring_validates_its_arguments)
     CHECK_ERR(kiln_logring_stats(&r.ring, NULL), KILN_ERR_INVALID_ARG);
 }
 
-/* --- FR-LOG-07 and the endurance analysis of architecture 10.4 ---------- */
+/* --- SWR-LOG-07 and the endurance analysis of architecture 10.4 ---------- */
 
 /* The real partition: 2 MB of 4 kB sectors. */
 static uint8_t g_full_partition[2u * 1024u * 1024u];
 
-KILN_TEST(frlog07_the_real_partition_holds_more_than_150_hours)
+KILN_TEST(swrlog07_the_real_partition_holds_more_than_150_hours)
 {
     kiln_host_flash_t flash;
     kiln_port_flash_t port;
@@ -443,16 +443,16 @@ KILN_TEST(frlog07_the_real_partition_holds_more_than_150_hours)
     CHECK_EQ_UINT(ring.recs_per_sector, 204u);
     CHECK_EQ_UINT(kiln_logring_capacity(&ring), 104448u);
 
-    /* FR-LOG-07: at the default 10 s interval. */
+    /* SWR-LOG-07: at the default 10 s interval. */
     const double hours = (double)kiln_logring_capacity(&ring) * 10.0 / 3600.0;
     CHECK_MSG(hours >= 150.0, "capacity is only %.0f h", hours);
-    CHECK_NEAR(hours, 290.0, 1.0);        /* AD-18's recomputed figure */
+    CHECK_NEAR(hours, 290.0, 1.0);        /* SWA-18's recomputed figure */
 }
 
 KILN_TEST(the_erase_count_for_150_hours_matches_the_endurance_analysis)
 {
     /* Architecture 10.4 claims one erase per 34 min of running, and bases the
-     * whole NFR-14 endurance argument on it.  This measures it. */
+     * whole SWR-NFR-14 endurance argument on it.  This measures it. */
     kiln_host_flash_t flash;
     kiln_port_flash_t port;
     kiln_logring_t    ring;
@@ -484,7 +484,7 @@ KILN_TEST(the_erase_count_for_150_hours_matches_the_endurance_analysis)
     const double minutes_per_erase = 150.0 * 60.0 / (double)flash.erases;
     CHECK_NEAR(minutes_per_erase, 34.0, 1.0);
 
-    /* And it has not wrapped at 150 h, so FR-LOG-07 is met with the data still
+    /* And it has not wrapped at 150 h, so SWR-LOG-07 is met with the data still
      * present rather than merely survivable. */
     CHECK(!ring.wrapped);
 }

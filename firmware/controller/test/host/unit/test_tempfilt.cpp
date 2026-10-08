@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
- * kiln_core/tempfilt -- FR-ACQ-07, FR-ACQ-08, FR-ACQ-11, NFR-01, NFR-17.
+ * kiln_core/tempfilt -- SWR-ACQ-07, SWR-ACQ-08, SWR-ACQ-11, SWR-NFR-01, SWR-NFR-17.
  */
 
 #include "kiln_check.h"
@@ -16,7 +16,7 @@ static kiln_tempfilt_t make(float tau_s, uint16_t window_s)
     return f;
 }
 
-KILN_TEST(fracq08_applies_gain_then_offset)
+KILN_TEST(swracq08_applies_gain_then_offset)
 {
     const kiln_tempfilt_cfg_t c = { .offset_c = 5.0f, .gain = 1.02f,
                                     .filter_tau_s = 0.0f, .rate_window_s = 60 };
@@ -27,7 +27,7 @@ KILN_TEST(fracq08_applies_gain_then_offset)
     CHECK_NEAR(kiln_tempfilt_raw(&f), 107.0f, 0.001f);
 }
 
-KILN_TEST(fracq08_bounds_the_calibration_ranges)
+KILN_TEST(swracq08_bounds_the_calibration_ranges)
 {
     const kiln_tempfilt_cfg_t c = { .offset_c = 500.0f, .gain = 5.0f,
                                     .filter_tau_s = 1000.0f, .rate_window_s = 9999 };
@@ -40,7 +40,7 @@ KILN_TEST(fracq08_bounds_the_calibration_ranges)
     CHECK_EQ_UINT(f.cfg.rate_window_s, KILN_RATE_WINDOW_MAX_S);
 }
 
-KILN_TEST(fracq07_first_order_filter_reaches_63_percent_in_one_tau)
+KILN_TEST(swracq07_first_order_filter_reaches_63_percent_in_one_tau)
 {
     kiln_tempfilt_t f = make(10.0f, 60);
 
@@ -52,7 +52,7 @@ KILN_TEST(fracq07_first_order_filter_reaches_63_percent_in_one_tau)
     CHECK_NEAR(kiln_tempfilt_raw(&f), 100.0f, 0.001f);
 }
 
-KILN_TEST(fracq11_regresses_a_steady_rate)
+KILN_TEST(swracq11_regresses_a_steady_rate)
 {
     kiln_tempfilt_t f = make(0.0f, 60);
 
@@ -65,7 +65,7 @@ KILN_TEST(fracq11_regresses_a_steady_rate)
     CHECK_NEAR(kiln_tempfilt_rate(&f), 360.0f, 5.0f);
 }
 
-KILN_TEST(fracq11_reports_no_rate_until_there_is_evidence)
+KILN_TEST(swracq11_reports_no_rate_until_there_is_evidence)
 {
     kiln_tempfilt_t f = make(0.0f, 60);
     CHECK(kiln_tempfilt_push(&f, 20.0f, 0.25f));
@@ -74,7 +74,7 @@ KILN_TEST(fracq11_reports_no_rate_until_there_is_evidence)
     CHECK_NEAR(kiln_tempfilt_rate(&f), 0.0f, 0.001f);
 }
 
-KILN_TEST(nfr01_the_regression_runs_only_when_the_history_changes)
+KILN_TEST(swrnfr01_the_regression_runs_only_when_the_history_changes)
 {
     /* At 4 Hz acquisition against 1 Hz decimation, three of every four pushes
      * used to repeat an identical 300-point walk for nothing.  The observable
@@ -97,11 +97,11 @@ KILN_TEST(nfr01_the_regression_runs_only_when_the_history_changes)
     CHECK_EQ_UINT(f.hist_count, count_before + 1u);
 }
 
-KILN_TEST(sr07_an_overrunning_cycle_does_not_flatten_the_regressed_rate)
+KILN_TEST(swrsaf07_an_overrunning_cycle_does_not_flatten_the_regressed_rate)
 {
     /* A cycle that overruns covers several decimation boundaries.  Pushing the
      * same value at each of them plants duplicate points at distinct x
-     * positions, which flattens the slope -- and SR-07 reads a flattened slope
+     * positions, which flattens the slope -- and SWR-SAF-07 reads a flattened slope
      * as "not rising", which is a heating-failure fault on a kiln that is
      * heating perfectly well. */
     kiln_tempfilt_t steady = make(0.0f, 60);
@@ -124,7 +124,7 @@ KILN_TEST(sr07_an_overrunning_cycle_does_not_flatten_the_regressed_rate)
     CHECK(kiln_tempfilt_rate(&bumpy) > 3000.0f);
 }
 
-KILN_TEST(nfr17_a_non_finite_sample_is_refused_and_changes_nothing)
+KILN_TEST(swrnfr17_a_non_finite_sample_is_refused_and_changes_nothing)
 {
     kiln_tempfilt_t f = make(5.0f, 60);
 

@@ -7,8 +7,8 @@
 #include "kiln_app/run_index.h"
 #include "kiln_app/settings.h"
 
-/* FR-CUR-07: apparent power and cumulative energy.  One transformer on one
- * conductor (HR-11), which is what a single-phase kiln has. */
+/* SWR-CUR-07: apparent power and cumulative energy.  One transformer on one
+ * conductor (SYS-HW-11), which is what a single-phase kiln has. */
 double kiln_app_apparent_va(const kiln_app_t *app)
 {
     return (app != nullptr) ? kiln_current_apparent_va(&app->cur) : 0.0;
@@ -26,7 +26,7 @@ namespace {
 
 /* One configuration struct, several core components with their own.  Doing the
  * translation in one function means a configuration item cannot reach one
- * consumer and miss another -- which is the failure mode FR-CFG-02's long list
+ * consumer and miss another -- which is the failure mode SWR-CFG-02's long list
  * invites. */
 void push_config(kiln_app_t *app)
 {
@@ -72,7 +72,7 @@ void push_config(kiln_app_t *app)
     sc.fail_off_fraction        = c->fail_off_fraction;
     sc.fail_off_window_s        = c->fail_off_window_s;
     sc.weld_wait_s              = c->weld_wait_s;
-    sc.weld_verdict_s           = c->weld_wait_s + 1.0f;   /* NFR-27 */
+    sc.weld_verdict_s           = c->weld_wait_s + 1.0f;   /* SWR-NFR-27 */
     sc.deviation_warn_frac      = c->deviation_warn_frac;
     sc.deviation_fault_frac     = c->deviation_fault_frac;
     sc.overcurrent_a            = c->overcurrent_a;
@@ -150,7 +150,7 @@ kiln_err_t kiln_app_init(kiln_app_t *app, const kiln_app_ports_t *ports,
     app->kiln_c      = app->cfg.max_temp_c > 0.0f ? 20.0f : 20.0f;
     app->case_c      = 20.0f;
 
-    /* FR-TUN-11: gains at their factory values are not gains for *this* kiln. */
+    /* SWR-TUN-11: gains at their factory values are not gains for *this* kiln. */
     if (app->cfg.kp <= 0.0f) {
         app->warnings |= KILN_WARN_BIT(KILN_WARN_GAINS_UNTUNED);
     }
@@ -193,9 +193,9 @@ kiln_err_t kiln_app_apply_config(kiln_app_t *app, const kiln_config_t *cfg,
     }
 
     push_config(app);
-    kiln_app_log_event(app, KILN_LOGE_CONFIG_CHANGE);   /* FR-LOG-04 */
+    kiln_app_log_event(app, KILN_LOGE_CONFIG_CHANGE);   /* SWR-LOG-04 */
 
-    /* FR-CFG-01: a change that is not persisted is a change the next boot
+    /* SWR-CFG-01: a change that is not persisted is a change the next boot
      * forgets, which is indistinguishable to the operator from it not having
      * been applied. */
     if (app->ports.kvstore != nullptr) {
@@ -216,7 +216,7 @@ namespace {
 /* Enqueue, never write.  Architecture 10.3: the control task enqueues and only
  * the logger touches flash, so nothing on the control path can be delayed by an
  * erase -- and a full queue drops the sample and counts it rather than stalling
- * a firing (FR-LOG-14). */
+ * a firing (SWR-LOG-14). */
 void log_enqueue(kiln_app_t *app, const kiln_log_sample_t *s)
 {
     const uint16_t next = (uint16_t)((app->log_head + 1u) % KILN_APP_LOG_QUEUE);
@@ -234,7 +234,7 @@ void build_sample(const kiln_app_t *app, kiln_log_event_t event,
     memset(out, 0, sizeof(*out));
 
     /* Relative to the run start, from accumulated dt rather than a clock: the
-     * monotonic figure is the one FR-LOG-12 requires every record to carry, and
+     * monotonic figure is the one SWR-LOG-12 requires every record to carry, and
      * it is meaningful even when the wall clock never synced. */
     const double ms = app->run_elapsed_s * 1000.0;
     out->t_rel_ms      = (ms < 0.0) ? 0u
@@ -261,7 +261,7 @@ void build_sample(const kiln_app_t *app, kiln_log_event_t event,
         out->flags |= KILN_LOGF_TC_FAULT;
     }
 
-    /* FR-LOG-12: a record logged before time sync says so, so a reader never
+    /* SWR-LOG-12: a record logged before time sync says so, so a reader never
      * mistakes a relative timestamp for a wall-clock one. */
     if ((app->ports.clock != nullptr) && (app->ports.clock->wall_valid != nullptr) &&
         app->ports.clock->wall_valid(app->ports.clock->ctx)) {
@@ -300,7 +300,7 @@ uint32_t kiln_app_log_drain(kiln_app_t *app, uint32_t max_records)
     while (written < max_records && app->log_tail != app->log_head) {
         const kiln_err_t e = ls->append(ls->ctx, app->log_q[app->log_tail]);
         if (e != KILN_OK) {
-            /* FR-LOG-14: counted and warned about, never fatal.  The record is
+            /* SWR-LOG-14: counted and warned about, never fatal.  The record is
              * dropped rather than retried forever, because a store that is
              * failing will fail the retry too and the queue has a firing behind
              * it. */
@@ -317,7 +317,7 @@ uint32_t kiln_app_log_drain(kiln_app_t *app, uint32_t max_records)
 
 namespace {
 
-/* FR-LOG-01/03: the periodic sample, plus FR-LOG-04's out-of-band records when
+/* SWR-LOG-01/03: the periodic sample, plus SWR-LOG-04's out-of-band records when
  * something actually happened. */
 void log_cycle(kiln_app_t *app, float dt_s)
 {
@@ -351,7 +351,7 @@ void log_cycle(kiln_app_t *app, float dt_s)
         kiln_app_log_event(app, KILN_LOGE_SAMPLE);
     }
 
-    /* FR-LOG-14 / warning 103, live: the operator should know the chart will
+    /* SWR-LOG-14 / warning 103, live: the operator should know the chart will
      * have holes in it, and should know while the firing is still running. */
     if (app->log_dropped > 0 || app->log_errors > 0 || (app->ports.logstore == nullptr)) {
         app->warnings |= KILN_WARN_BIT(KILN_WARN_LOG_UNAVAIL);
@@ -383,13 +383,13 @@ void read_channel(const kiln_port_tc_t *port, kiln_tempfilt_t *filt,
     }
 
     if (r.fault_bits != 0) {
-        /* FR-ACQ-12: the previous reading stands for the grace period, but it is
+        /* SWR-ACQ-12: the previous reading stands for the grace period, but it is
          * marked invalid so no rule treats it as a measurement. */
         *out_valid = false;
         return;
     }
 
-    /* NFR-17: a front end that answers with a NaN is a front end fault. */
+    /* SWR-NFR-17: a front end that answers with a NaN is a front end fault. */
     if (!kiln_tempfilt_push(filt, r.temp_c, dt_s)) {
         *out_bits  = KILN_TC_FAULT_COMMS;
         *out_valid = false;
@@ -429,7 +429,7 @@ void kiln_app_acquire_cycle(kiln_app_t *app, float dt_s)
 
 /* --- the 10 ms path: SSR pin and gated current sampling ----------------- */
 
-/* AD-07 and AD-17 in one function, because they are one mechanism: the pin level
+/* SWA-07 and SWA-17 in one function, because they are one mechanism: the pin level
  * *is* the window phase the sampler has to gate on, and anything that learned it
  * second-hand could be a tick out of date. */
 void kiln_app_window_tick(kiln_app_t *app, uint32_t dt_ms)
@@ -454,7 +454,7 @@ void kiln_app_window_tick(kiln_app_t *app, uint32_t dt_ms)
         }
     }
 
-    /* FR-CUR-13: count what the pin actually did, not what was asked for. */
+    /* SWR-CUR-13: count what the pin actually did, not what was asked for. */
     if ((app->ports.counters != nullptr) && (app->ports.counters->add_ssr_ops != nullptr)) {
         for (uint8_t ch = 0; ch < KILN_HEAT_CHANNELS; ch++) {
             const uint32_t seen =
@@ -462,7 +462,7 @@ void kiln_app_window_tick(kiln_app_t *app, uint32_t dt_ms)
             if (seen > app->ssr_switch_seen[ch]) {
                 const uint32_t delta = seen - app->ssr_switch_seen[ch];
                 app->ports.counters->add_ssr_ops(app->ports.counters->ctx, ch, delta);
-                /* And the app's own view, which is what SR-30 is evaluated
+                /* And the app's own view, which is what SWR-SAF-30 is evaluated
                  * against and what the run record carries: the adapter
                  * accumulates for flash, it is not a readable register. */
                 app->counters.ssr_ops[ch] += delta;
@@ -476,12 +476,12 @@ void kiln_app_window_tick(kiln_app_t *app, uint32_t dt_ms)
         return;
     }
 
-    /* AD-17: the measurement is gated to the commanded window, so the burst is
+    /* SWA-17: the measurement is gated to the commanded window, so the burst is
      * armed and collected against whichever half of the window is open. */
     const kiln_cur_window_t win_now = on ? KILN_CUR_WINDOW_ON : KILN_CUR_WINDOW_OFF;
     const uint32_t remaining = kiln_window_level_remaining_ms(&app->win, duty);
 
-    /* Collect a burst that has run.  Polled, never waited on (FR-CUR-14). */
+    /* Collect a burst that has run.  Polled, never waited on (SWR-CUR-14). */
     if (app->cur_burst_pending && (cp->read_burst != nullptr)) {
         kiln_cur_burst_t b = {};
         const kiln_err_t e = cp->read_burst(cp->ctx, 0, &b);
@@ -545,7 +545,7 @@ void kiln_app_control_cycle(kiln_app_t *app, float dt_s)
 
         app->heat_allowed = kiln_setpoint_heat_allowed(&app->sp);
 
-        /* FR-CTL-13: a cooling ramp is passive.  Decided by the setpoint
+        /* SWR-CTL-13: a cooling ramp is passive.  Decided by the setpoint
          * generator rather than by the sign of the PID error, so a lagging kiln
          * cannot talk the controller into heating through a cooling segment. */
         if (!app->heat_allowed) {
@@ -570,7 +570,7 @@ void kiln_app_control_cycle(kiln_app_t *app, float dt_s)
                                                app->rate_c_per_h, dt_s);
         if (kiln_autotune_done(&app->tune)) {
             if (kiln_autotune_succeeded(&app->tune)) {
-                /* FR-TUN-09: present, do not store.  The operator decides. */
+                /* SWR-TUN-09: present, do not store.  The operator decides. */
                 app->state = KILN_STATE_COMPLETE;
             } else {
                 finish_run(app, KILN_END_FAULT, app->tune.fail_reason);
@@ -589,7 +589,7 @@ void kiln_app_control_cycle(kiln_app_t *app, float dt_s)
         break;
     }
 
-    /* FR-CTL-11 / warning 102, recomputed: it is a live condition. */
+    /* SWR-CTL-11 / warning 102, recomputed: it is a live condition. */
     if (kiln_setpoint_holdback(&app->sp) && app->state == KILN_STATE_RUNNING) {
         app->warnings |= KILN_WARN_BIT(KILN_WARN_HOLDBACK);
     } else {
@@ -631,7 +631,7 @@ void build_safety_input(const kiln_app_t *app, kiln_safety_input_t *in)
     in->kiln_valid              = app->kiln_valid;
     in->case_valid              = app->case_valid;
 
-    /* SR-31.  An adapter that cannot read the pin reports open (port_door.h),
+    /* SWR-SAF-31.  An adapter that cannot read the pin reports open (port_door.h),
      * and an absent port is an absent interlock -- warning 113, not a silently
      * closed door.  Both failures therefore land on the safe side without the
      * supervisor needing to know which happened. */
@@ -645,7 +645,7 @@ void build_safety_input(const kiln_app_t *app, kiln_safety_input_t *in)
         in->door_open       = false;
     }
 
-    /* FR-CUR-11 against FR-CUR-12, and the distinction matters: monitoring is
+    /* SWR-CUR-11 against SWR-CUR-12, and the distinction matters: monitoring is
      * *on* whenever it is configured on, even if the channel is not answering.
      *
      * Folding "the CT is absent" into "monitoring is off" would downgrade a
@@ -684,7 +684,7 @@ void kiln_app_safety_cycle(kiln_app_t *app, float dt_s)
     kiln_safety_input_t in;
     build_safety_input(app, &in);
 
-    /* NFR-17: the checked form, so a contract violation here is counted rather
+    /* SWR-NFR-17: the checked form, so a contract violation here is counted rather
      * than absorbed into a fail-safe verdict nobody looks at. */
     kiln_safety_verdict_t v;
     if (kiln_safety_eval_checked(&app->safety, &in, dt_s, &v) != KILN_OK) {
@@ -707,7 +707,7 @@ void kiln_app_safety_cycle(kiln_app_t *app, float dt_s)
 
     const kiln_port_heat_t *h = app->ports.heat;
 
-    /* SR-27: the contactor comes open on request, ahead of any verdict. */
+    /* SWR-SAF-27: the contactor comes open on request, ahead of any verdict. */
     if (v.drop_contactor && (h->drop_contactor != nullptr)) {
         h->drop_contactor(h->ctx);
     }
@@ -725,12 +725,12 @@ void kiln_app_safety_cycle(kiln_app_t *app, float dt_s)
 
         if (newly_latched) {
             kiln_app_log_event(app, KILN_LOGE_FAULT);
-            persist_fault(app, v.fault, v.warnings);   /* SR-17, before the alarm */
+            persist_fault(app, v.fault, v.warnings);   /* SWR-SAF-17, before the alarm */
             finish_run(app, KILN_END_FAULT, v.fault);
         }
 
-        /* SR-20: audibly distinguishable from completion, and sounded after the
-         * fault is in non-volatile storage -- SR-17 is explicit that an
+        /* SWR-SAF-20: audibly distinguishable from completion, and sounded after the
+         * fault is in non-volatile storage -- SWR-SAF-17 is explicit that an
          * immediate power loss must not lose it, and the alarm is the point at
          * which the operator starts reacting. */
         if ((app->ports.alarm != nullptr) && (app->ports.alarm->set != nullptr)) {
@@ -739,13 +739,13 @@ void kiln_app_safety_cycle(kiln_app_t *app, float dt_s)
         return;
     }
 
-    /* AD-04: this assignment is the whole authority model, and this is the only
+    /* SWA-04: this assignment is the whole authority model, and this is the only
      * place in the firmware that makes it. */
     const bool was_authorised = app->heat_authorised;
     app->heat_authorised = v.heat_permitted && is_heating_state(app->state) &&
                            (app->state != KILN_STATE_RUNNING || app->heat_allowed);
 
-    /* FR-CUR-13: the contactor operates once per authority transition. */
+    /* SWR-CUR-13: the contactor operates once per authority transition. */
     if (app->heat_authorised != was_authorised) {
         app->counters.contactor_ops++;
         if ((app->ports.counters != nullptr) &&
@@ -755,7 +755,7 @@ void kiln_app_safety_cycle(kiln_app_t *app, float dt_s)
     }
 
     if (app->heat_authorised) {
-        /* AD-05 / SR-02: one edge per cycle into the charge pump.  Stop calling
+        /* SWA-05 / SYS-SAF-02: one edge per cycle into the charge pump.  Stop calling
          * this -- crash, hang, deadline miss -- and the coil de-energises in
          * about a second with no code involved. */
         if (h->enable_refresh != nullptr) {
@@ -766,7 +766,7 @@ void kiln_app_safety_cycle(kiln_app_t *app, float dt_s)
         h->force_off(h->ctx);
     }
 
-    /* FR-RUN-06: the completion alarm, for its configured duration. */
+    /* SWR-RUN-06: the completion alarm, for its configured duration. */
     if (app->state == KILN_STATE_COMPLETE && app->complete_pending) {
         app->alarm_timer_s += dt_s;
         if (app->alarm_timer_s >= (float)app->cfg.alarm_duration_s) {
@@ -778,7 +778,7 @@ void kiln_app_safety_cycle(kiln_app_t *app, float dt_s)
     }
 }
 
-/* --- persistence of the latched fault (SR-17) -------------------------- */
+/* --- persistence of the latched fault (SWR-SAF-17) -------------------------- */
 
 namespace {
 
@@ -839,14 +839,14 @@ kiln_err_t kiln_app_boot(kiln_app_t *app, kiln_reset_cause_t cause, float outage
             /* First boot: persist the defaults so the next one is a plain load. */
             (void)kiln_settings_save(app->ports.kvstore, &app->cfg);
         } else {
-            /* FR-CFG-05: defaults are in use and the operator is told.  Not a
+            /* SWR-CFG-05: defaults are in use and the operator is told.  Not a
              * reason to refuse to run -- a kiln with default limits is safer
              * than a kiln that will not answer. */
             app->config_storage_failed = true;
             result = KILN_ERR_IO;
         }
 
-        /* SR-17: a fault latched before the power went out is still latched. */
+        /* SWR-SAF-17: a fault latched before the power went out is still latched. */
         kiln_latched_fault_t f;
         if (kiln_settings_load_fault(app->ports.kvstore, &f) == KILN_OK) {
             app->latched       = f;
@@ -856,7 +856,7 @@ kiln_err_t kiln_app_boot(kiln_app_t *app, kiln_reset_cause_t cause, float outage
         }
     }
 
-    /* FR-PRG-09: the examples, idempotently. */
+    /* SWR-PRG-09: the examples, idempotently. */
     if (app->ports.filestore != nullptr) {
         (void)kiln_program_store_seed(app->ports.filestore);
 
@@ -864,7 +864,7 @@ kiln_err_t kiln_app_boot(kiln_app_t *app, kiln_reset_cause_t cause, float outage
          * colliding with records already on disk. */
         app->next_run_id = kiln_run_index_next_run_id(app->ports.filestore);
 
-        /* SR-12's baseline is the run history. */
+        /* SWR-SAF-12's baseline is the run history. */
         kiln_insulation_baseline_t baseline;
         if (kiln_run_index_baseline(app->ports.filestore, 2, &baseline) == KILN_OK) {
             app->baseline       = baseline;
@@ -872,7 +872,7 @@ kiln_err_t kiln_app_boot(kiln_app_t *app, kiln_reset_cause_t cause, float outage
         }
     }
 
-    /* FR-RUN-08's band test compares the interrupted setpoint against the
+    /* SWR-RUN-08's band test compares the interrupted setpoint against the
      * present temperature, so there has to *be* a present temperature: at this
      * point nothing has been measured and app->kiln_c still holds its
      * initialiser.  Deciding on that would refuse to resume any kiln that had
@@ -881,7 +881,7 @@ kiln_err_t kiln_app_boot(kiln_app_t *app, kiln_reset_cause_t cause, float outage
      * because the decision is meaningless without it. */
     kiln_app_acquire_cycle(app, 0.0f);
 
-    /* FR-RUN-08 / AD-09: the log tail is the power-loss journal. */
+    /* SWR-RUN-08 / SWA-09: the log tail is the power-loss journal. */
     app->recovery = kiln_recovery_decision_t{};
     app->recovery.action = KILN_RECOVER_NO_RUN;
 
@@ -902,7 +902,7 @@ kiln_err_t kiln_app_boot(kiln_app_t *app, kiln_reset_cause_t cause, float outage
                                              app->kiln_c, outage_s, cause);
 
         if (app->recovery.action == KILN_RECOVER_REFUSED) {
-            /* FR-RUN-08's refusal is a latched fault, because the operator has to
+            /* SWR-RUN-08's refusal is a latched fault, because the operator has to
              * know the firing in the kiln was abandoned part-way. */
             app->fault = app->recovery.fault;
             app->state = KILN_STATE_FAULT;
@@ -926,7 +926,7 @@ void finish_run(kiln_app_t *app, kiln_run_end_t reason, kiln_fault_t fault)
     /* Heat goes off here rather than on the next safety cycle.  The window tick
      * reads heat_authorised at 10 ms and the safety cycle runs at 100 ms, so
      * leaving it to the supervisor would keep the SSR driven for up to a tenth of
-     * a second after the program had finished -- inside FR-RUN-04's budget, but
+     * a second after the program had finished -- inside SWR-RUN-04's budget, but
      * there is no reason to spend any of it. */
     app->heat_authorised = false;
     app->duty_request    = 0;
@@ -956,12 +956,12 @@ void finish_run(kiln_app_t *app, kiln_run_end_t reason, kiln_fault_t fault)
         app->record.end_wall_utc_s = app->ports.clock->now_wall_utc_s(app->ports.clock->ctx);
     }
 
-    /* FR-LOG-04: the run end is an event, and it is written before the record is
+    /* SWR-LOG-04: the run end is an event, and it is written before the record is
      * persisted so the log and the index cannot disagree about whether the run
      * finished. */
     kiln_app_log_event(app, KILN_LOGE_RUN_END);
 
-    /* FR-RUN-07 / FR-LOG-09.  A failure here is reported and not fatal: the
+    /* SWR-RUN-07 / SWR-LOG-09.  A failure here is reported and not fatal: the
      * firing is over, and losing its record is not a reason to refuse the next
      * one. */
     if (app->ports.filestore != nullptr) {
@@ -988,7 +988,7 @@ kiln_err_t kiln_app_start(kiln_app_t *app, const kiln_program_t *prog)
         return KILN_ERR_INVALID_ARG;
     }
 
-    /* FR-RUN-10: not while a fault is latched, nor while autotune is running. */
+    /* SWR-RUN-10: not while a fault is latched, nor while autotune is running. */
     if (app->fault != KILN_FAULT_NONE) {
         return KILN_ERR_STATE;
     }
@@ -1000,13 +1000,13 @@ kiln_err_t kiln_app_start(kiln_app_t *app, const kiln_program_t *prog)
         return KILN_ERR_STATE;
     }
 
-    /* FR-RUN-02: validated before anything else happens. */
+    /* SWR-RUN-02: validated before anything else happens. */
     const kiln_prog_validation_t pv = kiln_profile_validate(prog, app->cfg.max_temp_c);
     if (pv.code != KILN_PROG_OK) {
         return KILN_ERR_RANGE;
     }
 
-    /* FR-CUR-12: refuse to start when current monitoring is unavailable, unless
+    /* SWR-CUR-12: refuse to start when current monitoring is unavailable, unless
      * it has been explicitly disabled.  Disabling it is a decision the operator
      * can make; silently firing without it is not. */
     if (app->cfg.current_enabled) {
@@ -1018,7 +1018,7 @@ kiln_err_t kiln_app_start(kiln_app_t *app, const kiln_program_t *prog)
         }
     }
 
-    /* FR-RUN-02's self-check: the chamber channel has to be answering. */
+    /* SWR-RUN-02's self-check: the chamber channel has to be answering. */
     if (!app->kiln_valid || app->tc_fault_bits != 0) {
         return KILN_ERR_STATE;
     }
@@ -1058,7 +1058,7 @@ kiln_err_t kiln_app_start(kiln_app_t *app, const kiln_program_t *prog)
             app->ports.clock->now_wall_utc_s(app->ports.clock->ctx);
     }
     else {
-        /* FR-LOG-12: no wall clock, so the run is identified by its id and its
+        /* SWR-LOG-12: no wall clock, so the run is identified by its id and its
          * monotonic timestamps.  Recorded as unknown rather than as zero-as-a-
          * date, which a reader would render as 1970. */
         app->warnings |= KILN_WARN_BIT(KILN_WARN_TIME_UNSYNCED);
@@ -1087,7 +1087,7 @@ kiln_err_t kiln_app_pause(kiln_app_t *app)
         return KILN_ERR_STATE;
     }
 
-    /* FR-RUN-03: heating off and every program timer frozen.  Freezing is simply
+    /* SWR-RUN-03: heating off and every program timer frozen.  Freezing is simply
      * not calling kiln_setpoint_tick, which is why the generator holds no clock. */
     app->state           = KILN_STATE_PAUSED;
     app->duty_request    = 0;
@@ -1108,7 +1108,7 @@ kiln_err_t kiln_app_resume(kiln_app_t *app)
         return KILN_ERR_STATE;
     }
 
-    /* FR-CTL-06: pick the output back up where it was rather than stepping. */
+    /* SWR-CTL-06: pick the output back up where it was rather than stepping. */
     (void)kiln_pid_bumpless(&app->pid, 0, kiln_setpoint_value(&app->sp), app->kiln_c);
     app->state = KILN_STATE_RUNNING;
     kiln_app_log_event(app, KILN_LOGE_OPERATOR);
@@ -1121,7 +1121,7 @@ kiln_err_t kiln_app_abort(kiln_app_t *app)
         return KILN_ERR_INVALID_ARG;
     }
 
-    /* FR-RUN-04: from any state, and heat off before anything else. */
+    /* SWR-RUN-04: from any state, and heat off before anything else. */
     app->duty_request    = 0;
     app->heat_authorised = false;
     if (app->ports.heat->force_off != nullptr) {
@@ -1158,7 +1158,7 @@ kiln_err_t kiln_app_clear_fault(kiln_app_t *app)
     kiln_safety_input_t in;
     build_safety_input(app, &in);
 
-    /* SR-18: the detector's own thresholds decide, so there is no second
+    /* SWR-SAF-18: the detector's own thresholds decide, so there is no second
      * implementation to disagree with it. */
     if (!kiln_safety_can_clear(&app->safety.cfg, app->fault, &in)) {
         return KILN_ERR_STATE;
@@ -1168,7 +1168,7 @@ kiln_err_t kiln_app_clear_fault(kiln_app_t *app)
     app->state         = KILN_STATE_IDLE;
     app->latched_valid = false;
 
-    /* The stored copy goes too, or the next boot latches it again (SR-17). */
+    /* The stored copy goes too, or the next boot latches it again (SWR-SAF-17). */
     if (app->ports.kvstore != nullptr) {
         (void)kiln_settings_clear_fault(app->ports.kvstore);
     }
@@ -1219,8 +1219,8 @@ kiln_err_t kiln_app_autotune(kiln_app_t *app, float setpoint_c)
         return KILN_ERR_STATE;
     }
 
-    /* FR-TUN-03's lower bound is the caller's, because only the application
-     * knows ambient; the upper bound is SR-23's and belongs to the core. */
+    /* SWR-TUN-03's lower bound is the caller's, because only the application
+     * knows ambient; the upper bound is SWR-SAF-23's and belongs to the core. */
     if (app->kiln_valid && setpoint_c < app->kiln_c + 50.0f) {
         return KILN_ERR_RANGE;
     }

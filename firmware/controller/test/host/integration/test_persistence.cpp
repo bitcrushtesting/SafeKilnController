@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * The real application against real storage logic and a simulated kiln --
- * FR-LOG-01..FR-LOG-04, FR-LOG-14, FR-CFG-05, SR-17, and FR-RUN-08's recovery
+ * SWR-LOG-01..SWR-LOG-04, SWR-LOG-14, SWR-CFG-05, SWR-SAF-17, and SWR-RUN-08's recovery
  * at an arbitrary instant.
  *
  * "Reboot" here means discarding every piece of RAM state and mounting the same
@@ -122,7 +122,7 @@ static void step(boot_t *b)
     if (b->t_s >= b->ns) { kiln_app_safety_cycle(&b->app, (float)SAFETY_DT);   b->ns += SAFETY_DT;  }
     if (b->t_s >= b->nc) { kiln_app_control_cycle(&b->app, (float)CONTROL_DT); b->nc += CONTROL_DT; }
 
-    /* The logger task: the only thing that touches flash (FR-LOG-14). */
+    /* The logger task: the only thing that touches flash (SWR-LOG-14). */
     (void)kiln_app_log_drain(&b->app, 4);
 }
 
@@ -172,9 +172,9 @@ static tally_t tally(boot_t *b, uint32_t run_id)
     return t;
 }
 
-/* --- FR-LOG-01..04 ------------------------------------------------------ */
+/* --- SWR-LOG-01..04 ------------------------------------------------------ */
 
-KILN_TEST(frlog01_a_firing_is_logged_from_start_to_finish)
+KILN_TEST(swrlog01_a_firing_is_logged_from_start_to_finish)
 {
     static medium_t m;
     static boot_t   b;
@@ -195,7 +195,7 @@ KILN_TEST(frlog01_a_firing_is_logged_from_start_to_finish)
     const tally_t t = tally(&b, run_id);
     CHECK(t.samples > 10u);
 
-    /* FR-LOG-04: the narrative, not just the series. */
+    /* SWR-LOG-04: the narrative, not just the series. */
     CHECK_EQ_UINT(t.events[KILN_LOGE_RUN_START], 1u);
     CHECK_EQ_UINT(t.events[KILN_LOGE_RUN_END], 1u);
     CHECK(t.events[KILN_LOGE_STATE_CHANGE] >= 1u);
@@ -205,7 +205,7 @@ KILN_TEST(frlog01_a_firing_is_logged_from_start_to_finish)
     CHECK_EQ_UINT(b.app.log_errors, 0u);
 }
 
-KILN_TEST(frrun07_the_run_record_is_persisted_when_the_firing_ends)
+KILN_TEST(swrrun07_the_run_record_is_persisted_when_the_firing_ends)
 {
     static medium_t m;
     static boot_t   b;
@@ -226,10 +226,10 @@ KILN_TEST(frrun07_the_run_record_is_persisted_when_the_firing_ends)
     CHECK_STR_EQ(r.program.name, "persist");
     CHECK(r.peak_c > 150.0f);
     CHECK(r.duration_s > 0u);
-    CHECK(r.start_wall_utc_s > 0u);      /* FR-LOG-12: the clock was synced */
+    CHECK(r.start_wall_utc_s > 0u);      /* SWR-LOG-12: the clock was synced */
 }
 
-KILN_TEST(frlog14_a_log_store_that_fails_does_not_stop_the_firing)
+KILN_TEST(swrlog14_a_log_store_that_fails_does_not_stop_the_firing)
 {
     static medium_t m;
     static boot_t   b;
@@ -248,14 +248,14 @@ KILN_TEST(frlog14_a_log_store_that_fails_does_not_stop_the_firing)
         step(&b);
     }
 
-    /* FR-LOG-14: the firing continued and finished, and the operator was told. */
+    /* SWR-LOG-14: the firing continued and finished, and the operator was told. */
     CHECK_EQ_INT(b.app.fault, KILN_FAULT_NONE);
     CHECK_EQ_INT(b.app.state, KILN_STATE_COMPLETE);
     CHECK(b.app.log_errors > 0u);
     CHECK(b.app.warnings & KILN_WARN_BIT(KILN_WARN_LOG_UNAVAIL));
 }
 
-KILN_TEST(frlog14_a_queue_that_overflows_drops_and_counts)
+KILN_TEST(swrlog14_a_queue_that_overflows_drops_and_counts)
 {
     static medium_t m;
     static boot_t   b;
@@ -283,9 +283,9 @@ KILN_TEST(frlog14_a_queue_that_overflows_drops_and_counts)
     CHECK(b.app.warnings & KILN_WARN_BIT(KILN_WARN_LOG_UNAVAIL));
 }
 
-/* --- FR-CFG-05 across a reboot ------------------------------------------ */
+/* --- SWR-CFG-05 across a reboot ------------------------------------------ */
 
-KILN_TEST(frcfg05_configuration_survives_a_reboot)
+KILN_TEST(swrcfg05_configuration_survives_a_reboot)
 {
     static medium_t m;
     static boot_t   b;
@@ -308,7 +308,7 @@ KILN_TEST(frcfg05_configuration_survives_a_reboot)
     CHECK_NEAR(b2.app.safety.cfg.max_temp_c, 1100.0f, 0.01f);
 }
 
-KILN_TEST(frprg09_the_examples_are_present_after_a_first_boot)
+KILN_TEST(swrprg09_the_examples_are_present_after_a_first_boot)
 {
     static medium_t m;
     static boot_t   b;
@@ -322,9 +322,9 @@ KILN_TEST(frprg09_the_examples_are_present_after_a_first_boot)
     CHECK(p.flags & KILN_PROG_FLAG_READONLY);
 }
 
-/* --- SR-17 across a reboot ---------------------------------------------- */
+/* --- SWR-SAF-17 across a reboot ---------------------------------------------- */
 
-KILN_TEST(sr17_a_latched_fault_is_still_latched_after_a_power_cycle)
+KILN_TEST(swrsaf17_a_latched_fault_is_still_latched_after_a_power_cycle)
 {
     static medium_t m;
     static boot_t   b;
@@ -336,7 +336,7 @@ KILN_TEST(sr17_a_latched_fault_is_still_latched_after_a_power_cycle)
     CHECK_OK(kiln_app_start(&b.app, &p));
     run_for(&b, 10.0);
 
-    /* Weld the contactor and short the SSR: SR-27's worst verdict. */
+    /* Weld the contactor and short the SSR: SWR-SAF-27's worst verdict. */
     kiln_sim_inject(&b.sim, KILN_INJ_SSR_SHORTED | KILN_INJ_CONTACTOR_WELD);
     for (int i = 0; i < 20000 && b.app.fault == KILN_FAULT_NONE; i++) {
         step(&b);
@@ -359,7 +359,7 @@ KILN_TEST(sr17_a_latched_fault_is_still_latched_after_a_power_cycle)
     CHECK_ERR(kiln_app_start(&b2.app, &p), KILN_ERR_STATE);
 }
 
-KILN_TEST(sr18_clearing_a_fault_clears_the_stored_copy_too)
+KILN_TEST(swrsaf18_clearing_a_fault_clears_the_stored_copy_too)
 {
     static medium_t m;
     static boot_t   b;
@@ -384,7 +384,7 @@ KILN_TEST(sr18_clearing_a_fault_clears_the_stored_copy_too)
     CHECK_EQ_INT(b2.app.state, KILN_STATE_IDLE);
 }
 
-/* --- FR-RUN-08 ---------------------------------------------------------- */
+/* --- SWR-RUN-08 ---------------------------------------------------------- */
 
 /* Cut power part-way into a firing and bring the controller back up. */
 static void interrupt_mid_run(medium_t *m, boot_t *b, uint16_t target,
@@ -404,7 +404,7 @@ static void interrupt_mid_run(medium_t *m, boot_t *b, uint16_t target,
     /* Power vanishes.  Nothing is flushed, nothing is closed. */
 }
 
-KILN_TEST(frrun08_the_default_policy_aborts_an_interrupted_firing)
+KILN_TEST(swrrun08_the_default_policy_aborts_an_interrupted_firing)
 {
     static medium_t m;
     static boot_t   b;
@@ -424,7 +424,7 @@ KILN_TEST(frrun08_the_default_policy_aborts_an_interrupted_firing)
     CHECK(b2.app.recovery.reason && b2.app.recovery.reason[0]);
 }
 
-KILN_TEST(frrun08_resume_is_offered_when_the_policy_allows_and_the_kiln_is_in_band)
+KILN_TEST(swrrun08_resume_is_offered_when_the_policy_allows_and_the_kiln_is_in_band)
 {
     static medium_t m;
     static boot_t   b;
@@ -449,12 +449,12 @@ KILN_TEST(frrun08_resume_is_offered_when_the_policy_allows_and_the_kiln_is_in_ba
     CHECK_OK(boot(&b2, &m, KILN_RESET_POWER_ON, 300.0f, temp));
     CHECK_EQ_INT(b2.app.recovery.action, KILN_RECOVER_RESUME);
     CHECK_EQ_INT(b2.app.fault, KILN_FAULT_NONE);
-    /* AD-09: the log tail supplied the setpoint and the segment. */
+    /* SWA-09: the log tail supplied the setpoint and the segment. */
     CHECK(b2.app.recovery.setpoint_c > 20.0f);
     CHECK(b2.app.recovery.t_rel_ms > 0u);
 }
 
-KILN_TEST(frrun08_a_kiln_that_has_cooled_out_of_band_is_refused_and_faults)
+KILN_TEST(swrrun08_a_kiln_that_has_cooled_out_of_band_is_refused_and_faults)
 {
     static medium_t m;
     static boot_t   b;
@@ -485,7 +485,7 @@ KILN_TEST(frrun08_a_kiln_that_has_cooled_out_of_band_is_refused_and_faults)
     CHECK_EQ_INT(b3.app.fault, KILN_FAULT_RECOVERY_REFUSED);
 }
 
-KILN_TEST(frrun08_an_outage_longer_than_the_limit_is_refused)
+KILN_TEST(swrrun08_an_outage_longer_than_the_limit_is_refused)
 {
     static medium_t m;
     static boot_t   b;
@@ -510,7 +510,7 @@ KILN_TEST(frrun08_an_outage_longer_than_the_limit_is_refused)
     CHECK_EQ_INT(b2.app.fault, KILN_FAULT_RECOVERY_REFUSED);
 }
 
-KILN_TEST(sr14_a_watchdog_reset_during_a_firing_is_never_resumed)
+KILN_TEST(swrsaf14_a_watchdog_reset_during_a_firing_is_never_resumed)
 {
     static medium_t m;
     static boot_t   b;
@@ -528,7 +528,7 @@ KILN_TEST(sr14_a_watchdog_reset_during_a_firing_is_never_resumed)
     run_for(&b, 120.0);
     const float temp = b.app.kiln_c;
 
-    /* NFR-15: the firmware's own state was in question at the moment it died, so
+    /* SWR-NFR-15: the firmware's own state was in question at the moment it died, so
      * the policy does not get a vote. */
     static boot_t b2;
     CHECK_OK(boot(&b2, &m, KILN_RESET_TASK_WDT, 5.0f, temp));
@@ -536,7 +536,7 @@ KILN_TEST(sr14_a_watchdog_reset_during_a_firing_is_never_resumed)
     CHECK_EQ_INT(b2.app.fault, KILN_FAULT_WATCHDOG);
 }
 
-KILN_TEST(frrun08_a_clean_boot_after_a_completed_firing_is_an_ordinary_boot)
+KILN_TEST(swrrun08_a_clean_boot_after_a_completed_firing_is_an_ordinary_boot)
 {
     static medium_t m;
     static boot_t   b;
@@ -559,7 +559,7 @@ KILN_TEST(frrun08_a_clean_boot_after_a_completed_firing_is_an_ordinary_boot)
     CHECK_EQ_INT(b2.app.state, KILN_STATE_IDLE);
 }
 
-KILN_TEST(frrun08_recovery_is_decided_at_many_different_instants)
+KILN_TEST(swrrun08_recovery_is_decided_at_many_different_instants)
 {
     /* Architecture 14.4 asks for power loss at random instants.  Cutting at a
      * spread of points through a firing exercises the ring head landing mid
@@ -597,9 +597,9 @@ KILN_TEST(frrun08_recovery_is_decided_at_many_different_instants)
     }
 }
 
-KILN_TEST(ad09_recovery_needs_no_write_of_its_own)
+KILN_TEST(swa09_recovery_needs_no_write_of_its_own)
 {
-    /* The whole point of AD-09: a 10 s run-state write to NVS would have added
+    /* The whole point of SWA-09: a 10 s run-state write to NVS would have added
      * ~60 000 writes per week-long run.  Recovery state comes out of the log,
      * which was already being written. */
     static medium_t m;

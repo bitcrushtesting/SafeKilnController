@@ -54,7 +54,7 @@ kiln_prog_validation_t kiln_profile_validate(const kiln_program_t *p, float max_
     if (p->schema_version != KILN_PROGRAM_SCHEMA_VERSION) {
         return fail(KILN_PROG_ERR_SCHEMA, KILN_SEG_NONE);
     }
-    /* NFR-19, before anything reads either string. */
+    /* SWR-NFR-19, before anything reads either string. */
     if (!terminated(p->name, KILN_PROGRAM_NAME_LEN) ||
         !terminated(p->description, KILN_PROGRAM_DESC_LEN)) {
         return fail(KILN_PROG_ERR_NAME_UNTERMINATED, KILN_SEG_NONE);
@@ -69,7 +69,7 @@ kiln_prog_validation_t kiln_profile_validate(const kiln_program_t *p, float max_
         return fail(KILN_PROG_ERR_TOO_MANY_SEGMENTS, KILN_SEG_NONE);
     }
 
-    /* SR-23: the compile-time ceiling binds even if a caller passes something
+    /* SWR-SAF-23: the compile-time ceiling binds even if a caller passes something
      * larger as the configured maximum. */
     const float limit = kiln_clampf(max_temp_c, 0.0f, KILN_TEMP_CEILING_C);
 
@@ -90,7 +90,7 @@ kiln_prog_validation_t kiln_profile_validate(const kiln_program_t *p, float max_
         }
     }
 
-    /* FR-PRG-05: reject an absurdly long program.  Evaluated from 20 degC, a
+    /* SWR-PRG-05: reject an absurdly long program.  Evaluated from 20 degC, a
      * representative cold start; the exact figure only matters near the limit. */
     if (kiln_profile_duration_s(p, 20.0f) > KILN_PROGRAM_MAX_DURATION_S) {
         return fail(KILN_PROG_ERR_TOO_LONG, KILN_SEG_NONE);
@@ -133,7 +133,7 @@ uint32_t kiln_profile_duration_s(const kiln_program_t *p, float start_c)
         const float span   = target > from ? target - from : from - target;
 
         if (s->rate_c_per_h > 0) {
-            /* FR-CTL-10: a stated rate governs both heating and cooling ramps. */
+            /* SWR-CTL-10: a stated rate governs both heating and cooling ramps. */
             total += (double)span * 3600.0 / (double)s->rate_c_per_h;
         }
         /* rate == 0 means "as fast as the kiln allows": the setpoint steps, so
@@ -188,7 +188,7 @@ void kiln_profile_init_empty(kiln_program_t *p, const char *name)
     }
 }
 
-/* --- built-in examples, FR-PRG-09 -------------------------------------- */
+/* --- built-in examples, SWR-PRG-09 -------------------------------------- */
 
 namespace {
 

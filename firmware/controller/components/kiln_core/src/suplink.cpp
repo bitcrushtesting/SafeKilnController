@@ -5,7 +5,7 @@
 
 #include "kiln_core/suplink.h"
 
-/* AD-22's link carries fault_bits across a boundary that shares no code beyond
+/* SWA-22's link carries fault_bits across a boundary that shares no code beyond
  * the wire header, so the two names for each bit have to be the same number.
  * A comment saying so was the previous arrangement; this is the version that
  * fails the build instead of misreporting a fault at runtime. */
@@ -21,8 +21,8 @@ namespace {
 
 /* port_tc::configure.
  *
- * Refused, and that is the point.  After AD-22 the ESP32 does not configure
- * the chamber front end: the supervisor owns it, and FR-ACQ-02 fixes the type
+ * Refused, and that is the point.  After SWA-22 the ESP32 does not configure
+ * the chamber front end: the supervisor owns it, and SWR-ACQ-02 fixes the type
  * to K precisely so that nothing on this side can change what the supervisor's
  * backstop means.  Returning an error rather than silently succeeding means a
  * caller that still thinks it owns the front end finds out. */
@@ -44,7 +44,7 @@ kiln_err_t sl_read(void *ctx, kiln_tc_reading_t *out)
         return KILN_ERR_INVALID_ARG;
     }
 
-    /* Same shape as the MAX31856 adapter's comms failure, so SR-04 needs no
+    /* Same shape as the MAX31856 adapter's comms failure, so SWR-SAF-04 needs no
      * new case: nothing has been heard, so the front end did not answer. */
     if (!s->have || !kiln_suplink_fresh(s)) {
         out->temp_c     = 0.0f;

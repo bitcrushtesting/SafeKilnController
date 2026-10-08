@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * kiln_core/faults -- SR-19 and requirements Appendix A.  The table's order is
+ * kiln_core/faults -- SWR-SAF-19 and requirements Appendix A.  The table's order is
  * load-bearing (the codes are stable and never reused), so this is the
  * consistency test architecture section 5.1 asks for.
  */
@@ -11,7 +11,7 @@
 #include "kiln/err.h"
 #include "kiln_core/faults.h"
 
-KILN_TEST(sr19_every_fault_code_has_a_label_a_cause_and_a_requirement)
+KILN_TEST(swrsaf19_every_fault_code_has_a_label_a_cause_and_a_requirement)
 {
     for (int c = KILN_FAULT_TC_OPEN; c < KILN_FAULT_MAX; c++) {
         const kiln_fault_t code = (kiln_fault_t)c;
@@ -40,15 +40,15 @@ KILN_TEST(the_current_fault_codes_are_the_ones_appendix_a_allocates)
     CHECK_EQ_INT(KILN_FAULT_OVERCURRENT,         25);
     CHECK_EQ_INT(KILN_FAULT_CT_FAULT,            26);
 
-    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_UNCOMMANDED_CURRENT), "SR-25");
-    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_CONTACTOR_WELDED),    "SR-27");
-    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_NO_HEATER_CURRENT),   "SR-26");
-    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_CURRENT_DEVIATION),   "SR-28");
-    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_OVERCURRENT),         "SR-29");
-    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_CT_FAULT),            "FR-CUR-11");
+    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_UNCOMMANDED_CURRENT), "SWR-SAF-25");
+    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_CONTACTOR_WELDED),    "SWR-SAF-27");
+    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_NO_HEATER_CURRENT),   "SWR-SAF-26");
+    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_CURRENT_DEVIATION),   "SWR-SAF-28");
+    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_OVERCURRENT),         "SWR-SAF-29");
+    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_CT_FAULT),            "SWR-CUR-11");
 }
 
-KILN_TEST(sr27_tells_the_operator_to_isolate_the_kiln)
+KILN_TEST(swrsaf27_tells_the_operator_to_isolate_the_kiln)
 {
     /* The one fault whose operator instruction is an action on the supply, not a
      * diagnosis.  If this text ever loses it, the fault becomes unactionable. */
@@ -109,9 +109,9 @@ KILN_TEST(every_error_code_has_a_message)
     CHECK_STR_EQ(kiln_err_str((kiln_err_t)999), "unknown error");
 }
 
-/* --- NFR-23: German --------------------------------------------------- */
+/* --- SWR-NFR-23: German --------------------------------------------------- */
 
-KILN_TEST(nfr23_every_fault_has_a_german_label_and_cause)
+KILN_TEST(swrnfr23_every_fault_has_a_german_label_and_cause)
 {
     for (int c = 0; c < KILN_FAULT_MAX; c++) {
         const kiln_fault_t f = (kiln_fault_t)c;
@@ -122,7 +122,7 @@ KILN_TEST(nfr23_every_fault_has_a_german_label_and_cause)
     }
 }
 
-KILN_TEST(nfr23_every_warning_has_a_german_label_and_cause)
+KILN_TEST(swrnfr23_every_warning_has_a_german_label_and_cause)
 {
     for (int b = 0; b < KILN_WARN_COUNT; b++) {
         const kiln_warn_bit_t w = (kiln_warn_bit_t)b;
@@ -133,7 +133,7 @@ KILN_TEST(nfr23_every_warning_has_a_german_label_and_cause)
     }
 }
 
-KILN_TEST(nfr23_german_text_actually_differs_from_english)
+KILN_TEST(swrnfr23_german_text_actually_differs_from_english)
 {
     /* A table copied from the English column would pass the emptiness checks
      * above and be useless.  Every cause must actually have been translated;
@@ -149,7 +149,7 @@ KILN_TEST(nfr23_german_text_actually_differs_from_english)
     CHECK_MSG(same == 0, "%d fault causes are identical in both languages", same);
 }
 
-KILN_TEST(nfr23_the_unsuffixed_calls_stay_english)
+KILN_TEST(swrnfr23_the_unsuffixed_calls_stay_english)
 {
     /* Diagnostics, the log and requirement traceability should read the same
      * whoever filed the report. */
@@ -159,7 +159,7 @@ KILN_TEST(nfr23_the_unsuffixed_calls_stay_english)
                  kiln_fault_label_in(KILN_FAULT_DOOR_OPEN, KILN_LANG_DE)) != 0);
 }
 
-KILN_TEST(nfr23_an_unknown_language_falls_back_to_english)
+KILN_TEST(swrnfr23_an_unknown_language_falls_back_to_english)
 {
     /* An operator who sees English has a worse day than one who sees German;
      * an operator who sees nothing cannot act at all. */
@@ -169,7 +169,7 @@ KILN_TEST(nfr23_an_unknown_language_falls_back_to_english)
     CHECK_STR_EQ(kiln_lang_tag(KILN_LANG_DE), "de");
 }
 
-KILN_TEST(nfr23_german_labels_still_fit_the_display)
+KILN_TEST(swrnfr23_german_labels_still_fit_the_display)
 {
     /* FR-HMI: the label column is 16 characters on a 128 px display, and a
      * translation that overflows it is a translation that cannot be shown. */

@@ -1,12 +1,12 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * JSON writing and reading, bounded -- NFR-11, NFR-19, architecture 12.2.
+ * JSON writing and reading, bounded -- SWR-NFR-11, SWR-NFR-19, architecture 12.2.
  *
  * No allocation anywhere, and nothing proportional to input: the writer fills a
  * buffer the caller owns and refuses to exceed it, the reader tokenises into a
  * fixed array the caller owns.  Both are needed because every request body on
- * this device is untrusted (NFR-19) and the device has 512 kB of RAM and no
+ * this device is untrusted (SWR-NFR-19) and the device has 512 kB of RAM and no
  * PSRAM.
  *
  * The writer's overflow flag is *sticky*: once a write would not fit, nothing

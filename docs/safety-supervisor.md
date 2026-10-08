@@ -26,7 +26,7 @@ concept is weakest. Layers L1 to L4 all run on the ESP32:
 
 and the only row in that table claiming full independence is L5, the external
 over-temperature cutout, which is explicitly *outside this project*
-([`HR-13`](requirements.sdoc)) and which the requirements place out of scope to
+([`SYS-HW-13`](02_system_req.sdoc)) and which the requirements place out of scope to
 replace.
 
 So today the product's claim to MCU-independent protection rests entirely on a
@@ -38,7 +38,7 @@ no longer reaches the trip.
 
 What it does **not** do is replace L5. Two MCUs from one vendor family on one
 power rail are not a substitute for a thermostat with its own contacts, and
-`HR-13` stays mandatory.
+`SYS-HW-13` stays mandatory.
 
 ## 2. The split
 
@@ -64,13 +64,13 @@ flowchart LR
 
 **The ESP32 keeps** everything else: the PID and the setpoint generator, the
 programs, logging, the current transformer and all the electrical detection
-rules (`SR-25` to `SR-30`), the enclosure channel and `SR-11`, **the lid switch
-and `SR-31`**, the HMI, WiFi,
+rules (`SWR-SAF-25` to `SWR-SAF-30`), the enclosure channel and `SWR-SAF-11`, **the lid switch
+and `SWR-SAF-31`**, the HMI, WiFi,
 the web API, the charge pump of L3, and its own thermal rules.
 
 The ESP32's thermal rules are **not** removed. They keep their own detections
-that the supervisor does not attempt: runaway (`SR-07`), shorted SSR
-(`SR-08`), reversed couple (`SR-05`), stuck sensor (`SR-06`). The supervisor is
+that the supervisor does not attempt: runaway (`SWR-SAF-07`), shorted SSR
+(`SWR-SAF-08`), reversed couple (`SWR-SAF-05`), stuck sensor (`SWR-SAF-06`). The supervisor is
 a backstop with one job, not a replacement for a layer that reasons.
 
 ## 3. What the supervisor trips on
@@ -83,8 +83,8 @@ Two conditions, both hard-coded, both latching:
 | 2 | A thermocouple fault reported by the front end, or `~FAULT` asserted, persisting beyond a short grace period | Without a trustworthy reading, condition 1 cannot be evaluated, so the absence of a reading must itself be a trip |
 
 **The lid is not one of them.** Its switch breaks the contactor coil in
-hardware (`HR-21`), so it is already safe with no firmware involved, and
-`SR-31`'s latch is gated on "while a heating state is active", which only the
+hardware (`SYS-HW-21`), so it is already safe with no firmware involved, and
+`SWR-SAF-31`'s latch is gated on "while a heating state is active", which only the
 ESP32 knows. A supervisor latching on lid open regardless would trip every time
 the kiln was loaded cold: a nuisance trip, and `HZ-10` names nuisance trips as
 how protections come to be disabled. So the lid sense goes to the ESP32, which
@@ -124,7 +124,7 @@ operator at all.
 decision rather than an oversight. It lives in RAM: persisting it would mean a
 flash write on the trip path, which is more firmware, more wear and another
 failure mode in the one component whose argument is its simplicity. The system
-level obligation of `SR-17`, that a latched fault survives power loss and needs
+level obligation of `SWR-SAF-17`, that a latched fault survives power loss and needs
 an explicit acknowledgement, is met by the ESP32, which has non-volatile
 storage and already does it.
 
@@ -132,7 +132,7 @@ The gap that leaves, stated plainly: a transient over-temperature that has
 since cooled would be cleared by switching the controller off and on, without
 anyone pressing the button. What stops that mattering is the ESP32's own
 latched fault, which does persist. If the supervisor's latch is ever wanted to
-persist independently, that is a change to `SR-17` and to this paragraph, not a
+persist independently, that is a change to `SWR-SAF-17` and to this paragraph, not a
 small firmware edit.
 
 Condition 2 is what fixes the defect `K1` records. The present discrete chain
@@ -143,7 +143,7 @@ that problem: it starts in the de-energised state and only permits heat after
 it has configured the device and seen good conversions. **Absence of evidence
 becomes a trip rather than a permission.**
 
-## 4. Two limits, and why `SR-23` has to move
+## 4. Two limits, and why `SWR-SAF-23` has to move
 
 A hard-coded limit and a configurable one are different things and both are
 needed. The configurable `safety.max_temp_c` is the working limit for this kiln
@@ -155,9 +155,9 @@ limit, with enough margin that normal operation never approaches it.
 
 **Decided: configurable ceiling 1300 °C, supervisor trip 1350 °C.**
 
-It did not fit before. [`SR-23`](requirements.sdoc) set the configurable
+It did not fit before. [`SWR-SAF-23`](03_software_req.sdoc) set the configurable
 ceiling at 1350 °C, which is also the top of type K's usable range
-(`FR-ACQ-05`), leaving no room above it. The ceiling moved down rather than the
+(`SWR-ACQ-05`), leaving no room above it. The ceiling moved down rather than the
 backstop up, because raising the backstop would put the trip outside the
 thermocouple's specified range and make it depend on an extrapolation.
 
@@ -174,7 +174,7 @@ invites exactly that confusion.
 
 **UART, not I²C.** Point-to-point, so a wedged supervisor cannot take a bus
 down with it, which matters because the I²C bus already carries the display and
-[`HR-03`](requirements.sdoc) already records a concern about a peripheral
+[`SYS-HW-03`](02_system_req.sdoc) already records a concern about a peripheral
 stalling a shared bus. A UART also lets the supervisor **push**, so silence is
 itself a detectable event, where an I²C slave that has stopped answering is
 only discovered by polling it.
@@ -185,18 +185,18 @@ sufficient. `UART0` is the console and must not be used.
 | | |
 |---|---|
 | **Direction** | Supervisor to ESP32. Report only. |
-| **Rate** | 10 Hz, unsolicited. `FR-ACQ-03` wants 4 Hz and `NFR-03` wants 4 Hz; 10 Hz matches the existing safety cycle and leaves margin for lost frames. |
+| **Rate** | 10 Hz, unsolicited. `SWR-ACQ-03` wants 4 Hz and `SWR-NFR-03` wants 4 Hz; 10 Hz matches the existing safety cycle and leaves margin for lost frames. |
 | **Frame** | Fixed length, CRC checked, carrying: chamber temperature, cold-junction temperature, front-end fault bits, lid state, the supervisor's own trip state and reason, and a monotonic sequence number. |
-| **On silence** | The ESP32 treats a stale link exactly as it treats a sensor fault today, under `FR-ACQ-12`'s grace period, and withholds heat. |
+| **On silence** | The ESP32 treats a stale link exactly as it treats a sensor fault today, under `SWR-ACQ-12`'s grace period, and withholds heat. |
 | **ESP32 to supervisor** | **Nothing at all.** The link is simplex, one wire. With the thermocouple type fixed (section 8) the supervisor needs no configuration, so it is given no receive path: it cannot be told anything, rather than being trusted not to listen. |
 
 The sequence number matters: it distinguishes "the link is quiet" from "the
 supervisor is repeating a stale frame", which are different failures.
 
-Note what the rate requirement now means. `FR-ACQ-03`'s 4 Hz acquisition
+Note what the rate requirement now means. `SWR-ACQ-03`'s 4 Hz acquisition
 becomes a property of the *link*, because the ESP32 no longer reads the
 thermocouple itself. The supervisor's own trip is unaffected by the link and
-remains local, so `NFR-04`'s 500 ms budget gets easier, not harder.
+remains local, so `SWR-NFR-04`'s 500 ms budget gets easier, not harder.
 
 ## 6. Failure modes
 
@@ -206,7 +206,7 @@ remains local, so `NFR-04`'s 500 ms budget gets easier, not harder.
 | Supervisor firmware defect or hang | Its own watchdog resets it; it comes up de-energised and does not permit heat until it has valid conversions. The ESP32 sees the link go quiet and withholds heat. |
 | Link fails, either direction or the cable | ESP32 loses its process value and withholds heat. Supervisor is unaffected and keeps protecting. |
 | Supervisor unpowered or absent | Its series element is open, so no heat. This is the opposite of the present discrete chain, which is closed when the front end is absent. |
-| Thermocouple open, shorted or reversed | Supervisor trips on condition 2. ESP32's `SR-04` to `SR-06` also act. |
+| Thermocouple open, shorted or reversed | Supervisor trips on condition 2. ESP32's `SWR-SAF-04` to `SWR-SAF-06` also act. |
 | Both MCUs lose the 3V3 rail | Everything de-energises. Shared, and safe by construction. |
 | Chamber thermocouple reads plausibly but wrongly | **Defeats both.** See section 9. |
 
@@ -214,7 +214,7 @@ remains local, so `NFR-04`'s 500 ms budget gets easier, not harder.
 
 The supervisor subsumes the discrete interlock chain of tasklist section K,
 which exists to put the front ends' fault outputs in series with the coil
-([`HR-24`](requirements.sdoc)):
+([`SYS-HW-24`](02_system_req.sdoc)):
 
 - `Q5`, `Q6` and `R28` to `R31` are no longer needed for thermocouple faults.
   The supervisor reads the fault pin and decides.
@@ -222,11 +222,11 @@ which exists to put the front ends' fault outputs in series with the coil
   rather than mitigated.
 - `K2`, which asks whether an enclosure thermocouple fault should stop a
   firing, is dissolved: the enclosure channel is not in the supervisor's remit
-  at all, so `SR-11` stays an ESP32 rule and can never cause this trip.
-- `HR-24` is superseded and should be rewritten rather than deleted, because
+  at all, so `SWR-SAF-11` stays an ESP32 rule and can never cause this trip.
+- `SYS-HW-24` is superseded and should be rewritten rather than deleted, because
   the property it was reaching for is now delivered differently.
 
-The lid's **series contact** stays. `HR-21` wants the switch wired both to a
+The lid's **series contact** stays. `SYS-HW-21` wants the switch wired both to a
 controller input and in series with the coil, and the series contact is the one
 element in the whole design that depends on no firmware at all. It costs
 nothing and it is kept.
@@ -238,7 +238,7 @@ This also changes the conclusion of
 
 This is the sharpest open question, and it is not obvious.
 
-[`FR-ACQ-02`](requirements.sdoc) allows any of {K, N, S, R, B, E, J, T}. The
+[`SWR-ACQ-02`](03_software_req.sdoc) allows any of {K, N, S, R, B, E, J, T}. The
 MAX31856 linearises in hardware according to a type register, so whoever
 configures that register determines what the reported temperature *means*. If
 the supervisor hard-codes type K and a type S couple is fitted, the supervisor
@@ -265,7 +265,7 @@ So the supervisor must know the type. The options:
    board area.
 
 **Decided: option 1, type K only.** The chamber thermocouple is type K and its
-type is not configurable; [`FR-ACQ-02`](requirements.sdoc) now says so. The
+type is not configurable; [`SWR-ACQ-02`](03_software_req.sdoc) now says so. The
 other types are a documented limitation of the supervised product rather than a
 silent hazard. The enclosure channel's type stays configurable, that channel
 not being in the supervisor's remit.
@@ -285,15 +285,15 @@ declined.
 So the independence this buys is against **software and MCU failure**, which
 was the point, and is explicitly *not* independence against a sensor that reads
 plausibly but wrongly. `safety.md` §6 names that as `HZ-03`, and it stays
-covered the way it is covered today: by `SR-04` to `SR-06` interrogating the
+covered the way it is covered today: by `SWR-SAF-04` to `SWR-SAF-06` interrogating the
 measurement rather than trusting it, and by the electrical rules reasoning from
 a different sensor entirely.
 
 Two consequences are worth stating rather than discovering.
 
 **The ESP32 no longer has any independent view of temperature.** It does not
-read a thermocouple at all now; `SR-05` (reversed couple), `SR-06` (stuck
-sensor), `SR-07` (runaway) and `SR-08` (shorted SSR) all reason about a value
+read a thermocouple at all now; `SWR-SAF-05` (reversed couple), `SWR-SAF-06` (stuck
+sensor), `SWR-SAF-07` (runaway) and `SWR-SAF-08` (shorted SSR) all reason about a value
 that arrived over the link. They still work, and the front end's fault bits
 arrive with it, but they are no longer a second opinion about the measurement.
 They are a second opinion about the *kiln*.
@@ -302,7 +302,7 @@ They are a second opinion about the *kiln*.
 detection channel left in the system.** `safety.md` §6 already records
 "L2 thermal rules vs. L2 current rules: yes, physically, different sensor,
 different quantity, different front end". That row was defence in depth before.
-It is now load-bearing, and `FR-CUR-12`'s refusal to start a firing without a
+It is now load-bearing, and `SWR-CUR-12`'s refusal to start a firing without a
 fitted CT carries more weight than it did when it was written. Anyone proposing
 to make the CT optional should be sent here first.
 
@@ -354,16 +354,16 @@ New requirements:
 
 Changed:
 
-- `SR-23`, the 1350 °C ceiling, per section 4
-- `FR-ACQ-01`, which says the system reads the MAX31856 over SPI, since it is
+- `SWR-SAF-23`, the 1350 °C ceiling, per section 4
+- `SWR-ACQ-01`, which says the system reads the MAX31856 over SPI, since it is
   now the supervisor that does
-- `FR-ACQ-02`, per section 8
-- `HR-02`, two MAX31856 on a shared bus with individual chip selects
-- `HR-24`, superseded per section 7
-- `AD-04`, the safety supervisor as a task, which is now one of two supervisors
-- `AD-05`, the charge pump, which remains but is no longer the only hardware
+- `SWR-ACQ-02`, per section 8
+- `SYS-HW-02`, two MAX31856 on a shared bus with individual chip selects
+- `SYS-HW-24`, superseded per section 7
+- `SWA-04`, the safety supervisor as a task, which is now one of two supervisors
+- `SWA-05`, the charge pump, which remains but is no longer the only hardware
   path to the coil
-- `SR-31` and `HR-21` are **unchanged**: the lid stays the ESP32's input and the
+- `SWR-SAF-31` and `SYS-HW-21` are **unchanged**: the lid stays the ESP32's input and the
   hardware contact stays in the coil. The supervisor does not touch either.
 - `safety.md` §5 and §6: a new layer and a new row in the independence table,
   which is the point of the exercise
@@ -376,7 +376,7 @@ Changed:
 3. ~~Second chamber couple~~ **declined: one couple, the supervisor's**,
    section 9.
 4. ~~How a latched trip is cleared~~ **decided: a local button, edge triggered
-   and held**, section 3. Its wording against `SR-17` is still to write, since
+   and held**, section 3. Its wording against `SWR-SAF-17` is still to write, since
    the supervisor's latch deliberately does not survive a power cycle.
 5. **Does the ESP32 need to distinguish "supervisor tripped" from "link
    dead"?** It can, via the frame's trip reason, but only while the link

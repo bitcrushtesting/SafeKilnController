@@ -12,14 +12,14 @@ SPDX-License-Identifier: GPL-3.0-or-later
 | **Version** | 0.1 (draft) |
 | **Date** | 2026-10-05 |
 | **Status** | For review |
-| **Derives from** | [`requirements.sdoc`](requirements.sdoc) v0.1, [`architecture.md`](architecture.md) v0.1, [`safety.md`](safety.md) and [`safety.sdoc`](safety.sdoc) v0.1 |
+| **Derives from** | [`03_software_req.sdoc`](03_software_req.sdoc) v0.1, [`architecture.md`](architecture.md) v0.1, [`safety.md`](safety.md) and [`safety.sdoc`](safety.sdoc) v0.1 |
 | **License** | GPL-3.0-or-later |
 
 ---
 
 > **Safe Kiln Controller is designed for a trusted local network and nothing else**
-> ([`NFR-20`](requirements.sdoc),
-> [`ASM-05`](requirements.sdoc)). It must not be exposed to the
+> ([`SWR-NFR-20`](03_software_req.sdoc),
+> [`SYS-ASM-05`](02_system_req.sdoc)). It must not be exposed to the
 > internet, port-forwarded, or placed on a network it shares with untrusted
 > devices. There is **no transport encryption**: everything, the web password
 > included, crosses the LAN in cleartext.
@@ -52,7 +52,7 @@ event, what the implementation already gets right, the obligations and the
 verification status.
 
 Identifiers introduced by this concept extend the scheme of
-[requirements §1.4](requirements.sdoc) and of
+[requirements §1.4](03_software_req.sdoc) and of
 [`safety.md` §1](safety.md#1-purpose-and-scope), and are defined as nodes in
 [`security.sdoc`](security.sdoc):
 
@@ -70,7 +70,7 @@ they are the legend of the diagram in [§3](#3-attack-surface-and-trust-boundari
 and carry no chain through them, so splitting them from the picture would help
 nobody.
 
-Note for anyone reading `requirements.sdoc` alongside this: its section anchors
+Note for anyone reading `03_software_req.sdoc` alongside this: its section anchors
 used to be `SEC-n`, which collided with the security goals here once both became
 StrictDoc documents. They are `SECT-n` now. `SEC` means security goal.
 
@@ -105,7 +105,7 @@ flowchart TB
     subgraph UNTRUSTED["Untrusted"]
         INET["The internet<br/>(must never reach the device)"]
     end
-    subgraph LAN["Trusted by assumption, ASM-05"]
+    subgraph LAN["Trusted by assumption, SYS-ASM-05"]
         BROWSER["Operator's browser"]
         OTHER["Other LAN devices<br/>(IoT, guests, malware)"]
     end
@@ -141,14 +141,14 @@ The trust boundaries, named:
 | **B-2** | LAN → device | Every HTTP request | The HTTP transport, **which does not exist**. |
 | **B-3** | Unauthenticated → authenticated | State-changing requests | [`kiln_api_needs_auth`](../firmware/components/kiln_web/include/kiln_web/api.h) decides *which*; the transport would decide *whether*. |
 | **B-4** | Request data → parser | Bodies, query strings, JSON | Bounded buffers in `kiln_web` **[built]**. |
-| **B-5** | API → control | Commands | `kiln_app`; the safety supervisor holds heat authority regardless ([`AD-04`](architecture.md#3-key-decisions)). |
+| **B-5** | API → control | Commands | `kiln_app`; the safety supervisor holds heat authority regardless ([`SWA-04`](architecture.md#3-key-decisions)). |
 | **B-6** | Physical → device | UART, JTAG, flash | **Nothing.** No secure boot, no flash encryption. |
 
 ## 4. Adversaries
 
 The six adversaries live in [`security.sdoc`](security.sdoc), each with its
 capability and an honest answer to whether it is realistic. `ADV-1`, another
-device on the same LAN, is the normal case and the one `ASM-05` quietly assumes
+device on the same LAN, is the normal case and the one `SYS-ASM-05` quietly assumes
 away.
 
 ## 5. Threats
@@ -191,27 +191,27 @@ the wrong side of the trust boundary:
 
 | Protection layer | What an attacker does to it |
 |---|---|
-| **L1 control**: setpoint clamped to the configured maximum | Raise the configured maximum (TH-02). Still bounded by `SR-23`'s compile-time 1350 °C ceiling, which no configuration and therefore no attacker can raise. |
-| **L2 safety supervisor**: 18 detection rules | Widen the thresholds (TH-02). `SR-22` bounds every range and forbids disabling a detection outright, so this degrades detection rather than removing it, a bound that was written for a careless operator and happens to hold against a hostile one. |
+| **L1 control**: setpoint clamped to the configured maximum | Raise the configured maximum (TH-02). Still bounded by `SWR-SAF-23`'s compile-time 1350 °C ceiling, which no configuration and therefore no attacker can raise. |
+| **L2 safety supervisor**: 18 detection rules | Widen the thresholds (TH-02). `SWR-SAF-22` bounds every range and forbids disabling a detection outright, so this degrades detection rather than removing it, a bound that was written for a careless operator and happens to hold against a hostile one. |
 | **L3 charge pump and contactor** | **Nothing.** It is hardware, and it does not care who asked. An attacker commanding heat gets heat, but a hung or crashed MCU still drops the contactor. |
 | **L4 watchdogs, brownout** | Nothing. |
 | **L5 independent hardware cutout** | **Nothing, and this is the point.** It has its own sensor and its own contacts, and it is reachable from no network. Against TH-01 to TH-05 it is the only layer that holds unconditionally. |
-| **L6 operator attendance** | Everything, if the operator is not there. `ASM-06` requires attendance during firing; an attack that starts a firing *when nobody expects one* removes L6 by surprise rather than by negligence. |
+| **L6 operator attendance** | Everything, if the operator is not there. `SYS-ASM-06` requires attendance during firing; an attack that starts a firing *when nobody expects one* removes L6 by surprise rather than by negligence. |
 
 Three consequences worth stating plainly:
 
-1. **`HR-13`'s independent cutout is a security control, not only a safety one.**
+1. **`SYS-HW-13`'s independent cutout is a security control, not only a safety one.**
    It is the one protection in the entire design that no network attacker can
    reach, degrade, or reason about. Every argument for it in `safety.md` is
    strengthened, not duplicated, here.
 
-2. **The bounded ranges of `SR-22` and the ceiling of `SR-23` do real security
+2. **The bounded ranges of `SWR-SAF-22` and the ceiling of `SWR-SAF-23` do real security
    work.** They were written so an operator could not disable a detection; the
    effect is that TH-02 degrades the safety envelope within known limits instead
    of removing it. A future change that relaxes a bound "because the operator
    knows what they are doing" would also be widening an attack.
 
-3. **`SR-18` blunts TH-03.** A latched fault cannot be cleared while its
+3. **`SWR-SAF-18` blunts TH-03.** A latched fault cannot be cleared while its
    triggering condition is still observably true, and the check reuses the
    detector's own rule function. An attacker can clear a *stale* fault; they
    cannot clear a *live* one and then heat.
@@ -225,7 +225,7 @@ design, and because each of these is a property worth not losing.
   route. A new state-changing endpoint is protected the moment it exists; the
   failure mode of the usual approach, an enumerated allow-list somebody forgets
   to update, cannot occur.
-- **Secrets cannot be read back.** `FR-CFG-07` is implemented and tested, and the
+- **Secrets cannot be read back.** `SWR-CFG-07` is implemented and tested, and the
   config endpoint is generated from the same table that declares the flag, so a
   new secret field is redacted by construction rather than by a second edit.
 - **No allocation proportional to input, anywhere.** The whole firmware contains
@@ -258,13 +258,13 @@ renumbering identifiers other documents cite.
 
 | | Requirement |
 |---|---|
-| Do not expose the device to the internet; do not port-forward to it | `NFR-20`, SRR-03 |
+| Do not expose the device to the internet; do not port-forward to it | `SWR-NFR-20`, SRR-03 |
 | Prefer an isolated network segment or VLAN over a flat home LAN | SRR-09 |
-| Set a web password; it is optional (`FR-WEB-23`) and the device ships without one | SEC-01 |
+| Set a web password; it is optional (`SWR-WEB-23`) and the device ships without one | SEC-01 |
 | Set an AP passphrase before relying on the provisioning fallback | SRR-08 |
 | Treat physical access to the controller as equivalent to knowing the WiFi password | SRR-05 |
 | **Erase flash before disposing of or selling a device** | SRR-05, ADV-4 |
-| Fit the independent hardware over-temperature cutout; it is the only protection no attacker can reach | `HR-13`, [§7](#7-security-as-a-safety-concern) |
+| Fit the independent hardware over-temperature cutout; it is the only protection no attacker can reach | `SYS-HW-13`, [§7](#7-security-as-a-safety-concern) |
 
 ### 10.2 On anyone implementing the HTTP transport
 
@@ -273,13 +273,13 @@ fact. These are not suggestions.
 
 | | Constraint |
 |---|---|
-| Resolve [SRR-02](#9-residual-risk) **first**: store a salted hash, never the password. Decide it before writing the comparison, not during. | `NFR-19` |
-| Constant-time comparison; increasing delay after repeated failures. | `NFR-19`, SEC-04 |
+| Resolve [SRR-02](#9-residual-risk) **first**: store a salted hash, never the password. Decide it before writing the comparison, not during. | `SWR-NFR-19` |
+| Constant-time comparison; increasing delay after repeated failures. | `SWR-NFR-19`, SEC-04 |
 | Validate `Origin`/`Host` on every state-changing request. The cost is trivial and SRR-06 is otherwise permanent. | SRR-06 |
 | Set `req.authenticated` **only** after a successful check. It is an input the API trusts absolutely. | SEC-01 |
-| Never add a back channel for the UI. `AD-16` is a security property, not a tidiness preference. | `FR-WEB-19`, `AD-16` |
-| Enforce the declared body maximum *before* parsing, not during. | `NFR-19`, SEC-03 |
-| Keep the server on core 0. Heat authority stays with the safety supervisor. | `AD-15`, `AD-04`, SEC-08 |
+| Never add a back channel for the UI. `SWA-16` is a security property, not a tidiness preference. | `SWR-WEB-19`, `SWA-16` |
+| Enforce the declared body maximum *before* parsing, not during. | `SWR-NFR-19`, SEC-03 |
+| Keep the server on core 0. Heat authority stays with the safety supervisor. | `SWA-15`, `SWA-04`, SEC-08 |
 | Do not bind the dev harness to anything but loopback. | [§8](#8-what-the-implementation-already-gets-right) |
 
 ### 10.3 On the project
@@ -287,10 +287,10 @@ fact. These are not suggestions.
 | | Constraint |
 |---|---|
 | A new state-changing route must not bypass `kiln_api_needs_auth`'s method rule. | SEC-01 |
-| A new configuration field holding a credential must carry `KILN_CFG_F_SECRET`. | `FR-CFG-07`, SEC-02 |
-| No dependency may be fetched at build time; assets stay vendored. | `CON-04`, ADV-6 |
-| No telemetry, no analytics, no outbound connection, ever. | `NFR-21`, SEC-06 |
-| Relaxing a bound in `SR-22` or the ceiling in `SR-23` widens an attack surface, not just a safety envelope. | [§7](#7-security-as-a-safety-concern) |
+| A new configuration field holding a credential must carry `KILN_CFG_F_SECRET`. | `SWR-CFG-07`, SEC-02 |
+| No dependency may be fetched at build time; assets stay vendored. | `UR-CON-04`, ADV-6 |
+| No telemetry, no analytics, no outbound connection, ever. | `SWR-NFR-21`, SEC-06 |
+| Relaxing a bound in `SWR-SAF-22` or the ceiling in `SWR-SAF-23` widens an attack surface, not just a safety envelope. | [§7](#7-security-as-a-safety-concern) |
 
 ## 11. Verification
 
@@ -299,7 +299,7 @@ fact. These are not suggestions.
 | Secrets are never serialised outward | Host unit test over every `SECRET`-flagged field, plus the API suite | **Verified** |
 | Parsers survive hostile input | `test_fuzz_logrec`, the JSON and API suites, all under ASan/UBSan in CI | **Verified** for the codec and API; the HTTP layer does not exist to fuzz |
 | No allocation proportional to input | Structural, zero `malloc`/`free` in the firmware; `tools/tidy.sh` enforces the check set | **Verified** |
-| Control is unaffected by web load | `NFR-02` timing tests | **Not performed**: needs the transport and on-target instrumentation |
+| Control is unaffected by web load | `SWR-NFR-02` timing tests | **Not performed**: needs the transport and on-target instrumentation |
 | Authentication is constant-time and rate-limited |, | **Not performed**: nothing to test |
 | OTA rejects an invalid or unauthenticated image |, | **Not performed**: nothing to test |
 | CSRF defences |, | **None designed** |

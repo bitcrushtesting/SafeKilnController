@@ -1,8 +1,8 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * One test per current-based safety rule -- SR-25..SR-30 and FR-CUR-11/12.
- * TR-23 requires every SR to have an automated test, and these are the rules
+ * One test per current-based safety rule -- SWR-SAF-25..SWR-SAF-30 and SWR-CUR-11/12.
+ * SWR-TST-23 requires every SR to have an automated test, and these are the rules
  * requirements section 5.2 makes the *primary* detection of relay and element
  * failure, so they are the ones that must not ship untested.
  */
@@ -49,9 +49,9 @@ static void conduction(kiln_safety_input_t *in, float amps)
     in->current_a     = amps;
 }
 
-/* --- SR-25 / SR-27 ------------------------------------------------------ */
+/* --- SWR-SAF-25 / SWR-SAF-27 ------------------------------------------------------ */
 
-KILN_TEST(sr25_latches_nothing_before_the_configured_window_count)
+KILN_TEST(swrsaf25_latches_nothing_before_the_configured_window_count)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -69,7 +69,7 @@ KILN_TEST(sr25_latches_nothing_before_the_configured_window_count)
     CHECK_EQ_UINT(s.fail_on_count, 1u);
 }
 
-KILN_TEST(sr25_withholds_heat_and_drops_the_contactor_on_the_second_window)
+KILN_TEST(swrsaf25_withholds_heat_and_drops_the_contactor_on_the_second_window)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -82,8 +82,8 @@ KILN_TEST(sr25_withholds_heat_and_drops_the_contactor_on_the_second_window)
     (void)kiln_safety_eval(&s, &in, 0.1f);
     const kiln_safety_verdict_t v = kiln_safety_eval(&s, &in, 0.1f);
 
-    /* NFR-27: de-energised in the same cycle as the offending measurement, and
-     * no fault latched yet -- naming the SSR before SR-27's test has run would
+    /* SWR-NFR-27: de-energised in the same cycle as the offending measurement, and
+     * no fault latched yet -- naming the SSR before SWR-SAF-27's test has run would
      * pre-empt the distinction from a welded contactor. */
     CHECK(!v.heat_permitted);
     CHECK(v.drop_contactor);
@@ -91,7 +91,7 @@ KILN_TEST(sr25_withholds_heat_and_drops_the_contactor_on_the_second_window)
     CHECK_EQ_INT(s.weld_phase, KILN_WELD_WAIT_DROPOUT);
 }
 
-KILN_TEST(sr27_latches_ssr_shorted_when_current_stops_with_the_contactor_open)
+KILN_TEST(swrsaf27_latches_ssr_shorted_when_current_stops_with_the_contactor_open)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -124,11 +124,11 @@ KILN_TEST(sr27_latches_ssr_shorted_when_current_stops_with_the_contactor_open)
     CHECK_EQ_INT(v.fault, KILN_FAULT_UNCOMMANDED_CURRENT);
     CHECK(!v.heat_permitted);
 
-    /* NFR-27: the verdict is inside 3 s of the de-assertion. */
+    /* SWR-NFR-27: the verdict is inside 3 s of the de-assertion. */
     CHECK(s.weld_timer_s <= c.weld_verdict_s);
 }
 
-KILN_TEST(sr27_latches_contactor_welded_when_current_persists)
+KILN_TEST(swrsaf27_latches_contactor_welded_when_current_persists)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -154,7 +154,7 @@ KILN_TEST(sr27_latches_contactor_welded_when_current_persists)
     CHECK(!v.heat_permitted);
 }
 
-KILN_TEST(sr27_takes_the_severe_verdict_when_no_measurement_arrives_in_time)
+KILN_TEST(swrsaf27_takes_the_severe_verdict_when_no_measurement_arrives_in_time)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -176,7 +176,7 @@ KILN_TEST(sr27_takes_the_severe_verdict_when_no_measurement_arrives_in_time)
     CHECK_EQ_INT(got, KILN_FAULT_CONTACTOR_WELDED);
 }
 
-KILN_TEST(sr25_stands_down_while_heating_is_commanded_on)
+KILN_TEST(swrsaf25_stands_down_while_heating_is_commanded_on)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -195,9 +195,9 @@ KILN_TEST(sr25_stands_down_while_heating_is_commanded_on)
     CHECK_EQ_UINT(s.fail_on_count, 0u);
 }
 
-/* --- SR-26 ------------------------------------------------------------- */
+/* --- SWR-SAF-26 ------------------------------------------------------------- */
 
-KILN_TEST(sr26_latches_no_heater_current_after_the_configured_period)
+KILN_TEST(swrsaf26_latches_no_heater_current_after_the_configured_period)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -216,13 +216,13 @@ KILN_TEST(sr26_latches_no_heater_current_after_the_configured_period)
         elapsed += 0.1f;
     }
     CHECK_EQ_INT(got, KILN_FAULT_NO_HEATER_CURRENT);
-    /* And it acts on the configured 30 s, far inside SR-07's 15 min backstop. */
+    /* And it acts on the configured 30 s, far inside SWR-SAF-07's 15 min backstop. */
     CHECK_NEAR(elapsed, c.fail_off_window_s, 0.3f);
 }
 
-KILN_TEST(sr26_uses_the_nominal_floor_before_a_reference_exists)
+KILN_TEST(swrsaf26_uses_the_nominal_floor_before_a_reference_exists)
 {
-    /* FR-CUR-08's reference is learned during the cold full-power stretch at the
+    /* SWR-CUR-08's reference is learned during the cold full-power stretch at the
      * start of a firing -- which is exactly when a dead element group is most
      * detectable, so the rule must not be blind until then. */
     kiln_safety_t s;
@@ -244,7 +244,7 @@ KILN_TEST(sr26_uses_the_nominal_floor_before_a_reference_exists)
     CHECK_EQ_INT(got, KILN_FAULT_NO_HEATER_CURRENT);
 }
 
-KILN_TEST(sr26_needs_a_run_of_low_windows_and_not_just_an_elapsed_timer)
+KILN_TEST(swrsaf26_needs_a_run_of_low_windows_and_not_just_an_elapsed_timer)
 {
     /* Elapsed time alone can be tipped over by one unrepresentative measurement
      * that happens to be the last before the window expires.  Requiring a run of
@@ -280,7 +280,7 @@ KILN_TEST(sr26_needs_a_run_of_low_windows_and_not_just_an_elapsed_timer)
     CHECK_EQ_INT(kiln_safety_eval(&s, &in, 0.1f).fault, KILN_FAULT_NO_HEATER_CURRENT);
 }
 
-KILN_TEST(sr26_a_single_good_window_clears_the_accumulated_evidence)
+KILN_TEST(swrsaf26_a_single_good_window_clears_the_accumulated_evidence)
 {
     /* The first on-window of a run can be caught while the contactor is still
      * closing and read near zero through no fault of the kiln.  One healthy
@@ -305,7 +305,7 @@ KILN_TEST(sr26_a_single_good_window_clears_the_accumulated_evidence)
     CHECK_NEAR(s.fail_off_timer_s, 0.0f, 0.001f);
 }
 
-KILN_TEST(sr26_does_not_trip_on_healthy_current)
+KILN_TEST(swrsaf26_does_not_trip_on_healthy_current)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -322,9 +322,9 @@ KILN_TEST(sr26_does_not_trip_on_healthy_current)
     }
 }
 
-/* --- SR-28 ------------------------------------------------------------- */
+/* --- SWR-SAF-28 ------------------------------------------------------------- */
 
-KILN_TEST(sr28_warns_at_the_warning_band_without_withholding_heat)
+KILN_TEST(swrsaf28_warns_at_the_warning_band_without_withholding_heat)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -344,7 +344,7 @@ KILN_TEST(sr28_warns_at_the_warning_band_without_withholding_heat)
     CHECK(v.warnings & KILN_WARN_BIT(KILN_WARN_CURRENT_DEV));
 }
 
-KILN_TEST(sr28_latches_current_deviation_at_the_fault_band)
+KILN_TEST(swrsaf28_latches_current_deviation_at_the_fault_band)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -367,7 +367,7 @@ KILN_TEST(sr28_latches_current_deviation_at_the_fault_band)
     CHECK_EQ_INT(got, KILN_FAULT_CURRENT_DEVIATION);
 }
 
-KILN_TEST(sr28_holds_its_timer_when_no_comparison_is_available)
+KILN_TEST(swrsaf28_holds_its_timer_when_no_comparison_is_available)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -387,7 +387,7 @@ KILN_TEST(sr28_holds_its_timer_when_no_comparison_is_available)
     const float before = s.deviation_timer_s;
     CHECK(before > 0.0f);
 
-    /* A run of skipped windows (FR-CUR-05) is not evidence of anything, so it
+    /* A run of skipped windows (SWR-CUR-05) is not evidence of anything, so it
      * must neither advance the timer nor reset the progress already made. */
     in.current_deviation_valid = false;
     for (int i = 0; i < 100; i++) {
@@ -396,9 +396,9 @@ KILN_TEST(sr28_holds_its_timer_when_no_comparison_is_available)
     CHECK_NEAR(s.deviation_timer_s, before, 0.001f);
 }
 
-/* --- SR-29 ------------------------------------------------------------- */
+/* --- SWR-SAF-29 ------------------------------------------------------------- */
 
-KILN_TEST(sr29_latches_overcurrent_after_the_configured_windows)
+KILN_TEST(swrsaf29_latches_overcurrent_after_the_configured_windows)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -419,7 +419,7 @@ KILN_TEST(sr29_latches_overcurrent_after_the_configured_windows)
     CHECK(!v2.heat_permitted);
 }
 
-KILN_TEST(sr29_resets_its_count_on_a_single_clean_window)
+KILN_TEST(swrsaf29_resets_its_count_on_a_single_clean_window)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -438,9 +438,9 @@ KILN_TEST(sr29_resets_its_count_on_a_single_clean_window)
     CHECK_EQ_INT(kiln_safety_eval(&s, &in, 0.1f).fault, KILN_FAULT_NONE);
 }
 
-/* --- SR-30 ------------------------------------------------------------- */
+/* --- SWR-SAF-30 ------------------------------------------------------------- */
 
-KILN_TEST(sr30_warns_when_a_relay_reaches_its_life_limit)
+KILN_TEST(swrsaf30_warns_when_a_relay_reaches_its_life_limit)
 {
     kiln_safety_t s;
     kiln_safety_cfg_t c = cfg();
@@ -458,7 +458,7 @@ KILN_TEST(sr30_warns_when_a_relay_reaches_its_life_limit)
     CHECK(v.heat_permitted);     /* a relay at its life limit still works */
 }
 
-KILN_TEST(sr30_warns_on_intermittent_mismatches_that_self_clear)
+KILN_TEST(swrsaf30_warns_on_intermittent_mismatches_that_self_clear)
 {
     kiln_safety_t s;
     kiln_safety_cfg_t c = cfg();
@@ -469,7 +469,7 @@ KILN_TEST(sr30_warns_on_intermittent_mismatches_that_self_clear)
     kiln_safety_input_t in = base();
 
     /* Current appears in an off-window and goes away again, three times: never
-     * enough to trip SR-25, which is exactly the early sign SR-30 is after. */
+     * enough to trip SWR-SAF-25, which is exactly the early sign SWR-SAF-30 is after. */
     for (int ep = 0; ep < 3; ep++) {
         leakage(&in, 1.0f);
         (void)kiln_safety_eval(&s, &in, 0.1f);
@@ -483,9 +483,9 @@ KILN_TEST(sr30_warns_on_intermittent_mismatches_that_self_clear)
     CHECK_EQ_INT(v.fault, KILN_FAULT_NONE);
 }
 
-/* --- FR-CUR-11 and FR-CUR-12 ------------------------------------------- */
+/* --- SWR-CUR-11 and SWR-CUR-12 ------------------------------------------- */
 
-KILN_TEST(frcur11_latches_a_ct_fault_only_after_its_grace_period)
+KILN_TEST(swrcur11_latches_a_ct_fault_only_after_its_grace_period)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -498,7 +498,7 @@ KILN_TEST(frcur11_latches_a_ct_fault_only_after_its_grace_period)
     in.current_a     = 0.0f;
 
     /* A burst spoiled by the switching transient of a multi-kilowatt load is not
-     * a missing transformer, so it is graced like SR-04. */
+     * a missing transformer, so it is graced like SWR-SAF-04. */
     for (int i = 0; i < 40; i++) {
         CHECK_EQ_INT(kiln_safety_eval(&s, &in, 0.1f).fault, KILN_FAULT_NONE);
     }
@@ -509,10 +509,10 @@ KILN_TEST(frcur11_latches_a_ct_fault_only_after_its_grace_period)
     CHECK_EQ_INT(got, KILN_FAULT_CT_FAULT);
 }
 
-KILN_TEST(frcur11_a_void_measurement_does_not_read_as_a_dead_element)
+KILN_TEST(swrcur11_a_void_measurement_does_not_read_as_a_dead_element)
 {
     /* The dangerous confusion: 0 A reported by a CT that is not there must not
-     * satisfy SR-26, or an unplugged transformer would be diagnosed as a failed
+     * satisfy SWR-SAF-26, or an unplugged transformer would be diagnosed as a failed
      * element group on every firing. */
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -526,7 +526,7 @@ KILN_TEST(frcur11_a_void_measurement_does_not_read_as_a_dead_element)
     in.current_flags = (uint8_t)(KILN_CURF_CT_FAULT | KILN_CURF_CONDUCTION);
     in.current_a     = 0.0f;
 
-    /* The CT fault latches first, and SR-26 never sees a usable measurement. */
+    /* The CT fault latches first, and SWR-SAF-26 never sees a usable measurement. */
     kiln_fault_t got = KILN_FAULT_NONE;
     for (int i = 0; i < 400 && got == KILN_FAULT_NONE; i++) {
         got = kiln_safety_eval(&s, &in, 0.1f).fault;
@@ -535,7 +535,7 @@ KILN_TEST(frcur11_a_void_measurement_does_not_read_as_a_dead_element)
     CHECK_NEAR(s.fail_off_timer_s, 0.0f, 0.001f);
 }
 
-KILN_TEST(frcur12_warns_persistently_while_monitoring_is_disabled)
+KILN_TEST(swrcur12_warns_persistently_while_monitoring_is_disabled)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -558,7 +558,7 @@ KILN_TEST(frcur12_warns_persistently_while_monitoring_is_disabled)
     CHECK(!(v.warnings & KILN_WARN_BIT(KILN_WARN_CURRENT_OFF)));
 }
 
-KILN_TEST(frcur12_current_rules_stand_down_when_monitoring_is_off)
+KILN_TEST(swrcur12_current_rules_stand_down_when_monitoring_is_off)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -607,9 +607,9 @@ KILN_TEST(stale_and_skipped_measurements_are_not_evidence)
     CHECK_EQ_UINT(s.fail_on_count, 0u);
 }
 
-/* --- SR-17 / SR-18: clearability --------------------------------------- */
+/* --- SWR-SAF-17 / SWR-SAF-18: clearability --------------------------------------- */
 
-KILN_TEST(sr27_welded_contactor_is_never_clearable_by_acknowledgement)
+KILN_TEST(swrsaf27_welded_contactor_is_never_clearable_by_acknowledgement)
 {
     const kiln_safety_cfg_t c = cfg();
     kiln_safety_input_t in = base();
@@ -621,7 +621,7 @@ KILN_TEST(sr27_welded_contactor_is_never_clearable_by_acknowledgement)
     CHECK(!kiln_safety_can_clear(&c, KILN_FAULT_CONTACTOR_WELDED, &in));
 }
 
-KILN_TEST(sr18_can_clear_is_an_allow_list_not_a_deny_list)
+KILN_TEST(swrsaf18_can_clear_is_an_allow_list_not_a_deny_list)
 {
     const kiln_safety_cfg_t c = cfg();
     const kiln_safety_input_t in = base();
@@ -634,7 +634,7 @@ KILN_TEST(sr18_can_clear_is_an_allow_list_not_a_deny_list)
     CHECK(!kiln_safety_can_clear(&c, KILN_FAULT_TC_OPEN, NULL));
 }
 
-KILN_TEST(sr18_current_faults_clear_only_once_their_condition_has_gone)
+KILN_TEST(swrsaf18_current_faults_clear_only_once_their_condition_has_gone)
 {
     const kiln_safety_cfg_t c = cfg();
     kiln_safety_input_t in = base();
@@ -645,13 +645,13 @@ KILN_TEST(sr18_current_faults_clear_only_once_their_condition_has_gone)
     in.current_flags = KILN_CURF_LEAKAGE;
     CHECK(kiln_safety_can_clear(&c, KILN_FAULT_CT_FAULT, &in));
 
-    /* SR-25: only once an off-window actually measures no current. */
+    /* SWR-SAF-25: only once an off-window actually measures no current. */
     in.current_a = 2.0f;
     CHECK(!kiln_safety_can_clear(&c, KILN_FAULT_UNCOMMANDED_CURRENT, &in));
     in.current_a = 0.0f;
     CHECK(kiln_safety_can_clear(&c, KILN_FAULT_UNCOMMANDED_CURRENT, &in));
 
-    /* SR-29: only once current is back inside the limit. */
+    /* SWR-SAF-29: only once current is back inside the limit. */
     in.current_a = 50.0f;
     CHECK(!kiln_safety_can_clear(&c, KILN_FAULT_OVERCURRENT, &in));
     in.current_a = 20.0f;

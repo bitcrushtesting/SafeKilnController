@@ -1,10 +1,10 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Named blobs in a raw flash partition -- AD-10, FR-PRG-04, FR-LOG-09.
+ * Named blobs in a raw flash partition -- SWA-10, SWR-PRG-04, SWR-LOG-09.
  *
  * This is what backs kiln_port_filestore.  It is not a filesystem, for the same
- * reason AD-08 gave when it refused one for the log: a filesystem adds metadata
+ * reason SWA-08 gave when it refused one for the log: a filesystem adds metadata
  * writes, fragmentation and a torn-write failure mode across structures we do
  * not control.  The two callers above it -- program_store and run_index -- do
  * not need one either.  Both address a fixed array of numbered slots, `/p/00`
@@ -32,11 +32,11 @@
  * before the second write leaves the magic erased, so the half-written copy is
  * not a copy at all and the previous one still carries the highest seq.  A
  * power cut during the second write is caught by the CRC.  There is no instant
- * at which a reader sees a torn file, which is the property FR-RUN-08 needs and
+ * at which a reader sees a torn file, which is the property SWR-RUN-08 needs and
  * the one the host tests cut power to prove.
  *
  * Pure logic over kiln_port_flash: no clock, no allocation, all state in the
- * caller's struct (AD-02, AD-03).
+ * caller's struct (SWA-02, SWA-03).
  */
 #ifndef KILN_CORE_FILESLOTS_H
 #define KILN_CORE_FILESLOTS_H

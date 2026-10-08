@@ -148,8 +148,8 @@ jobs:
             echo '```'
             echo
             echo 'Not covered by any of it: the device drivers, and the charge-pump'
-            echo 'release of `AD-05` — the central safety property of the design, which'
-            echo 'needs real hardware to verify (`TR-17`, `SR-02`).'
+            echo 'release of `SWA-05` — the central safety property of the design, which'
+            echo 'needs real hardware to verify (`SWR-TST-17`, `SYS-SAF-02`).'
             echo
             echo '## Changes'
             echo

@@ -1,9 +1,9 @@
 # SPDX-FileCopyrightText: 2026 Bitcrush Testing
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Dual-target (AD-14): the same sources build as an ESP-IDF component and as a
+# Dual-target (SWA-14): the same sources build as an ESP-IDF component and as a
 # plain CMake library for the host tests.  kiln_hmi holds no platform header
-# for the same reason kiln_core does not -- its screens are logic, and TR-01
+# for the same reason kiln_core does not -- its screens are logic, and SWR-TST-01
 # wants logic where a test can reach it.
 
 set(KILN_HMI_SRCS

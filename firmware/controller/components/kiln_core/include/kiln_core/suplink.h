@@ -1,16 +1,16 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * The ESP32's end of the supervisor link (AD-22).
+ * The ESP32's end of the supervisor link (SWA-22).
  *
- * After AD-22 the chamber thermocouple belongs to the supervisor, which reports
+ * After SWA-22 the chamber thermocouple belongs to the supervisor, which reports
  * it ten times a second over a one-wire serial link.  This component turns that
  * byte stream into a `kiln_port_tc_t`, so nothing in the core had to change:
  * the control and safety paths still read a thermocouple port, and only the
  * thing behind the port moved.
  *
- * It lives in kiln_core rather than in the ESP32 adapter for the reason AD-19
- * and AD-21 give for the log ring and the file store: everything interesting
+ * It lives in kiln_core rather than in the ESP32 adapter for the reason SWA-19
+ * and SWA-21 give for the log ring and the file store: everything interesting
  * here is a decision with a failure mode.  Frames arrive split across reads,
  * line noise has to be resynchronised past, a repeated sequence number is a
  * different fault from silence, and a dead link has to present as something the
@@ -22,7 +22,7 @@
  * ---------------------------------------------------------------------------
  * When the link goes quiet, `read` reports `KILN_TC_FAULT_COMMS` and returns an
  * error, which is exactly what the MAX31856 adapter does when the part does not
- * answer.  So SR-04's existing grace period and fault latch handle a dead
+ * answer.  So SWR-SAF-04's existing grace period and fault latch handle a dead
  * supervisor with no new rule and no special case: from the core's point of
  * view the front end stopped answering, which is true.
  */
@@ -40,7 +40,7 @@
 /* Sized against the rate this is *pumped*, not the rate the supervisor sends.
  *
  * The supervisor reports every 100 ms, but the acquisition cycle drains the
- * UART every 250 ms (which is FR-ACQ-03's 4 Hz), so the timer advances in
+ * UART every 250 ms (which is SWR-ACQ-03's 4 Hz), so the timer advances in
  * 250 ms steps and a threshold near the report period would trip on one late
  * cycle.  0.75 s is three acquisition cycles: three missed pumps, or about
  * seven missed frames.
@@ -49,7 +49,7 @@
  * not a protection one: the supervisor's own trip is local and entirely
  * unaffected by whether anyone is listening.  What this threshold decides is
  * how quickly the ESP32 stops believing a stale temperature, and it then feeds
- * FR-ACQ-12's grace (1 to 30 s, default 5 s), which is what actually latches a
+ * SWR-ACQ-12's grace (1 to 30 s, default 5 s), which is what actually latches a
  * fault.  Being well inside that grace is the requirement; being fast is not. */
 #define KILN_SUPLINK_STALE_S 0.75f
 
@@ -62,7 +62,7 @@ typedef struct {
     bool         have;          /* one has been accepted at all       */
     float        since_s;       /* since the last frame with a new seq */
 
-    /* Diagnostics.  FR-NET-09 asks for link counters and these are the
+    /* Diagnostics.  SWR-NET-09 asks for link counters and these are the
      * supervisor link's equivalent: bytes discarded while frames still arrive
      * is noise or wiring, frames stopping is a dead supervisor. */
     uint32_t     frames;

@@ -1,8 +1,8 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * The circular sample log -- AD-08, architecture 10.3, FR-LOG-05..FR-LOG-09,
- * FR-LOG-15.
+ * The circular sample log -- SWA-08, architecture 10.3, SWR-LOG-05..SWR-LOG-09,
+ * SWR-LOG-15.
  *
  * A raw flash partition holding a ring of sectors, each with a 16 byte header
  * and 204 fixed 20 byte records.  Not a filesystem: a filesystem adds metadata
@@ -20,12 +20,12 @@
  *   written, never in advance.  Erasing ahead would leave a window in which a
  *   power loss destroys records the index still claims exist.
  *
- *   Torn records (FR-LOG-08).  A record whose CRC fails, or which is partly
+ *   Torn records (SWR-LOG-08).  A record whose CRC fails, or which is partly
  *   erased, terminates the scan of its sector and is skipped by readers.  At
  *   most the one record in flight is lost.
  *
  * Pure logic over kiln_port_flash: no clock, no allocation, and all state in the
- * caller's struct (AD-02, AD-03).
+ * caller's struct (SWA-02, SWA-03).
  */
 #ifndef KILN_CORE_LOGRING_H
 #define KILN_CORE_LOGRING_H
@@ -48,14 +48,14 @@ typedef struct {
     uint32_t head_slot;
     uint32_t head_seq;          /* seq of head_sector */
 
-    /* The oldest sector still holding data, for the stats of FR-LOG-15. */
+    /* The oldest sector still holding data, for the stats of SWR-LOG-15. */
     uint32_t tail_sector;
     bool     wrapped;           /* the ring has overwritten at least once */
 
     uint32_t run_id;            /* the run being appended to */
     bool     run_open;
 
-    /* FR-LOG-15 */
+    /* SWR-LOG-15 */
     uint32_t write_errors;
     uint32_t erase_count;
     uint32_t records_stored;
@@ -66,10 +66,10 @@ typedef struct {
  * mount, KILN_ERR_CORRUPT when no valid sector header was found at all (an
  * unformatted or wiped partition, which is then formatted on the first
  * begin_run), and KILN_ERR_IO when the flash itself would not answer -- in which
- * case `available` is false and FR-LOG-14 says the firing continues anyway. */
+ * case `available` is false and SWR-LOG-14 says the firing continues anyway. */
 kiln_err_t kiln_logring_mount(kiln_logring_t *r, const kiln_port_flash_t *flash);
 
-/* FR-LOG-13: erase everything, irreversibly. */
+/* SWR-LOG-13: erase everything, irreversibly. */
 kiln_err_t kiln_logring_erase_all(kiln_logring_t *r);
 
 /* Open a run for appending.  Starts a fresh sector so that a run's records are
@@ -85,7 +85,7 @@ kiln_err_t kiln_logring_append(kiln_logring_t *r,
 kiln_err_t kiln_logring_iterate(kiln_logring_t *r, uint32_t run_id,
                                 kiln_logstore_visit_fn fn, void *user);
 
-/* The newest intact record of a run, which is the power-loss journal of AD-09. */
+/* The newest intact record of a run, which is the power-loss journal of SWA-09. */
 kiln_err_t kiln_logring_last_record(kiln_logring_t *r, uint32_t run_id,
                                     uint8_t rec[KILN_LOG_RECORD_BYTES]);
 
@@ -95,7 +95,7 @@ kiln_err_t kiln_logring_stats(kiln_logring_t *r, kiln_logstore_stats_t *out);
  * against the port and a different store could be substituted. */
 void kiln_logring_bind(kiln_logring_t *r, kiln_port_logstore_t *out);
 
-/* Records the ring can hold, for the FR-LOG-07 capacity analysis. */
+/* Records the ring can hold, for the SWR-LOG-07 capacity analysis. */
 static inline uint32_t kiln_logring_capacity(const kiln_logring_t *r)
 {
     return r->sector_count * r->recs_per_sector;

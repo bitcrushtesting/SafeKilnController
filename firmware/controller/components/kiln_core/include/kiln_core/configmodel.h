@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Configuration schema -- FR-CFG-01..FR-CFG-08, architecture section 11.
+ * Configuration schema -- SWR-CFG-01..SWR-CFG-08, architecture section 11.
  *
  * One static table, one row per item, carrying key, type, unit, range, default
  * and flags.  Everything else is *derived* from it: NVS persistence, the JSON
@@ -37,11 +37,11 @@ typedef enum {
     KILN_CFG_T_STRING,
 } kiln_cfg_type_t;
 
-/* FR-CFG-07: never serialised outward; the API reports only "set": true|false. */
+/* SWR-CFG-07: never serialised outward; the API reports only "set": true|false. */
 constexpr uint32_t KILN_CFG_F_SECRET = 1u << 0u;
-/* FR-CFG-04: takes effect only after a restart. */
+/* SWR-CFG-04: takes effect only after a restart. */
 constexpr uint32_t KILN_CFG_F_REBOOT = 1u << 1u;
-/* FR-CFG-08: safety-relevant, so refused while a run is in progress. */
+/* SWR-CFG-08: safety-relevant, so refused while a run is in progress. */
 constexpr uint32_t KILN_CFG_F_SAFETY = 1u << 2u;
 /* Not safety-relevant, but meaningless to change mid-run. */
 constexpr uint32_t KILN_CFG_F_LOCKED_RUNNING = 1u << 3u;
@@ -49,7 +49,7 @@ constexpr uint32_t KILN_CFG_F_LOCKED_RUNNING = 1u << 3u;
 typedef struct {
     const char            *key;        /* stable API and NVS name            */
     const char            *unit;       /* "degC", "A", "ms", "" ...           */
-    const char            *req;        /* the requirement it serves (TR-22)   */
+    const char            *req;        /* the requirement it serves (SWR-TST-22)   */
     kiln_cfg_type_t        type;
     uint16_t               offset;     /* byte offset into kiln_config_t      */
     uint16_t               str_cap;    /* KILN_CFG_T_STRING only              */
@@ -61,10 +61,10 @@ typedef struct {
     uint8_t                flags;
 } kiln_cfg_item_t;
 
-/* --- the configuration itself (FR-CFG-02) ------------------------------- */
+/* --- the configuration itself (SWR-CFG-02) ------------------------------- */
 
 typedef enum {
-    KILN_RECOVERY_ABORT = 0,       /* FR-RUN-08 default */
+    KILN_RECOVERY_ABORT = 0,       /* SWR-RUN-08 default */
     KILN_RECOVERY_RESUME,
     KILN_RECOVERY_COUNT,
 } kiln_recovery_policy_t;
@@ -72,13 +72,13 @@ typedef enum {
 typedef enum {
     KILN_WIFI_STA = 0,
     KILN_WIFI_AP,
-    KILN_WIFI_STA_AP_FALLBACK,     /* FR-NET-02 */
+    KILN_WIFI_STA_AP_FALLBACK,     /* SWR-NET-02 */
     KILN_WIFI_MODE_COUNT,
 } kiln_wifi_mode_t;
 
 typedef enum {
     KILN_UNITS_C = 0,
-    KILN_UNITS_F,                  /* FR-HMI-13: display only */
+    KILN_UNITS_F,                  /* SWR-HMI-13: display only */
     KILN_UNITS_COUNT,
 } kiln_units_t;
 
@@ -154,7 +154,7 @@ typedef struct {
 
     /* HMI */
     uint8_t  units;                      /* kiln_units_t */
-    uint8_t  language;                   /* kiln_lang_t (NFR-23) */
+    uint8_t  language;                   /* kiln_lang_t (SWR-NFR-23) */
     uint16_t dim_timeout_s;
     uint16_t alarm_duration_s;
 
@@ -189,11 +189,11 @@ kiln_err_t kiln_config_get_str(const kiln_config_t *cfg, const kiln_cfg_item_t *
 kiln_err_t kiln_config_set_str(kiln_config_t *cfg, const kiln_cfg_item_t *it,
                                const char *value);
 
-/* FR-CFG-03: validate every item.  On failure names the offending item, so the
+/* SWR-CFG-03: validate every item.  On failure names the offending item, so the
  * API can report which key was wrong rather than "invalid configuration". */
 kiln_err_t kiln_config_validate(const kiln_config_t *cfg, const kiln_cfg_item_t **bad);
 
-/* FR-CFG-03 and FR-CFG-08: apply `incoming` over `cfg` atomically -- the whole
+/* SWR-CFG-03 and SWR-CFG-08: apply `incoming` over `cfg` atomically -- the whole
  * write is validated first and rejected whole, so a bad item cannot leave half a
  * configuration applied.  With running true, any item flagged safety-relevant or
  * locked-while-running that actually differs is refused.
@@ -203,10 +203,10 @@ kiln_err_t kiln_config_validate(const kiln_config_t *cfg, const kiln_cfg_item_t 
 kiln_err_t kiln_config_apply(kiln_config_t *cfg, const kiln_config_t *incoming,
                              bool running, const kiln_cfg_item_t **bad);
 
-/* FR-CFG-04: does moving from `a` to `b` need a restart? */
+/* SWR-CFG-04: does moving from `a` to `b` need a restart? */
 bool kiln_config_reboot_required(const kiln_config_t *a, const kiln_config_t *b);
 
-/* --- persistence (FR-CFG-05) -------------------------------------------- */
+/* --- persistence (SWR-CFG-05) -------------------------------------------- */
 
 /* The stored blob is the struct plus a header and a CRC.  Fixed layout, so a
  * migration is a question of version rather than of parsing. */

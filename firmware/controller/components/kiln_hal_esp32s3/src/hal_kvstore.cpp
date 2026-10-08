@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * port_kvstore over NVS (AD-10).  Blobs only: the configuration is typed by
+ * port_kvstore over NVS (SWA-10).  Blobs only: the configuration is typed by
  * kiln_core/configmodel, and splitting it into NVS-typed entries would put the
  * schema in two places.
  */
@@ -122,7 +122,7 @@ kiln_err_t kiln_hal_kvstore_init(kiln_port_kvstore_t *out)
     esp_err_t e = nvs_flash_init();
     if (e == ESP_ERR_NVS_NO_FREE_PAGES || e == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         /* A first boot on a used device, or an NVS format change.  Erasing loses
-         * the configuration, which FR-CFG-05 already covers: defaults plus a
+         * the configuration, which SWR-CFG-05 already covers: defaults plus a
          * warning beats refusing to boot. */
         ESP_LOGW(TAG, "NVS needs erasing (%s); configuration will return to defaults",
                  esp_err_to_name(e));

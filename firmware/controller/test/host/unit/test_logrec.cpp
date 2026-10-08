@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
- * kiln_core/logrec -- FR-LOG-02, FR-LOG-08, FR-LOG-10, FR-LOG-11, AD-18.
+ * kiln_core/logrec -- SWR-LOG-02, SWR-LOG-08, SWR-LOG-10, SWR-LOG-11, SWA-18.
  */
 
 #include <string.h>
@@ -24,15 +24,15 @@ static kiln_log_sample_t sample(uint32_t t_ms, float kiln_c, float current_a)
     return s;
 }
 
-KILN_TEST(ad18_the_record_is_twenty_bytes)
+KILN_TEST(swa18_the_record_is_twenty_bytes)
 {
-    /* AD-18: 20 B since FR-CUR-09 added heater current, which gives 204 records
+    /* SWA-18: 20 B since SWR-CUR-09 added heater current, which gives 204 records
      * per 4 kB sector. */
     CHECK_EQ_UINT(KILN_LOG_RECORD_BYTES, 20u);
     CHECK_EQ_UINT(KILN_LOG_RECS_PER_SECTOR, 204u);
 }
 
-KILN_TEST(frlog02_a_record_round_trips_within_its_stated_resolution)
+KILN_TEST(swrlog02_a_record_round_trips_within_its_stated_resolution)
 {
     const kiln_log_sample_t in = sample(123456u, 987.6f, 28.45f);
     uint8_t rec[KILN_LOG_RECORD_BYTES];
@@ -46,7 +46,7 @@ KILN_TEST(frlog02_a_record_round_trips_within_its_stated_resolution)
     CHECK_NEAR(out.kiln_raw_c, in.kiln_raw_c, 0.05f);
     CHECK_NEAR(out.setpoint_c, in.setpoint_c, 0.05f);
     CHECK_NEAR(out.case_c, in.case_c, 0.05f);
-    /* FR-CUR-02 asks for 0.1 A; the record carries 10 mA steps. */
+    /* SWR-CUR-02 asks for 0.1 A; the record carries 10 mA steps. */
     CHECK_NEAR(out.current_a, in.current_a, 0.01f);
     CHECK_NEAR((double)out.duty_permille, (double)in.duty_permille, 3.0);
     CHECK_EQ_UINT(out.segment, in.segment);
@@ -55,7 +55,7 @@ KILN_TEST(frlog02_a_record_round_trips_within_its_stated_resolution)
     CHECK_EQ_UINT(out.current_flags, in.current_flags);
 }
 
-KILN_TEST(frlog02_saturates_rather_than_wrapping)
+KILN_TEST(swrlog02_saturates_rather_than_wrapping)
 {
     kiln_log_sample_t in = sample(0, 5000.0f, 900.0f);
     in.duty_permille = 60000;
@@ -75,7 +75,7 @@ KILN_TEST(frlog02_saturates_rather_than_wrapping)
     CHECK_NEAR(out.current_a, 0.0f, 0.001f);   /* a negative current is zero */
 }
 
-KILN_TEST(frlog08_a_torn_record_is_corrupt_and_an_erased_one_is_simply_absent)
+KILN_TEST(swrlog08_a_torn_record_is_corrupt_and_an_erased_one_is_simply_absent)
 {
     /* The distinction matters to the reader: "not found" is the end of what has
      * been written and iteration stops; "corrupt" is a torn write or bit rot and
@@ -141,9 +141,9 @@ KILN_TEST(the_sector_header_round_trips_and_rejects_a_foreign_one)
     CHECK_ERR(kiln_logrec_decode_hdr(buf, &out), KILN_ERR_UNSUPPORTED);
 }
 
-/* --- decimation, FR-LOG-10 and FR-LOG-11 ------------------------------- */
+/* --- decimation, SWR-LOG-10 and SWR-LOG-11 ------------------------------- */
 
-KILN_TEST(frlog11_a_brief_excursion_survives_downsampling)
+KILN_TEST(swrlog11_a_brief_excursion_survives_downsampling)
 {
     kiln_log_bucket_t buckets[10];
     kiln_decimator_t d;
@@ -156,7 +156,7 @@ KILN_TEST(frlog11_a_brief_excursion_survives_downsampling)
         kiln_decimator_push(&d, &s);
     }
 
-    /* Averaging it away is precisely what FR-LOG-11 forbids. */
+    /* Averaging it away is precisely what SWR-LOG-11 forbids. */
     bool found = false;
     for (uint16_t i = 0; i < d.used; i++) {
         if (buckets[i].kiln_max_c > 790.0f) {
@@ -167,7 +167,7 @@ KILN_TEST(frlog11_a_brief_excursion_survives_downsampling)
     CHECK_EQ_UINT(d.used, 10u);
 }
 
-KILN_TEST(frlog10_an_open_ended_query_returns_a_view_of_the_whole_run)
+KILN_TEST(swrlog10_an_open_ended_query_returns_a_view_of_the_whole_run)
 {
     /* The old behaviour filled buckets sequentially and then dropped everything,
      * so an open-ended query returned the *first* N samples rather than a
@@ -209,7 +209,7 @@ KILN_TEST(frlog10_an_open_ended_query_returns_a_view_of_the_whole_run)
     CHECK_EQ_UINT(counted, pushed);
 }
 
-KILN_TEST(frlog11_extrema_survive_a_fold)
+KILN_TEST(swrlog11_extrema_survive_a_fold)
 {
     kiln_log_bucket_t buckets[8];
     kiln_decimator_t d;

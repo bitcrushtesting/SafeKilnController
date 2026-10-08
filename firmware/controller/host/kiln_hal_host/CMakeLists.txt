@@ -6,7 +6,7 @@
 # living there is a build failure waiting for whoever next runs idf.py.  Keeping
 # it here makes the exclusion structural rather than a list someone has to
 # remember to maintain -- and it is the honest arrangement anyway, since nothing
-# here is ever linked into a target image (TR-10).
+# here is ever linked into a target image (SWR-TST-10).
 #
 # These are the per-port fakes architecture 5.2 lists against each port, shared
 # by the test suites and by any host-side harness.

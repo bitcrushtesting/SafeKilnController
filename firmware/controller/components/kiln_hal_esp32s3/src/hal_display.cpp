@@ -1,14 +1,14 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * SSD1306 128x64 monochrome OLED over I2C (HR-04, FR-HMI-14).
+ * SSD1306 128x64 monochrome OLED over I2C (SYS-HW-04, SWR-HMI-14).
  *
  * The port transfers a framebuffer and nothing else: the HMI renders into it,
  * so screens are verifiable by golden-image comparison on the host with no
  * display present.  Keeping the font and the layout out of this file is what
  * makes that possible, and is the same reason the log ring lives in the core.
  *
- * FR-HMI-14 is the governing requirement here: if the display fails to
+ * SWR-HMI-14 is the governing requirement here: if the display fails to
  * initialise or stops acknowledging, the system logs it and **keeps
  * controlling the kiln**.  So nothing in this file returns an error that could
  * be mistaken for a reason to stop, and `available()` exists so the
@@ -55,7 +55,7 @@ namespace {
 typedef struct {
     i2c_master_bus_handle_t bus;
     i2c_master_dev_handle_t dev;
-    bool                    ok;        /* FR-HMI-14: last transfer succeeded */
+    bool                    ok;        /* SWR-HMI-14: last transfer succeeded */
     uint32_t                failures;
 } disp_t;
 
@@ -97,7 +97,7 @@ kiln_err_t disp_present(void *ctx, const uint8_t *fb, size_t len)
     }
 
     /* 0x40 marks the rest of the transfer as display data.  One transmit for
-     * the whole frame: 1025 bytes at 400 kHz is about 25 ms, and NFR-02 bounds
+     * the whole frame: 1025 bytes at 400 kHz is about 25 ms, and SWR-NFR-02 bounds
      * non-safety work at 50 ms, so this must not be split into page writes
      * that could interleave with the control cycle. */
     static uint8_t frame[KILN_DISPLAY_BYTES + 1];
@@ -107,7 +107,7 @@ kiln_err_t disp_present(void *ctx, const uint8_t *fb, size_t len)
     if (i2c_master_transmit(d->dev, frame, len + 1u, 100) != ESP_OK) {
         d->ok = false;
         d->failures++;
-        /* FR-HMI-14: report it and let the caller warn; do not escalate. */
+        /* SWR-HMI-14: report it and let the caller warn; do not escalate. */
         return KILN_ERR_IO;
     }
     d->ok = true;
@@ -120,7 +120,7 @@ kiln_err_t disp_set_contrast(void *ctx, uint8_t contrast)
     if ((d == nullptr) || (d->dev == nullptr)) {
         return KILN_ERR_INVALID_ARG;
     }
-    /* FR-HMI-12's dim timeout is the caller's; this is only the knob. */
+    /* SWR-HMI-12's dim timeout is the caller's; this is only the knob. */
     const uint8_t cmds[] = { SSD_SET_CONTRAST, contrast };
     return send_cmds(d, cmds, sizeof(cmds)) ? KILN_OK : KILN_ERR_IO;
 }
@@ -198,7 +198,7 @@ kiln_err_t kiln_hal_display_init(kiln_port_display_t *out)
     out->available    = disp_available;
 
     if (!ok) {
-        /* FR-HMI-14: a display that will not initialise is a warning, not a
+        /* SWR-HMI-14: a display that will not initialise is a warning, not a
          * reason to refuse to run a kiln. */
         ESP_LOGE(TAG, "SSD1306 at 0x%02x did not acknowledge; continuing without it",
                  KILN_HAL_OLED_ADDR);

@@ -8,9 +8,9 @@
 #
 #   EnumCastOutOfRange ..... test_faults casts 999 and 99 to a fault code, and
 #                            test_safety_current casts 200, precisely to prove
-#                            an out-of-range code is rejected (SR-19).
+#                            an out-of-range code is rejected (SWR-SAF-19).
 #   NullDereference ........ the suites pass NULL deliberately to check the
-#                            NFR-17 argument guards return an error instead of
+#                            SWR-NFR-17 argument guards return an error instead of
 #                            faulting.
 #   insecureAPI.strcpy ..... fixed test fixtures of known length.
 #   signed-char-misuse ..... the fuzz and profile suites feed deliberately

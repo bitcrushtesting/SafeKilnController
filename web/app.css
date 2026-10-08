@@ -12,7 +12,7 @@
  * treatment instead: weight 900, uppercase, letter-spacing -0.01em on a system
  * stack, which is what reads as Orbitron at a glance.
  *
- * FR-WEB-26: both schemes, following the browser.  Dark is the primary
+ * SWR-WEB-26: both schemes, following the browser.  Dark is the primary
  * expression; light is a faithful inversion rather than an afterthought, because
  * a workshop in daylight is a real place.
  */
@@ -62,7 +62,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font: 15px/1.5 var(--sans);
-  /* FR-WEB-03: never a horizontal scroll of the page body. */
+  /* SWR-WEB-03: never a horizontal scroll of the page body. */
   overflow-x: hidden;
 }
 
@@ -84,7 +84,7 @@ body {
 .conn.stale .dot { background: var(--warn); }
 .conn.down .dot { background: var(--bad); }
 
-/* FR-WEB-24 */
+/* SWR-WEB-24 */
 .banner {
   padding: 0.7rem 1rem;
   border-bottom: 1px solid var(--line);
@@ -217,7 +217,7 @@ label.inline { display: inline-flex; align-items: center; gap: 0.4rem; font-size
 .note.ok  { border-left-color: var(--ok); }
 .diag { font: 12px/1.5 var(--mono); background: var(--raised); border: 1px solid var(--line); padding: 0.8rem; overflow-x: auto; color: var(--dim); }
 
-/* The identity list (FR-PROD-03).  Two columns on anything but a phone, where
+/* The identity list (SWR-PROD-03).  Two columns on anything but a phone, where
  * the label sits above its value rather than squeezing both into 180px. */
 .kv { display: grid; grid-template-columns: max-content 1fr; gap: 0.3rem 1rem; margin: 0 0 1rem; }
 .kv dt { color: var(--dim); }
@@ -244,7 +244,7 @@ label.inline { display: inline-flex; align-items: center; gap: 0.4rem; font-size
 .cfg-item.locked input, .cfg-item.locked select { opacity: 0.5; }
 .tagline { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--warn); }
 
-/* FR-WEB-03: a 360 px phone, with the readouts stacking rather than squeezing. */
+/* SWR-WEB-03: a 360 px phone, with the readouts stacking rather than squeezing. */
 @media (max-width: 720px) {
   .split { grid-template-columns: 1fr; }
   .readout.big { grid-column: 1 / -1; }
@@ -252,7 +252,7 @@ label.inline { display: inline-flex; align-items: center; gap: 0.4rem; font-size
   .readout.big .value { font-size: 2.1rem; }
 }
 
-/* FR-WEB-26: the interface observes.  Stated plainly where controls used to
+/* SWR-WEB-26: the interface observes.  Stated plainly where controls used to
    be, so the absence reads as a decision rather than a missing feature. */
 .readonly-note {
     margin: .75rem 0;
@@ -263,7 +263,7 @@ label.inline { display: inline-flex; align-items: center; gap: 0.4rem; font-size
 }
 .readonly-note strong { font-weight: 600; }
 
-/* NFR-23: the language selector sits with the tabs, not buried in settings,
+/* SWR-NFR-23: the language selector sits with the tabs, not buried in settings,
    because somebody who cannot read the interface cannot navigate to settings. */
 .lang {
     margin-left: auto;

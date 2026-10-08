@@ -10,7 +10,7 @@ void kiln_window_cfg_defaults(kiln_window_cfg_t *cfg)
         .tick_ms              = KILN_TICK_MS_DEFAULT,
         .min_on_ms            = 100u,
         .min_off_ms           = 100u,
-        .preserve_off_window  = true,     /* SR-25 is the primary detection */
+        .preserve_off_window  = true,     /* SWR-SAF-25 is the primary detection */
         .min_measure_off_ms   = 100u,     /* 20 ms settle + 40 ms burst + margin */
     };
     *cfg = d;
@@ -29,7 +29,7 @@ bool validate(kiln_window_cfg_t *c)
     if (c->window_ms > KILN_WINDOW_MS_MAX) { c->window_ms = KILN_WINDOW_MS_MAX; corrected = true; }
     if (c->window_ms < c->tick_ms)         { c->window_ms = c->tick_ms;         corrected = true; }
 
-    /* FR-CTL-07: a whole number of ticks, or the duty resolution silently lies. */
+    /* SWR-CTL-07: a whole number of ticks, or the duty resolution silently lies. */
     if (c->window_ms % c->tick_ms != 0) {
         c->window_ms -= c->window_ms % c->tick_ms;
         if (c->window_ms < c->tick_ms) {
@@ -132,8 +132,8 @@ uint16_t kiln_window_quantise(const kiln_window_t *w, uint16_t duty_permille)
     }
 
     if (off_ms < w->cfg.min_off_ms) {
-        /* FR-CTL-08 would promote this to fully on.  With current monitoring in
-         * play that silently deletes the leakage measurement SR-25 depends on, so
+        /* SWR-CTL-08 would promote this to fully on.  With current monitoring in
+         * play that silently deletes the leakage measurement SWR-SAF-25 depends on, so
          * cap instead -- see kiln_window_cfg_t. */
         return w->cfg.preserve_off_window ? measurable_max_duty(w) : KILN_DUTY_MAX;
     }
@@ -165,7 +165,7 @@ bool kiln_window_tick(kiln_window_t *w, uint16_t duty_permille, bool authorised)
 
     if (!authorised) {
         /* Withdrawal of authority is immediate and outranks every minimum
-         * time: SR-16 requires duty zero without waiting for a window edge. */
+         * time: SWR-SAF-16 requires duty zero without waiting for a window edge. */
         if (w->on) {
             w->on = false;
             w->since_change_ms = 0;
@@ -194,7 +194,7 @@ bool kiln_window_tick(kiln_window_t *w, uint16_t duty_permille, bool authorised)
         w->on = want;
         w->since_change_ms = 0;
         if (w->on) {
-            w->switch_count++; /* FR-CUR-13 */
+            w->switch_count++; /* SWR-CUR-13 */
         }
     } else {
         w->since_change_ms += w->cfg.tick_ms;

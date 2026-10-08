@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
- * kiln_core/runstate -- FR-RUN-07, FR-RUN-08, SR-12's baseline, AD-09.
+ * kiln_core/runstate -- SWR-RUN-07, SWR-RUN-08, SWR-SAF-12's baseline, SWA-09.
  */
 
 #include <string.h>
@@ -26,9 +26,9 @@ static kiln_log_sample_t tail(kiln_state_t state, float sp, float pv)
     return s;
 }
 
-/* --- FR-RUN-08 --------------------------------------------------------- */
+/* --- SWR-RUN-08 --------------------------------------------------------- */
 
-KILN_TEST(frrun08_defaults_to_abort)
+KILN_TEST(swrrun08_defaults_to_abort)
 {
     /* Resuming a firing is a decision an operator opts into. */
     const kiln_recovery_cfg_t c = cfg(KILN_RECOVERY_ABORT);
@@ -45,7 +45,7 @@ KILN_TEST(frrun08_defaults_to_abort)
     CHECK(d.reason && d.reason[0]);
 }
 
-KILN_TEST(frrun08_resumes_when_the_outage_was_short_and_the_kiln_is_in_band)
+KILN_TEST(swrrun08_resumes_when_the_outage_was_short_and_the_kiln_is_in_band)
 {
     const kiln_recovery_cfg_t c = cfg(KILN_RECOVERY_RESUME);
     const kiln_log_sample_t t = tail(KILN_STATE_RUNNING, 900.0f, 898.0f);
@@ -59,7 +59,7 @@ KILN_TEST(frrun08_resumes_when_the_outage_was_short_and_the_kiln_is_in_band)
     CHECK_EQ_UINT(d.t_rel_ms, 3600000u);
 }
 
-KILN_TEST(frrun08_refuses_an_outage_longer_than_the_limit)
+KILN_TEST(swrrun08_refuses_an_outage_longer_than_the_limit)
 {
     const kiln_recovery_cfg_t c = cfg(KILN_RECOVERY_RESUME);
     const kiln_log_sample_t t = tail(KILN_STATE_RUNNING, 900.0f, 898.0f);
@@ -71,7 +71,7 @@ KILN_TEST(frrun08_refuses_an_outage_longer_than_the_limit)
     CHECK_EQ_INT(d.fault, KILN_FAULT_RECOVERY_REFUSED);
 }
 
-KILN_TEST(frrun08_refuses_a_kiln_that_has_cooled_out_of_band)
+KILN_TEST(swrrun08_refuses_a_kiln_that_has_cooled_out_of_band)
 {
     const kiln_recovery_cfg_t c = cfg(KILN_RECOVERY_RESUME);
     const kiln_log_sample_t t = tail(KILN_STATE_RUNNING, 900.0f, 898.0f);
@@ -84,12 +84,12 @@ KILN_TEST(frrun08_refuses_a_kiln_that_has_cooled_out_of_band)
     CHECK_EQ_INT(d.fault, KILN_FAULT_RECOVERY_REFUSED);
 }
 
-KILN_TEST(frrun08_an_unknown_outage_is_not_a_short_one)
+KILN_TEST(swrrun08_an_unknown_outage_is_not_a_short_one)
 {
     const kiln_recovery_cfg_t c = cfg(KILN_RECOVERY_RESUME);
     const kiln_log_sample_t t = tail(KILN_STATE_RUNNING, 900.0f, 898.0f);
 
-    /* FR-LOG-12: the wall clock is only valid once SNTP has succeeded, so after
+    /* SWR-LOG-12: the wall clock is only valid once SNTP has succeeded, so after
      * a power cut the length of the outage may simply not be knowable. */
     kiln_recovery_decision_t d =
         kiln_runstate_decide(&c, &t, 898.0f, -1.0f, KILN_RESET_POWER_ON);
@@ -102,9 +102,9 @@ KILN_TEST(frrun08_an_unknown_outage_is_not_a_short_one)
     CHECK_EQ_INT(d.action, KILN_RECOVER_REFUSED);
 }
 
-KILN_TEST(sr14_an_abnormal_reset_is_never_resumed)
+KILN_TEST(swrsaf14_an_abnormal_reset_is_never_resumed)
 {
-    /* NFR-15: the firmware's own state was in question when it died, so the
+    /* SWR-NFR-15: the firmware's own state was in question when it died, so the
      * policy does not get a vote. */
     const kiln_recovery_cfg_t c = cfg(KILN_RECOVERY_RESUME);
     const kiln_log_sample_t t = tail(KILN_STATE_RUNNING, 900.0f, 898.0f);
@@ -129,7 +129,7 @@ KILN_TEST(sr14_an_abnormal_reset_is_never_resumed)
     CHECK(!kiln_reset_was_abnormal(KILN_RESET_SOFTWARE));
 }
 
-KILN_TEST(frrun08_a_boot_with_no_interrupted_run_is_an_ordinary_boot)
+KILN_TEST(swrrun08_a_boot_with_no_interrupted_run_is_an_ordinary_boot)
 {
     const kiln_recovery_cfg_t c = cfg(KILN_RECOVERY_RESUME);
 
@@ -138,7 +138,7 @@ KILN_TEST(frrun08_a_boot_with_no_interrupted_run_is_an_ordinary_boot)
     CHECK_EQ_INT(d.action, KILN_RECOVER_NO_RUN);
     CHECK_EQ_INT(d.fault, KILN_FAULT_NONE);
 
-    /* AD-09: the log tail is the journal, so a run that ended normally is
+    /* SWA-09: the log tail is the journal, so a run that ended normally is
      * recognisable from the state in its last record. */
     const kiln_log_sample_t done = tail(KILN_STATE_COMPLETE, 900.0f, 898.0f);
     d = kiln_runstate_decide(&c, &done, 898.0f, 10.0f, KILN_RESET_POWER_ON);
@@ -149,7 +149,7 @@ KILN_TEST(frrun08_a_boot_with_no_interrupted_run_is_an_ordinary_boot)
     CHECK_EQ_INT(d.action, KILN_RECOVER_NO_RUN);
 }
 
-KILN_TEST(frrun08_a_paused_run_is_recoverable_too)
+KILN_TEST(swrrun08_a_paused_run_is_recoverable_too)
 {
     const kiln_recovery_cfg_t c = cfg(KILN_RECOVERY_RESUME);
     const kiln_log_sample_t t = tail(KILN_STATE_PAUSED, 900.0f, 890.0f);
@@ -166,9 +166,9 @@ KILN_TEST(a_missing_policy_aborts_rather_than_guessing)
     CHECK_EQ_INT(d.action, KILN_RECOVER_ABORT);
 }
 
-/* --- FR-RUN-07 --------------------------------------------------------- */
+/* --- SWR-RUN-07 --------------------------------------------------------- */
 
-KILN_TEST(frrun07_a_record_starts_empty_with_its_run_id)
+KILN_TEST(swrrun07_a_record_starts_empty_with_its_run_id)
 {
     kiln_run_record_t r;
     kiln_runstate_record_init(&r, 17u);
@@ -185,9 +185,9 @@ KILN_TEST(frrun07_a_record_starts_empty_with_its_run_id)
     }
 }
 
-/* --- SR-12's baseline -------------------------------------------------- */
+/* --- SWR-SAF-12's baseline -------------------------------------------------- */
 
-KILN_TEST(sr12_the_baseline_is_a_median_across_previous_runs)
+KILN_TEST(swrsaf12_the_baseline_is_a_median_across_previous_runs)
 {
     kiln_run_record_t runs[5];
     for (int i = 0; i < 5; i++) {
@@ -206,7 +206,7 @@ KILN_TEST(sr12_the_baseline_is_a_median_across_previous_runs)
     CHECK(!bl.valid[0]);                     /* no run recorded that band */
 }
 
-KILN_TEST(sr12_a_band_needs_enough_runs_before_it_is_trusted)
+KILN_TEST(swrsaf12_a_band_needs_enough_runs_before_it_is_trusted)
 {
     kiln_run_record_t runs[5];
     for (int i = 0; i < 5; i++) {
@@ -226,7 +226,7 @@ KILN_TEST(sr12_a_band_needs_enough_runs_before_it_is_trusted)
     CHECK_EQ_UINT(bl.duty_s[5], 1050u);
 }
 
-KILN_TEST(sr12_a_faulted_run_does_not_contribute_to_the_baseline)
+KILN_TEST(swrsaf12_a_faulted_run_does_not_contribute_to_the_baseline)
 {
     /* Duty-seconds accumulated while a rule was already unhappy are not a
      * measurement of a healthy kiln. */

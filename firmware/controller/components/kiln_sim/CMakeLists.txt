@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Bitcrush Testing
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Plant simulator (TR-11).  Dual-target like the core: the host integration suite
+# Plant simulator (SWR-TST-11).  Dual-target like the core: the host integration suite
 # links it, and so does the target build when the firmware is configured with the
 # simulated plant -- which is how it runs under QEMU.
 

@@ -43,7 +43,7 @@ void kiln_sim_cfg_defaults(kiln_sim_cfg_t *cfg)
 
 namespace {
 
-/* xorshift32: deterministic, seeded, and adequate for sensor noise (TR-12). */
+/* xorshift32: deterministic, seeded, and adequate for sensor noise (SWR-TST-12). */
 uint32_t rng_next(kiln_sim_t *s)
 {
     uint32_t x = (s->rng != 0u) ? s->rng : 0x9E3779B9u;
@@ -131,7 +131,7 @@ float element_fraction(const kiln_sim_t *s)
     if ((s->inject & KILN_INJ_ELEMENT_PARTIAL) != 0u) {
         const uint8_t g = (s->cfg.element_groups != 0u) ? s->cfg.element_groups : 1u;
         /* One group of g has gone: a step change of a known fraction, which is
-         * precisely what SR-28 is written to recognise. */
+         * precisely what SWR-SAF-28 is written to recognise. */
         return (float)(g - 1u) / (float)g;
     }
     return 1.0f;
@@ -166,7 +166,7 @@ float current_now(const kiln_sim_t *s)
         return s->cfg.leakage_a;
     }
 
-    /* Elements gain resistance as they heat, so current falls -- the effect SR-28
+    /* Elements gain resistance as they heat, so current falls -- the effect SWR-SAF-28
      * has to correct for before it can call a deviation a lost element group. */
     const float r = 1.0f + s->cfg.element_tc_per_c * (s->kiln_c - s->cfg.ambient_c);
     float a = s->cfg.nominal_a * element_fraction(s) / (r > 0.1f ? r : 0.1f);
@@ -218,7 +218,7 @@ void kiln_sim_step(kiln_sim_t *s, float dt_s)
     s->t_s += (double)dt_s;
 
     /* Dead time: push the present drive into a ring and read out what was
-     * commanded dead_time_s ago (ASM-01's transport lag). */
+     * commanded dead_time_s ago (SYS-ASM-01's transport lag). */
     const float u_now = heat_fraction(s);
     const float slot_s = s->cfg.dead_time_s > 0.0f
                        ? s->cfg.dead_time_s / (float)KILN_SIM_DEAD_SLOTS
@@ -284,7 +284,7 @@ void kiln_sim_step(kiln_sim_t *s, float dt_s)
 
     s->current_a = current_now(s);
 
-    /* AD-05: the charge pump decays unless it is being refreshed.  Nothing
+    /* SWA-05: the charge pump decays unless it is being refreshed.  Nothing
      * calling enable_refresh -- a crashed, hung or deadlocked safety task -- and
      * the coil drops with no code involved, which is the whole point of the
      * circuit. */
@@ -309,7 +309,7 @@ void kiln_sim_step(kiln_sim_t *s, float dt_s)
         for (uint16_t i = 0; i < s->burst_n && i < KILN_CUR_BURST_MAX; i++) {
             float v;
             if (ct_gone) {
-                /* FR-CUR-11, and tasklist A6: an open input has no DC path, so it
+                /* SWR-CUR-11, and tasklist A6: an open input has no DC path, so it
                  * sits away from the bias the conditioning establishes, and it
                  * carries no AC at all -- not even the noise floor a live winding
                  * always contributes.  Both symptoms, because the firmware tests
@@ -429,7 +429,7 @@ void sim_heat_drop_contactor(void *ctx)
         return;
     }
     s->heat_enable = false;
-    /* A welded contactor does not open, which is what SR-27 exists to find out. */
+    /* A welded contactor does not open, which is what SWR-SAF-27 exists to find out. */
     if ((s->inject & KILN_INJ_CONTACTOR_WELD) == 0u) {
         s->contactor_closed = false;
     }
@@ -782,7 +782,7 @@ void kiln_sim_fs_bind(kiln_sim_fs_t *fs, kiln_port_filestore_t *out)
 
 namespace {
 
-/* SR-31.  Reports open for the switch injection, and -- because this is what
+/* SWR-SAF-31.  Reports open for the switch injection, and -- because this is what
  * the hardware would do -- also while the port is "absent", since port_door.h
  * requires an adapter that cannot read the pin to report open rather than
  * closed. */

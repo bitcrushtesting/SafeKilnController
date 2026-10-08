@@ -10,17 +10,17 @@
  *
  * Four entry points, one per period of the task table in architecture section
  * 6.1.  They are separate functions rather than one tick because their periods
- * and their priorities differ, and because AD-04 requires that heat authority be
+ * and their priorities differ, and because SWA-04 requires that heat authority be
  * written from exactly one of them:
  *
- *   kiln_app_window_tick     10 ms   SSR pin and the gated current sampler (AD-07, AD-17)
- *   kiln_app_safety_cycle   100 ms   the only writer of heat authority (AD-04)
- *   kiln_app_acquire_cycle  250 ms   >= 4 Hz per FR-ACQ-03
+ *   kiln_app_window_tick     10 ms   SSR pin and the gated current sampler (SWA-07, SWA-17)
+ *   kiln_app_safety_cycle   100 ms   the only writer of heat authority (SWA-04)
+ *   kiln_app_acquire_cycle  250 ms   >= 4 Hz per SWR-ACQ-03
  *   kiln_app_control_cycle     1 s   setpoint, PID, duty request
  *
  * On the target each runs in its own task; on the host the integration suite
  * calls them from one loop against a virtual clock, which is what makes a 168 h
- * firing testable in milliseconds (AD-02).
+ * firing testable in milliseconds (SWA-02).
  *
  * Deliberately one component rather than the six of architecture section 5.3:
  * run_controller, control_task, safety_task, telemetry and the event bus are all
@@ -61,17 +61,17 @@ typedef struct {
     const kiln_port_tc_t       *tc;         /* required */
     const kiln_port_tc_t       *case_tc;    /* optional */
     const kiln_port_heat_t     *heat;       /* required */
-    const kiln_port_current_t  *current;    /* optional: FR-CUR-12 */
+    const kiln_port_current_t  *current;    /* optional: SWR-CUR-12 */
     const kiln_port_counters_t *counters;   /* optional */
     const kiln_port_alarm_t    *alarm;      /* optional */
-    const kiln_port_door_t     *door;       /* optional: SR-31, warning 113 */
-    /* AD-22.  Optional, and reporting only: the supervisor's authority is a
+    const kiln_port_door_t     *door;       /* optional: SWR-SAF-31, warning 113 */
+    /* SWA-22.  Optional, and reporting only: the supervisor's authority is a
      * series element in the coil, not anything this firmware consults.  What
      * this port is for is being able to tell the operator *which* condition
      * tripped, and that the button on the panel is what clears it. */
     const kiln_port_supervisor_t *supervisor;
 
-    /* Persistence (M5).  All optional: FR-LOG-14 requires the firing to
+    /* Persistence (M5).  All optional: SWR-LOG-14 requires the firing to
      * continue with a warning when the log store is unavailable, and the same
      * reasoning covers a board whose storage has not been wired up yet. */
     const kiln_port_logstore_t  *logstore;
@@ -81,7 +81,7 @@ typedef struct {
 } kiln_app_ports_t;
 
 /* Architecture 13.4 budgets 64 records for the log queue.  The control task
- * enqueues and only the logger touches flash (FR-LOG-14), so a full queue drops
+ * enqueues and only the logger touches flash (SWR-LOG-14), so a full queue drops
  * the sample and counts it rather than stalling control. */
 constexpr size_t KILN_APP_LOG_QUEUE = 64;
 
@@ -101,7 +101,7 @@ typedef struct {
 
     /* mode state machine, requirements section 2.2 */
     kiln_state_t state;
-    kiln_fault_t fault;              /* latched; SR-17                     */
+    kiln_fault_t fault;              /* latched; SWR-SAF-17                     */
     uint32_t     warnings;
 
     /* readings */
@@ -113,9 +113,9 @@ typedef struct {
     uint16_t duty_request;
     uint16_t duty_manual;
     bool     heat_authorised;
-    bool     heat_allowed;           /* FR-CTL-13 */
+    bool     heat_allowed;           /* SWR-CTL-13 */
 
-    /* current sampling (AD-17) */
+    /* current sampling (SWA-17) */
     bool     cur_fresh;              /* a measurement landed since the last
                                       * safety evaluation                   */
     bool     cur_burst_pending;
@@ -131,13 +131,13 @@ typedef struct {
     double   run_elapsed_s;
     float    alarm_timer_s;
 
-    /* FR-RUN-06 */
+    /* SWR-RUN-06 */
     bool     complete_pending;
 
     /* --- logging (FR-LOG) --------------------------------------------- */
     uint8_t  log_q[KILN_APP_LOG_QUEUE][KILN_LOG_RECORD_BYTES];
     uint16_t log_head, log_tail;
-    uint32_t log_dropped;          /* FR-LOG-14 / warning 103 */
+    uint32_t log_dropped;          /* SWR-LOG-14 / warning 103 */
     uint32_t log_written;
     uint32_t log_errors;
     double   log_accum_s;
@@ -145,17 +145,17 @@ typedef struct {
     uint32_t last_logged_warnings;
     bool     log_run_open;
 
-    /* --- boot (FR-RUN-08, SR-17) -------------------------------------- */
+    /* --- boot (SWR-RUN-08, SWR-SAF-17) -------------------------------------- */
     kiln_recovery_decision_t recovery;
     kiln_latched_fault_t     latched;
     bool                     latched_valid;
     bool                     config_storage_failed;   /* fault 20 */
 
-    /* SR-12: the baseline is the run history, loaded at boot. */
+    /* SWR-SAF-12: the baseline is the run history, loaded at boot. */
     kiln_insulation_baseline_t baseline;
     bool                       baseline_valid;
 
-    /* NFR-17: safety cycles called with an argument that violated the contract.
+    /* SWR-NFR-17: safety cycles called with an argument that violated the contract.
      * Non-zero is a defect in the task that drives this one. */
     uint32_t safety_bad_calls;
 } kiln_app_t;
@@ -164,22 +164,22 @@ typedef struct {
 kiln_err_t kiln_app_init(kiln_app_t *app, const kiln_app_ports_t *ports,
                          const kiln_config_t *cfg);
 
-/* FR-CFG-03/04/08: validate, refuse what may not change now, apply the rest. */
+/* SWR-CFG-03/04/08: validate, refuse what may not change now, apply the rest. */
 kiln_err_t kiln_app_apply_config(kiln_app_t *app, const kiln_config_t *cfg,
                                  const kiln_cfg_item_t **bad);
 
 /* Everything that has to happen once, before the cycles start running:
  * configuration, seeded programs, the run-id sequence, the latched fault of
- * SR-17, and the power-loss decision of FR-RUN-08.
+ * SWR-SAF-17, and the power-loss decision of SWR-RUN-08.
  *
  * `outage_s` is how long power was off if the wall clock can say; pass a
  * negative value when it cannot, because an unknown outage is not a short one.
  *
- * Performs one acquisition cycle of its own before deciding, because FR-RUN-08's
+ * Performs one acquisition cycle of its own before deciding, because SWR-RUN-08's
  * band test needs a temperature that has actually been measured.
  *
  * Returns KILN_OK, or KILN_ERR_IO when configuration storage failed -- in which
- * case defaults are in use and FR-CFG-05 wants fault 20 reported. */
+ * case defaults are in use and SWR-CFG-05 wants fault 20 reported. */
 kiln_err_t kiln_app_boot(kiln_app_t *app, kiln_reset_cause_t cause, float outage_s);
 
 static inline const kiln_recovery_decision_t *kiln_app_recovery(const kiln_app_t *app)
@@ -187,12 +187,12 @@ static inline const kiln_recovery_decision_t *kiln_app_recovery(const kiln_app_t
     return &app->recovery;
 }
 
-/* FR-LOG-04: an out-of-band record, written at once rather than at the next
+/* SWR-LOG-04: an out-of-band record, written at once rather than at the next
  * sample boundary. */
 void kiln_app_log_event(kiln_app_t *app, kiln_log_event_t event);
 
 /* Drain up to `max_records` to the log store.  The only call here that touches
- * flash, and the only one that may block (FR-LOG-14). */
+ * flash, and the only one that may block (SWR-LOG-14). */
 uint32_t kiln_app_log_drain(kiln_app_t *app, uint32_t max_records);
 
 void kiln_app_window_tick(kiln_app_t *app, uint32_t dt_ms);
@@ -214,8 +214,8 @@ kiln_err_t kiln_app_idle(kiln_app_t *app);
 
 void kiln_app_snapshot(const kiln_app_t *app, kiln_snapshot_t *out);
 
-/* FR-CUR-07: apparent power and cumulative energy from the measured current
- * and the configured mains voltage.  A resistive load is assumed (ASM-09),
+/* SWR-CUR-07: apparent power and cumulative energy from the measured current
+ * and the configured mains voltage.  A resistive load is assumed (SYS-ASM-09),
  * and every presentation of these figures states it. */
 double  kiln_app_apparent_va(const kiln_app_t *app);
 double  kiln_app_energy_wh(const kiln_app_t *app);

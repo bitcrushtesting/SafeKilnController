@@ -56,7 +56,7 @@ insert_h    = 5.0;
 use_inserts = true;
 
 /* [Ventilation] ---------------------------------------------------------- */
-// SR-11 trips on enclosure over-temperature, so the box has to actually
+// SWR-SAF-11 trips on enclosure over-temperature, so the box has to actually
 // breathe. Slots are on the side walls, not the top, to keep kiln-room dust
 // and debris from dropping straight in.
 vent            = true;
@@ -84,7 +84,7 @@ enc_nut_d   = 10.0;  // recess for the mounting nut
 enc_nut_h   = 1.2;
 
 // Sound port over the on-board buzzer (BZ1, TMB12A05, 12 mm dia). A buzzer
-// sealed inside the box is heavily muffled, and SR-20 depends on the operator
+// sealed inside the box is heavily muffled, and SWR-SAF-20 depends on the operator
 // actually hearing it, so the lid is perforated above it.
 buzz_x        = 45;    // centre of BZ1, relative to the PCB origin
 buzz_y        = 15;

@@ -9,7 +9,7 @@
 # Why a simulated plant rather than emulated peripherals: QEMU's esp32s3 model
 # covers the CPU, memory, flash and UART.  It does not model a MAX31856 on SPI,
 # an SSD1306 on I2C, the ADC, or PCNT -- so there is nothing for a thermocouple
-# driver to talk to and nothing for the CT front end to sample.  AD-01 is what
+# driver to talk to and nothing for the CT front end to sample.  SWA-01 is what
 # makes this work anyway: the plant substitutes at the *port* boundary, which is
 # the same seam the host tests use, so the code under test is the real control and
 # safety path rather than a mock of it.
@@ -18,8 +18,8 @@
 # periods, the real core logic end to end against a plant that responds, the
 # window and current-gating timing, the state machine, and every fault injection
 # -- all on the target's own compiler, scheduler and FPU.  What it cannot
-# exercise: the drivers, the charge-pump release of AD-05, and anything else that
-# needs a pin.  Those are target-and-HIL work (TR-17).
+# exercise: the drivers, the charge-pump release of SWA-05, and anything else that
+# needs a pin.  Those are target-and-HIL work (SWR-TST-17).
 
 CONFIG_KILN_PLANT_SIM=y
 

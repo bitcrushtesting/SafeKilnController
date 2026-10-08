@@ -1,8 +1,8 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * One test per thermal safety rule -- SR-04..SR-13, plus the reading-validity
- * behaviour of FR-ACQ-12 and the non-latching warning semantics of Appendix A.
+ * One test per thermal safety rule -- SWR-SAF-04..SWR-SAF-13, plus the reading-validity
+ * behaviour of SWR-ACQ-12 and the non-latching warning semantics of Appendix A.
  */
 
 #include "kiln_check.h"
@@ -43,9 +43,9 @@ static kiln_fault_t run_for(kiln_safety_t *s, kiln_safety_input_t *in, float sec
     return KILN_FAULT_NONE;
 }
 
-/* --- SR-04 ------------------------------------------------------------- */
+/* --- SWR-SAF-04 ------------------------------------------------------------- */
 
-KILN_TEST(sr04_tolerates_a_glitch_and_latches_a_persistent_tc_fault)
+KILN_TEST(swrsaf04_tolerates_a_glitch_and_latches_a_persistent_tc_fault)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -53,7 +53,7 @@ KILN_TEST(sr04_tolerates_a_glitch_and_latches_a_persistent_tc_fault)
 
     kiln_safety_input_t in = base();
 
-    /* FR-ACQ-12: inside the grace period a reported fault is tolerated. */
+    /* SWR-ACQ-12: inside the grace period a reported fault is tolerated. */
     in.tc_fault_bits = KILN_TC_FAULT_OPEN;
     in.kiln_valid    = false;
     CHECK_EQ_INT(run_for(&s, &in, c.tc_grace_s - 1.0f), KILN_FAULT_NONE);
@@ -69,7 +69,7 @@ KILN_TEST(sr04_tolerates_a_glitch_and_latches_a_persistent_tc_fault)
     CHECK_EQ_INT(run_for(&s, &in, c.tc_grace_s + 1.0f), KILN_FAULT_TC_OPEN);
 }
 
-KILN_TEST(sr04_maps_each_fault_bit_to_its_own_code)
+KILN_TEST(swrsaf04_maps_each_fault_bit_to_its_own_code)
 {
     const kiln_safety_cfg_t c = cfg();
     const struct { uint16_t bits; kiln_fault_t want; } cases[] = {
@@ -91,7 +91,7 @@ KILN_TEST(sr04_maps_each_fault_bit_to_its_own_code)
     }
 }
 
-KILN_TEST(sr04_case_channel_reports_its_own_code)
+KILN_TEST(swrsaf04_case_channel_reports_its_own_code)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -105,7 +105,7 @@ KILN_TEST(sr04_case_channel_reports_its_own_code)
 
 KILN_TEST(an_invalid_chamber_reading_withholds_heat_without_latching)
 {
-    /* FR-ACQ-12's grace period says tolerate the fault, not control on a number
+    /* SWR-ACQ-12's grace period says tolerate the fault, not control on a number
      * the front end has disowned. */
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -122,7 +122,7 @@ KILN_TEST(an_invalid_chamber_reading_withholds_heat_without_latching)
 
 KILN_TEST(a_non_finite_reading_is_treated_as_an_invalid_one)
 {
-    /* NFR-17 / SR-01: a NaN must not be able to produce a non-zero duty, and a
+    /* SWR-NFR-17 / SYS-SAF-01: a NaN must not be able to produce a non-zero duty, and a
      * NaN compared against a limit satisfies no comparison at all. */
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -135,9 +135,9 @@ KILN_TEST(a_non_finite_reading_is_treated_as_an_invalid_one)
     CHECK(!v.heat_permitted);
 }
 
-/* --- SR-05 / SR-06 / SR-07 / SR-08 / SR-10 ----------------------------- */
+/* --- SWR-SAF-05 / SWR-SAF-06 / SWR-SAF-07 / SWR-SAF-08 / SWR-SAF-10 ----------------------------- */
 
-KILN_TEST(sr05_latches_a_reversed_thermocouple)
+KILN_TEST(swrsaf05_latches_a_reversed_thermocouple)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -154,7 +154,7 @@ KILN_TEST(sr05_latches_a_reversed_thermocouple)
     CHECK_EQ_INT(run_for(&s, &in, 2.0f), KILN_FAULT_TC_REVERSED);
 }
 
-KILN_TEST(sr05_does_not_trip_on_an_overshoot_that_recovers)
+KILN_TEST(swrsaf05_does_not_trip_on_an_overshoot_that_recovers)
 {
     /* The false trip this confirmation window exists to prevent: the controller
      * pushes duty back up while the kiln, ten seconds of transport lag behind it,
@@ -169,7 +169,7 @@ KILN_TEST(sr05_does_not_trip_on_an_overshoot_that_recovers)
 
     for (int cycle = 0; cycle < 20; cycle++) {
         /* Fall 8 degC over ten seconds, then recover the same 8.  The setpoint
-         * follows, because SR-10 is not the subject here. */
+         * follows, because SWR-SAF-10 is not the subject here. */
         for (int i = 0; i < 100; i++) {
             in.kiln_c    -= 0.08f;
             in.setpoint_c = in.kiln_c;
@@ -183,7 +183,7 @@ KILN_TEST(sr05_does_not_trip_on_an_overshoot_that_recovers)
     }
 }
 
-KILN_TEST(sr06_latches_a_stuck_sensor_after_its_window)
+KILN_TEST(swrsaf06_latches_a_stuck_sensor_after_its_window)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -195,11 +195,11 @@ KILN_TEST(sr06_latches_a_stuck_sensor_after_its_window)
     CHECK_EQ_INT(run_for(&s, &in, c.stuck_window_s + 1.0f), KILN_FAULT_TC_STUCK);
 }
 
-KILN_TEST(sr06_holds_its_window_across_an_invalid_reading)
+KILN_TEST(swrsaf06_holds_its_window_across_an_invalid_reading)
 {
     /* The reason the rules hold rather than reset: a sensor that glitches once
      * per grace period would otherwise keep a 10 min window permanently at zero,
-     * which disables SR-06 altogether. */
+     * which disables SWR-SAF-06 altogether. */
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
     kiln_safety_init(&s, &c);
@@ -218,7 +218,7 @@ KILN_TEST(sr06_holds_its_window_across_an_invalid_reading)
     CHECK_EQ_INT(run_for(&s, &in, c.stuck_window_s), KILN_FAULT_TC_STUCK);
 }
 
-KILN_TEST(sr06_does_not_record_an_invalid_reading_as_a_window_extreme)
+KILN_TEST(swrsaf06_does_not_record_an_invalid_reading_as_a_window_extreme)
 {
     /* A frozen value admitted into min/max is indistinguishable from a stuck
      * probe -- and worse, a wild one would make a stuck probe look healthy. */
@@ -237,10 +237,10 @@ KILN_TEST(sr06_does_not_record_an_invalid_reading_as_a_window_extreme)
     CHECK_NEAR(s.stuck.max_c, 500.0f, 0.001f);
 }
 
-KILN_TEST(sr07_latches_a_heating_failure)
+KILN_TEST(swrsaf07_latches_a_heating_failure)
 {
     kiln_safety_t s;
-    /* SR-06's window is shorter than SR-07's and would fire first on a reading
+    /* SWR-SAF-06's window is shorter than SWR-SAF-07's and would fire first on a reading
      * that never moves at all, so it is pushed out of the way here: this test is
      * about the runaway rule, and the two are exercised separately. */
     kiln_safety_cfg_t c = cfg();
@@ -253,7 +253,7 @@ KILN_TEST(sr07_latches_a_heating_failure)
     CHECK_EQ_INT(run_for(&s, &in, c.runaway_window_s + 1.0f), KILN_FAULT_RUNAWAY);
 }
 
-KILN_TEST(sr07_does_not_trip_while_the_kiln_is_rising)
+KILN_TEST(swrsaf07_does_not_trip_while_the_kiln_is_rising)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -262,7 +262,7 @@ KILN_TEST(sr07_does_not_trip_while_the_kiln_is_rising)
     kiln_safety_input_t in = base();
     in.duty_permille = 1000;
     in.rate_c_per_h  = 150.0f;
-    /* And the reading moves as the rate says it does, so SR-06 is satisfied too. */
+    /* And the reading moves as the rate says it does, so SWR-SAF-06 is satisfied too. */
     const int steps = (int)((c.runaway_window_s + 100.0f) / 0.1f);
     for (int i = 0; i < steps; i++) {
         in.kiln_c += 150.0f / 3600.0f * 0.1f;
@@ -270,7 +270,7 @@ KILN_TEST(sr07_does_not_trip_while_the_kiln_is_rising)
     }
 }
 
-KILN_TEST(sr08_latches_uncommanded_heating_after_the_settle_period)
+KILN_TEST(swrsaf08_latches_uncommanded_heating_after_the_settle_period)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -291,7 +291,7 @@ KILN_TEST(sr08_latches_uncommanded_heating_after_the_settle_period)
     CHECK_EQ_INT(run_for(&s, &in, 1.0f), KILN_FAULT_UNCOMMANDED_HEAT);
 }
 
-KILN_TEST(sr08_is_not_fooled_by_a_cooling_kiln)
+KILN_TEST(swrsaf08_is_not_fooled_by_a_cooling_kiln)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -310,7 +310,7 @@ KILN_TEST(sr08_is_not_fooled_by_a_cooling_kiln)
     }
 }
 
-KILN_TEST(sr09_withholds_heat_at_the_limit_and_latches_beyond_the_margin)
+KILN_TEST(swrsaf09_withholds_heat_at_the_limit_and_latches_beyond_the_margin)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -329,9 +329,9 @@ KILN_TEST(sr09_withholds_heat_at_the_limit_and_latches_beyond_the_margin)
     CHECK_EQ_INT(v2.fault, KILN_FAULT_OVERTEMP);
 }
 
-KILN_TEST(sr09_binds_the_compile_time_ceiling_whatever_is_configured)
+KILN_TEST(swrsaf09_binds_the_compile_time_ceiling_whatever_is_configured)
 {
-    /* SR-23: no configuration may exceed the compile-time ceiling. */
+    /* SWR-SAF-23: no configuration may exceed the compile-time ceiling. */
     kiln_safety_t s;
     kiln_safety_cfg_t c = cfg();
     c.max_temp_c = 5000.0f;
@@ -339,7 +339,7 @@ KILN_TEST(sr09_binds_the_compile_time_ceiling_whatever_is_configured)
     CHECK_NEAR(s.cfg.max_temp_c, KILN_TEMP_CEILING_C, 0.01f);
 }
 
-KILN_TEST(sr10_latches_a_setpoint_excursion)
+KILN_TEST(swrsaf10_latches_a_setpoint_excursion)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -351,7 +351,7 @@ KILN_TEST(sr10_latches_a_setpoint_excursion)
     CHECK_EQ_INT(run_for(&s, &in, c.excursion_window_s + 1.0f), KILN_FAULT_SP_EXCURSION);
 }
 
-KILN_TEST(sr11_latches_an_over_hot_enclosure)
+KILN_TEST(swrsaf11_latches_an_over_hot_enclosure)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -365,7 +365,7 @@ KILN_TEST(sr11_latches_an_over_hot_enclosure)
     CHECK_EQ_INT(v.fault, KILN_FAULT_CASE_OVERTEMP);
 }
 
-KILN_TEST(sr12_warns_when_a_band_costs_more_than_the_baseline)
+KILN_TEST(swrsaf12_warns_when_a_band_costs_more_than_the_baseline)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -391,7 +391,7 @@ KILN_TEST(sr12_warns_when_a_band_costs_more_than_the_baseline)
     CHECK(v.heat_permitted);     /* a warning never withholds heat */
 }
 
-KILN_TEST(sr13_reports_a_missed_deadline_and_withholds_heat)
+KILN_TEST(swrsaf13_reports_a_missed_deadline_and_withholds_heat)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -414,7 +414,7 @@ KILN_TEST(sr13_reports_a_missed_deadline_and_withholds_heat)
 
 KILN_TEST(warning_107_clears_when_duty_comes_off_the_ceiling)
 {
-    /* Appendix A defines warnings as non-latching, and FR-CTL-15's is a live
+    /* Appendix A defines warnings as non-latching, and SWR-CTL-15's is a live
      * condition: the kiln is at full power *now*. */
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -424,7 +424,7 @@ KILN_TEST(warning_107_clears_when_duty_comes_off_the_ceiling)
     kiln_safety_input_t in = base();
     in.duty_permille = KILN_DUTY_MAX;
 
-    /* Rising as it goes, so SR-06 and SR-07 stay satisfied: the warning is the
+    /* Rising as it goes, so SWR-SAF-06 and SWR-SAF-07 stay satisfied: the warning is the
      * subject here, not a race between rules. */
     for (int i = 0; i < (int)(c.saturated_warn_s / 0.1f) + 10; i++) {
         in.kiln_c += 0.01f;
@@ -475,7 +475,7 @@ KILN_TEST(warning_101_stays_for_the_run_because_its_evidence_has_passed)
 KILN_TEST(eval_checked_separates_an_invalid_argument_from_a_missed_deadline)
 {
     /* Reporting fault 14 for a NULL pointer conflates a firmware defect with
-     * SR-13's missed deadline, and sends the reader looking at the scheduler. */
+     * SWR-SAF-13's missed deadline, and sends the reader looking at the scheduler. */
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
     kiln_safety_init(&s, &c);
@@ -486,7 +486,7 @@ KILN_TEST(eval_checked_separates_an_invalid_argument_from_a_missed_deadline)
     CHECK(!v.heat_permitted);
     CHECK_EQ_INT(v.fault, KILN_FAULT_NONE);
 
-    /* And the unchecked form too: fault 14 is SR-13's missed deadline and
+    /* And the unchecked form too: fault 14 is SWR-SAF-13's missed deadline and
      * nothing else, so a bad argument must not borrow it. */
     v = kiln_safety_eval(&s, &in, -1.0f);
     CHECK(!v.heat_permitted);

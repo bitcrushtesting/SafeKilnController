@@ -3,8 +3,8 @@
  *
  * The four views of architecture 12.3 -- Dashboard, Programs, History, Settings.
  *
- * Plain ES modules, no framework, no build step (CON-06, FR-WEB-02).  Everything
- * goes through the documented REST API and nothing else (AD-16, FR-WEB-19), so
+ * Plain ES modules, no framework, no build step (UR-CON-06, SWR-WEB-02).  Everything
+ * goes through the documented REST API and nothing else (SWA-16, SWR-WEB-19), so
  * anything this file can do is something the API exposes and documents.
  */
 
@@ -32,7 +32,7 @@ async function api(method, path, body) {
   try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON, e.g. CSV */ }
 
   if (!r.ok) {
-    /* FR-WEB-20: the error carries a code and a message, and the message is
+    /* SWR-WEB-20: the error carries a code and a message, and the message is
      * written for the operator -- so it is shown verbatim rather than replaced
      * with something vaguer. */
     const e = new Error((data && data.error && data.error.message) || `HTTP ${r.status}`);
@@ -53,9 +53,9 @@ function toast(node, message, kind) {
   node._t = setTimeout(() => { node.hidden = true; }, 6000);
 }
 
-/* --- live state (FR-WEB-05, FR-WEB-25) ---------------------------------- */
+/* --- live state (SWR-WEB-05, SWR-WEB-25) ---------------------------------- */
 
-/* --- NFR-23: operator language --------------------------------------
+/* --- SWR-NFR-23: operator language --------------------------------------
  *
  * Only the interface's own chrome lives here.  Fault and warning text comes
  * from the firmware already translated (kiln_core/faults is the single
@@ -135,7 +135,7 @@ function connect() {
     } catch { /* a truncated frame is simply skipped */ }
   });
   sse.addEventListener('error', () => {
-    /* FR-WEB-25: say the connection is gone rather than leaving old values
+    /* SWR-WEB-25: say the connection is gone rather than leaving old values
      * looking current, and reconnect with backoff rather than hammering a device
      * that is busy firing. */
     setConn('down', 'reconnecting');
@@ -155,7 +155,7 @@ setInterval(() => {
   if (stale && sse && sse.readyState === 1) setConn('stale', `stale ${Math.round(age / 1000)}s`);
 }, 1000);
 
-/* --- banner (FR-WEB-24) ------------------------------------------------- */
+/* --- banner (SWR-WEB-24) ------------------------------------------------- */
 
 function renderBanner(s) {
   const b = $('banner');
@@ -212,7 +212,7 @@ function renderDash() {
   setReadout('r-rate', (s.rate_c_per_h >= 0 ? '+' : '') + num(s.rate_c_per_h, 0));
   setReadout('r-duty', num(s.duty_permille / 10, 0));
   setReadout('r-current', num(s.current_a, 2));
-  /* FR-CUR-07: totals across the measured phases, in the units a kiln owner
+  /* SWR-CUR-07: totals across the measured phases, in the units a kiln owner
      actually thinks in -- kW and kWh, not VA and Wh. */
   setReadout('r-power', live.power ? num(live.power.kw, 2) : '--');
   setReadout('r-energy', live.power ? num(live.power.kwh, 2) : '--');
@@ -233,7 +233,7 @@ function renderDash() {
 
   renderBanner(s);
 
-  /* FR-WEB-08: once a run is live, fetch its planned curve once and let the
+  /* SWR-WEB-08: once a run is live, fetch its planned curve once and let the
    * chart draw it as a dashed continuation. */
   if (running && s.program && planLoadedFor !== s.program) {
     planLoadedFor = s.program;
@@ -247,7 +247,7 @@ function renderDash() {
   if (!running) planLoadedFor = null;
 }
 
-/* FR-CUR-07 / FR-CUR-15.  Power and energy come from /api/current rather than
+/* SWR-CUR-07 / FR-CUR-15.  Power and energy come from /api/current rather than
    the telemetry stream: they change slowly, and the SSE payload is kept to what
    the chart needs.  Totals are summed over the measured phases by the firmware,
    so the client does no arithmetic it could get wrong. */
@@ -297,14 +297,14 @@ async function refreshDashLog() {
   const run = s.run_id || 0;
   if (!run) return;
   try {
-    /* max_points matched to the canvas, which is how FR-WEB-11's budget is met:
+    /* max_points matched to the canvas, which is how SWR-WEB-11's budget is met:
      * the device decimates to what can actually be drawn. */
     const width = Math.max(200, Math.round($('chart').clientWidth));
     chart.setData(await get(`/api/log?run=${run}&max_points=${width}`));
   } catch { /* the chart keeps the data it has */ }
 }
 
-/* --- programs (FR-WEB-12, FR-WEB-13) ----------------------------------- */
+/* --- programs (SWR-WEB-12, SWR-WEB-13) ----------------------------------- */
 
 let editing = null, edChart = null;
 
@@ -364,7 +364,7 @@ function segRow(seg, i) {
   return tr;
 }
 
-/* FR-WEB-26: a viewer, not an editor.  Every field is disabled unconditionally
+/* SWR-WEB-26: a viewer, not an editor.  Every field is disabled unconditionally
    rather than by the program's readonly flag, because nothing here can be
    saved whatever the flag says. */
 function renderEditor() {
@@ -383,9 +383,9 @@ function renderEditor() {
   previewEdit();
 }
 
-/* FR-WEB-12: the resulting curve, previewed before saving.  Computed locally so
+/* SWR-WEB-12: the resulting curve, previewed before saving.  Computed locally so
  * it follows every keystroke; the server still re-validates on save, which is
- * FR-WEB-13 and is the check that counts. */
+ * SWR-WEB-13 and is the check that counts. */
 function previewEdit() {
   if (!edChart || !editing) return;
   let t = 0, from = 20;
@@ -409,7 +409,7 @@ async function editProgram(id) {
   renderEditor();
 }
 
-/* --- history (FR-WEB-09, FR-WEB-18) ------------------------------------ */
+/* --- history (SWR-WEB-09, SWR-WEB-18) ------------------------------------ */
 
 let histChart = null, histRun = null;
 
@@ -430,7 +430,7 @@ async function loadRuns() {
     const bits = [`peak ${r.peak_c.toFixed(0)}°C`, fmtDur(r.duration_s), r.end_reason];
     if (r.energy_wh) bits.push(`${(r.energy_wh / 1000).toFixed(2)} kWh`);
     if (r.fault) bits.push(`fault: ${r.fault}`);
-    /* FR-LOG-09: an empty chart for this run is expected, not a bug. */
+    /* SWR-LOG-09: an empty chart for this run is expected, not a bug. */
     if (r.samples_truncated) bits.push('samples overwritten');
     left.append(el('div', 'sub', bits.join(' · ')));
     li.append(left);
@@ -459,7 +459,7 @@ async function selectRun(id, list, li) {
   }
 }
 
-/* --- settings (FR-WEB-17) ---------------------------------------------- */
+/* --- settings (SWR-WEB-17) ---------------------------------------------- */
 
 let cfgItems = [], cfgEdits = {};
 
@@ -508,7 +508,7 @@ async function loadConfig() {
         input = el('input');
         input.type = it.secret ? 'password' : 'text';
         input.maxLength = it.max_len;
-        /* FR-CFG-07: a secret is never sent to us, so the field starts empty and
+        /* SWR-CFG-07: a secret is never sent to us, so the field starts empty and
          * only a typed value is submitted. */
         input.value = it.secret ? '' : (it.value || '');
         input.placeholder = it.secret ? (it.set ? '(set)' : '(not set)') : '';
@@ -556,7 +556,7 @@ async function loadDiagnostics() {
   }
 }
 
-/* FR-PROD-03.  The firmware always sends a `production` object and says in it
+/* SWR-PROD-03.  The firmware always sends a `production` object and says in it
  * whether it means anything, so the unprogrammed case is a label rather than a
  * missing section: a board that has not been through production should say so
  * out loud, not render as a unit with blank fields. */
@@ -609,7 +609,7 @@ async function pollTune() {
       const box = $('tune-state');
       box.hidden = false;
       box.innerHTML = '';
-      /* FR-WEB-26: the candidates are shown, and accepting one is done at
+      /* SWR-WEB-26: the candidates are shown, and accepting one is done at
          the kiln. Listing them here is still worth it, because choosing a
          rule is a judgement the operator makes better with the numbers in
          front of them than from a menu on a 128x64 panel. */
@@ -659,7 +659,7 @@ function wire() {
   ['c-sp', 'c-plan', 'c-duty', 'c-cur', 'c-case'].forEach(id => { $(id).onchange = vis; });
   $('c-reset').onclick = () => chart.resetZoom();
 
-  /* FR-WEB-26: the program screen displays a stored curve and does not edit
+  /* SWR-WEB-26: the program screen displays a stored curve and does not edit
      one. The name and description fields are read-only for the same reason
      the buttons are gone. */
 

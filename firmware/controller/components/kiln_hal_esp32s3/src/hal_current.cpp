@@ -1,13 +1,13 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Heater current front end: current transformer into ADC1 via HR-17's
- * conditioning (FR-CUR-01..FR-CUR-05, FR-CUR-11, FR-CUR-14, AD-17).
+ * Heater current front end: current transformer into ADC1 via SYS-HW-17's
+ * conditioning (SWR-CUR-01..SWR-CUR-05, SWR-CUR-11, SWR-CUR-14, SWA-17).
  *
  * The port hands up **raw ADC counts**, mid-rail biased exactly as they arrive.
  * Removing the bias, computing true RMS over whole mains cycles and scaling to
  * amps is kiln_core/current, where it is tested against a synthetic waveform
- * (TR-13).  In particular the noise floor must survive to the core: FR-CUR-11
+ * (SWR-TST-13).  In particular the noise floor must survive to the core: SWR-CUR-11
  * distinguishes an absent transformer from a genuine zero by the absence of any
  * signal *at all, including noise*, and an adapter that helpfully squelched
  * small values would destroy that distinction.
@@ -15,8 +15,8 @@
  * ---------------------------------------------------------------------------
  * Why the DMA continuous driver and not one-shot reads
  * ---------------------------------------------------------------------------
- * FR-CUR-14 says measurement may not delay the control or safety cycles, and
- * FR-CUR-03 wants RMS over a whole number of mains cycles so the result does
+ * SWR-CUR-14 says measurement may not delay the control or safety cycles, and
+ * SWR-CUR-03 wants RMS over a whole number of mains cycles so the result does
  * not depend on sampling phase.  One-shot reads in a loop would either block a
  * task for 40 ms or jitter badly enough to put energy at the wrong frequency.
  * The continuous driver samples into a DMA pool on its own, and the burst
@@ -24,9 +24,9 @@
  *
  * The stream runs continuously and a burst is carved out of it.  start_burst
  * therefore *flushes* first: the pool may hold samples from the previous
- * commanded window, and AD-17's whole point is that a measurement belongs to
+ * commanded window, and SWA-17's whole point is that a measurement belongs to
  * one window.  Mixing conduction and leakage samples in one RMS would make
- * SR-25 and SR-26 meaningless, which is the failure the gating exists to stop.
+ * SWR-SAF-25 and SWR-SAF-26 meaningless, which is the failure the gating exists to stop.
  *
  * ---------------------------------------------------------------------------
  * One channel, and why (HR-23, tasklist I1)
@@ -62,7 +62,7 @@ namespace {
 
 typedef struct {
     adc_continuous_handle_t handle;
-    uint32_t          rate_hz;        /* achieved, which is what FR-CUR-03 wants */
+    uint32_t          rate_hz;        /* achieved, which is what SWR-CUR-03 wants */
     bool              running;
 
     /* the burst in flight */
@@ -72,7 +72,7 @@ typedef struct {
     uint16_t          have;
     uint16_t          samples[KILN_CUR_BURST_MAX];
 
-    /* FR-CUR-11: a live winding always contributes some noise. */
+    /* SWR-CUR-11: a live winding always contributes some noise. */
     bool              ever_sampled;
     uint16_t          last_min, last_max;
 } cur_t;
@@ -107,7 +107,7 @@ kiln_err_t cur_configure(void *ctx, uint8_t channel, uint32_t sample_rate_hz)
         return KILN_ERR_INVALID_ARG;
     }
     if (sample_rate_hz < KILN_CUR_RATE_MIN_HZ) {
-        return KILN_ERR_RANGE;       /* FR-CUR-03's floor */
+        return KILN_ERR_RANGE;       /* SWR-CUR-03's floor */
     }
 
     if (c->running) {
@@ -123,7 +123,7 @@ kiln_err_t cur_configure(void *ctx, uint8_t channel, uint32_t sample_rate_hz)
      * NOLINTNEXTLINE(bugprone-invalid-enum-default-initialization) */
     adc_continuous_config_t cfg = {};
     adc_digi_pattern_config_t pat = {};
-    pat.atten     = ADC_ATTEN_DB_12;      /* HR-17 clamps to the ADC rails */
+    pat.atten     = ADC_ATTEN_DB_12;      /* SYS-HW-17 clamps to the ADC rails */
     pat.channel   = (adc_channel_t)KILN_HAL_CURR_ADC_CHANNEL;
     pat.unit      = ADC_UNIT_1;
     pat.bit_width = ADC_BITWIDTH_12;
@@ -166,7 +166,7 @@ kiln_err_t cur_start_burst(void *ctx, uint8_t channel,
         return KILN_ERR_BUSY;
     }
 
-    /* AD-17: this burst belongs to *this* commanded window.  Anything already
+    /* SWA-17: this burst belongs to *this* commanded window.  Anything already
      * in the pool belongs to the last one. */
     drain_pool(c);
 
@@ -188,7 +188,7 @@ kiln_err_t cur_read_burst(void *ctx, uint8_t channel, kiln_cur_burst_t *out)
     }
 
     /* Take whatever has arrived and return BUSY until the burst is whole.  The
-     * caller polls from its own cycle, so this never waits (FR-CUR-14). */
+     * caller polls from its own cycle, so this never waits (SWR-CUR-14). */
     uint8_t  frame[CUR_FRAME_BYTES];
     uint32_t got = 0;
     while (c->have < c->want &&
@@ -237,7 +237,7 @@ void cur_abort_burst(void *ctx, uint8_t channel)
     if ((c == nullptr) || channel != 0u) {
         return;
     }
-    /* FR-CUR-05: the window closed early, so discard rather than mix. */
+    /* SWR-CUR-05: the window closed early, so discard rather than mix. */
     c->armed = false;
     c->have  = 0;
     drain_pool(c);
@@ -252,8 +252,8 @@ bool cur_present(void *ctx, uint8_t channel)
     if (!c->ever_sampled) {
         return c->running;      /* nothing measured yet: no opinion but "wired" */
     }
-    /* FR-CUR-11, and the adapter's half of it: the front end's own view is
-     * whether the DC bias sits where HR-17's conditioning puts it.  An open
+    /* SWR-CUR-11, and the adapter's half of it: the front end's own view is
+     * whether the DC bias sits where SYS-HW-17's conditioning puts it.  An open
      * input has no DC path and drifts to a rail.  The *absence of a noise
      * floor* is the core's test, not this one, because only the core knows
      * what the floor should look like after scaling.

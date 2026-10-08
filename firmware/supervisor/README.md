@@ -5,7 +5,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # The independent safety supervisor
 
-Firmware for the second microcontroller of [`AD-22`](../docs/architecture.sdoc).
+Firmware for the second microcontroller of [`SWA-22`](../docs/04_software_arch.sdoc).
 It reads the chamber thermocouple, the front end's fault output and the lid
 switch, holds one series element in the contactor coil, and reports to the
 ESP32 over a one-way serial link. It takes no instruction from anything.
@@ -77,7 +77,7 @@ Why this one:
   from its own oscillator and cannot be disabled in software once started.
 - **LQFP32 rather than QFN.** Hand-solderable, reworkable, and every pin can be
   probed, which matters for a part whose whole argument is that it can be
-  verified independently. `HR-19` already requires top-side test points for the
+  verified independently. `SYS-HW-19` already requires top-side test points for the
   same reason.
 - **64 KB of flash against a firmware that currently uses 3.5 KB.** The
   headroom is not for features. It is for self-tests, and for the fact that a
@@ -101,13 +101,13 @@ firmware/supervisor/
   test/host/    24 tests, no ARM toolchain needed
 ```
 
-The split is the one [`AD-01`](../docs/architecture.sdoc) makes on the other
+The split is the one [`SWA-01`](../docs/04_software_arch.sdoc) makes on the other
 side of the link, for the same reason: everything that *decides* is
 platform-free and exercised on a development host, and what needs the silicon
 is thin enough to read.
 
 `core/` shares no code with the ESP32's safety rules. That is the point of
-`AD-22`; any resemblance is a resemblance and not reuse. The one file both
+`SWA-22`; any resemblance is a resemblance and not reuse. The one file both
 projects include is `protocol/include/sup_proto.h`, which is declarative, and
 the host test harness, which is macros.
 
@@ -122,7 +122,7 @@ ctest --test-dir build-sup --output-on-failure
 ```
 
 Target firmware. The compiler ships with STM32CubeCLT, so nothing is fetched at
-build time (`CON-04`):
+build time (`UR-CON-04`):
 
 ```sh
 cmake -B build-sup-target -S supervisor \

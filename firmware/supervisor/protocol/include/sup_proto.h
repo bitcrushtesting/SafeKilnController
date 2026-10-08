@@ -1,18 +1,18 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * The supervisor link wire format (AD-22, docs/safety-supervisor.md section 5).
+ * The supervisor link wire format (SWA-22, docs/safety-supervisor.md section 5).
  *
  * One header, two consumers: the STM32 supervisor that emits these frames and
  * the ESP32 adapter that consumes them.  The layout is declared once because a
  * wire format described in two places eventually disagrees with itself.
  *
  * The link is **simplex**.  The supervisor transmits; it has no receive path at
- * all.  With the thermocouple type fixed to K (FR-ACQ-02) there is nothing the
+ * all.  With the thermocouple type fixed to K (SWR-ACQ-02) there is nothing the
  * ESP32 could usefully tell it, and having no receiver is a stronger claim than
  * having one and being trusted not to act on what arrives.
  *
- * Sharing this header does not weaken the independence AD-22 buys.  It is
+ * Sharing this header does not weaken the independence SWA-22 buys.  It is
  * declarative: no trip logic crosses the boundary, and the only shared
  * behaviour is the CRC, whose failure mode is a rejected frame, which both
  * sides already treat as silence.

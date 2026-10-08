@@ -1,17 +1,17 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * The supervisor's trip logic (AD-22, docs/safety-supervisor.md section 3).
+ * The supervisor's trip logic (SWA-22, docs/safety-supervisor.md section 3).
  *
  * This is the whole safety function, and it is deliberately the only thing in
  * this component.  It is a pure function of an input snapshot plus its own
  * timers, with time injected, no globals and no platform headers, for the same
- * reason AD-01 to AD-03 say so on the other side of the link: a backstop whose
+ * reason SWA-01 to SWA-03 say so on the other side of the link: a backstop whose
  * behaviour cannot be exercised on a development host is a backstop nobody has
  * tested.
  *
  * It shares no code with the ESP32's safety rules, which is the point of
- * AD-22.  Any resemblance between the two is a resemblance, not reuse.
+ * SWA-22.  Any resemblance between the two is a resemblance, not reuse.
  *
  * Every threshold here is hard-coded.  There is no configuration, no
  * persistence and no receive path, so there is nothing to get into a state
@@ -26,8 +26,8 @@
 #include "sup_proto.h"
 
 /* The lid is NOT here, deliberately.  Its switch breaks the contactor coil in
- * hardware (HR-21), so it is already safe without any firmware involvement,
- * and SR-31's latch is gated on "while a heating state is active", which only
+ * hardware (SYS-HW-21), so it is already safe without any firmware involvement,
+ * and SWR-SAF-31's latch is gated on "while a heating state is active", which only
  * the ESP32 knows.  A supervisor that latched on lid open regardless would
  * trip every time the kiln was loaded cold: a nuisance trip, which HZ-10 names
  * as how protections come to be disabled.  The lid sense goes to the ESP32,
@@ -37,7 +37,7 @@
  *
  * SUP_OVERTEMP_C must agree with KILN_SUPERVISOR_TRIP_C on the ESP32 side, and
  * must stay above that side's KILN_TEMP_CEILING_C of 1300 degC.  The 50 degC
- * between them is the margin (SR-23); see safety-supervisor.md section 4 for
+ * between them is the margin (SWR-SAF-23); see safety-supervisor.md section 4 for
  * why the ceiling moved down rather than this moving up. */
 #define SUP_OVERTEMP_C      1350.0f
 

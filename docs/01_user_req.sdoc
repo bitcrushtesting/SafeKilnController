@@ -1,0 +1,773 @@
+[DOCUMENT]
+TITLE: Safe Kiln Controller, User Requirements
+UID: SAFEKILN-UR
+VERSION: 0.1 (draft)
+DATE: 2026-10-08
+OPTIONS:
+  MARKUP: Markdown
+  VIEW_STYLE: Table
+  NODE_IN_TOC: True
+METADATA:
+  SPDX-FileCopyrightText: 2026 Bitcrush Testing
+  SPDX-License-Identifier: GPL-3.0-or-later
+  Status: For review
+  Project: Safe Kiln Controller, PID kiln controller
+
+[GRAMMAR]
+ELEMENTS:
+- TAG: TEXT
+  FIELDS:
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+- TAG: SECTION
+  PROPERTIES:
+    IS_COMPOSITE: True
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: False
+  - TITLE: TITLE
+    TYPE: String
+    REQUIRED: True
+- TAG: MARKET
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: TITLE
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATUS
+    TYPE: SingleChoice(Active, Withdrawn, Superseded, Reversed, Resolved)
+    REQUIRED: True
+- TAG: REGULATION
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: TITLE
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: INSTRUMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: EDITION
+    TYPE: String
+    REQUIRED: True
+  - TITLE: REG_TYPE
+    TYPE: SingleChoice(Regulation, Directive, HarmonisedStandard, ProductStandard, Reference)
+    REQUIRED: True
+  - TITLE: ROUTE
+    TYPE: SingleChoice(SoldUnits, PublishedDesign, Both)
+    REQUIRED: True
+  - TITLE: APPLICABILITY
+    TYPE: String
+    REQUIRED: False
+  - TITLE: ASSESSMENT
+    TYPE: String
+    REQUIRED: False
+  - TITLE: STATUS
+    TYPE: SingleChoice(Active, Withdrawn, Superseded, Reversed, Resolved)
+    REQUIRED: True
+  RELATIONS:
+  - TYPE: Parent
+    ROLE: Applies to market
+    REVERSE_ROLE: Brings in
+- TAG: REQUIREMENT
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: TITLE
+    TYPE: String
+    REQUIRED: False
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: RATIONALE
+    TYPE: String
+    REQUIRED: False
+  - TITLE: ACCEPTANCE
+    TYPE: String
+    REQUIRED: False
+  - TITLE: PRIORITY
+    TYPE: SingleChoice(M, S, C, W)
+    REQUIRED: False
+  - TITLE: VERIFICATION
+    TYPE: MultipleChoice(T, A, I, D)
+    REQUIRED: False
+  - TITLE: STATUS
+    TYPE: SingleChoice(Active, Withdrawn, Superseded, Reversed, Resolved)
+    REQUIRED: False
+  RELATIONS:
+  - TYPE: Parent
+    ROLE: Applies to market
+    REVERSE_ROLE: Brings in
+  - TYPE: Parent
+    ROLE: Required by
+    REVERSE_ROLE: Requires
+- TAG: CONSTRAINT
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATUS
+    TYPE: SingleChoice(Active, Withdrawn, Superseded, Reversed, Resolved)
+    REQUIRED: False
+- TAG: QUESTION
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATUS
+    TYPE: SingleChoice(Active, Withdrawn, Superseded, Reversed, Resolved)
+    REQUIRED: False
+
+[TEXT]
+STATEMENT: >>>
+Level 1 of the V-model (see [`v-model-process.md`](v-model-process.md)): what the
+user and the market need, in their language, with no solution in it. Refined by
+[`02_system_req.sdoc`](02_system_req.sdoc) and validated by acceptance tests.
+
+This document is where the **target markets** and the **regulatory framework**
+live, because both are properties of where the product is placed rather than of
+how it is built, and because every market-specific requirement below has to be
+traceable to the market that brings it in.
+
+---
+
+**A caveat that belongs at the top rather than in a footnote.** The entries in
+section 2 are an engineering reading of which EU legislation applies, with
+instrument numbers and editions recorded so they can be checked. They are not a
+conformity assessment, they are not legal advice, and two of them turn on a
+classification decision this project has not yet made (see [LINK: OQ-R1] and
+[LINK: OQ-R2]). Nothing here may be cited as evidence of compliance. The purpose
+of writing it down is that an unstated framework cannot be reviewed, and
+`SYS-SAF-24` already requires the documentation to be honest about what this
+device is not.
+<<<
+
+[[SECTION]]
+UID: SECT-UR-1
+TITLE: 1. Target markets
+
+[TEXT]
+STATEMENT: >>>
+One item per region, so that a regulation can name the market that brings it in
+and a change of market triggers the impact analysis of rule 6 of the process
+document.
+<<<
+
+[MARKET]
+UID: UR-MKT-001
+TITLE: Target market European Union
+STATEMENT: >>>
+The product shall be suitable for placing on the market in all member states of the **European Union**.
+<<<
+STATUS: Active
+
+[MARKET]
+UID: UR-MKT-002
+TITLE: Target market EEA and Switzerland
+STATEMENT: >>>
+The product should additionally be suitable for the **EEA EFTA states** (Iceland, Liechtenstein, Norway) and **Switzerland**, which accept CE marking under the EEA Agreement and the EU-Swiss Mutual Recognition Agreement respectively. No additional technical requirement is expected beyond [LINK: UR-MKT-001]; the distinction is recorded because the obligations on importers and the language of the instructions differ.
+<<<
+STATUS: Active
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SECT-UR-2
+TITLE: 2. Regulatory framework
+
+[TEXT]
+STATEMENT: >>>
+The legislation and standards that follow from the target markets and the
+intended use. `ROUTE` says which way of reaching the market an item applies to,
+because this project has two and they carry different obligations:
+
+- **SoldUnits**, where Bitcrush Testing places finished controllers on the
+  market and is the manufacturer in the sense of EU product law.
+- **PublishedDesign**, where the design and firmware are published under
+  GPL-3.0-or-later and somebody else builds, integrates and puts a kiln into
+  service. They then carry the manufacturer's obligations for the finished
+  machine; what this project owes them is the information to discharge those.
+
+The single most important structural point: **this is radio equipment.** It
+contains a 2.4 GHz WiFi transceiver, so Directive 2014/53/EU applies, and its
+Article 3(1)(a) and 3(1)(b) subsume the protection objectives of the Low Voltage
+and EMC Directives for the radio equipment itself. Those two directives are
+therefore recorded as `Superseded` in scope rather than omitted, because their
+*objectives* still have to be met, through the RED.
+<<<
+
+[REGULATION]
+UID: UR-REG-001
+TITLE: Radio Equipment Directive
+STATEMENT: >>>
+The product shall comply with the **Radio Equipment Directive**, whose Article 3(1)(a) covers health and safety including the protection objectives of the Low Voltage Directive with no voltage limit, Article 3(1)(b) covers electromagnetic compatibility, and Article 3(2) covers effective use of the radio spectrum.
+<<<
+INSTRUMENT: Directive 2014/53/EU
+EDITION: OJ L 153, 22.5.2014
+REG_TYPE: Directive
+ROUTE: SoldUnits
+APPLICABILITY: >>>
+Whole product, because the WiFi transceiver makes the whole controller radio equipment.
+<<<
+ASSESSMENT: >>>
+Annex II internal production control is available only if harmonised standards are applied in full; otherwise Annex III or IV with a notified body. See [LINK: OQ-R2].
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: UR-MKT-001
+  ROLE: Applies to market
+
+[REGULATION]
+UID: UR-REG-002
+TITLE: RED cybersecurity requirements
+STATEMENT: >>>
+The product shall meet the requirements of **Article 3(3)(d), (e) and (f)** of [LINK: UR-REG-001], activated by delegated regulation: network protection, protection of personal data and privacy, and protection from fraud. These have been **mandatory since 1 August 2025** and are the requirements the project is furthest from meeting, because the HTTP transport that would enforce them does not exist and `SRR-01` says so.
+<<<
+INSTRUMENT: Commission Delegated Regulation (EU) 2022/30
+EDITION: OJ L 7, 12.1.2022; applicable from 2025-08-01
+REG_TYPE: Regulation
+ROUTE: SoldUnits
+APPLICABILITY: >>>
+Article 3(3)(d) applies because the device connects to the internet-capable local network. Whether (e) and (f) apply depends on whether it processes personal data or enables transfer of money or value; on the present design it does neither, which should be recorded as a reasoned exclusion rather than assumed.
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: UR-MKT-001
+  ROLE: Applies to market
+
+[REGULATION]
+UID: UR-REG-003
+TITLE: Machinery Regulation
+STATEMENT: >>>
+Where the controller is supplied as a **safety component** for machinery, or integrated into a kiln placed on the market as machinery, the **Machinery Regulation** shall be complied with. It applies from **20 January 2027** and repeals Directive 2006/42/EC, so a product reaching the market before then falls under the Directive and after then under the Regulation.
+<<<
+INSTRUMENT: Regulation (EU) 2023/1230
+EDITION: OJ L 165, 29.6.2023; applicable from 2027-01-20
+REG_TYPE: Regulation
+ROUTE: Both
+APPLICABILITY: >>>
+Turns on classification. A logic unit performing a safety function is named in the Regulation's Annex I list of products subject to the stricter conformity assessment, and the safety supervisor of `SWA-22` performs exactly such a function (absolute over-temperature cut-off). If the controller is held to be such a safety component, self-assessment is not available. This is [LINK: OQ-R1], it is unresolved, and it is the single largest open regulatory question the project has.
+<<<
+ASSESSMENT: >>>
+Annex VI internal checks if not an Annex I product and harmonised standards applied in full; otherwise Annex VII or VIII involving a notified body.
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: UR-MKT-001
+  ROLE: Applies to market
+
+[REGULATION]
+UID: UR-REG-004
+TITLE: Cyber Resilience Act
+STATEMENT: >>>
+As a **product with digital elements** made available on the Union market, the product shall meet the essential cybersecurity requirements of the **Cyber Resilience Act** and its vulnerability-handling obligations. Reporting obligations apply from **11 September 2026** and the main obligations from **11 December 2027**.
+<<<
+INSTRUMENT: Regulation (EU) 2024/2847
+EDITION: OJ L, 20.11.2024; main obligations from 2027-12-11
+REG_TYPE: Regulation
+ROUTE: SoldUnits
+APPLICABILITY: >>>
+Whole product. Annex I Part II requires, among other things, that vulnerabilities be addressed and that **security updates be made available** for the support period.
+<<<
+ASSESSMENT: >>>
+**This collides head-on with `SRR-11`.** The project deliberately removed every network update path (`SWR-UPD-01`), leaving no way to deliver a security fix without physical access to each unit. Under the CRA that is not merely an engineering limitation, it is an obstacle to placing the product on the market as sold units at all. `OQ-08` has to be answered before this route is viable, and answering it is now a regulatory deadline rather than a preference. The free-and-open-source provisions do not rescue the SoldUnits route, because they turn on supply outside a commercial activity.
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: UR-MKT-001
+  ROLE: Applies to market
+
+[REGULATION]
+UID: UR-REG-005
+TITLE: Low Voltage Directive, objectives via the RED
+STATEMENT: >>>
+The **safety objectives** of the Low Voltage Directive shall be met. The Directive itself does not apply to radio equipment, because Article 3(1)(a) of [LINK: UR-REG-001] carries its protection objectives instead and without the 50 V lower limit. Recorded so the objectives are not lost along with the instrument.
+<<<
+INSTRUMENT: Directive 2014/35/EU
+EDITION: OJ L 96, 29.3.2014
+REG_TYPE: Directive
+ROUTE: Both
+APPLICABILITY: >>>
+Objectives apply to the mains-switching parts. The instrument is superseded in scope by the RED for this product.
+<<<
+STATUS: Superseded
+
+[REGULATION]
+UID: UR-REG-006
+TITLE: EMC Directive, objectives via the RED
+STATEMENT: >>>
+The **electromagnetic compatibility** objectives shall be met, carried by Article 3(1)(b) of [LINK: UR-REG-001] rather than by the EMC Directive itself, which excludes radio equipment within the RED's scope.
+<<<
+INSTRUMENT: Directive 2014/30/EU
+EDITION: OJ L 96, 29.3.2014
+REG_TYPE: Directive
+ROUTE: Both
+APPLICABILITY: >>>
+Objectives apply to the whole product; a zero-cross SSR switching kilowatts next to a 2.4 GHz radio is the part that will need the most attention.
+<<<
+STATUS: Superseded
+
+[REGULATION]
+UID: UR-REG-007
+TITLE: RoHS
+STATEMENT: >>>
+The product shall comply with the restriction of hazardous substances in electrical and electronic equipment.
+<<<
+INSTRUMENT: Directive 2011/65/EU
+EDITION: OJ L 174, 1.7.2011, as amended
+REG_TYPE: Directive
+ROUTE: SoldUnits
+APPLICABILITY: >>>
+Whole product. Flows down to the bill of materials, and is a selection criterion rather than a test.
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: UR-MKT-001
+  ROLE: Applies to market
+
+[REGULATION]
+UID: UR-REG-008
+TITLE: WEEE
+STATEMENT: >>>
+The product shall carry the separate-collection marking and the producer shall meet the registration and take-back obligations of the **WEEE Directive** in each member state where it is placed on the market.
+<<<
+INSTRUMENT: Directive 2012/19/EU
+EDITION: OJ L 197, 24.7.2012
+REG_TYPE: Directive
+ROUTE: SoldUnits
+APPLICABILITY: >>>
+Marking on the product; registration is a per-member-state obligation on the producer and not a design requirement.
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: UR-MKT-001
+  ROLE: Applies to market
+
+[REGULATION]
+UID: UR-REG-009
+TITLE: REACH
+STATEMENT: >>>
+Substances of very high concern in the delivered article shall be known, and the Article 33 communication obligation met where an SVHC is present above 0.1 % by weight.
+<<<
+INSTRUMENT: Regulation (EC) No 1907/2006
+EDITION: OJ L 396, 30.12.2006, as amended
+REG_TYPE: Regulation
+ROUTE: SoldUnits
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: UR-MKT-001
+  ROLE: Applies to market
+
+[REGULATION]
+UID: UR-REG-010
+TITLE: Automatic electrical controls, the product standard
+STATEMENT: >>>
+The control shall be designed and assessed against **EN IEC 60730-1** and its part 2-9 for temperature-sensing controls. Annex H of part 1 covers controls with safety functions and classifies their software as **class A, B or C**; a control whose declared function includes an independent over-temperature cut-off is **class B or C**, which is the clause the safety supervisor of `SWA-22` and the trip logic exist to satisfy.
+<<<
+INSTRUMENT: EN IEC 60730-1 and EN IEC 60730-2-9
+EDITION: Edition to be fixed; see [LINK: OQ-R3]
+REG_TYPE: HarmonisedStandard
+ROUTE: Both
+APPLICABILITY: >>>
+The controller as an automatic electrical control. This is the most directly relevant product standard the project has, and the software-class clauses of Annex H map onto work already done rather than new work.
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: UR-MKT-001
+  ROLE: Applies to market
+
+[REGULATION]
+UID: UR-REG-011
+TITLE: Safety-related parts of control systems
+STATEMENT: >>>
+Where the controller is a safety component under [LINK: UR-REG-003], the safety function shall be designed and its performance level determined per **EN ISO 13849-1**, or equivalently per EN IEC 62061 or EN IEC 61508.
+<<<
+INSTRUMENT: EN ISO 13849-1
+EDITION: EN ISO 13849-1:2023
+REG_TYPE: HarmonisedStandard
+ROUTE: Both
+APPLICABILITY: >>>
+The over-temperature and thermocouple-fault safety functions. `safety.md` already states that no performance level or SIL is claimed, which is the honest position today and the gap this standard would close.
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: UR-MKT-001
+  ROLE: Applies to market
+
+[REGULATION]
+UID: UR-REG-012
+TITLE: Radio, EMC and RF exposure standards
+STATEMENT: >>>
+The radio shall be assessed against **EN 300 328** for 2.4 GHz wideband data transmission, **EN 301 489-1** and **EN 301 489-17** for the electromagnetic compatibility of radio equipment, and **EN IEC 62311** for human exposure to electromagnetic fields.
+<<<
+INSTRUMENT: EN 300 328, EN 301 489-1, EN 301 489-17, EN IEC 62311
+EDITION: Editions to be fixed against the current OJ list; see [LINK: OQ-R3]
+REG_TYPE: HarmonisedStandard
+ROUTE: SoldUnits
+APPLICABILITY: >>>
+Supports Article 3(1)(b) and 3(2) of [LINK: UR-REG-001]. A pre-certified radio module would move most of this burden to the module vendor, which is a design decision the project has not taken.
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: UR-MKT-001
+  ROLE: Applies to market
+
+[REGULATION]
+UID: UR-REG-013
+TITLE: Cybersecurity standards for radio equipment
+STATEMENT: >>>
+The requirements of [LINK: UR-REG-002] shall be met by applying **EN 18031-1, EN 18031-2 and EN 18031-3**, which are the harmonised standards for Article 3(3)(d), (e) and (f) respectively.
+<<<
+INSTRUMENT: EN 18031-1, EN 18031-2, EN 18031-3
+EDITION: 2024
+REG_TYPE: HarmonisedStandard
+ROUTE: SoldUnits
+APPLICABILITY: >>>
+EN 18031-1 at minimum. Note that the Commission restricted parts of these standards in the OJ citation, so the presumption of conformity is not complete and the restrictions have to be read before relying on them. `SEC-00`'s read-only interface helps considerably here: an interface with no state-changing route has far less of EN 18031-1 to satisfy.
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: UR-MKT-001
+  ROLE: Applies to market
+
+[REGULATION]
+UID: UR-REG-014
+TITLE: Safety in electroheating installations
+STATEMENT: >>>
+The installation into which the controller is fitted is subject to **IEC/EN 60519-1**, safety in installations for electroheating and electromagnetic processing. Retained as the reference `[R6]` that `SYS-SAF-24` already points installers at.
+<<<
+INSTRUMENT: EN IEC 60519-1
+EDITION: Edition to be fixed; see [LINK: OQ-R3]
+REG_TYPE: Reference
+ROUTE: Both
+APPLICABILITY: >>>
+The installation rather than the controller, which is why it is a reference the documentation cites rather than a standard the product is assessed against.
+<<<
+STATUS: Active
+
+[REGULATION]
+UID: UR-REG-015
+TITLE: Obligations of the self-builder
+STATEMENT: >>>
+On the **PublishedDesign** route the project places no product on the market and CE-marks nothing. Whoever assembles the controller and puts a kiln into service takes on the manufacturer's obligations for that machine, including its conformity assessment, its declaration of conformity and its CE marking. The project shall supply what makes that possible: the safety concept, the hazard analysis, the requirement and architecture documents, the test evidence, and an explicit statement of what has **not** been assessed.
+<<<
+INSTRUMENT: Regulation (EU) 2023/1230 Art. 3; Regulation (EU) 2019/1020
+EDITION: n/a
+REG_TYPE: Reference
+ROUTE: PublishedDesign
+APPLICABILITY: >>>
+The whole design. Note that building for one's own use is not placing on the market, but making the result available to anybody else is, and a studio that builds two and sells one has placed one on the market.
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: UR-MKT-001
+  ROLE: Applies to market
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SECT-UR-3
+TITLE: 3. User needs
+
+[TEXT]
+STATEMENT: >>>
+What the user needs, in the user's language and with no solution in it. Each
+carries an acceptance criterion, because the process document's exit criteria for
+this level require one and because a need without one cannot be validated by an
+acceptance test.
+<<<
+
+[REQUIREMENT]
+UID: UR-001
+TITLE: Fire a programmed curve unattended within reason
+STATEMENT: >>>
+A potter needs the kiln to follow a time and temperature programme they wrote, without standing over it adjusting a dial.
+<<<
+ACCEPTANCE: >>>
+A multi-segment programme runs to completion and the chamber follows each ramp and dwell closely enough that the ware fires as intended.
+<<<
+PRIORITY: M
+VERIFICATION: D
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: UR-MKT-001
+  ROLE: Applies to market
+
+[REQUIREMENT]
+UID: UR-002
+TITLE: Do not burn the building down
+STATEMENT: >>>
+The owner needs confidence that a failure of the controller, the sensor or the switching device cannot leave a multi-kilowatt heater on. This is the need the whole project exists for, and it outranks every other need here.
+<<<
+ACCEPTANCE: >>>
+No single failure of software, processor, sensor or switching device results in heating; every such failure removes it. Demonstrated on a bench fixture, not only argued on paper.
+<<<
+PRIORITY: M
+VERIFICATION: T, D, A
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: UR-MKT-001
+  ROLE: Applies to market
+
+[REQUIREMENT]
+UID: UR-003
+TITLE: Know what the kiln is doing, at the kiln
+STATEMENT: >>>
+The operator standing in front of the kiln needs to see what it is doing and to be able to start, stop and acknowledge without a phone, a browser or a network.
+<<<
+ACCEPTANCE: >>>
+Every action that can heat the kiln is reachable from the device's own controls, and the current state is readable at a glance from a normal working distance.
+<<<
+PRIORITY: M
+VERIFICATION: D
+STATUS: Active
+
+[REQUIREMENT]
+UID: UR-004
+TITLE: Watch a firing without standing next to it
+STATEMENT: >>>
+During a firing that runs for many hours the operator needs to see progress from elsewhere in the building, and afterwards needs the curve the kiln actually followed rather than the one it was asked for.
+<<<
+RATIONALE: >>>
+This is a watching need, not a controlling need, and the distinction is the whole of `SEC-00`: granting it does not require granting control.
+<<<
+ACCEPTANCE: >>>
+A browser on the same network shows live temperature and programme progress, and the logged history of a completed firing, without being able to change anything.
+<<<
+PRIORITY: S
+VERIFICATION: D
+STATUS: Active
+
+[REQUIREMENT]
+UID: UR-005
+TITLE: Get good control without being a control engineer
+STATEMENT: >>>
+A potter needs the controller to suit their particular kiln without them having to understand or hand-tune PID gains.
+<<<
+ACCEPTANCE: >>>
+An automatic tuning run on the real kiln produces gains that hold a dwell acceptably, and the interface says plainly when the gains in use are untuned defaults.
+<<<
+PRIORITY: M
+VERIFICATION: D
+STATUS: Active
+
+[REQUIREMENT]
+UID: UR-006
+TITLE: Keep a record of what was fired
+STATEMENT: >>>
+A production potter needs the history of past firings, to repeat a success, to diagnose a failure and to show a customer what a piece went through.
+<<<
+ACCEPTANCE: >>>
+Completed firings are retrievable with their temperature history after a power cycle, with no memory card and no external database.
+<<<
+PRIORITY: S
+VERIFICATION: T, D
+STATUS: Active
+
+[REQUIREMENT]
+UID: UR-007
+TITLE: Retrofit an existing kiln
+STATEMENT: >>>
+An owner needs to fit the controller to a kiln they already have, rather than buying a new kiln to get a controller.
+<<<
+ACCEPTANCE: >>>
+The controller can be installed on a single-phase electric kiln with a type-K thermocouple by a competent person, using the supplied documentation and without modifying the kiln's chamber.
+<<<
+PRIORITY: M
+VERIFICATION: D, I
+STATUS: Active
+
+[REQUIREMENT]
+UID: UR-008
+TITLE: Be affordable and buildable
+STATEMENT: >>>
+A hobbyist or a small studio needs the controller to cost a small fraction of a commercial one, and a self-builder needs to be able to build it from published sources.
+<<<
+ACCEPTANCE: >>>
+The controller electronics remain comparable in cost to the reference design `[R1]`, and the design, firmware and build instructions are published under a licence that permits a self-builder to use them.
+<<<
+PRIORITY: S
+VERIFICATION: A, I
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: UR-MKT-001
+  ROLE: Applies to market
+
+[REQUIREMENT]
+UID: UR-009
+TITLE: Reach the market by two routes
+STATEMENT: >>>
+The project needs to be able to place finished controllers on the EU market **and** to publish the design for self-builders, with the obligations of each route identified separately.
+<<<
+RATIONALE: >>>
+The two routes are not variations of one thing. On the first, Bitcrush Testing is the manufacturer and carries the whole of section 2. On the second, the obligations fall on whoever puts a kiln into service, and the project's duty is to give them what they need. [LINK: UR-REG-004] applies to only one of them, and it is currently the blocking one.
+<<<
+ACCEPTANCE: >>>
+For each route, the applicable legislation is identified with its edition, and the conformity assessment route is either chosen or recorded as an open question.
+<<<
+PRIORITY: M
+VERIFICATION: I
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: UR-MKT-001
+  ROLE: Applies to market
+
+[REQUIREMENT]
+UID: UR-010
+TITLE: An independent cutout is required, not optional
+STATEMENT: >>>
+The installation needs a hardware over-temperature cutout that is independent of this controller, and the user needs to be told so unambiguously rather than discovering it in an appendix.
+<<<
+RATIONALE: >>>
+It is the only protection layer no software defect and no network attacker can reach, which `safety.md` and `security.md` both reach from opposite directions.
+<<<
+ACCEPTANCE: >>>
+The requirement appears in the installation documentation, and the documentation states that the controller is not a substitute for it.
+<<<
+PRIORITY: M
+VERIFICATION: I
+STATUS: Active
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SECT-UR-5
+TITLE: 5. Open regulatory questions
+
+[TEXT]
+STATEMENT: >>>
+Three questions that section 2 depends on and that the project has not answered.
+They are recorded here rather than in `03_software_req.sdoc`'s question list
+because they are market questions, and because two of them decide whether the
+**SoldUnits** route is available at all.
+<<<
+
+[QUESTION]
+UID: OQ-R1
+STATEMENT: >>>
+**Is the controller a safety component under [LINK: UR-REG-003]?** Its declared function includes an independent over-temperature cut-off performed by a separate microcontroller, which reads like a logic unit performing a safety function, and such products are subject to the stricter conformity assessment with a notified body. If it is, self-assessment is not available and the cost and timeline of the SoldUnits route change substantially. If it is not, the Regulation still applies to the kiln it is fitted to, but through the integrator. This is the largest unresolved regulatory question the project has.
+<<<
+STATUS: Active
+
+[QUESTION]
+UID: OQ-R2
+STATEMENT: >>>
+**Which conformity assessment route under [LINK: UR-REG-001]?** Annex II internal production control is available only if harmonised standards are applied in full, and [LINK: UR-REG-013] notes that the OJ citation of the EN 18031 series carries restrictions, which may leave no complete presumption of conformity for the Article 3(3)(d) requirements. If so, a notified body opinion under Annex III is needed. Settling this needs the current OJ list read rather than recalled.
+<<<
+STATUS: Active
+
+[QUESTION]
+UID: OQ-R3
+STATEMENT: >>>
+**Which editions?** Every standard in section 2 needs its edition fixed against the current Official Journal list of harmonised standards, and against the dates of cessation of presumption of conformity. The editions recorded here are indicative; a conformity claim needs the cited edition, not the latest one.
+<<<
+STATUS: Active
+
+[QUESTION]
+UID: OQ-R4
+STATEMENT: >>>
+**Does [LINK: UR-REG-004] make the SoldUnits route impossible as designed?** The Cyber Resilience Act requires security updates to be made available for the support period, and `SRR-11` records that the device has no field update path at all. Either `OQ-08` is answered with a real update mechanism, or finished units cannot be placed on the EU market after the Act's main obligations apply. There is no third option that involves shipping as-is.
+<<<
+STATUS: Active
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SECT-8
+TITLE: 8. Constraints
+
+[CONSTRAINT]
+UID: UR-CON-01
+STATEMENT: >>>
+The firmware shall be built with **ESP-IDF v5.x** and its native build system. The Arduino framework shall not be used.
+<<<
+
+[CONSTRAINT]
+UID: UR-CON-02
+STATEMENT: >>>
+The target is the **ESP32-S3**. Nothing in the design shall depend on a feature absent from that part.
+<<<
+
+[CONSTRAINT]
+UID: UR-CON-03
+STATEMENT: >>>
+Logged data and programs shall live on internal flash. **No SD card** shall be required, and **no external database** or network service shall be required for any function.
+<<<
+
+[CONSTRAINT]
+UID: UR-CON-04
+STATEMENT: >>>
+The project shall be licensed **GPL-3.0-or-later**, and every third-party component shall carry a licence compatible with distribution under GPL-3.0. Web assets shall be vendored, not fetched at build time from an unpinned source.
+<<<
+
+[CONSTRAINT]
+UID: UR-CON-05
+STATEMENT: >>>
+Implementation language shall be C or C++ as supported by ESP-IDF; the logic components of [LINK: SWR-TST-01] shall be written so as to be compilable by a host toolchain without ESP-IDF headers.
+<<<
+
+[CONSTRAINT]
+UID: UR-CON-06
+STATEMENT: >>>
+The web interface shall run in current versions of Firefox, Chrome and Safari, including on mobile, without a build step that requires a network connection at build time.
+<<<
+
+[CONSTRAINT]
+UID: UR-CON-07
+STATEMENT: >>>
+Total bill of materials for the controller electronics should remain comparable to the reference design of [R1] (order of 40 EUR), excluding the SSR, contactor and enclosure.
+<<<
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SECT-12
+TITLE: 12. Out of scope
+
+[TEXT]
+STATEMENT: >>>
+- Phase-angle or PWM mains modulation; only zero-cross SSR switching.
+- Multi-zone control in v1.0 ([LINK: SYS-ASM-02]).
+- **Three-phase kilns.** Decided 2026-10-06 ([LINK: OQ-06]). Monitoring one phase of three would leave a fault on either of the others to the thermal rules alone, and would report a third of the load as though it were the whole, so partial support is worse than none.
+- Cloud connectivity, remote access outside the local network, mobile apps.
+- Safety certification, or replacement of the hardware over-temperature cutout.
+- Atmosphere, damper, oxygen or gas control; kiln venting hardware.
+- Kiln power wiring, contactor sizing and enclosure design (documented in `hardware/`, not specified here).
+- Firing-recipe advice; the device executes curves, it does not author them.
+<<<
+
+[[/SECTION]]

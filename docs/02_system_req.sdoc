@@ -1,0 +1,417 @@
+[DOCUMENT]
+TITLE: Safe Kiln Controller, System Requirements
+UID: SAFEKILN-SYS
+VERSION: 0.1 (draft)
+DATE: 2026-10-08
+OPTIONS:
+  MARKUP: Markdown
+  VIEW_STYLE: Table
+  NODE_IN_TOC: True
+METADATA:
+  SPDX-FileCopyrightText: 2026 Bitcrush Testing
+  SPDX-License-Identifier: GPL-3.0-or-later
+  Status: For review
+  Project: Safe Kiln Controller, PID kiln controller
+
+[GRAMMAR]
+ELEMENTS:
+- TAG: TEXT
+  FIELDS:
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+- TAG: SECTION
+  PROPERTIES:
+    IS_COMPOSITE: True
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: False
+  - TITLE: TITLE
+    TYPE: String
+    REQUIRED: True
+- TAG: REQUIREMENT
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: PRIORITY
+    TYPE: SingleChoice(M, S, C, W)
+    REQUIRED: False
+  - TITLE: VERIFICATION
+    TYPE: MultipleChoice(T, A, I, D)
+    REQUIRED: False
+  - TITLE: STATUS
+    TYPE: SingleChoice(Active, Withdrawn, Superseded, Reversed, Resolved)
+    REQUIRED: False
+  RELATIONS:
+  - TYPE: Parent
+- TAG: CONSTRAINT
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATUS
+    TYPE: SingleChoice(Active, Withdrawn, Superseded, Reversed, Resolved)
+    REQUIRED: False
+- TAG: ASSUMPTION
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATUS
+    TYPE: SingleChoice(Active, Withdrawn, Superseded, Reversed, Resolved)
+    REQUIRED: False
+- TAG: QUESTION
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATUS
+    TYPE: SingleChoice(Active, Withdrawn, Superseded, Reversed, Resolved)
+    REQUIRED: False
+
+[TEXT]
+STATEMENT: >>>
+Level 2 of the V-model (see [`v-model-process.md`](v-model-process.md)): what the
+**whole system** must do, hardware and software and mechanics together, derived
+from the user requirements of
+[`01_user_req.sdoc`](01_user_req.sdoc) and refined by the software requirements
+of [`03_software_req.sdoc`](03_software_req.sdoc). Verified by system tests.
+
+Three groups live here, and the reason each is at system level rather than
+software level is worth stating.
+
+`SYS-HW-` are the hardware interface requirements. They constrain the board, not
+a program.
+
+`SYS-SAF-` are the four safety requirements that are **not** software behaviour.
+`SYS-SAF-03` asks for an SSR in series with an electromechanical contactor, which
+is a wiring diagram. `SYS-SAF-01` and `SYS-SAF-02` are properties of the system
+as a whole, discharged by hardware and software together: a charge pump that
+decays and a program that keeps refreshing it. `SYS-SAF-24` is about the
+documentation. The remaining 27 safety requirements are software rules and sit in
+`03_software_req.sdoc`.
+
+`SYS-ASM-` are the assumptions about the environment the system is placed in.
+They are not requirements on the product; they are the conditions under which its
+requirements hold, which is why a wrong one is a defeated protection layer rather
+than a bug.
+<<<
+
+[[SECTION]]
+UID: SECT-6
+TITLE: 6. Hardware interface requirements
+
+[TEXT]
+STATEMENT: >>>
+> This section constrains the firmware's view of the hardware. The board design
+> itself is documented in `hardware/`.
+<<<
+
+[REQUIREMENT]
+UID: SYS-HW-01
+STATEMENT: >>>
+The controller shall be an **ESP32-S3** with at least 8 MB flash; PSRAM shall not be required.
+<<<
+PRIORITY: M
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-HW-02
+STATEMENT: >>>
+The chamber and enclosure thermocouple front-ends shall be MAX31856 devices on a shared SPI bus with individual chip selects.
+<<<
+PRIORITY: M
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-HW-03
+STATEMENT: >>>
+The thermocouple front-end SPI bus shall be separate from, or arbitrated independently of, any bus shared with a peripheral that can stall it.
+<<<
+PRIORITY: M
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-HW-04
+STATEMENT: >>>
+The display shall be a 128×64 monochrome OLED on I²C, at a configurable address (default 0x3C).
+<<<
+PRIORITY: M
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-HW-05
+STATEMENT: >>>
+The operator input shall be a quadrature rotary encoder with a push button, read by hardware (pulse counter unit) rather than by polling in software.
+<<<
+PRIORITY: M
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-HW-06
+STATEMENT: >>>
+The heater modulation output shall drive a zero-cross-switching SSR rated for the kiln's current with a documented margin.
+<<<
+PRIORITY: M
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-HW-07
+STATEMENT: >>>
+The heat-enable output shall drive the safety contactor through a circuit that requires a **periodic software refresh** to hold the contactor closed, so that a hung or crashed MCU releases it ([LINK: SYS-SAF-02]).
+<<<
+PRIORITY: M
+VERIFICATION: I, T
+
+[REQUIREMENT]
+UID: SYS-HW-08
+STATEMENT: >>>
+All heater and contactor control outputs shall have external pull-downs to the de-energised state, and shall not use pins that are strapping pins or that glitch during reset or boot on the ESP32-S3.
+<<<
+PRIORITY: M
+VERIFICATION: I, T
+
+[REQUIREMENT]
+UID: SYS-HW-09
+STATEMENT: >>>
+The system shall carry an **on-board** audible alarm: a 5 V active (self-driving) magnetic buzzer switched low-side from the alarm GPIO, so that annunciation needs no external component or field wiring.
+<<<
+PRIORITY: M
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-HW-19
+STATEMENT: >>>
+Every test point shall be a surface pad on the **top copper layer only**, so the whole board can be probed without turning it over or removing it from its enclosure. No test point shall be placed on the bottom layer.
+<<<
+PRIORITY: M
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-HW-20
+STATEMENT: >>>
+Test-point pads shall be small enough not to drive the board area, and shall carry no drilled hole. 1.5 mm square is the design value.
+<<<
+PRIORITY: S
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-HW-10
+STATEMENT: >>>
+Pin assignments shall be defined in one place per board variant and shall not be duplicated across the codebase.
+<<<
+PRIORITY: M
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-HW-11
+STATEMENT: >>>
+The design shall include a **current transformer (Stromwandler)** around one heater conductor, downstream of the safety contactor and the SSR, sized for the kiln's rated current with headroom, and preferably split-core so it can be fitted without breaking the heater wiring.
+<<<
+PRIORITY: M
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-HW-16
+STATEMENT: >>>
+The current transformer shall be a **voltage-output type with an integral burden resistor**, or shall have a burden resistor permanently fitted at the board. A current-output CT whose burden can be disconnected shall not be used, because an open secondary carrying primary current develops dangerous voltages.
+<<<
+PRIORITY: M
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-HW-17
+STATEMENT: >>>
+The CT input shall be conditioned for a single-supply ADC: mid-rail bias, anti-alias filtering matched to the sample rate of [LINK: SWR-CUR-03], and clamping to the ADC supply rails.
+<<<
+PRIORITY: M
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-HW-18
+STATEMENT: >>>
+The CT provides the only galvanic isolation between the heater circuit and the controller electronics; its insulation rating and the creepage and clearance around its input shall be appropriate to the mains voltage in use.
+<<<
+PRIORITY: M
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-HW-12
+STATEMENT: >>>
+The design shall support an optional second SSR channel for a kiln with independently switched element groups.
+<<<
+PRIORITY: C
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-HW-13
+STATEMENT: >>>
+The installation shall include a hardware over-temperature cutout in the safety chain that operates independently of this controller.
+<<<
+PRIORITY: M
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-HW-24
+STATEMENT: >>>
+The thermocouple front ends' **`FAULT` outputs shall interrupt the contactor coil in hardware**, each through its own series switching element, so that a reported sensor fault removes the heater without the firmware taking part. Each `FAULT` net shall retain its own test point. The limits of this interlock shall be documented: the outputs are open-drain, so an **unpowered or absent** front end leaves the path closed, and the MAX31856 detects an open circuit only once its fault mask has been configured. The hardware interlock therefore covers faults the device actively reports, and [LINK: SWR-SAF-04] in firmware remains the cover for a dead or unconfigured front end.
+<<<
+PRIORITY: M
+VERIFICATION: I, T
+
+[REQUIREMENT]
+UID: SYS-HW-21
+STATEMENT: >>>
+Where a door or lid interlock is fitted, its switch shall be **normally closed** and shall be wired **both** into a controller input ([LINK: SWR-SAF-31]) **and** in series with the safety contactor coil, so that opening the door de-energises the heater through hardware whether or not the firmware is working. The controller input provides annunciation, latching and logging; it is not the interlock.
+<<<
+PRIORITY: S
+VERIFICATION: I, T
+
+[REQUIREMENT]
+UID: SYS-HW-25
+STATEMENT: >>>
+The contactor coil's freewheel diode shall be connected **across the coil itself**, on the kiln side of every series interrupting element of [LINK: SYS-HW-21] and [LINK: SYS-HW-24], so that opening any of them leaves the coil current a path to decay through. A freewheel path referenced to the raw supply instead would put the inductive transient across the opening contacts, eroding the lid switch and stressing the sense divider.
+<<<
+PRIORITY: M
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-HW-14
+STATEMENT: >>>
+The controller electronics shall be supplied from a regulated source able to power the MCU, display and contactor coil simultaneously, and shall not rely on a USB host for operating power.
+<<<
+PRIORITY: M
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-HW-15
+STATEMENT: >>>
+Thermocouple inputs shall be filtered and protected at the hardware level against the electrical noise of a switching multi-kilowatt load.
+<<<
+PRIORITY: M
+VERIFICATION: I
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SECT-SYS-SAF
+TITLE: 7. System-level safety requirements
+
+[TEXT]
+STATEMENT: >>>
+The safety requirements that hardware discharges, wholly or in part. The numbering
+is the original `SR-` numbering and is deliberately not compacted: these
+identifiers are cited from [`safety.sdoc`](safety.sdoc), from the firmware and
+from the hardware design, and renumbering them to close a gap would break every
+one of those citations to no benefit.
+<<<
+
+[REQUIREMENT]
+UID: SYS-SAF-01
+STATEMENT: >>>
+The system shall be **fail-safe**: any single failure of software, MCU, sensor, or SSR shall result in heating being de-energised, never in uncontrolled heating.
+<<<
+VERIFICATION: A, T
+
+[REQUIREMENT]
+UID: SYS-SAF-02
+STATEMENT: >>>
+Heating shall be enabled only by the *active and continuous* assertion of software; no static condition, boot state, hung task or crashed firmware shall be capable of holding heating on.
+<<<
+VERIFICATION: A, T
+
+[REQUIREMENT]
+UID: SYS-SAF-03
+STATEMENT: >>>
+The heating output stage shall consist of an SSR for modulation **in series with** an electromechanical contactor that provides an independent break, each controlled by a separate output.
+<<<
+VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-SAF-24
+STATEMENT: >>>
+The documentation shall state that Safe Kiln Controller is **not** a safety-certified device, that an independent hardware over-temperature cutout is required ([LINK: SYS-HW-13]), and that mains wiring must be performed by a competent person in accordance with local regulation [R6].
+<<<
+VERIFICATION: I
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SECT-9
+TITLE: 9. Assumptions
+
+[ASSUMPTION]
+UID: SYS-ASM-01
+STATEMENT: >>>
+The kiln is a resistively heated electric kiln whose thermal response is adequately described by a first-order-plus-dead-time model over the operating range.
+<<<
+
+[ASSUMPTION]
+UID: SYS-ASM-02
+STATEMENT: >>>
+The kiln has a single thermal zone. Multi-zone kilns are out of scope for v1.0 but the architecture shall not preclude them.
+<<<
+
+[ASSUMPTION]
+UID: SYS-ASM-03
+STATEMENT: >>>
+The heating elements are switched by a zero-cross SSR; the controller does not perform phase-angle control.
+<<<
+
+[ASSUMPTION]
+UID: SYS-ASM-04
+STATEMENT: >>>
+A competent person performs the mains installation, and an independent over-temperature cutout is fitted ([LINK: SYS-HW-13]).
+<<<
+
+[ASSUMPTION]
+UID: SYS-ASM-05
+STATEMENT: >>>
+The device is on a trusted local network ([LINK: SWR-NFR-20]).
+<<<
+
+[ASSUMPTION]
+UID: SYS-ASM-06
+STATEMENT: >>>
+The operator is present in the building during firing, as kiln manufacturers require. Unattended firing is not a design goal.
+<<<
+
+[ASSUMPTION]
+UID: SYS-ASM-07
+STATEMENT: >>>
+Wall-clock time may be unavailable; all timing-critical behaviour uses the monotonic time base ([LINK: SWR-NET-08]).
+<<<
+
+[ASSUMPTION]
+UID: SYS-ASM-08
+STATEMENT: >>>
+Internal flash endurance is at least 100 000 erase cycles per block.
+<<<
+
+[ASSUMPTION]
+UID: SYS-ASM-09
+STATEMENT: >>>
+The heater load is resistive and switched as a single group, so the current in the monitored conductor is proportional to total heater power.
+<<<
+
+[ASSUMPTION]
+UID: SYS-ASM-10
+STATEMENT: >>>
+The kiln is **single phase**. Three-phase kilns are out of scope (§12 ([LINK: SECT-12]), [LINK: OQ-06]), so there is no unmonitored phase for a fault to hide on: there is one phase and one current transformer on it ([LINK: SYS-HW-11]).
+<<<
+
+[[/SECTION]]

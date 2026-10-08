@@ -110,7 +110,7 @@ the risk that remains after every layer has done its work.
 
 These were three markdown tables in [`safety.md`](safety.md). They are here
 instead for the reason the architecture decisions moved to
-[`architecture.sdoc`](architecture.sdoc): they are the part of the safety
+[`04_software_arch.sdoc`](04_software_arch.sdoc): they are the part of the safety
 concept that has identity. Thirty-six stable IDs, cited from the requirements,
 from the hardware requirements and from each other, and arranged in a chain that
 was previously maintained by hand in an appendix.
@@ -126,7 +126,7 @@ built:
 
 A goal can therefore no longer claim a requirement that does not exist, a
 hazard cannot be left with no goal and no explanation, and
-[`requirements.sdoc`](requirements.sdoc) can be read in the other direction, from
+[`03_software_req.sdoc`](03_software_req.sdoc) can be read in the other direction, from
 a safety requirement to the goal it realises and the hazard behind it. The
 relations are declared on this side, so no edit to the requirements
 specification was needed to create them.
@@ -250,16 +250,16 @@ Predominantly an installation hazard. The firmware can reduce it hardly at all, 
 <<<
 RELATIONS:
 - TYPE: Child
-  VALUE: HR-16
+  VALUE: SYS-HW-16
   ROLE: Addressed by
 - TYPE: Child
-  VALUE: HR-18
+  VALUE: SYS-HW-18
   ROLE: Addressed by
 - TYPE: Child
-  VALUE: SR-24
+  VALUE: SYS-SAF-24
   ROLE: Addressed by
 - TYPE: Child
-  VALUE: ASM-04
+  VALUE: SYS-ASM-04
   ROLE: Addressed by
 
 [HAZARD]
@@ -335,13 +335,13 @@ As with [LINK: HZ-07], predominantly an operating hazard, discharged through doc
 <<<
 RELATIONS:
 - TYPE: Child
-  VALUE: SR-24
+  VALUE: SYS-SAF-24
   ROLE: Addressed by
 - TYPE: Child
-  VALUE: NFR-26
+  VALUE: SWR-NFR-26
   ROLE: Addressed by
 - TYPE: Child
-  VALUE: ASM-06
+  VALUE: SYS-ASM-06
   ROLE: Addressed by
 
 [HAZARD]
@@ -353,11 +353,11 @@ CAUSES: >>>
 Unauthenticated or hostile access to the web interface over the local network.
 <<<
 CONSEQUENCE: >>>
-A firing started, altered or a fault acknowledged by someone not at the kiln. **Largely closed by [LINK: FR-WEB-26]**: no network route can put heat into the kiln, write configuration or clear a fault. What remains is program *authoring*: an attacker can alter a curve the operator then starts at the kiln, bounded by [LINK: SR-23]'s ceiling.
+A firing started, altered or a fault acknowledged by someone not at the kiln. **Largely closed by [LINK: SWR-WEB-26]**: no network route can put heat into the kiln, write configuration or clear a fault. What remains is program *authoring*: an attacker can alter a curve the operator then starts at the kiln, bounded by [LINK: SWR-SAF-23]'s ceiling.
 <<<
 SEVERITY: Moderate
 COMMENT: >>>
-Severe before [LINK: FR-WEB-26] removed every heating route, Moderate after. Analysed in full in [`security.sdoc`](security.sdoc), whose threats relate to this hazard directly, with the reasoning in [`security.md`](security.md).
+Severe before [LINK: SWR-WEB-26] removed every heating route, Moderate after. Analysed in full in [`security.sdoc`](security.sdoc), whose threats relate to this hazard directly, with the reasoning in [`security.md`](security.md).
 <<<
 
 [TEXT]
@@ -391,7 +391,7 @@ No single failure of software, MCU, sensor or switching device shall result in h
 <<<
 LAYERS: L2, L3, L5
 COMMENT: >>>
-Realised by [LINK: SR-01] and by the whole of [`safety.md` §5](safety.md#5-the-protection-layers), which is why only the one requirement is named here.
+Realised by [LINK: SYS-SAF-01] and by the whole of [`safety.md` §5](safety.md#5-the-protection-layers), which is why only the one requirement is named here.
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -404,7 +404,7 @@ RELATIONS:
   VALUE: HZ-04
   ROLE: Mitigates
 - TYPE: Child
-  VALUE: SR-01
+  VALUE: SYS-SAF-01
   ROLE: Realised by
 
 [SAFETY_GOAL]
@@ -421,16 +421,16 @@ RELATIONS:
   VALUE: HZ-04
   ROLE: Mitigates
 - TYPE: Child
-  VALUE: SR-02
+  VALUE: SYS-SAF-02
   ROLE: Realised by
 - TYPE: Child
-  VALUE: HR-07
+  VALUE: SYS-HW-07
   ROLE: Realised by
 - TYPE: Child
-  VALUE: HR-08
+  VALUE: SYS-HW-08
   ROLE: Realised by
 - TYPE: Child
-  VALUE: AD-05
+  VALUE: SWA-05
   ROLE: Realised by
 
 [SAFETY_GOAL]
@@ -444,13 +444,13 @@ RELATIONS:
   VALUE: HZ-01
   ROLE: Mitigates
 - TYPE: Child
-  VALUE: SR-03
+  VALUE: SYS-SAF-03
   ROLE: Realised by
 - TYPE: Child
-  VALUE: HR-06
+  VALUE: SYS-HW-06
   ROLE: Realised by
 - TYPE: Child
-  VALUE: HR-07
+  VALUE: SYS-HW-07
   ROLE: Realised by
 
 [SAFETY_GOAL]
@@ -464,16 +464,16 @@ RELATIONS:
   VALUE: HZ-03
   ROLE: Mitigates
 - TYPE: Child
-  VALUE: SR-04
+  VALUE: SWR-SAF-04
   ROLE: Realised by
 - TYPE: Child
-  VALUE: SR-05
+  VALUE: SWR-SAF-05
   ROLE: Realised by
 - TYPE: Child
-  VALUE: SR-06
+  VALUE: SWR-SAF-06
   ROLE: Realised by
 - TYPE: Child
-  VALUE: FR-ACQ-12
+  VALUE: SWR-ACQ-12
   ROLE: Realised by
 
 [SAFETY_GOAL]
@@ -496,25 +496,25 @@ RELATIONS:
   VALUE: HZ-09
   ROLE: Mitigates
 - TYPE: Child
-  VALUE: SR-25
+  VALUE: SWR-SAF-25
   ROLE: Realised by
 - TYPE: Child
-  VALUE: SR-26
+  VALUE: SWR-SAF-26
   ROLE: Realised by
 - TYPE: Child
-  VALUE: SR-27
+  VALUE: SWR-SAF-27
   ROLE: Realised by
 - TYPE: Child
-  VALUE: SR-28
+  VALUE: SWR-SAF-28
   ROLE: Realised by
 - TYPE: Child
-  VALUE: SR-29
+  VALUE: SWR-SAF-29
   ROLE: Realised by
 - TYPE: Child
-  VALUE: SR-30
+  VALUE: SWR-SAF-30
   ROLE: Realised by
 - TYPE: Child
-  VALUE: NFR-27
+  VALUE: SWR-NFR-27
   ROLE: Realised by
 
 [SAFETY_GOAL]
@@ -528,13 +528,13 @@ RELATIONS:
   VALUE: HZ-02
   ROLE: Mitigates
 - TYPE: Child
-  VALUE: SR-09
+  VALUE: SWR-SAF-09
   ROLE: Realised by
 - TYPE: Child
-  VALUE: SR-10
+  VALUE: SWR-SAF-10
   ROLE: Realised by
 - TYPE: Child
-  VALUE: SR-23
+  VALUE: SWR-SAF-23
   ROLE: Realised by
 
 [SAFETY_GOAL]
@@ -548,22 +548,22 @@ RELATIONS:
   VALUE: HZ-08
   ROLE: Mitigates
 - TYPE: Child
-  VALUE: SR-16
+  VALUE: SWR-SAF-16
   ROLE: Realised by
 - TYPE: Child
-  VALUE: SR-17
+  VALUE: SWR-SAF-17
   ROLE: Realised by
 - TYPE: Child
-  VALUE: SR-18
+  VALUE: SWR-SAF-18
   ROLE: Realised by
 - TYPE: Child
-  VALUE: SR-19
+  VALUE: SWR-SAF-19
   ROLE: Realised by
 - TYPE: Child
-  VALUE: SR-20
+  VALUE: SWR-SAF-20
   ROLE: Realised by
 - TYPE: Child
-  VALUE: FR-RUN-08
+  VALUE: SWR-RUN-08
   ROLE: Realised by
 
 [SAFETY_GOAL]
@@ -577,10 +577,10 @@ RELATIONS:
   VALUE: HZ-05
   ROLE: Mitigates
 - TYPE: Child
-  VALUE: SR-11
+  VALUE: SWR-SAF-11
   ROLE: Realised by
 - TYPE: Child
-  VALUE: SR-12
+  VALUE: SWR-SAF-12
   ROLE: Realised by
 
 [SAFETY_GOAL]
@@ -624,10 +624,10 @@ RELATIONS:
   VALUE: HZ-10
   ROLE: Mitigates
 - TYPE: Child
-  VALUE: SR-22
+  VALUE: SWR-SAF-22
   ROLE: Realised by
 - TYPE: Child
-  VALUE: SR-23
+  VALUE: SWR-SAF-23
   ROLE: Realised by
 
 [SAFETY_GOAL]
@@ -647,16 +647,16 @@ RELATIONS:
   VALUE: HZ-08
   ROLE: Mitigates
 - TYPE: Child
-  VALUE: SR-21
+  VALUE: SWR-SAF-21
   ROLE: Realised by
 - TYPE: Child
-  VALUE: NFR-09
+  VALUE: SWR-NFR-09
   ROLE: Realised by
 - TYPE: Child
-  VALUE: NFR-15
+  VALUE: SWR-NFR-15
   ROLE: Realised by
 - TYPE: Child
-  VALUE: FR-UPD-02
+  VALUE: SWR-UPD-02
   ROLE: Realised by
 
 [SAFETY_GOAL]
@@ -664,16 +664,16 @@ UID: SG-13
 STATEMENT: >>>
 Opening the chamber shall remove power from the elements immediately, through hardware as well as software.
 <<<
-LAYERS: L2 ([LINK: SR-31]) + L3 ([LINK: HR-21] series wiring)
+LAYERS: L2 ([LINK: SWR-SAF-31]) + L3 ([LINK: SYS-HW-21] series wiring)
 RELATIONS:
 - TYPE: Parent
   VALUE: HZ-13
   ROLE: Mitigates
 - TYPE: Child
-  VALUE: SR-31
+  VALUE: SWR-SAF-31
   ROLE: Realised by
 - TYPE: Child
-  VALUE: HR-21
+  VALUE: SYS-HW-21
   ROLE: Realised by
 
 [SAFETY_GOAL]
@@ -687,16 +687,16 @@ RELATIONS:
   VALUE: HZ-12
   ROLE: Mitigates
 - TYPE: Child
-  VALUE: FR-WEB-26
+  VALUE: SWR-WEB-26
   ROLE: Realised by
 - TYPE: Child
-  VALUE: NFR-19
+  VALUE: SWR-NFR-19
   ROLE: Realised by
 - TYPE: Child
-  VALUE: NFR-20
+  VALUE: SWR-NFR-20
   ROLE: Realised by
 - TYPE: Child
-  VALUE: ASM-05
+  VALUE: SYS-ASM-05
   ROLE: Realised by
 
 [[/SECTION]]
@@ -724,7 +724,7 @@ CARRIED_BY: >>>
 **The L5 cutout and the operator.**
 <<<
 MITIGATION: >>>
-[LINK: SR-27] discriminates the case within about 4 s and latches fault 22, whose operator instruction is to isolate at the supply; the alarm sounds; [LINK: SR-30] warns of the intermittent mismatches that precede outright relay failure.
+[LINK: SWR-SAF-27] discriminates the case within about 4 s and latches fault 22, whose operator instruction is to isolate at the supply; the alarm sounds; [LINK: SWR-SAF-30] warns of the intermittent mismatches that precede outright relay failure.
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -743,7 +743,7 @@ CARRIED_BY: >>>
 The installer, who must not fit this controller to a three-phase kiln.
 <<<
 MITIGATION: >>>
-Stated as out of scope in the README, in [requirements §12](requirements.sdoc) and in [LINK: ASM-10], rather than left as a limitation to be discovered. The thermal rules still protect a single-phase kiln in full.
+Stated as out of scope in the README, in [requirements §12](03_software_req.sdoc) and in [LINK: SYS-ASM-10], rather than left as a limitation to be discovered. The thermal rules still protect a single-phase kiln in full.
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -765,7 +765,7 @@ CARRIED_BY: >>>
 The installer.
 <<<
 MITIGATION: >>>
-Commissioning verifies a plausible reference current before the first firing; [LINK: FR-CUR-11] distinguishes "no signal at all" from "zero current"; a disabled or failed channel raises warning 111 continuously rather than going quiet.
+Commissioning verifies a plausible reference current before the first firing; [LINK: SWR-CUR-11] distinguishes "no signal at all" from "zero current"; a disabled or failed channel raises warning 111 continuously rather than going quiet.
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -787,7 +787,7 @@ CARRIED_BY: >>>
 The project, through verification.
 <<<
 MITIGATION: >>>
-100 % of safety decision branches covered by automated host tests ([LINK: TR-19]); every `SR` covered by at least one automated test, inspection alone insufficient ([LINK: TR-23]); rules are pure functions driven directly by tests ([LINK: TR-09]); CI blocks merge on any failure ([LINK: TR-24]). **L5 remains the only protection genuinely independent of this risk.**
+100 % of safety decision branches covered by automated host tests ([LINK: SWR-TST-19]); every `SR` covered by at least one automated test, inspection alone insufficient ([LINK: SWR-TST-23]); rules are pure functions driven directly by tests ([LINK: SWR-TST-09]); CI blocks merge on any failure ([LINK: SWR-TST-24]). **L5 remains the only protection genuinely independent of this risk.**
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -825,13 +825,13 @@ STATEMENT: >>>
 **An operator who widens thresholds to their limits** reduces the effectiveness of detection without disabling it.
 <<<
 WHY_IT_REMAINS: >>>
-[LINK: SR-22] bounds the ranges but permits the full range.
+[LINK: SWR-SAF-22] bounds the ranges but permits the full range.
 <<<
 CARRIED_BY: >>>
 The operator.
 <<<
 MITIGATION: >>>
-Ranges are bounded; [LINK: SR-23]'s 1350 °C ceiling is a compile-time constant no configuration can raise; nothing can be disabled outright; untuned gains and disabled monitoring are annunciated as standing warnings (108, 111).
+Ranges are bounded; [LINK: SWR-SAF-23]'s 1350 °C ceiling is a compile-time constant no configuration can raise; nothing can be disabled outright; untuned gains and disabled monitoring are annunciated as standing warnings (108, 111).
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -844,16 +844,16 @@ RELATIONS:
 [RESIDUAL_RISK]
 UID: RR-07
 STATEMENT: >>>
-**Network-borne program edits.** [LINK: FR-WEB-26] removed every route that can heat the kiln, so a firing can no longer be started, altered or aborted over the network. What remains is that an attacker can edit a stored firing *program*, which takes effect only if an operator then starts it at the kiln.
+**Network-borne program edits.** [LINK: SWR-WEB-26] removed every route that can heat the kiln, so a firing can no longer be started, altered or aborted over the network. What remains is that an attacker can edit a stored firing *program*, which takes effect only if an operator then starts it at the kiln.
 <<<
 WHY_IT_REMAINS: >>>
 Program authoring on a keyboard is the one thing a rotary encoder and a 128x64 OLED are genuinely bad at, so it was kept deliberately.
 <<<
 CARRIED_BY: >>>
-The owner of the network ([LINK: ASM-05]), and the operator who confirms the start.
+The owner of the network ([LINK: SYS-ASM-05]), and the operator who confirms the start.
 <<<
 MITIGATION: >>>
-Authentication with constant-time comparison and rate-limited failures ([LINK: NFR-19]); every request body and parameter treated as untrusted; no cloud connectivity and no remote access outside the local network by design. The device is **not** to be exposed to the internet.
+Authentication with constant-time comparison and rate-limited failures ([LINK: SWR-NFR-19]); every request body and parameter treated as untrusted; no cloud connectivity and no remote access outside the local network by design. The device is **not** to be exposed to the internet.
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -872,7 +872,7 @@ CARRIED_BY: >>>
 The installation and the operator.
 <<<
 MITIGATION: >>>
-[LINK: HR-18] on CT isolation, creepage and clearance; [LINK: HR-16] forbidding a CT whose burden can be disconnected; documentation obligations ([LINK: NFR-26], [LINK: SR-24]).
+[LINK: SYS-HW-18] on CT isolation, creepage and clearance; [LINK: SYS-HW-16] forbidding a CT whose burden can be disconnected; documentation obligations ([LINK: SWR-NFR-26], [LINK: SYS-SAF-24]).
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -885,7 +885,7 @@ RELATIONS:
 [RESIDUAL_RISK]
 UID: RR-10
 STATEMENT: >>>
-**A door interlock is optional** ([LINK: HR-21] is a *should*, not a *shall*). The board now carries the series contact and the sense divider (2026-10-06), so fitting one is wiring rather than redesign, but a kiln without a switch still has nothing against [LINK: HZ-13], and the controller cannot tell the difference between "not fitted" and "fitted and shut" except by being told.
+**A door interlock is optional** ([LINK: SYS-HW-21] is a *should*, not a *shall*). The board now carries the series contact and the sense divider (2026-10-06), so fitting one is wiring rather than redesign, but a kiln without a switch still has nothing against [LINK: HZ-13], and the controller cannot tell the difference between "not fitted" and "fitted and shut" except by being told.
 <<<
 WHY_IT_REMAINS: >>>
 Many existing kilns have no interlock, and retro-fitting one means working on the door furniture.
@@ -894,7 +894,7 @@ CARRIED_BY: >>>
 The installer.
 <<<
 MITIGATION: >>>
-Warning 113 is raised continuously whenever no interlock is configured, so the gap is visible on the display and in the API rather than silent. [LINK: SR-31]'s normally-closed requirement means a *fitted* switch cannot fail silently.
+Warning 113 is raised continuously whenever no interlock is configured, so the gap is visible on the display and in the API rather than silent. [LINK: SWR-SAF-31]'s normally-closed requirement means a *fitted* switch cannot fail silently.
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -904,7 +904,7 @@ RELATIONS:
 [RESIDUAL_RISK]
 UID: RR-09
 STATEMENT: >>>
-**Unattended firing**, contrary to [LINK: ASM-06], removes L6 entirely.
+**Unattended firing**, contrary to [LINK: SYS-ASM-06], removes L6 entirely.
 <<<
 WHY_IT_REMAINS: >>>
 The firmware cannot verify attendance.
@@ -913,7 +913,7 @@ CARRIED_BY: >>>
 The operator.
 <<<
 MITIGATION: >>>
-Stated in the README, in [LINK: SR-24], and here. Unattended firing is **not** a design goal and the layered concept does not assume it.
+Stated in the README, in [LINK: SYS-SAF-24], and here. Unattended firing is **not** a design goal and the layered concept does not assume it.
 <<<
 RELATIONS:
 - TYPE: Parent

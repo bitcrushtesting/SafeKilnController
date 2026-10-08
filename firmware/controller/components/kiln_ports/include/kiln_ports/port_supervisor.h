@@ -1,10 +1,10 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * What the independent supervisor is doing (AD-22), for the operator's benefit.
+ * What the independent supervisor is doing (SWA-22), for the operator's benefit.
  *
  * Optional: a build without a supervisor leaves it null and the interface
- * simply says nothing, the same way SR-11 stands down without an enclosure
+ * simply says nothing, the same way SWR-SAF-11 stands down without an enclosure
  * probe.
  *
  * ---------------------------------------------------------------------------

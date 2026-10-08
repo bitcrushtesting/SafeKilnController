@@ -110,16 +110,16 @@ bool kiln_tempfilt_push(kiln_tempfilt_t *f, float raw_sensor_c, float dt_s)
         return false;
     }
 
-    /* NFR-17 / SR-01: refuse rather than poison persistent state. */
+    /* SWR-NFR-17 / SYS-SAF-01: refuse rather than poison persistent state. */
     if (!kiln_is_finite(raw_sensor_c) || !kiln_is_finite(dt_s)) {
         f->rejected++;
         return false;
     }
 
-    /* FR-ACQ-08: gain then offset, applied before anything else uses the value. */
+    /* SWR-ACQ-08: gain then offset, applied before anything else uses the value. */
     f->raw_c = raw_sensor_c * f->cfg.gain + f->cfg.offset_c;
 
-    /* FR-ACQ-07: first order low pass, exact-enough discrete form. */
+    /* SWR-ACQ-07: first order low pass, exact-enough discrete form. */
     const float prev = f->primed ? f->filt_c : f->raw_c;
     if (!f->primed) {
         f->filt_c      = f->raw_c;
@@ -147,7 +147,7 @@ bool kiln_tempfilt_push(kiln_tempfilt_t *f, float raw_sensor_c, float dt_s)
             /* A cycle that overran covers several decimation boundaries.  Pushing
              * the same filt_c at each of them would plant duplicate points at
              * distinct x positions, which flattens the regressed slope -- and a
-             * flattened slope is exactly what SR-07 reads as "not rising".
+             * flattened slope is exactly what SWR-SAF-07 reads as "not rising".
              * Interpolate across the interval instead, which is the best
              * available statement about where the temperature was. */
             for (uint16_t k = 1; k <= pushes; k++) {
@@ -161,7 +161,7 @@ bool kiln_tempfilt_push(kiln_tempfilt_t *f, float raw_sensor_c, float dt_s)
             }
 
             /* The history only changes here, so the regression only runs here.
-             * At 4 Hz acquisition (FR-ACQ-03) three of every four pushes used to
+             * At 4 Hz acquisition (SWR-ACQ-03) three of every four pushes used to
              * repeat an identical 300-point walk for nothing. */
             f->rate_c_per_h = regress_rate_per_h(f);
         }

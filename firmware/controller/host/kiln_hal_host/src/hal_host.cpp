@@ -96,7 +96,7 @@ kiln_err_t hf_write(void *ctx, uint32_t off, const void *data, size_t len)
     }
 
     /* Power cut part-way through: some bytes land, the rest do not, and the
-     * medium stays that way.  A torn record, exactly as FR-LOG-08 means it. */
+     * medium stays that way.  A torn record, exactly as SWR-LOG-08 means it. */
     if ((f->cut_power_at_write != 0u) && f->writes == f->cut_power_at_write) {
         const size_t n = f->cut_bytes < len ? f->cut_bytes : len;
         for (size_t i = 0; i < n; i++) {

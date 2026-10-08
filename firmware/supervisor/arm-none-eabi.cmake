@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Bare-metal ARM toolchain file.  CubeCLT ships the compiler; nothing is
-# fetched at build time (CON-04).  Override with -DTOOLCHAIN_PREFIX_PATH if it
+# fetched at build time (UR-CON-04).  Override with -DTOOLCHAIN_PREFIX_PATH if it
 # lives elsewhere.
 set(CMAKE_SYSTEM_NAME Generic)
 set(CMAKE_SYSTEM_PROCESSOR arm)

@@ -1,23 +1,23 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * WiFi station with access-point fallback and SNTP (FR-NET-01..FR-NET-09,
- * except FR-NET-04: see the note on mDNS below).
+ * WiFi station with access-point fallback and SNTP (SWR-NET-01..SWR-NET-09,
+ * except SWR-NET-04: see the note on mDNS below).
  *
  * ---------------------------------------------------------------------------
- * FR-NET-07 is the requirement that shapes this file
+ * SWR-NET-07 is the requirement that shapes this file
  * ---------------------------------------------------------------------------
  * "Loss of WiFi, of the internet, or of time sync shall not interrupt, pause
  * or otherwise alter a running firing."  So nothing here blocks, nothing here
  * is on the control path, and nothing here can fail in a way the application
- * has to care about.  The whole component runs on core 0 (AD-15) and the
+ * has to care about.  The whole component runs on core 0 (SWA-15) and the
  * application reads a status struct; there is no call from this file into
  * kiln_app at all.
  *
  * The retry is the usual place this requirement gets broken.  An adapter that
  * retried in a tight loop, or blocked a task waiting for an association, would
- * satisfy "connects to WiFi" and quietly violate FR-NET-07.  Reconnection here
- * is driven by events with an exponential backoff (FR-NET-03), so a kiln in a
+ * satisfy "connects to WiFi" and quietly violate SWR-NET-07.  Reconnection here
+ * is driven by events with an exponential backoff (SWR-NET-03), so a kiln in a
  * shed with no reception spends its firing idle rather than busy.
  */
 #include <stdlib.h>
@@ -41,7 +41,7 @@ const char *TAG = "hal_net";
 
 } // namespace
 
-/* FR-NET-03: 1 s doubling to 60 s.  The cap matters more than the curve: a
+/* SWR-NET-03: 1 s doubling to 60 s.  The cap matters more than the curve: a
  * kiln may fire for a week, and a device that kept trying every second for
  * that long would spend real power on it. */
 constexpr uint32_t RETRY_MIN_MS = 1000u;
@@ -56,13 +56,13 @@ typedef struct {
     char      hostname[32];
     int8_t    rssi;
     uint32_t  disconnects;
-    uint8_t   last_reason;        /* FR-NET-09 */
+    uint8_t   last_reason;        /* SWR-NET-09 */
     int64_t   up_since_us;
     bool      time_synced;
 
     uint32_t  retry_ms;
     int64_t   first_attempt_us;
-    uint16_t  fallback_after_s;   /* FR-NET-02 */
+    uint16_t  fallback_after_s;   /* SWR-NET-02 */
     bool      ap_started;
     bool      sta_configured;
     esp_timer_handle_t retry_timer;
@@ -90,9 +90,9 @@ bool copy_checked(void *dst, size_t cap, const char *src, const char *what)
     return true;
 }
 
-/* --- the AP fallback (FR-NET-02, FR-NET-05) ----------------------------- */
+/* --- the AP fallback (SWR-NET-02, SWR-NET-05) ----------------------------- */
 
-/* FR-NET-05: at least eight characters, device-unique, derived from the MAC so
+/* SWR-NET-05: at least eight characters, device-unique, derived from the MAC so
  * it can be printed on the display and on a label rather than being a shared
  * secret every Safe Kiln Controller in the world has. */
 void default_ap_pass(char *out, size_t n)
@@ -127,7 +127,7 @@ void start_ap(const kiln_config_t *cfg)
                      "net.ap_pass")) {
         ap.ap.authmode = WIFI_AUTH_WPA2_PSK;
     } else {
-        /* FR-NET-05 again: never an open access point.  An open AP serving the
+        /* SWR-NET-05 again: never an open access point.  An open AP serving the
          * provisioning page would hand the kiln to anyone in radio range, and
          * "the installer did not set one" is not a reason to do that. */
         char gen[16];
@@ -172,12 +172,12 @@ void on_wifi(void *arg, esp_event_base_t base, int32_t id, void *data)
             static_cast<const wifi_event_sta_disconnected_t *>(data);
         s_net.last_reason = (d != nullptr) ? (uint8_t)d->reason : 0u;
         if (s_net.state == KILN_NET_STA_CONNECTED) {
-            s_net.disconnects++;        /* FR-NET-09 */
+            s_net.disconnects++;        /* SWR-NET-09 */
         }
         s_net.state  = KILN_NET_CONNECTING;
         s_net.ip[0]  = '\0';
 
-        /* FR-NET-02: give up on the station after the configured period and
+        /* SWR-NET-02: give up on the station after the configured period and
          * bring the AP up, so a kiln on a changed network is still reachable
          * to be told the new one. */
         const int64_t trying_s =
@@ -186,7 +186,7 @@ void on_wifi(void *arg, esp_event_base_t base, int32_t id, void *data)
             start_ap(cfg);
         }
 
-        /* FR-NET-03: exponential backoff, event-driven, never a spin. */
+        /* SWR-NET-03: exponential backoff, event-driven, never a spin. */
         (void)esp_timer_stop(s_net.retry_timer);
         (void)esp_timer_start_once(s_net.retry_timer,
                                    (uint64_t)s_net.retry_ms * 1000ull);
@@ -212,8 +212,8 @@ void on_wifi(void *arg, esp_event_base_t base, int32_t id, void *data)
 void on_time_sync(struct timeval *tv)
 {
     (void)tv;
-    /* FR-LOG-12 and warning 105.  Wall time is for timestamps only: every
-     * control and safety deadline uses the monotonic base (FR-NET-08), so a
+    /* SWR-LOG-12 and warning 105.  Wall time is for timestamps only: every
+     * control and safety deadline uses the monotonic base (SWR-NET-08), so a
      * step here cannot move a runaway timer. */
     s_net.time_synced = true;
     ESP_LOGI(TAG, "wall clock synchronised");
@@ -263,7 +263,7 @@ kiln_err_t kiln_hal_net_init(const kiln_config_t *cfg, kiln_port_net_t *out)
     memset(&s_net, 0, sizeof(s_net));
     s_net.state            = KILN_NET_DOWN;
     s_net.retry_ms         = RETRY_MIN_MS;
-    s_net.fallback_after_s = 60;        /* FR-NET-02 default */
+    s_net.fallback_after_s = 60;        /* SWR-NET-02 default */
     (void)snprintf(s_net.hostname, sizeof(s_net.hostname), "%s",
                    (cfg->hostname[0] != '\0') ? cfg->hostname : "safekiln");
 
@@ -295,7 +295,7 @@ kiln_err_t kiln_hal_net_init(const kiln_config_t *cfg, kiln_port_net_t *out)
     (void)esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP,
                                               on_wifi, (void *)cfg, nullptr);
 
-    /* FR-NET-01 / FR-NET-02: with no stored credentials there is nothing to
+    /* SWR-NET-01 / SWR-NET-02: with no stored credentials there is nothing to
      * connect to, so the AP comes up immediately rather than after a timeout
      * that could only ever expire. */
     if (cfg->wifi_ssid[0] != '\0') {
@@ -325,19 +325,19 @@ kiln_err_t kiln_hal_net_init(const kiln_config_t *cfg, kiln_port_net_t *out)
         return KILN_ERR_IO;
     }
 
-    /* FR-NET-04 wants kiln.local, and it is **not implemented here**.
+    /* SWR-NET-04 wants kiln.local, and it is **not implemented here**.
      *
-     * mDNS left the ESP-IDF tree for the component manager, and CON-04 forbids
+     * mDNS left the ESP-IDF tree for the component manager, and UR-CON-04 forbids
      * a build-time fetch from an unpinned source -- the same constraint that
      * has LittleFS waiting to be vendored (tasklist E7).  Adding a managed
      * dependency to get a convenience feature would be the wrong trade against
      * a constraint the project applies to everything else, so the device is
      * reachable by IP until mDNS is vendored deliberately.
      *
-     * The address is on the network screen (FR-HMI-07), which is where an
+     * The address is on the network screen (SWR-HMI-07), which is where an
      * operator standing at the kiln would look for it anyway. */
 
-    /* FR-NET-06.  Best effort by design: no route to the internet is normal in
+    /* SWR-NET-06.  Best effort by design: no route to the internet is normal in
      * a workshop, and warning 105 says so rather than anything failing. */
     if (cfg->ntp_server[0] != '\0') {
         esp_sntp_config_t sc = ESP_NETIF_SNTP_DEFAULT_CONFIG(cfg->ntp_server);

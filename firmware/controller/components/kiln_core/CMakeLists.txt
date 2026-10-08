@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Bitcrush Testing
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Dual-target build (AD-14, architecture section 14.2): the same sources compile
+# Dual-target build (SWA-14, architecture section 14.2): the same sources compile
 # as an ESP-IDF component and as a plain CMake library for the host tests.  The
 # core may not include a single IDF header -- tools/layercheck enforces that.
 
@@ -23,7 +23,7 @@ set(KILN_CORE_SRCS
     src/tempfilt.cpp
     src/window.cpp
     # The supervisor link's wire format, owned by firmware/supervisor/protocol and
-    # compiled into both firmwares (AD-22).  Declarative plus a CRC, which is
+    # compiled into both firmwares (SWA-22).  Declarative plus a CRC, which is
     # the only behaviour the two ends share; a CRC that disagreed would show up
     # as rejected frames, which both sides already treat as silence.
     ${CMAKE_CURRENT_LIST_DIR}/../../../supervisor/protocol/src/sup_proto.cpp

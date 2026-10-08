@@ -1,10 +1,10 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Fault and warning text (SR-19, requirements appendix A).  A single table so
+ * Fault and warning text (SWR-SAF-19, requirements appendix A).  A single table so
  * the display, the API and the documentation cannot disagree.
  *
- * NFR-23: the table is indexed by kiln_lang_t, and it is the only place in the
+ * SWR-NFR-23: the table is indexed by kiln_lang_t, and it is the only place in the
  * firmware holding operator-facing prose.  Adding a language is a column here
  * and nowhere else.
  *
@@ -39,7 +39,7 @@ static inline uint16_t kiln_warn_code(kiln_warn_bit_t bit)
 
 const char *kiln_state_label(kiln_state_t state);
 
-/* --- the independent supervisor (AD-22) ---------------------------------
+/* --- the independent supervisor (SWA-22) ---------------------------------
  *
  * Why the supervisor stopped the kiln, in the operator's language.  Separate
  * from the fault table because these are not this firmware's faults: the

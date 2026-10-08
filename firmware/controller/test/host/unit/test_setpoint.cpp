@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
- * kiln_core/setpoint -- FR-CTL-09..FR-CTL-13, FR-PRG-03, FR-PRG-06, FR-PRG-10.
+ * kiln_core/setpoint -- SWR-CTL-09..SWR-CTL-13, SWR-PRG-03, SWR-PRG-06, SWR-PRG-10.
  */
 
 #include "kiln_check.h"
@@ -26,9 +26,9 @@ static kiln_program_t prog_of(uint8_t n, const kiln_segment_t *segs)
     return p;
 }
 
-/* --- FR-CTL-09, FR-CTL-10 ---------------------------------------------- */
+/* --- SWR-CTL-09, SWR-CTL-10 ---------------------------------------------- */
 
-KILN_TEST(frctl09_the_setpoint_ramps_rather_than_stepping)
+KILN_TEST(swrctl09_the_setpoint_ramps_rather_than_stepping)
 {
     const kiln_segment_t segs[] = { { 600, 360, 0, 0, 0 } };   /* 360 degC/h */
     const kiln_program_t p = prog_of(1, segs);
@@ -45,7 +45,7 @@ KILN_TEST(frctl09_the_setpoint_ramps_rather_than_stepping)
     CHECK_NEAR(kiln_setpoint_value(&st), 30.0f, 0.2f);
 }
 
-KILN_TEST(frctl10_rate_zero_means_as_fast_as_the_kiln_allows)
+KILN_TEST(swrctl10_rate_zero_means_as_fast_as_the_kiln_allows)
 {
     const kiln_segment_t segs[] = { { 600, 0, 0, 0, 0 } };
     const kiln_program_t p = prog_of(1, segs);
@@ -57,9 +57,9 @@ KILN_TEST(frctl10_rate_zero_means_as_fast_as_the_kiln_allows)
     CHECK_NEAR(kiln_setpoint_value(&st), 600.0f, 0.01f);
 }
 
-/* --- FR-CTL-11, FR-CTL-12 ---------------------------------------------- */
+/* --- SWR-CTL-11, SWR-CTL-12 ---------------------------------------------- */
 
-KILN_TEST(frctl11_holdback_freezes_the_curve_while_the_kiln_lags)
+KILN_TEST(swrctl11_holdback_freezes_the_curve_while_the_kiln_lags)
 {
     const kiln_segment_t segs[] = { { 600, 360, 0, 0, 0 } };
     const kiln_program_t p = prog_of(1, segs);
@@ -83,7 +83,7 @@ KILN_TEST(frctl11_holdback_freezes_the_curve_while_the_kiln_lags)
     CHECK(!kiln_setpoint_holdback(&st));
 }
 
-KILN_TEST(frctl12_dwell_accrues_only_while_the_kiln_is_within_tolerance)
+KILN_TEST(swrctl12_dwell_accrues_only_while_the_kiln_is_within_tolerance)
 {
     const kiln_segment_t segs[] = { { 100, 0, 1, 0, 0 } };   /* 1 minute dwell */
     const kiln_program_t p = prog_of(1, segs);
@@ -107,9 +107,9 @@ KILN_TEST(frctl12_dwell_accrues_only_while_the_kiln_is_within_tolerance)
     CHECK(kiln_setpoint_finished(&st));
 }
 
-/* --- FR-CTL-13: the clamping consistency that B9 fixed ----------------- */
+/* --- SWR-CTL-13: the clamping consistency that B9 fixed ----------------- */
 
-KILN_TEST(frctl13_a_cooling_ramp_is_passive)
+KILN_TEST(swrctl13_a_cooling_ramp_is_passive)
 {
     const kiln_segment_t segs[] = { { 400, 100, 0, 0, 0 } };
     const kiln_program_t p = prog_of(1, segs);
@@ -120,12 +120,12 @@ KILN_TEST(frctl13_a_cooling_ramp_is_passive)
     CHECK(!kiln_setpoint_heat_allowed(&st));
 }
 
-KILN_TEST(frctl13_heat_allowed_uses_the_same_clamped_target_as_the_executor)
+KILN_TEST(swrctl13_heat_allowed_uses_the_same_clamped_target_as_the_executor)
 {
     /* The executor ramps toward clamp(target, 0, max); heat_allowed used to
      * compare the *unclamped* target against the segment start, so the two could
      * disagree about which direction the ramp was going -- and a cooling ramp
-     * that heat_allowed called a heating one is FR-CTL-13's passive cooling not
+     * that heat_allowed called a heating one is SWR-CTL-13's passive cooling not
      * happening, with the PID driving full duty into a descending setpoint.
      *
      * With the start value also clamped to the maximum, the divergence is not
@@ -164,7 +164,7 @@ KILN_TEST(frctl13_heat_allowed_uses_the_same_clamped_target_as_the_executor)
     CHECK(saw_cooling);
 }
 
-KILN_TEST(sr23_the_configured_maximum_and_the_ceiling_both_bind)
+KILN_TEST(swrsaf23_the_configured_maximum_and_the_ceiling_both_bind)
 {
     const kiln_segment_t segs[] = { { 1340, 0, 0, 0, 0 } };
     const kiln_program_t p = prog_of(1, segs);
@@ -178,9 +178,9 @@ KILN_TEST(sr23_the_configured_maximum_and_the_ceiling_both_bind)
     CHECK(kiln_setpoint_value(&st) <= KILN_TEMP_CEILING_C);
 }
 
-/* --- FR-PRG-03 --------------------------------------------------------- */
+/* --- SWR-PRG-03 --------------------------------------------------------- */
 
-KILN_TEST(frprg03_a_segment_can_wait_for_an_operator)
+KILN_TEST(swrprg03_a_segment_can_wait_for_an_operator)
 {
     const kiln_segment_t segs[] = {
         { 100, 0, 0, KILN_SEG_FLAG_REQUIRE_ACK, 0 },
@@ -207,11 +207,11 @@ KILN_TEST(frprg03_a_segment_can_wait_for_an_operator)
     CHECK_ERR(kiln_setpoint_ack(&st), KILN_ERR_STATE);
 }
 
-/* --- FR-PRG-06 / FR-RUN-05: the closed-form prediction of B6 ------------ */
+/* --- SWR-PRG-06 / SWR-RUN-05: the closed-form prediction of B6 ------------ */
 
 /* The oracle: the forward simulation the closed form replaced.  Kept as a test
  * fixture rather than in the firmware, so the two cannot drift apart while
- * NFR-02's 50 ms ceiling is not being spent on it in production. */
+ * SWR-NFR-02's 50 ms ceiling is not being spent on it in production. */
 static uint32_t predict_by_simulation(const kiln_setpoint_t *st, bool stop_at_segment_end)
 {
     if (!st->started || st->finished) {
@@ -271,7 +271,7 @@ static void check_prediction_matches_oracle(const kiln_program_t *p, float start
     }
 }
 
-KILN_TEST(frprg06_closed_form_prediction_agrees_with_the_simulation_oracle)
+KILN_TEST(swrprg06_closed_form_prediction_agrees_with_the_simulation_oracle)
 {
     const kiln_segment_t a[] = { { 600, 100, 30, 0, 0 } };
     const kiln_program_t pa = prog_of(1, a);
@@ -298,7 +298,7 @@ KILN_TEST(frprg06_closed_form_prediction_agrees_with_the_simulation_oracle)
     check_prediction_matches_oracle(&pc, 20.0f, 700.0f);
 }
 
-KILN_TEST(frprg06_prediction_stops_at_a_segment_that_waits_on_a_human)
+KILN_TEST(swrprg06_prediction_stops_at_a_segment_that_waits_on_a_human)
 {
     const kiln_segment_t segs[] = {
         { 100, 0, 1, 0, 0 },
@@ -316,7 +316,7 @@ KILN_TEST(frprg06_prediction_stops_at_a_segment_that_waits_on_a_human)
     CHECK_EQ_UINT(remaining, predict_by_simulation(&st, false));
 }
 
-KILN_TEST(frprg06_prediction_is_zero_once_there_is_nothing_to_predict)
+KILN_TEST(swrprg06_prediction_is_zero_once_there_is_nothing_to_predict)
 {
     kiln_setpoint_t st = {};
     CHECK_EQ_UINT(kiln_setpoint_remaining_s(&st), 0u);
@@ -332,9 +332,9 @@ KILN_TEST(frprg06_prediction_is_zero_once_there_is_nothing_to_predict)
     CHECK_EQ_UINT(kiln_setpoint_remaining_s(&st), 0u);
 }
 
-/* --- FR-PRG-10 --------------------------------------------------------- */
+/* --- SWR-PRG-10 --------------------------------------------------------- */
 
-KILN_TEST(frprg10_only_segments_that_have_not_started_may_be_replaced)
+KILN_TEST(swrprg10_only_segments_that_have_not_started_may_be_replaced)
 {
     const kiln_segment_t segs[] = {
         { 100, 0, 0, 0, 0 },
@@ -368,9 +368,9 @@ KILN_TEST(frprg10_only_segments_that_have_not_started_may_be_replaced)
     CHECK_ERR(kiln_setpoint_replace_remaining(&st, &shorter), KILN_ERR_STATE);
 }
 
-/* --- NFR-17 ------------------------------------------------------------ */
+/* --- SWR-NFR-17 ------------------------------------------------------------ */
 
-KILN_TEST(nfr17_tick_reports_what_it_refused_to_do)
+KILN_TEST(swrnfr17_tick_reports_what_it_refused_to_do)
 {
     const kiln_segment_t segs[] = { { 100, 0, 0, 0, 0 } };
     const kiln_program_t p = prog_of(1, segs);

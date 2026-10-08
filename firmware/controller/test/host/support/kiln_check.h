@@ -1,12 +1,12 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Minimal host test harness.  Deliberately dependency-free: CON-04 forbids a
+ * Minimal host test harness.  Deliberately dependency-free: UR-CON-04 forbids a
  * build-time network fetch, and a unit test framework for pure C logic is a few
- * macros.  One executable per component, registered with ctest (TR-13).
+ * macros.  One executable per component, registered with ctest (SWR-TST-13).
  *
  * Test names carry the requirement they verify, because tools/trace parses them
- * (TR-22, TR-23): KILN_TEST(sr25_latches_on_uncommanded_current).
+ * (SWR-TST-22, SWR-TST-23): KILN_TEST(swrsaf25_latches_on_uncommanded_current).
  */
 #ifndef KILN_CHECK_H
 #define KILN_CHECK_H
@@ -51,7 +51,7 @@ extern int               kiln_current_failures;
     }                                                                          \
     static void kiln_test_##test_name_(void)
 
-/* The (void) casts on every fprintf below are not decoration: NFR-17's rule is
+/* The (void) casts on every fprintf below are not decoration: SWR-NFR-17's rule is
  * that no return value is silently dropped, and cert-err33-c enforces it with
  * no baseline.  A diagnostic that cannot be written is genuinely nothing this
  * harness can do anything about, so the cast is the handling -- stated once,

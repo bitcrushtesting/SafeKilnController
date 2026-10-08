@@ -1,16 +1,16 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * The supervisor link's UART (AD-22).
+ * The supervisor link's UART (SWA-22).
  *
  * This file moves bytes off a UART and hands them to kiln_core/suplink, and
  * does nothing else.  Every decision about what those bytes mean -- frame
  * assembly, resynchronisation, a repeated sequence number, when a quiet link
  * becomes a fault -- lives in the core where a host test can drive it, which
- * is the same split AD-19 and AD-21 make for the log ring and the file store.
+ * is the same split SWA-19 and SWA-21 make for the log ring and the file store.
  *
  * Receive only.  No TX pin is assigned, so the peripheral has nothing to
- * transmit on: the simplex link of AD-22 is structural here and not merely a
+ * transmit on: the simplex link of SWA-22 is structural here and not merely a
  * convention this file happens to follow.
  */
 #include <string.h>
@@ -79,7 +79,7 @@ size_t kiln_hal_suplink_read(uint8_t *out, size_t cap)
         return 0;
     }
     /* Non-blocking: this is called from the acquisition cycle and must not
-     * delay it (NFR-02).  Whatever has arrived is taken; the core's staleness
+     * delay it (SWR-NFR-02).  Whatever has arrived is taken; the core's staleness
      * timer is what notices if that is nothing. */
     const int n = uart_read_bytes((uart_port_t)KILN_HAL_SUP_UART, out, cap, 0);
     return (n > 0) ? (size_t)n : 0u;

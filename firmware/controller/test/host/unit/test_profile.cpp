@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
- * kiln_core/profile -- FR-PRG-01, FR-PRG-02, FR-PRG-05, FR-PRG-09, NFR-19.
+ * kiln_core/profile -- SWR-PRG-01, SWR-PRG-02, SWR-PRG-05, SWR-PRG-09, SWR-NFR-19.
  */
 
 #include <string.h>
@@ -18,7 +18,7 @@ static kiln_program_t valid_program(void)
     return p;
 }
 
-KILN_TEST(frprg05_accepts_a_valid_program)
+KILN_TEST(swrprg05_accepts_a_valid_program)
 {
     const kiln_program_t p = valid_program();
     const kiln_prog_validation_t v = kiln_profile_validate(&p, 1280.0f);
@@ -26,7 +26,7 @@ KILN_TEST(frprg05_accepts_a_valid_program)
     CHECK_EQ_UINT(v.segment, KILN_SEG_NONE);
 }
 
-KILN_TEST(frprg05_rejects_every_out_of_range_field_and_names_the_segment)
+KILN_TEST(swrprg05_rejects_every_out_of_range_field_and_names_the_segment)
 {
     kiln_program_t p = valid_program();
     p.segment_count = 3;
@@ -74,7 +74,7 @@ KILN_TEST(a_null_program_is_not_an_empty_one)
     CHECK_STR_EQ(kiln_profile_validation_str(KILN_PROG_ERR_NULL), "no program supplied");
 }
 
-KILN_TEST(nfr19_an_unterminated_string_is_rejected)
+KILN_TEST(swrnfr19_an_unterminated_string_is_rejected)
 {
     /* name and description are fixed arrays that arrive from the network and
      * from flash, and the struct is memcpy'd wholesale into kiln_setpoint_t -- so
@@ -96,7 +96,7 @@ KILN_TEST(nfr19_an_unterminated_string_is_rejected)
     CHECK_EQ_UINT(strlen(p.description), KILN_PROGRAM_DESC_LEN - 1u);
 }
 
-KILN_TEST(frprg05_rejects_a_program_longer_than_168_hours)
+KILN_TEST(swrprg05_rejects_a_program_longer_than_168_hours)
 {
     kiln_program_t p = valid_program();
     p.segment_count = 2;
@@ -106,7 +106,7 @@ KILN_TEST(frprg05_rejects_a_program_longer_than_168_hours)
     CHECK_EQ_INT(kiln_profile_validate(&p, 1280.0f).code, KILN_PROG_ERR_TOO_LONG);
 }
 
-KILN_TEST(frprg06_duration_counts_ramps_and_dwells)
+KILN_TEST(swrprg06_duration_counts_ramps_and_dwells)
 {
     kiln_program_t p;
     kiln_profile_init_empty(&p, "d");
@@ -124,9 +124,9 @@ KILN_TEST(frprg06_duration_counts_ramps_and_dwells)
     CHECK_NEAR((double)kiln_profile_peak_c(NULL), 0.0, 0.01);
 }
 
-/* --- FR-PRG-09: the built-in examples ---------------------------------- */
+/* --- SWR-PRG-09: the built-in examples ---------------------------------- */
 
-KILN_TEST(frprg09_every_built_in_example_passes_validation)
+KILN_TEST(swrprg09_every_built_in_example_passes_validation)
 {
     /* The examples were never run through the validator, so an edit could ship a
      * built-in program the controller would refuse to start. */
@@ -142,7 +142,7 @@ KILN_TEST(frprg09_every_built_in_example_passes_validation)
                   "example %u \"%s\" is invalid: %s (segment %u)",
                   i, p.name, kiln_profile_validation_str(v.code), v.segment);
 
-        /* FR-PRG-09: the examples are read-only. */
+        /* SWR-PRG-09: the examples are read-only. */
         CHECK(p.flags & KILN_PROG_FLAG_READONLY);
         CHECK(p.name[0] != '\0');
         CHECK(p.segment_count > 0);
@@ -154,7 +154,7 @@ KILN_TEST(frprg09_every_built_in_example_passes_validation)
     CHECK_ERR(kiln_profile_example(0, NULL), KILN_ERR_INVALID_ARG);
 }
 
-KILN_TEST(frprg09_examples_stay_valid_against_the_lowest_sensible_maximum)
+KILN_TEST(swrprg09_examples_stay_valid_against_the_lowest_sensible_maximum)
 {
     /* A kiln configured for a lower maximum must still be offered examples it
      * can actually run, or the seeded programs are a trap. */

@@ -46,7 +46,7 @@ kiln_err_t read_slot(const kiln_port_filestore_t *fs, uint8_t slot,
     }
 
     memcpy(out, &blob[8], sizeof(*out));
-    /* NFR-19: it came off storage, so the embedded program's strings are
+    /* SWR-NFR-19: it came off storage, so the embedded program's strings are
      * untrusted until proven terminated. */
     out->program.name[KILN_PROGRAM_NAME_LEN - 1]        = '\0';
     out->program.description[KILN_PROGRAM_DESC_LEN - 1] = '\0';
@@ -89,7 +89,7 @@ kiln_err_t kiln_run_index_append(const kiln_port_filestore_t *fs,
     }
 
     /* A free slot, or the one holding the oldest run.  "Oldest" by run_id and
-     * not by wall time, because FR-LOG-12 allows the clock to have been unset:
+     * not by wall time, because SWR-LOG-12 allows the clock to have been unset:
      * run_id is monotonic whatever the clock was doing. */
     uint8_t  target  = KILN_RUN_SLOTS;
     uint32_t lowest  = 0;

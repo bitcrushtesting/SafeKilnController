@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * 128x64 monochrome OLED (HR-04).  The HMI renders into a framebuffer that the
+ * 128x64 monochrome OLED (SYS-HW-04).  The HMI renders into a framebuffer that the
  * port merely transfers, so screens are verifiable by golden-image comparison
  * on the host without any display present.
  */
@@ -20,7 +20,7 @@ typedef struct kiln_port_display {
     void *ctx;
     kiln_err_t (*present)(void *ctx, const uint8_t *fb, size_t len);
     kiln_err_t (*set_contrast)(void *ctx, uint8_t contrast);
-    bool       (*available)(void *ctx);   /* FR-HMI-14 */
+    bool       (*available)(void *ctx);   /* SWR-HMI-14 */
 } kiln_port_display_t;
 
 #endif

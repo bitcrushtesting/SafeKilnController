@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * kiln_core/current -- FR-CUR-02..FR-CUR-08 and FR-CUR-11.
+ * kiln_core/current -- SWR-CUR-02..SWR-CUR-08 and SWR-CUR-11.
  */
 
 #include <math.h>
@@ -17,7 +17,7 @@ static kiln_current_cfg_t cfg(void)
     return c;
 }
 
-/* Synthesise what HR-17's conditioning delivers for a given RMS current: a sine
+/* Synthesise what SYS-HW-17's conditioning delivers for a given RMS current: a sine
  * about the mid-rail bias, plus a noise floor. */
 static uint16_t g_samples[KILN_CUR_BURST_MAX];
 
@@ -66,9 +66,9 @@ static uint16_t arm(kiln_current_t *c, kiln_cur_window_t window)
     return 0;
 }
 
-/* --- FR-CUR-02, FR-CUR-03 ---------------------------------------------- */
+/* --- SWR-CUR-02, SWR-CUR-03 ---------------------------------------------- */
 
-KILN_TEST(frcur02_measures_rms_to_the_required_accuracy)
+KILN_TEST(swrcur02_measures_rms_to_the_required_accuracy)
 {
     const kiln_current_cfg_t cc = cfg();
     kiln_current_t c;
@@ -84,14 +84,14 @@ KILN_TEST(frcur02_measures_rms_to_the_required_accuracy)
         const kiln_cur_burst_t b = make_burst(&cc, wanted[i], KILN_CUR_WINDOW_ON, n);
         CHECK_OK(kiln_current_push_burst(&ch, &b));
 
-        /* FR-CUR-02: +/-3 % of reading or +/-0.3 A, whichever is greater. */
+        /* SWR-CUR-02: +/-3 % of reading or +/-0.3 A, whichever is greater. */
         const float tol = wanted[i] * 0.03f > 0.3f ? wanted[i] * 0.03f : 0.3f;
         CHECK_NEAR(kiln_current_amps(&ch), wanted[i], tol);
         CHECK(kiln_current_flags(&ch) & KILN_CURF_CONDUCTION);
     }
 }
 
-KILN_TEST(frcur03_result_is_independent_of_sampling_phase)
+KILN_TEST(swrcur03_result_is_independent_of_sampling_phase)
 {
     /* The point of whole mains cycles: start the burst anywhere in the waveform
      * and the answer must not move. */
@@ -127,9 +127,9 @@ KILN_TEST(frcur03_result_is_independent_of_sampling_phase)
     }
 }
 
-/* --- FR-CUR-04, FR-CUR-05: gating -------------------------------------- */
+/* --- SWR-CUR-04, SWR-CUR-05: gating -------------------------------------- */
 
-KILN_TEST(frcur04_waits_out_the_settle_delay_before_measuring)
+KILN_TEST(swrcur04_waits_out_the_settle_delay_before_measuring)
 {
     kiln_current_cfg_t cc = cfg();
     cc.settle_ms = 50;
@@ -149,15 +149,15 @@ KILN_TEST(frcur04_waits_out_the_settle_delay_before_measuring)
     CHECK(n > 0);
 }
 
-KILN_TEST(frcur05_skips_a_window_too_short_to_measure)
+KILN_TEST(swrcur05_skips_a_window_too_short_to_measure)
 {
     const kiln_current_cfg_t cc = cfg();
     kiln_current_t c;
     CHECK_OK(kiln_current_init(&c, &cc));
 
     /* 30 ms cannot hold a 20 ms settle plus a whole mains cycle.  Skipped, and
-     * flagged as such -- never reported as zero current, which SR-25 would read
-     * as a healthy relay and SR-26 as a dead element. */
+     * flagged as such -- never reported as zero current, which SWR-SAF-25 would read
+     * as a healthy relay and SWR-SAF-26 as a dead element. */
     uint16_t n = 0;
     CHECK_EQ_INT(kiln_current_tick(&c, KILN_CUR_WINDOW_ON, 30u, 10u, &n),
                  KILN_CUR_ACT_NONE);
@@ -171,7 +171,7 @@ KILN_TEST(frcur05_skips_a_window_too_short_to_measure)
     }
 }
 
-KILN_TEST(frcur04_aborts_a_burst_when_the_window_closes_under_it)
+KILN_TEST(swrcur04_aborts_a_burst_when_the_window_closes_under_it)
 {
     const kiln_current_cfg_t cc = cfg();
     kiln_current_t c;
@@ -210,7 +210,7 @@ KILN_TEST(an_unrequested_burst_is_rejected)
 KILN_TEST(an_unbounded_off_window_is_remeasured_so_sr25_keeps_its_evidence)
 {
     /* At duty 0 the commanded-off interval never ends, and that is exactly where
-     * SR-25 matters most.  Measuring once and falling silent would leave the rule
+     * SWR-SAF-25 matters most.  Measuring once and falling silent would leave the rule
      * with a single sample. */
     const kiln_current_cfg_t cc = cfg();
     kiln_current_t c;
@@ -227,13 +227,13 @@ KILN_TEST(an_unbounded_off_window_is_remeasured_so_sr25_keeps_its_evidence)
             measurements++;
         }
     }
-    /* Two consecutive windows inside NFR-27's one second. */
+    /* Two consecutive windows inside SWR-NFR-27's one second. */
     CHECK(measurements >= 4);
 }
 
-/* --- FR-CUR-06 --------------------------------------------------------- */
+/* --- SWR-CUR-06 --------------------------------------------------------- */
 
-KILN_TEST(frcur06_one_point_calibration_makes_the_reading_match_the_meter)
+KILN_TEST(swrcur06_one_point_calibration_makes_the_reading_match_the_meter)
 {
     const kiln_current_cfg_t cc = cfg();
     kiln_current_t c;
@@ -254,7 +254,7 @@ KILN_TEST(frcur06_one_point_calibration_makes_the_reading_match_the_meter)
     CHECK_NEAR(kiln_current_amps(&c), 22.0f, 0.7f);
 }
 
-KILN_TEST(frcur06_refuses_to_calibrate_against_a_measurement_that_is_not_one)
+KILN_TEST(swrcur06_refuses_to_calibrate_against_a_measurement_that_is_not_one)
 {
     const kiln_current_cfg_t cc = cfg();
     kiln_current_t c;
@@ -273,7 +273,7 @@ KILN_TEST(frcur06_refuses_to_calibrate_against_a_measurement_that_is_not_one)
     CHECK_ERR(kiln_current_calibrate(&c, -5.0f), KILN_ERR_INVALID_ARG);
 }
 
-KILN_TEST(frcur06_refuses_a_calibration_gain_outside_its_range)
+KILN_TEST(swrcur06_refuses_a_calibration_gain_outside_its_range)
 {
     const kiln_current_cfg_t cc = cfg();
     kiln_current_t c;
@@ -288,9 +288,9 @@ KILN_TEST(frcur06_refuses_a_calibration_gain_outside_its_range)
     CHECK_ERR(kiln_current_calibrate(&c, 100.0f), KILN_ERR_RANGE);
 }
 
-/* --- FR-CUR-08 --------------------------------------------------------- */
+/* --- SWR-CUR-08 --------------------------------------------------------- */
 
-KILN_TEST(frcur08_learns_the_reference_from_cold_full_power_windows)
+KILN_TEST(swrcur08_learns_the_reference_from_cold_full_power_windows)
 {
     const kiln_current_cfg_t cc = cfg();
     kiln_current_t c;
@@ -312,7 +312,7 @@ KILN_TEST(frcur08_learns_the_reference_from_cold_full_power_windows)
     CHECK_NEAR(kiln_current_ref(&c), 30.2f, 0.6f);
 }
 
-KILN_TEST(frcur08_does_not_learn_a_reference_from_a_hot_or_partial_window)
+KILN_TEST(swrcur08_does_not_learn_a_reference_from_a_hot_or_partial_window)
 {
     const kiln_current_cfg_t cc = cfg();
     kiln_current_t c;
@@ -339,9 +339,9 @@ KILN_TEST(frcur08_does_not_learn_a_reference_from_a_hot_or_partial_window)
     CHECK(!kiln_current_ref_valid(&c));
 }
 
-/* --- SR-28 deviation, with the temperature correction ------------------ */
+/* --- SWR-SAF-28 deviation, with the temperature correction ------------------ */
 
-KILN_TEST(sr28_deviation_corrects_for_the_element_temperature_coefficient)
+KILN_TEST(swrsaf28_deviation_corrects_for_the_element_temperature_coefficient)
 {
     kiln_current_cfg_t cc = cfg();
     cc.element_tc_per_c = 0.0005f;
@@ -360,7 +360,7 @@ KILN_TEST(sr28_deviation_corrects_for_the_element_temperature_coefficient)
 
     /* At 1050 degC the expected current is 30 / (1 + 0.0005*1000) = 20 A.  A
      * perfectly healthy kiln therefore reads 33 % low against the cold
-     * reference, and without the correction SR-28 would latch fault 24 on every
+     * reference, and without the correction SWR-SAF-28 would latch fault 24 on every
      * firing that got hot. */
     kiln_current_note_plant(&c, 1050.0f, KILN_DUTY_MAX, 1.0f);
     const uint16_t n = arm(&c, KILN_CUR_WINDOW_ON);
@@ -392,9 +392,9 @@ KILN_TEST(deviation_is_unavailable_without_a_usable_comparison)
     CHECK(!kiln_current_deviation(NULL, &dev));
 }
 
-/* --- FR-CUR-07 --------------------------------------------------------- */
+/* --- SWR-CUR-07 --------------------------------------------------------- */
 
-KILN_TEST(frcur07_derives_apparent_power_and_accumulates_energy)
+KILN_TEST(swrcur07_derives_apparent_power_and_accumulates_energy)
 {
     const kiln_current_cfg_t cc = cfg();
     kiln_current_t c;
@@ -418,9 +418,9 @@ KILN_TEST(frcur07_derives_apparent_power_and_accumulates_energy)
     CHECK_NEAR(kiln_current_energy_wh(&c), was, 0.001);
 }
 
-/* --- FR-CUR-11 --------------------------------------------------------- */
+/* --- SWR-CUR-11 --------------------------------------------------------- */
 
-KILN_TEST(frcur11_absent_transformer_is_distinguished_from_zero_current)
+KILN_TEST(swrcur11_absent_transformer_is_distinguished_from_zero_current)
 {
     const kiln_current_cfg_t cc = cfg();
     kiln_current_t c;
@@ -458,9 +458,9 @@ KILN_TEST(frcur11_absent_transformer_is_distinguished_from_zero_current)
     CHECK(kiln_current_flags(&c) & KILN_CURF_CT_FAULT);
 }
 
-/* --- FR-CUR-12 and configuration --------------------------------------- */
+/* --- SWR-CUR-12 and configuration --------------------------------------- */
 
-KILN_TEST(frcur12_disabled_monitoring_suppresses_every_measurement)
+KILN_TEST(swrcur12_disabled_monitoring_suppresses_every_measurement)
 {
     kiln_current_cfg_t cc = cfg();
     cc.enabled = false;
@@ -481,11 +481,11 @@ KILN_TEST(frcur12_disabled_monitoring_suppresses_every_measurement)
 
 KILN_TEST(configuration_outside_its_range_is_corrected_and_reported)
 {
-    /* NFR-17: a silently corrected configuration is a defect. */
+    /* SWR-NFR-17: a silently corrected configuration is a defect. */
     kiln_current_cfg_t cc = cfg();
-    cc.sample_rate_hz = 100;        /* below FR-CUR-03's 1 kHz */
-    cc.settle_ms      = 5000;       /* beyond FR-CUR-04's 200 ms */
-    cc.cal_gain       = 9.0f;       /* beyond FR-CUR-06's 2.00 */
+    cc.sample_rate_hz = 100;        /* below SWR-CUR-03's 1 kHz */
+    cc.settle_ms      = 5000;       /* beyond SWR-CUR-04's 200 ms */
+    cc.cal_gain       = 9.0f;       /* beyond SWR-CUR-06's 2.00 */
     cc.mains_hz       = 42;
 
     kiln_current_t c;

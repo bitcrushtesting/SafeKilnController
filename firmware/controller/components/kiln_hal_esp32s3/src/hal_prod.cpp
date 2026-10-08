@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * The production data block (FR-PROD-01, FR-PROD-02): manufacturer, model,
+ * The production data block (SWR-PROD-01, SWR-PROD-02): manufacturer, model,
  * board revision, serial number and production date, written once at
  * manufacture by tools/prod-data.py and read here.
  *
@@ -17,7 +17,7 @@
  *
  * 3. It is read once, at init, into a cached struct.  The block cannot change
  *    while the firmware runs, and a getter that cannot touch flash cannot delay
- *    the safety cycle (NFR-02) no matter who calls it or how often.
+ *    the safety cycle (SWR-NFR-02) no matter who calls it or how often.
  */
 
 #include <string.h>
@@ -63,7 +63,7 @@ kiln_err_t kiln_hal_prod_init(void)
 
     /* A board that has not been through the production step has no `prod`
      * partition contents, and must still boot: this is information, not a
-     * fault.  FR-PROD-04 is explicit that an unprogrammed block is reported as
+     * fault.  SWR-PROD-04 is explicit that an unprogrammed block is reported as
      * unprogrammed rather than guessed at or treated as an error. */
     esp_err_t e = nvs_flash_init_partition(PROD_PARTITION);
     if (e != ESP_OK) {
@@ -90,7 +90,7 @@ kiln_err_t kiln_hal_prod_init(void)
 
     /* All five or none.  A block missing its serial number is not a unit with a
      * partial identity, it is a unit whose identity cannot be trusted, and
-     * FR-PROD-04 would rather say so than report half of it. */
+     * SWR-PROD-04 would rather say so than report half of it. */
     s_prod.programmed = ok;
     if (ok) {
         ESP_LOGI(TAG, "%s %s %s serial %s, made %s",

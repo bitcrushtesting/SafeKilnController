@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Bitcrush Testing
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Run clang-tidy over the host build, exactly as CI does (NFR-25, TR-24).
+# Run clang-tidy over the host build, exactly as CI does (SWR-NFR-25, SWR-TST-24).
 #
 #   tools/tidy.sh              analyse, fail on any finding
 #   tools/tidy.sh --fix        apply the fixes clang-tidy can apply

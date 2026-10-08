@@ -1,15 +1,15 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Framebuffer primitives and the 5x7 font (HR-04).
+ * Framebuffer primitives and the 5x7 font (SYS-HW-04).
  *
  * Every routine here clips rather than asserting.  A screen that draws one
  * pixel off the edge should lose that pixel, not take down a kiln: this code
- * runs on the same MCU as the safety supervisor, and FR-HMI-14's position is
+ * runs on the same MCU as the safety supervisor, and SWR-HMI-14's position is
  * that the display is the least important thing in the box.
  *
  * Lower case reuses the upper-case glyphs.  At five pixels wide a distinct
- * lower-case set is less legible rather than more, and FR-HMI-03 cares about
+ * lower-case set is less legible rather than more, and SWR-HMI-03 cares about
  * being readable at two metres.
  */
 #include <string.h>

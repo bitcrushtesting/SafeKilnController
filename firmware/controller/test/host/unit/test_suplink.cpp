@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * The ESP32's end of the supervisor link (AD-22).
+ * The ESP32's end of the supervisor link (SWA-22).
  *
  * This is the one place where the chamber temperature enters the firmware, so
  * every way the link can lie or fall silent has to end up somewhere the safety
@@ -38,7 +38,7 @@ void send(kiln_suplink_t *s, const sup_report_t &r)
 
 }  // namespace
 
-KILN_TEST(ad22_a_frame_becomes_a_thermocouple_reading)
+KILN_TEST(swa22_a_frame_becomes_a_thermocouple_reading)
 {
     kiln_suplink_t s;
     kiln_suplink_init(&s);
@@ -54,10 +54,10 @@ KILN_TEST(ad22_a_frame_becomes_a_thermocouple_reading)
     CHECK_EQ_UINT(s.frames, 1u);
 }
 
-KILN_TEST(sr04_before_anything_is_received_the_front_end_has_not_answered)
+KILN_TEST(swrsaf04_before_anything_is_received_the_front_end_has_not_answered)
 {
     /* Absence of evidence is not a temperature.  The core sees exactly what it
-     * would see from a MAX31856 that is not responding, so SR-04's grace and
+     * would see from a MAX31856 that is not responding, so SWR-SAF-04's grace and
      * latch handle a missing supervisor with no new rule. */
     kiln_suplink_t s;
     kiln_suplink_init(&s);
@@ -70,7 +70,7 @@ KILN_TEST(sr04_before_anything_is_received_the_front_end_has_not_answered)
     CHECK(!kiln_suplink_fresh(&s));
 }
 
-KILN_TEST(sr04_a_link_that_goes_quiet_becomes_a_comms_fault)
+KILN_TEST(swrsaf04_a_link_that_goes_quiet_becomes_a_comms_fault)
 {
     kiln_suplink_t s;
     kiln_suplink_init(&s);
@@ -97,7 +97,7 @@ KILN_TEST(sr04_a_link_that_goes_quiet_becomes_a_comms_fault)
     CHECK_NEAR(out.temp_c, 0.0f, 0.001);
 }
 
-KILN_TEST(ad22_a_repeated_sequence_number_ages_into_a_fault)
+KILN_TEST(swa22_a_repeated_sequence_number_ages_into_a_fault)
 {
     /* Bytes arriving is not the same as news arriving.  A supervisor repeating
      * one frame would otherwise look perfectly healthy. */
@@ -118,7 +118,7 @@ KILN_TEST(ad22_a_repeated_sequence_number_ages_into_a_fault)
     CHECK(kiln_suplink_fresh(&s));
 }
 
-KILN_TEST(ad22_the_sequence_number_may_wrap)
+KILN_TEST(swa22_the_sequence_number_may_wrap)
 {
     kiln_suplink_t s;
     kiln_suplink_init(&s);
@@ -129,7 +129,7 @@ KILN_TEST(ad22_the_sequence_number_may_wrap)
     CHECK_EQ_UINT(s.repeats, 0u);
 }
 
-KILN_TEST(ad22_a_frame_split_across_reads_still_arrives)
+KILN_TEST(swa22_a_frame_split_across_reads_still_arrives)
 {
     /* A UART read can split a frame anywhere, including between every byte. */
     kiln_suplink_t s;
@@ -145,7 +145,7 @@ KILN_TEST(ad22_a_frame_split_across_reads_still_arrives)
     CHECK_EQ_UINT(s.frames, 1u);
 }
 
-KILN_TEST(ad22_several_frames_in_one_read_are_all_consumed)
+KILN_TEST(swa22_several_frames_in_one_read_are_all_consumed)
 {
     kiln_suplink_t s;
     kiln_suplink_init(&s);
@@ -164,7 +164,7 @@ KILN_TEST(ad22_several_frames_in_one_read_are_all_consumed)
     CHECK_NEAR(out.temp_c, 300.0f, 0.05);   /* the last one */
 }
 
-KILN_TEST(ad22_line_noise_is_resynchronised_past)
+KILN_TEST(swa22_line_noise_is_resynchronised_past)
 {
     kiln_suplink_t s;
     kiln_suplink_init(&s);
@@ -175,7 +175,7 @@ KILN_TEST(ad22_line_noise_is_resynchronised_past)
     CHECK_EQ_UINT(s.frames, 1u);
 }
 
-KILN_TEST(ad22_a_corrupt_frame_is_rejected_not_interpreted)
+KILN_TEST(swa22_a_corrupt_frame_is_rejected_not_interpreted)
 {
     kiln_suplink_t s;
     kiln_suplink_init(&s);
@@ -188,7 +188,7 @@ KILN_TEST(ad22_a_corrupt_frame_is_rejected_not_interpreted)
     CHECK_EQ_UINT(s.frames, 0u);
 }
 
-KILN_TEST(ad22_a_buffer_of_pure_noise_does_not_wedge_the_decoder)
+KILN_TEST(swa22_a_buffer_of_pure_noise_does_not_wedge_the_decoder)
 {
     /* Otherwise a disconnected, floating line fills the window once and no
      * frame is ever seen again.  This is why the pull-up is specified, and why
@@ -206,7 +206,7 @@ KILN_TEST(ad22_a_buffer_of_pure_noise_does_not_wedge_the_decoder)
     CHECK(kiln_suplink_fresh(&s));
 }
 
-KILN_TEST(ad22_a_different_protocol_version_is_refused)
+KILN_TEST(swa22_a_different_protocol_version_is_refused)
 {
     /* Guessing at the fields of a version this firmware does not know would be
      * worse than silence. */
@@ -226,9 +226,9 @@ KILN_TEST(ad22_a_different_protocol_version_is_refused)
     CHECK_EQ_UINT(s.version_errors, 1u);
 }
 
-KILN_TEST(ad22_the_supervisors_fault_bits_pass_straight_through)
+KILN_TEST(swa22_the_supervisors_fault_bits_pass_straight_through)
 {
-    /* It reads the same part and reports its status register, so SR-04's
+    /* It reads the same part and reports its status register, so SWR-SAF-04's
      * existing decoding applies without translation. */
     kiln_suplink_t s;
     kiln_suplink_init(&s);
@@ -244,7 +244,7 @@ KILN_TEST(ad22_the_supervisors_fault_bits_pass_straight_through)
     CHECK_EQ_UINT(out.fault_bits, (uint16_t)KILN_TC_FAULT_OPEN);
 }
 
-KILN_TEST(ad22_a_trip_is_visible_so_the_operator_can_be_told_why)
+KILN_TEST(swa22_a_trip_is_visible_so_the_operator_can_be_told_why)
 {
     kiln_suplink_t s;
     kiln_suplink_init(&s);
@@ -260,7 +260,7 @@ KILN_TEST(ad22_a_trip_is_visible_so_the_operator_can_be_told_why)
     CHECK_EQ_INT(got.trip_reason, SUP_TRIP_OVERTEMP);
 }
 
-KILN_TEST(fracq02_the_esp32_may_not_configure_the_chamber_front_end)
+KILN_TEST(swracq02_the_esp32_may_not_configure_the_chamber_front_end)
 {
     /* The supervisor owns it and the type is fixed to K, so that nothing here
      * can change what its backstop means.  Refused rather than ignored, so a
@@ -272,7 +272,7 @@ KILN_TEST(fracq02_the_esp32_may_not_configure_the_chamber_front_end)
     CHECK_ERR(port.configure(port.ctx, KILN_TC_TYPE_S, 60u), KILN_ERR_UNSUPPORTED);
 }
 
-KILN_TEST(nfr17_suplink_refuses_bad_arguments)
+KILN_TEST(swrnfr17_suplink_refuses_bad_arguments)
 {
     kiln_suplink_t s;
     kiln_suplink_init(&s);
@@ -295,7 +295,7 @@ KILN_TEST(nfr17_suplink_refuses_bad_arguments)
 
 /* --- what the operator is told (R12) ------------------------------------ */
 
-KILN_TEST(ad22_the_reason_reaches_the_operators_vocabulary)
+KILN_TEST(swa22_the_reason_reaches_the_operators_vocabulary)
 {
     kiln_suplink_t s;
     kiln_suplink_init(&s);
@@ -315,7 +315,7 @@ KILN_TEST(ad22_the_reason_reaches_the_operators_vocabulary)
     CHECK(st.link_ok);
 }
 
-KILN_TEST(ad22_a_silent_supervisor_reads_as_absent_not_as_content)
+KILN_TEST(swa22_a_silent_supervisor_reads_as_absent_not_as_content)
 {
     /* The reason the port has its own enum: a supervisor that has gone quiet
      * cannot report that it is quiet, and the distinction between "the
@@ -344,7 +344,7 @@ KILN_TEST(ad22_a_silent_supervisor_reads_as_absent_not_as_content)
     CHECK(!st.link_ok);
 }
 
-KILN_TEST(ad22_every_wire_reason_maps_to_one_the_operator_can_read)
+KILN_TEST(swa22_every_wire_reason_maps_to_one_the_operator_can_read)
 {
     const struct { sup_trip_reason_t wire; kiln_sup_reason_t shown; } cases[] = {
         { SUP_TRIP_NONE,         KILN_SUP_OK },
@@ -364,7 +364,7 @@ KILN_TEST(ad22_every_wire_reason_maps_to_one_the_operator_can_read)
     }
 }
 
-KILN_TEST(ad22_an_unrecognised_wire_reason_is_a_fault_not_an_ok)
+KILN_TEST(swa22_an_unrecognised_wire_reason_is_a_fault_not_an_ok)
 {
     /* Same protocol version, a reason this build does not know.  Reporting it
      * as OK would turn a trip into silence. */
@@ -381,7 +381,7 @@ KILN_TEST(ad22_an_unrecognised_wire_reason_is_a_fault_not_an_ok)
     CHECK_EQ_INT(kiln_suplink_reason(&s), KILN_SUP_TC_FAULT);
 }
 
-KILN_TEST(nfr23_every_supervisor_reason_has_text_in_both_languages)
+KILN_TEST(swrnfr23_every_supervisor_reason_has_text_in_both_languages)
 {
     /* The same obligation the fault table carries: a reason with no German is
      * a screen that falls back to English in front of an operator who does not

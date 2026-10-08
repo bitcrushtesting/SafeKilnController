@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * The HTTP transport: esp_http_server wired to the route table in api.cpp
- * (architecture 5.4, 12.2, FR-WEB-19 to FR-WEB-26).
+ * (architecture 5.4, 12.2, SWR-WEB-19 to SWR-WEB-26).
  *
  * This file moves bytes between a socket and kiln_api_handle and does nothing
  * else.  Every decision about what a route means lives in api.cpp, where a
@@ -11,7 +11,7 @@
  * exactly there is why the API suite can cover the whole interface.
  *
  * ---------------------------------------------------------------------------
- * FR-WEB-26: there is one method
+ * SWR-WEB-26: there is one method
  * ---------------------------------------------------------------------------
  * The server registers **GET only**.  Anything else is refused by
  * esp_http_server before a handler runs, and the catch-all below turns that
@@ -23,9 +23,9 @@
  * Neither is load-bearing alone and both are cheap.
  *
  * ---------------------------------------------------------------------------
- * NFR-02: this must not delay a control cycle
+ * SWR-NFR-02: this must not delay a control cycle
  * ---------------------------------------------------------------------------
- * The server runs on core 0 with the rest of the UI (AD-15), at a priority
+ * The server runs on core 0 with the rest of the UI (SWA-15), at a priority
  * below the control and safety tasks, and every handler writes into a
  * caller-owned buffer that is sized once here.  Nothing allocates per request.
  */
@@ -91,7 +91,7 @@ static const char *split_query(char *path)
     return q + 1;
 }
 
-/* --- the log stream (FR-LOG-10, FR-WEB-18) ------------------------------ */
+/* --- the log stream (SWR-LOG-10, SWR-WEB-18) ------------------------------ */
 
 /* kiln_api_log_stream pushes; this is the sink that puts the bytes on the
  * socket.  Returning false aborts the scan, which is how a client that has
@@ -129,7 +129,7 @@ static esp_err_t handle_any(httpd_req_t *req)
     ar.query  = query;
     ar.body   = nullptr;
     ar.body_len = 0;
-    /* FR-WEB-23 is withdrawn and FR-WEB-26 leaves nothing to authenticate, so
+    /* SWR-WEB-23 is withdrawn and SWR-WEB-26 leaves nothing to authenticate, so
      * this is true for everyone and means only "the transport did its half".
      * It is kept rather than removed from the struct because the API's own
      * tests still exercise the field, and because a future reader deserves to
@@ -159,7 +159,7 @@ static esp_err_t handle_any(httpd_req_t *req)
     (void)httpd_resp_set_status(req, status_line(resp.status));
     (void)httpd_resp_set_type(req, (resp.content_type != nullptr)
                                      ? resp.content_type : "application/json");
-    /* ASM-05 is a trusted LAN, not a trusted browser: a page the operator is
+    /* SYS-ASM-05 is a trusted LAN, not a trusted browser: a page the operator is
      * also viewing should not be able to read the kiln's telemetry
      * cross-origin just because they are on the same network. */
     (void)httpd_resp_set_hdr(req, "X-Content-Type-Options", "nosniff");
@@ -192,14 +192,14 @@ kiln_err_t kiln_httpd_start(kiln_api_ctx_t *api)
     s_http.api = api;
 
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
-    /* FR-WEB-21: four concurrent clients, which is what the requirement asks
+    /* SWR-WEB-21: four concurrent clients, which is what the requirement asks
      * for and what architecture 13.4's RAM budget was written against. */
     cfg.max_open_sockets   = 4;
     cfg.lru_purge_enable   = true;
     cfg.uri_match_fn       = httpd_uri_match_wildcard;
     cfg.max_uri_handlers   = 2;
     cfg.stack_size         = 6144;
-    /* AD-15 / NFR-02: core 0, below control and safety, so a slow client
+    /* SWA-15 / SWR-NFR-02: core 0, below control and safety, so a slow client
      * cannot contend with a control cycle. */
     cfg.core_id            = 0;
     cfg.task_priority      = 4;
@@ -209,7 +209,7 @@ kiln_err_t kiln_httpd_start(kiln_api_ctx_t *api)
         return KILN_ERR_IO;
     }
 
-    /* FR-WEB-26: GET and nothing else is ever registered.  A POST does not
+    /* SWR-WEB-26: GET and nothing else is ever registered.  A POST does not
      * reach a handler at all; the server answers 405 on its own, and the
      * error handler below rewrites that into the API's own read_only body so
      * the client sees one consistent answer. */
@@ -220,7 +220,7 @@ kiln_err_t kiln_httpd_start(kiln_api_ctx_t *api)
     get_any.user_ctx = &s_http;
     (void)httpd_register_uri_handler(s_http.server, &get_any);
 
-    ESP_LOGI(TAG, "listening on port %u, GET only (FR-WEB-26)",
+    ESP_LOGI(TAG, "listening on port %u, GET only (SWR-WEB-26)",
              (unsigned)cfg.server_port);
     return KILN_OK;
 }

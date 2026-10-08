@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * SR-31, the door / lid interlock.
+ * SWR-SAF-31, the door / lid interlock.
  *
  * The rule has two tiers and they are tested separately, because conflating
  * them is exactly how this requirement gets implemented wrongly: heat comes off
@@ -40,7 +40,7 @@ static kiln_safety_input_t base(void)
 
 /* --- tier one: immediate, unconditional ------------------------------- */
 
-KILN_TEST(sr31_open_withholds_heat_on_the_very_first_sample)
+KILN_TEST(swrsaf31_open_withholds_heat_on_the_very_first_sample)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -54,7 +54,7 @@ KILN_TEST(sr31_open_withholds_heat_on_the_very_first_sample)
     CHECK_MSG(!v.heat_permitted, "heat must be withheld on the first open sample");
 }
 
-KILN_TEST(sr31_open_drops_the_contactor_not_merely_the_duty)
+KILN_TEST(swrsaf31_open_drops_the_contactor_not_merely_the_duty)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -69,7 +69,7 @@ KILN_TEST(sr31_open_drops_the_contactor_not_merely_the_duty)
 
 /* --- tier two: the latch ---------------------------------------------- */
 
-KILN_TEST(sr31_latches_once_the_door_has_been_open_for_the_confirm_window)
+KILN_TEST(swrsaf31_latches_once_the_door_has_been_open_for_the_confirm_window)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -83,7 +83,7 @@ KILN_TEST(sr31_latches_once_the_door_has_been_open_for_the_confirm_window)
     CHECK_EQ_INT(kiln_safety_eval(&s, &in, 0.1f).fault, KILN_FAULT_DOOR_OPEN);
 }
 
-KILN_TEST(sr31_a_single_glitched_sample_does_not_stop_a_healthy_firing)
+KILN_TEST(swrsaf31_a_single_glitched_sample_does_not_stop_a_healthy_firing)
 {
     /* HZ-10: a rule that stops a healthy firing is worse than no rule, because
      * it gets switched off.  One sample of switching noise must cost a fraction
@@ -103,7 +103,7 @@ KILN_TEST(sr31_a_single_glitched_sample_does_not_stop_a_healthy_firing)
     }
 }
 
-KILN_TEST(sr31_the_confirm_timer_resets_when_the_door_shuts)
+KILN_TEST(swrsaf31_the_confirm_timer_resets_when_the_door_shuts)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -119,7 +119,7 @@ KILN_TEST(sr31_the_confirm_timer_resets_when_the_door_shuts)
               "the window must start again, not resume where it left off");
 }
 
-KILN_TEST(sr31_open_while_idle_inhibits_but_does_not_latch)
+KILN_TEST(swrsaf31_open_while_idle_inhibits_but_does_not_latch)
 {
     /* Opening the door of an idle kiln is what loading one looks like. */
     kiln_safety_t s;
@@ -139,7 +139,7 @@ KILN_TEST(sr31_open_while_idle_inhibits_but_does_not_latch)
 
 /* --- not fitted -------------------------------------------------------- */
 
-KILN_TEST(sr31_no_interlock_fitted_stands_the_rule_down_and_warns)
+KILN_TEST(swrsaf31_no_interlock_fitted_stands_the_rule_down_and_warns)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -156,7 +156,7 @@ KILN_TEST(sr31_no_interlock_fitted_stands_the_rule_down_and_warns)
               "warning 113 must say the interlock is missing");
 }
 
-KILN_TEST(sr31_a_fitted_and_shut_door_raises_no_warning)
+KILN_TEST(swrsaf31_a_fitted_and_shut_door_raises_no_warning)
 {
     kiln_safety_t s;
     const kiln_safety_cfg_t c = cfg();
@@ -167,18 +167,18 @@ KILN_TEST(sr31_a_fitted_and_shut_door_raises_no_warning)
     CHECK((v.warnings & KILN_WARN_BIT(KILN_WARN_DOOR_OFF)) == 0u);
 }
 
-/* --- SR-18: clearing --------------------------------------------------- */
+/* --- SWR-SAF-18: clearing --------------------------------------------------- */
 
-KILN_TEST(sr31_cannot_be_cleared_while_the_door_is_still_open)
+KILN_TEST(swrsaf31_cannot_be_cleared_while_the_door_is_still_open)
 {
     const kiln_safety_cfg_t c = cfg();
     kiln_safety_input_t in = base();
     in.door_open = true;
     CHECK_MSG(!kiln_safety_can_clear(&c, KILN_FAULT_DOOR_OPEN, &in),
-              "SR-18: refuse while the triggering condition still holds");
+              "SWR-SAF-18: refuse while the triggering condition still holds");
 }
 
-KILN_TEST(sr31_clearable_once_the_door_is_shut)
+KILN_TEST(swrsaf31_clearable_once_the_door_is_shut)
 {
     const kiln_safety_cfg_t c = cfg();
     kiln_safety_input_t in = base();
@@ -188,7 +188,7 @@ KILN_TEST(sr31_clearable_once_the_door_is_shut)
 
 /* --- ordering ----------------------------------------------------------- */
 
-KILN_TEST(sr31_is_decided_before_the_deadline_rules)
+KILN_TEST(swrsaf31_is_decided_before_the_deadline_rules)
 {
     /* A door switch is a direct physical signal; it does not depend on the loop
      * having met its deadline.  With both conditions true the door wins, because
@@ -207,10 +207,10 @@ KILN_TEST(sr31_is_decided_before_the_deadline_rules)
     CHECK(!v.heat_permitted);
 }
 
-KILN_TEST(sr31_fault_has_a_label_a_cause_and_a_requirement)
+KILN_TEST(swrsaf31_fault_has_a_label_a_cause_and_a_requirement)
 {
-    /* SR-19: every fault is presentable and documented. */
+    /* SWR-SAF-19: every fault is presentable and documented. */
     CHECK_STR_EQ(kiln_fault_label(KILN_FAULT_DOOR_OPEN), "DOOR OPEN");
     CHECK(kiln_fault_cause(KILN_FAULT_DOOR_OPEN)[0] != '\0');
-    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_DOOR_OPEN), "SR-31");
+    CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_DOOR_OPEN), "SWR-SAF-31");
 }

@@ -16,7 +16,7 @@ void slot_path(uint8_t slot, char out[KILN_PATH_MAX])
 {
     /* slot is a uint8_t, so the longest result is "/p/255": 6 characters into
      * KILN_PATH_MAX (64).  Truncation is unreachable, which is the handling
-     * NFR-17 asks for here -- stated rather than checked at runtime. */
+     * SWR-NFR-17 asks for here -- stated rather than checked at runtime. */
     (void)snprintf(out, KILN_PATH_MAX, "/p/%02u", (unsigned)slot);
 }
 
@@ -65,7 +65,7 @@ kiln_err_t decode(const uint8_t *in, size_t len, kiln_program_t *out)
 
     memcpy(out, &in[8], sizeof(*out));
 
-    /* NFR-19: this came off storage, so it is untrusted in exactly the way a
+    /* SWR-NFR-19: this came off storage, so it is untrusted in exactly the way a
      * network body is.  Force termination before anything reads the strings. */
     kiln_profile_terminate_strings(out);
     return KILN_OK;
@@ -177,7 +177,7 @@ kiln_err_t kiln_program_store_save(const kiln_port_filestore_t *fs,
         return KILN_ERR_INVALID_ARG;
     }
 
-    /* FR-PRG-05 before anything reaches storage. */
+    /* SWR-PRG-05 before anything reaches storage. */
     const kiln_prog_validation_t v = kiln_profile_validate(p, max_temp_c);
     if (v.code != KILN_PROG_OK) {
         return KILN_ERR_RANGE;
@@ -186,7 +186,7 @@ kiln_err_t kiln_program_store_save(const kiln_port_filestore_t *fs,
     bool ro = false;
     uint8_t slot = find_by_name(fs, p->name, &ro);
     if (slot < KILN_PROGRAM_SLOTS) {
-        /* FR-PRG-09: the built-in examples are read-only.  Saving over one would
+        /* SWR-PRG-09: the built-in examples are read-only.  Saving over one would
          * leave the operator with no way back to a known-good program. */
         if (ro) {
             return KILN_ERR_STATE;
@@ -232,7 +232,7 @@ kiln_err_t kiln_program_store_delete(const kiln_port_filestore_t *fs, const char
         return KILN_ERR_NOT_FOUND;
     }
     if (ro) {
-        return KILN_ERR_STATE; /* FR-PRG-09 */
+        return KILN_ERR_STATE; /* SWR-PRG-09 */
     }
 
     char path[KILN_PATH_MAX];

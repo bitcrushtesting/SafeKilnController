@@ -6,7 +6,7 @@
  * any host-side harness share them instead of each growing their own.
  *
  * Host-only: the CMake has no ESP_PLATFORM path, so none of this can reach a
- * target image (TR-10).
+ * target image (SWR-TST-10).
  *
  * The flash fake is the interesting one.  It enforces NOR semantics rather than
  * behaving like memory -- a write may only clear bits, and writing over
@@ -14,7 +14,7 @@
  * only works on forgiving storage is a ring that works until it is flashed.  It
  * can also cut power part-way through a write, which is the one thing a real
  * device does that a test otherwise cannot ask for, and the whole subject of
- * FR-LOG-08.
+ * SWR-LOG-08.
  */
 #ifndef KILN_HAL_HOST_H
 #define KILN_HAL_HOST_H
@@ -81,7 +81,7 @@ typedef struct {
     kiln_host_kv_entry_t entries[KILN_HOST_KV_ENTRIES];
     uint32_t             sets;
     uint32_t             commits;
-    bool                 fail_writes;    /* FR-CFG-05 / fault 20 */
+    bool                 fail_writes;    /* SWR-CFG-05 / fault 20 */
 } kiln_host_kv_t;
 
 void kiln_host_kv_init(kiln_host_kv_t *kv);
@@ -115,11 +115,11 @@ void kiln_host_fs_bind(kiln_host_fs_t *fs, kiln_port_filestore_t *out);
 
 /* --- clock ------------------------------------------------------------- */
 
-/* AD-02: the virtual clock the tests drive.  A 168 h soak costs no wall time. */
+/* SWA-02: the virtual clock the tests drive.  A 168 h soak costs no wall time. */
 typedef struct {
     uint64_t mono_us;
     uint64_t wall_utc_s;
-    bool     wall_valid;        /* FR-LOG-12: false until SNTP has succeeded */
+    bool     wall_valid;        /* SWR-LOG-12: false until SNTP has succeeded */
 } kiln_host_clock_t;
 
 void kiln_host_clock_init(kiln_host_clock_t *c, uint64_t wall_utc_s, bool wall_valid);

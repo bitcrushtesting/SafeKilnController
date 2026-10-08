@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Interface headers only -- no sources, by design (architecture section 4 rule 2).
-# Dual-target (AD-14): an IDF component on the target, an INTERFACE library on
+# Dual-target (SWA-14): an IDF component on the target, an INTERFACE library on
 # the host, so the same include path serves both builds.
 
 if(ESP_PLATFORM)

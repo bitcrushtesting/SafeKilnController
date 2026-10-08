@@ -1,16 +1,16 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Kiln plant simulator -- TR-11, TR-12, TR-27, architecture section 14.3.
+ * Kiln plant simulator -- SWR-TST-11, SWR-TST-12, SWR-TST-27, architecture section 14.3.
  *
- * First-order-plus-dead-time (ASM-01) for temperature, plus a heater-current
+ * First-order-plus-dead-time (SYS-ASM-01) for temperature, plus a heater-current
  * model consistent with the commanded output state, plus the fault injections
  * that each safety rule is meant to catch.  One plant drives both channels, so an
  * injected element failure shows up in degrees *and* in amps exactly as it would
  * on a real kiln -- which is the whole reason the current rules and the thermal
  * rules can be tested against the same scenario.
  *
- * Deterministic from a seed (TR-12): a failure replays exactly.
+ * Deterministic from a seed (SWR-TST-12): a failure replays exactly.
  *
  * This component implements kiln_ports interfaces, so it substitutes for the
  * hardware adapters at the composition root -- on the host for the integration
@@ -30,7 +30,7 @@
 #include "kiln_ports/port_heat.h"
 #include "kiln_ports/port_tc.h"
 
-/* --- fault injection (TR-27, architecture section 14.3) ----------------- */
+/* --- fault injection (SWR-TST-27, architecture section 14.3) ----------------- */
 
 /* uint32_t rather than the implementation's choice: these are only ever used
  * as a mask against kiln_sim_t.inject, which is a uint32_t, and an unscoped
@@ -40,37 +40,37 @@
  * crosses no port boundary. */
 typedef enum : uint32_t {
     /* electrical */
-    KILN_INJ_RELAY_FAIL_ON    = 1u << 0u,  /* SR-25: current with duty 0      */
-    KILN_INJ_RELAY_FAIL_OFF   = 1u << 1u,  /* SR-26: no current with duty > 0 */
-    KILN_INJ_CONTACTOR_WELD   = 1u << 2u,  /* SR-27: current persists after
+    KILN_INJ_RELAY_FAIL_ON    = 1u << 0u,  /* SWR-SAF-25: current with duty 0      */
+    KILN_INJ_RELAY_FAIL_OFF   = 1u << 1u,  /* SWR-SAF-26: no current with duty > 0 */
+    KILN_INJ_CONTACTOR_WELD   = 1u << 2u,  /* SWR-SAF-27: current persists after
                                             * the contactor is commanded open */
-    KILN_INJ_ELEMENT_PARTIAL  = 1u << 3u,  /* SR-26, SR-28, SR-07            */
-    KILN_INJ_OVERCURRENT      = 1u << 4u,  /* SR-29                          */
-    KILN_INJ_CT_DISCONNECTED  = 1u << 5u,  /* FR-CUR-11, FR-CUR-12           */
-    KILN_INJ_SSR_SHORTED      = 1u << 6u,  /* SR-08 and SR-25 together       */
+    KILN_INJ_ELEMENT_PARTIAL  = 1u << 3u,  /* SWR-SAF-26, SWR-SAF-28, SWR-SAF-07            */
+    KILN_INJ_OVERCURRENT      = 1u << 4u,  /* SWR-SAF-29                          */
+    KILN_INJ_CT_DISCONNECTED  = 1u << 5u,  /* SWR-CUR-11, SWR-CUR-12           */
+    KILN_INJ_SSR_SHORTED      = 1u << 6u,  /* SWR-SAF-08 and SWR-SAF-25 together       */
 
     /* sensing */
-    KILN_INJ_TC_OPEN          = 1u << 7u,  /* SR-04                          */
+    KILN_INJ_TC_OPEN          = 1u << 7u,  /* SWR-SAF-04                          */
     KILN_INJ_TC_SHORT         = 1u << 8u,
     KILN_INJ_TC_RANGE         = 1u << 9u,
     KILN_INJ_TC_COMMS         = 1u << 10u,
-    KILN_INJ_TC_REVERSED      = 1u << 11u, /* SR-05                          */
-    KILN_INJ_TC_STUCK         = 1u << 12u, /* SR-06                          */
-    KILN_INJ_TC_DRIFT         = 1u << 13u, /* FR-ACQ-08, SR-12               */
+    KILN_INJ_TC_REVERSED      = 1u << 11u, /* SWR-SAF-05                          */
+    KILN_INJ_TC_STUCK         = 1u << 12u, /* SWR-SAF-06                          */
+    KILN_INJ_TC_DRIFT         = 1u << 13u, /* SWR-ACQ-08, SWR-SAF-12               */
 
     /* plant */
-    KILN_INJ_LID_OPEN         = 1u << 14u, /* SR-07, FR-CTL-11               */
-    KILN_INJ_CASE_HEATING     = 1u << 15u, /* SR-11                          */
-    KILN_INJ_ELEMENT_OPEN     = 1u << 16u, /* SR-07 and SR-26                */
+    KILN_INJ_LID_OPEN         = 1u << 14u, /* SWR-SAF-07, SWR-CTL-11               */
+    KILN_INJ_CASE_HEATING     = 1u << 15u, /* SWR-SAF-11                          */
+    KILN_INJ_ELEMENT_OPEN     = 1u << 16u, /* SWR-SAF-07 and SWR-SAF-26                */
 
-    /* SR-31.  Separate from KILN_INJ_LID_OPEN on purpose: that one is the
-     * *thermal* model -- an open lid losing heat, which is what SR-07 sees --
+    /* SWR-SAF-31.  Separate from KILN_INJ_LID_OPEN on purpose: that one is the
+     * *thermal* model -- an open lid losing heat, which is what SWR-SAF-07 sees --
      * whereas this is the interlock *switch* reading open.  Keeping them apart
      * is what lets a test exercise a switch that has failed open while the door
      * is shut, or a door genuinely open on a kiln with no interlock fitted.
      * A realistic "operator opened the door mid-firing" injects both. */
     KILN_INJ_DOOR_SWITCH_OPEN = 1u << 17u,
-    /* No interlock fitted at all -- stands SR-31 down, warning 113. */
+    /* No interlock fitted at all -- stands SWR-SAF-31 down, warning 113. */
     KILN_INJ_DOOR_ABSENT      = 1u << 18u,
 } kiln_inject_t;
 
@@ -82,7 +82,7 @@ typedef struct {
     float    dead_time_s;
     float    ambient_c;
     /* Radiative loss rises steeply with temperature, so a kiln's gain falls as it
-     * gets hotter -- the reason FR-TUN-13 offers several gain sets and the reason
+     * gets hotter -- the reason SWR-TUN-13 offers several gain sets and the reason
      * one autotune at 600 degC does not suit 1250 degC.  Effective gain is
      * scaled by (1 - loss_frac * (T/1300)^4). */
     float    loss_frac;
@@ -105,15 +105,15 @@ typedef struct {
     float    ct_a_per_v;
     float    adc_v_per_count;
     uint16_t bias_counts;
-    float    noise_counts;       /* the floor FR-CUR-11 looks for              */
+    float    noise_counts;       /* the floor SWR-CUR-11 looks for              */
 
-    /* AD-05 / HR-07 / SR-02: heat enable is a square wave into a charge pump,
+    /* SWA-05 / SYS-HW-07 / SYS-SAF-02: heat enable is a square wave into a charge pump,
      * not a level, so the coil de-energises unless something keeps refreshing
      * it.  Modelled as a decay timeout rather than as an RC curve: what the
      * firmware's correctness depends on is that a *stopped* safety task releases
      * the contactor, and that is exactly what a timeout captures.  Whether the
-     * real circuit reaches the contactor's drop-out voltage inside NFR-04's one
-     * second is a question about resistors, and belongs on the HIL jig (TR-17,
+     * real circuit reaches the contactor's drop-out voltage inside SWR-NFR-04's one
+     * second is a question about resistors, and belongs on the HIL jig (SWR-TST-17,
      * tasklist A7). */
     float    enable_decay_s;     /* default 1.0 */
 } kiln_sim_cfg_t;
@@ -193,10 +193,10 @@ typedef struct {
 
 /* --- a RAM file store ---------------------------------------------------- */
 
-/* A fallback, kept for the case where the flash-backed store of AD-21 does not
+/* A fallback, kept for the case where the flash-backed store of SWA-21 does not
  * come up: the simulated build mounts kiln_core/fileslots on the real kilnfs
  * partition like any other build, because QEMU emulates flash.  This stands in
- * only if that mount fails, so the persistence path of FR-PRG and FR-RUN-07 is
+ * only if that mount fails, so the persistence path of FR-PRG and SWR-RUN-07 is
  * exercised either way rather than skipped.
  *
  * It is RAM, so nothing survives a reboot.  That is a visible limitation of the
@@ -204,7 +204,7 @@ typedef struct {
  * it will against flash, which is the point of the port boundary.
  *
  * Sized for the three seeded examples plus a handful of run records -- about
- * 8 kB, which is affordable on a device with no PSRAM (NFR-11). */
+ * 8 kB, which is affordable on a device with no PSRAM (SWR-NFR-11). */
 constexpr size_t KILN_SIM_FS_FILES    = 12;
 constexpr size_t KILN_SIM_FS_FILE_MAX = 640;
 
@@ -222,10 +222,10 @@ void kiln_sim_fs_bind(kiln_sim_fs_t *fs, kiln_port_filestore_t *out);
 
 void kiln_sim_bind(kiln_sim_t *s, kiln_sim_ports_t *out);
 
-/* The SSR pin level, published by whoever owns the 10 ms window tick (AD-07).
+/* The SSR pin level, published by whoever owns the 10 ms window tick (SWA-07).
  * Separate from set_duty because the duty is a *request* and this is the pin:
  * the distinction is what lets the simulator model a window whose off interval
- * is too short to measure (FR-CUR-05). */
+ * is too short to measure (SWR-CUR-05). */
 void kiln_sim_set_ssr(kiln_sim_t *s, uint8_t channel, bool on);
 
 #endif /* KILN_SIM_H */

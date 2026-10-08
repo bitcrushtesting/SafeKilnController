@@ -10,7 +10,7 @@ void kiln_autotune_cfg_defaults(kiln_tune_cfg_t *cfg)
 {
     const kiln_tune_cfg_t d = {
         .setpoint_c          = 600.0f,
-        .max_temp_c          = 1280.0f,   /* SR-23; the configured kiln maximum */
+        .max_temp_c          = 1280.0f,   /* SWR-SAF-23; the configured kiln maximum */
         .amplitude_permille  = 500,
         .hysteresis_c        = 1.0f,
         .peak_threshold_c    = 1.0f,
@@ -34,7 +34,7 @@ kiln_err_t kiln_autotune_start(kiln_autotune_t *at, const kiln_tune_cfg_t *cfg)
     *at = zero;
     at->cfg = *cfg;
 
-    /* SR-23: the configured maximum and the compile-time ceiling both bind, and
+    /* SWR-SAF-23: the configured maximum and the compile-time ceiling both bind, and
      * they bind here rather than in a comment addressed to the caller. */
     const float requested = at->cfg.setpoint_c;
     const float limit     = kiln_clampf(at->cfg.max_temp_c, 0.0f, KILN_TEMP_CEILING_C);
@@ -116,7 +116,7 @@ void push_cycle(kiln_autotune_t *at, float period_s, float amplitude_c)
     }
 }
 
-/* FR-TUN-05: discard the first cycle, then require the rest to agree. */
+/* SWR-TUN-05: discard the first cycle, then require the rest to agree. */
 bool qualify(const kiln_autotune_t *at, float *ku_out, float *tu_out)
 {
     if (at->cycle_count < (uint8_t)(at->cfg.required_cycles + 1u)) {
@@ -240,7 +240,7 @@ uint16_t kiln_autotune_tick(kiln_autotune_t *at, float pv_c,
         return 0;
     }
 
-    /* NFR-17 / SR-01: extreme_c and last_pv_c are persistent state, and a NaN
+    /* SWR-NFR-17 / SYS-SAF-01: extreme_c and last_pv_c are persistent state, and a NaN
      * admitted into them never leaves.  No heat, and the caller is told by the
      * counter rather than by a quietly wrong tuning result. */
     if (!kiln_is_finite(dt_s) || dt_s <= 0.0f ||
@@ -257,7 +257,7 @@ uint16_t kiln_autotune_tick(kiln_autotune_t *at, float pv_c,
     at->elapsed_s       += dt_s;
     at->phase_elapsed_s += dt_s;
 
-    /* FR-TUN-07: one timeout covers the whole procedure. */
+    /* SWR-TUN-07: one timeout covers the whole procedure. */
     if (at->elapsed_s > at->cfg.timeout_s) {
         at->phase       = KILN_TUNE_FAILED;
         at->fail_reason = KILN_FAULT_TUNE_NO_CONVERGE;
@@ -304,7 +304,7 @@ uint16_t kiln_autotune_tick(kiln_autotune_t *at, float pv_c,
         return at->relay_on ? at->cfg.amplitude_permille : 0u;
 
     case KILN_TUNE_IDENTIFY: {
-        /* FR-TUN-05 qualification and the Ku/Tu identification.  Keep driving the
+        /* SWR-TUN-05 qualification and the Ku/Tu identification.  Keep driving the
          * relay: dropping the output for a cycle here would perturb the very
          * oscillation being measured. */
         relay_update(at, pv_c);
@@ -317,12 +317,12 @@ uint16_t kiln_autotune_tick(kiln_autotune_t *at, float pv_c,
             for (int r = 0; r < KILN_TUNE_RULE_COUNT; r++) {
                 at->gains[r] = kiln_autotune_gains_from(ku, tu, (kiln_tune_rule_t)r);
             }
-            at->phase = KILN_TUNE_PRESENT;   /* FR-TUN-09: nothing stored yet */
+            at->phase = KILN_TUNE_PRESENT;   /* SWR-TUN-09: nothing stored yet */
             return 0;
         }
 
         /* Not consistent enough.  Drop the oldest cycle, go back to collecting,
-         * and let FR-TUN-07's timeout decide when to give up. */
+         * and let SWR-TUN-07's timeout decide when to give up. */
         if (at->cycle_count >= KILN_TUNE_MAX_CYCLES) {
             for (uint8_t i = 1; i < at->cycle_count; i++) {
                 at->cycles[i - 1] = at->cycles[i];

@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Result codes shared by every layer.  NFR-17: no failure is silently dropped,
+ * Result codes shared by every layer.  SWR-NFR-17: no failure is silently dropped,
  * so every fallible operation returns one of these.
  */
 #ifndef KILN_ERR_H

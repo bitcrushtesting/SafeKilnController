@@ -124,7 +124,7 @@ void alarm_set(void *ctx, kiln_alarm_pattern_t pattern)
 
 const kiln_port_alarm_t s_alarm_port = { .ctx = NULL, .set = alarm_set };
 
-/* --- the 10 ms output window (AD-07) ------------------------------------ */
+/* --- the 10 ms output window (SWA-07) ------------------------------------ */
 
 /* Runs in esp_timer context: allocation-free, lock-free and short, which is
  * exactly what kiln_app_window_tick is written to be. */
@@ -136,15 +136,15 @@ void window_timer_cb(void *arg)
 
 /* --- tasks -------------------------------------------------------------- */
 
-/* The safety task is the only writer of heat authority (AD-04) and the highest
- * priority task in the system (SR-13, NFR-03). */
+/* The safety task is the only writer of heat authority (SWA-04) and the highest
+ * priority task in the system (SWR-SAF-13, SWR-NFR-03). */
 void safety_task(void *arg)
 {
     (void)arg;
     TickType_t next = xTaskGetTickCount();
     const TickType_t period = pdMS_TO_TICKS(SAFETY_PERIOD_MS);
 
-    esp_task_wdt_add(NULL);     /* SR-14 */
+    esp_task_wdt_add(NULL);     /* SWR-SAF-14 */
 
     for (;;) {
         kiln_app_safety_cycle(&s_app, (float)SAFETY_PERIOD_MS / 1000.0f * TIME_ACCEL);
@@ -165,7 +165,7 @@ void acquire_task(void *arg)
          * whatever has arrived is taken, and the staleness timer in
          * kiln_core/suplink is what notices when that is nothing.
          *
-         * Pumped here, at 4 Hz, because that is FR-ACQ-03's acquisition rate
+         * Pumped here, at 4 Hz, because that is SWR-ACQ-03's acquisition rate
          * and the supervisor's 10 Hz report gives 2.5 frames per cycle of
          * margin.  KILN_SUPLINK_STALE_S is sized against this period. */
         uint8_t rx[64];
@@ -186,7 +186,7 @@ void control_task(void *arg)
     TickType_t next = xTaskGetTickCount();
     const TickType_t period = pdMS_TO_TICKS(CONTROL_PERIOD_MS);
 
-    esp_task_wdt_add(NULL);     /* SR-14 */
+    esp_task_wdt_add(NULL);     /* SWR-SAF-14 */
 
     for (;;) {
         kiln_app_control_cycle(&s_app, (float)CONTROL_PERIOD_MS / 1000.0f * TIME_ACCEL);
@@ -195,7 +195,7 @@ void control_task(void *arg)
     }
 }
 
-/* The only task that touches flash (FR-LOG-14, architecture 6.1).  Core 0, so an
+/* The only task that touches flash (SWR-LOG-14, architecture 6.1).  Core 0, so an
  * erase -- tens of milliseconds -- cannot delay control or safety on core 1. */
 void logger_task(void *arg)
 {
@@ -241,12 +241,12 @@ void print_help(void)
            "  c  clear the latched fault        m  manual 50%% duty\n"
            "  i  idle\n"
            "  Fault injection (toggle):\n"
-           "   d  door switch open (SR-31)     D  no interlock fitted (warn 113)\n"
-           "   1  relay fail-on (SR-25/SR-27)   2  relay fail-off (SR-26)\n"
-           "   3  welded contactor (SR-27)      4  partial element loss (SR-28)\n"
-           "   5  over-current (SR-29)          6  CT disconnected (FR-CUR-11)\n"
-           "   7  SSR shorted (SR-08/SR-25)     8  thermocouple open (SR-04)\n"
-           "   9  thermocouple stuck (SR-06)    0  lid open (SR-07)\n"
+           "   d  door switch open (SWR-SAF-31)     D  no interlock fitted (warn 113)\n"
+           "   1  relay fail-on (SWR-SAF-25/SWR-SAF-27)   2  relay fail-off (SWR-SAF-26)\n"
+           "   3  welded contactor (SWR-SAF-27)      4  partial element loss (SWR-SAF-28)\n"
+           "   5  over-current (SWR-SAF-29)          6  CT disconnected (SWR-CUR-11)\n"
+           "   7  SSR shorted (SWR-SAF-08/SWR-SAF-25)     8  thermocouple open (SWR-SAF-04)\n"
+           "   9  thermocouple stuck (SWR-SAF-06)    0  lid open (SWR-SAF-07)\n"
            "   x  clear all injections          h  this help\n\n");
 }
 
@@ -290,23 +290,23 @@ void handle_key(int ch)
     case 'm': ESP_LOGI(TAG, "manual: %s", kiln_err_str(kiln_app_manual(&s_app, 500))); break;
     case 'i': ESP_LOGI(TAG, "idle: %s", kiln_err_str(kiln_app_idle(&s_app))); break;
 
-    case '1': toggle_inject(KILN_INJ_RELAY_FAIL_ON,   "relay fail-on (SR-25)"); break;
-    case '2': toggle_inject(KILN_INJ_RELAY_FAIL_OFF,  "relay fail-off (SR-26)"); break;
-    case '3': toggle_inject(KILN_INJ_CONTACTOR_WELD,  "welded contactor (SR-27)"); break;
-    case '4': toggle_inject(KILN_INJ_ELEMENT_PARTIAL, "partial element loss (SR-28)"); break;
-    case '5': toggle_inject(KILN_INJ_OVERCURRENT,     "over-current (SR-29)"); break;
-    case '6': toggle_inject(KILN_INJ_CT_DISCONNECTED, "CT disconnected (FR-CUR-11)"); break;
-    case '7': toggle_inject(KILN_INJ_SSR_SHORTED,     "SSR shorted (SR-08/SR-25)"); break;
-    case '8': toggle_inject(KILN_INJ_TC_OPEN,         "thermocouple open (SR-04)"); break;
-    case '9': toggle_inject(KILN_INJ_TC_STUCK,        "thermocouple stuck (SR-06)"); break;
-    case '0': toggle_inject(KILN_INJ_LID_OPEN,        "lid open (SR-07)"); break;
-    case 'd': toggle_inject(KILN_INJ_DOOR_SWITCH_OPEN, "door switch open (SR-31)"); break;
+    case '1': toggle_inject(KILN_INJ_RELAY_FAIL_ON,   "relay fail-on (SWR-SAF-25)"); break;
+    case '2': toggle_inject(KILN_INJ_RELAY_FAIL_OFF,  "relay fail-off (SWR-SAF-26)"); break;
+    case '3': toggle_inject(KILN_INJ_CONTACTOR_WELD,  "welded contactor (SWR-SAF-27)"); break;
+    case '4': toggle_inject(KILN_INJ_ELEMENT_PARTIAL, "partial element loss (SWR-SAF-28)"); break;
+    case '5': toggle_inject(KILN_INJ_OVERCURRENT,     "over-current (SWR-SAF-29)"); break;
+    case '6': toggle_inject(KILN_INJ_CT_DISCONNECTED, "CT disconnected (SWR-CUR-11)"); break;
+    case '7': toggle_inject(KILN_INJ_SSR_SHORTED,     "SSR shorted (SWR-SAF-08/SWR-SAF-25)"); break;
+    case '8': toggle_inject(KILN_INJ_TC_OPEN,         "thermocouple open (SWR-SAF-04)"); break;
+    case '9': toggle_inject(KILN_INJ_TC_STUCK,        "thermocouple stuck (SWR-SAF-06)"); break;
+    case '0': toggle_inject(KILN_INJ_LID_OPEN,        "lid open (SWR-SAF-07)"); break;
+    case 'd': toggle_inject(KILN_INJ_DOOR_SWITCH_OPEN, "door switch open (SWR-SAF-31)"); break;
     case 'D': toggle_inject(KILN_INJ_DOOR_ABSENT,      "no door interlock fitted (warning 113)"); break;
     case 'x': kiln_sim_clear(&s_sim, 0xFFFFFFFFu);
               ESP_LOGW(TAG, "all injections cleared"); break;
     case 'h': print_help(); break;
     case 'l': {
-        /* FR-LOG-13 is an operator action with a warning attached; here it is
+        /* SWR-LOG-13 is an operator action with a warning attached; here it is
          * just the quickest way to see the ring start over. */
         ESP_LOGW(TAG, "erasing the sample log: %s",
                  kiln_err_str(kiln_logring_erase_all(&s_ring)));
@@ -416,14 +416,14 @@ namespace {
 
 /* --- the local interface (FR-HMI, architecture 5.4) --------------------
  *
- * On core 0 with the rest of the UI (AD-15), so a slow I2C frame cannot
+ * On core 0 with the rest of the UI (SWA-15), so a slow I2C frame cannot
  * contend with the control or safety tasks on core 1.  A whole 128x64 frame
- * is about 25 ms at 400 kHz, which is inside NFR-02's 50 ms on its own but
+ * is about 25 ms at 400 kHz, which is inside SWR-NFR-02's 50 ms on its own but
  * has no business sharing a core with the supervisor.
  *
  * The input is polled at 50 Hz because an encoder detent is a human gesture
  * and 20 ms of latency is imperceptible; the display is redrawn at 4 Hz,
- * comfortably inside FR-HMI-05's "twice per second and no more than 1 s
+ * comfortably inside SWR-HMI-05's "twice per second and no more than 1 s
  * stale".  Redrawing only when the HMI says it is dirty keeps the bus quiet
  * when nothing is moving.
  */
@@ -432,7 +432,7 @@ kiln_hmi_t s_hmi;
 void hmi_apply(const kiln_hmi_action_t *a)
 {
     /* The HMI asks; kiln_app decides.  Every one of these can be refused --
-     * SR-18 will not clear a live fault, FR-CUR-12 will not start a run
+     * SWR-SAF-18 will not clear a live fault, SWR-CUR-12 will not start a run
      * without current monitoring -- and a refusal is logged rather than
      * swallowed, because the operator pressed a button and deserves to know
      * it did nothing. */
@@ -445,7 +445,7 @@ void hmi_apply(const kiln_hmi_action_t *a)
     case KILN_HMI_ACT_ACK_FAULT:
         e = kiln_app_clear_fault(&s_app);
         if (e == KILN_OK) {
-            kiln_hal_heat_rearm();      /* SR-18: let the output arm again */
+            kiln_hal_heat_rearm();      /* SWR-SAF-18: let the output arm again */
         }
         break;
     case KILN_HMI_ACT_START:
@@ -474,7 +474,7 @@ void hmi_build_view(kiln_hmi_view_t *v)
     v->energy_wh  = kiln_app_energy_wh(&s_app);
     v->kp = s_app.cfg.kp; v->ki = s_app.cfg.ki; v->kd = s_app.cfg.kd;
 
-    /* AD-22: so the fault screen can show the supervisor's own instruction,
+    /* SWA-22: so the fault screen can show the supervisor's own instruction,
      * which names the button on the panel rather than the acknowledgement the
      * operator has learned for every other fault. */
     kiln_sup_status_t sup = {};
@@ -490,14 +490,14 @@ void hmi_build_view(kiln_hmi_view_t *v)
     (void)snprintf(v->version, sizeof(v->version), "%s", fw.version);
     v->uptime_s = (uint32_t)(esp_timer_get_time() / 1000000);
 
-    /* FR-HMI-07: where the web interface is, which is the question an operator
+    /* SWR-HMI-07: where the web interface is, which is the question an operator
      * standing at the kiln actually has. */
     kiln_net_status_t ns = {};
     if (s_net_port.status != nullptr &&
         s_net_port.status(s_net_port.ctx, &ns) == KILN_OK) {
         v->net_up = (ns.state == KILN_NET_STA_CONNECTED) ||
                     (ns.state == KILN_NET_AP_FALLBACK);
-        /* The device's own name, not the SSID: FR-HMI-07 asks where the web
+        /* The device's own name, not the SSID: SWR-HMI-07 asks where the web
          * interface is, and "safekiln" is half that answer. */
         (void)snprintf(v->hostname, sizeof(v->hostname), "%s", ns.hostname);
         (void)snprintf(v->ip, sizeof(v->ip), "%s",
@@ -535,7 +535,7 @@ void hmi_task(void *arg)
         if (kiln_hmi_dirty(&s_hmi) || since_draw_ms >= 250u) {
             since_draw_ms = 0;
             if (s_display_port.present != NULL) {
-                /* FR-HMI-14: a display that stops acknowledging is a warning,
+                /* SWR-HMI-14: a display that stops acknowledging is a warning,
                  * not a reason to stop controlling a kiln. */
                 (void)s_display_port.present(s_display_port.ctx,
                                              kiln_hmi_frame(&s_hmi),
@@ -552,13 +552,13 @@ void hmi_task(void *arg)
 
 extern "C" void app_main(void)
 {
-    /* NFR-15 / SR-14 / SR-15: the reset cause decides whether an interrupted
+    /* SWR-NFR-15 / SWR-SAF-14 / SWR-SAF-15: the reset cause decides whether an interrupted
      * firing may be resumed at all, so it is read before anything else can
      * overwrite it. */
     kiln_hal_system_init(&s_system);
     const kiln_reset_cause_t cause = s_system.reset_cause(s_system.ctx);
 
-    /* FR-PROD-02: before the system port is wired, so its prod_info answers
+    /* SWR-PROD-02: before the system port is wired, so its prod_info answers
      * from a populated cache rather than reading flash per call. */
     (void)kiln_hal_prod_init();
 
@@ -567,7 +567,7 @@ extern "C" void app_main(void)
     ESP_LOGI(TAG, "Safe Kiln Controller %s (rev %s, %s, IDF %s) on %s",
              fw.version, fw.git_rev, fw.build_time, fw.idf_version, fw.target);
 
-    /* FR-PROD-03: which unit this is, in the log, next to which firmware it is
+    /* SWR-PROD-03: which unit this is, in the log, next to which firmware it is
      * running.  A support report that carries one without the other is half a
      * report. */
     kiln_prod_info_t prod = {};
@@ -580,7 +580,7 @@ extern "C" void app_main(void)
         ESP_LOGW(TAG, "unit has no production data; see tools/prod-data.py");
     }
     ESP_LOGI(TAG, "reset cause %d%s", (int)cause,
-             kiln_reset_was_abnormal(cause) ? "  (ABNORMAL -- SR-14)" : "");
+             kiln_reset_was_abnormal(cause) ? "  (ABNORMAL -- SWR-SAF-14)" : "");
 
     kiln_app_ports_t ports = {};
     ports.alarm = &s_alarm_port;
@@ -593,7 +593,7 @@ extern "C" void app_main(void)
     if (kiln_hal_kvstore_init(&s_kv) == KILN_OK) {
         ports.kvstore = &s_kv;
     } else {
-        /* FR-CFG-05: defaults, and a warning.  A kiln with default limits is
+        /* SWR-CFG-05: defaults, and a warning.  A kiln with default limits is
          * safer than a kiln that refuses to boot. */
         ESP_LOGE(TAG, "no NVS: configuration will not persist");
     }
@@ -615,12 +615,12 @@ extern "C" void app_main(void)
                          (unsigned)st.sectors_total);
             }
         } else {
-            /* FR-LOG-14: carry on without a log, and warn. */
+            /* SWR-LOG-14: carry on without a log, and warn. */
             ESP_LOGE(TAG, "log partition unreadable: %s", kiln_err_str(me));
         }
     }
 
-    /* Programs and run records (AD-10).  Raw flash on every build: QEMU
+    /* Programs and run records (SWA-10).  Raw flash on every build: QEMU
      * emulates flash, so the simulated firmware exercises the same store and
      * keeps its programs across a reboot rather than pretending to. */
     if (kiln_hal_flash_init(KILN_HAL_FS_PARTITION, &s_fs_flash) == KILN_OK) {
@@ -646,7 +646,7 @@ extern "C" void app_main(void)
      * simulator integrates is in accelerated seconds, so a decay expressed in
      * real seconds would expire between two safety refreshes 100 ms apart and
      * drop the contactor continuously -- which then reads, correctly, as no
-     * heater current and latches SR-26 within seconds of starting a firing.
+     * heater current and latches SWR-SAF-26 within seconds of starting a firing.
      *
      * Scaling it keeps the circuit's *real* 1 s against the real refresh rate.
      * The same reasoning applies to anything else in the simulator whose time
@@ -661,7 +661,7 @@ extern "C" void app_main(void)
     ports.heat     = &s_sim_ports.heat;
     ports.current  = &s_sim_ports.current;
     ports.counters = &s_sim_ports.counters;
-    ports.door     = &s_sim_ports.door;        /* SR-31 */
+    ports.door     = &s_sim_ports.door;        /* SWR-SAF-31 */
 
     /* Only if the flash-backed store above did not come up: a simulated kiln
      * with programs that vanish at reset is still more useful than none. */
@@ -679,20 +679,20 @@ extern "C" void app_main(void)
      *
      * The composition root, and the only place that binds a port to a concrete
      * adapter (architecture 5.3).  Pins come from board_pins.h and appear
-     * nowhere else (HR-10).
+     * nowhere else (SYS-HW-10).
      *
      * Order matters once: the heat adapter puts every output in its safe state,
-     * so it is bound before anything can ask for heat (SR-21, NFR-09). */
+     * so it is bound before anything can ask for heat (SWR-SAF-21, SWR-NFR-09). */
     kiln_hal_heat_init(&s_heat_port);
     ports.heat = &s_heat_port;
 
-    /* AD-22: the chamber thermocouple is the supervisor's.  This firmware does
+    /* SWA-22: the chamber thermocouple is the supervisor's.  This firmware does
      * not read that front end and cannot configure it; the reading arrives
      * over a one-wire serial link and is bound as the chamber port, so nothing
      * in the core knows the difference.
      *
      * A link that never comes up, or that goes quiet, presents to the core as
-     * KILN_TC_FAULT_COMMS, which is what SR-04 already handles. */
+     * KILN_TC_FAULT_COMMS, which is what SWR-SAF-04 already handles. */
     kiln_suplink_init(&s_suplink);
     kiln_suplink_bind(&s_suplink, &s_tc_port);
     ports.tc = &s_tc_port;
@@ -706,29 +706,29 @@ extern "C" void app_main(void)
                       "so no heat");
     }
 
-    /* The enclosure channel is still this firmware's own MAX31856 (HR-02), and
-     * is optional: SR-11 stands down without it rather than refusing to run. */
+    /* The enclosure channel is still this firmware's own MAX31856 (SYS-HW-02), and
+     * is optional: SWR-SAF-11 stands down without it rather than refusing to run. */
     if (kiln_hal_tc_init(1, &s_case_tc_port) == KILN_OK) {
         ports.case_tc = &s_case_tc_port;
     } else {
-        ESP_LOGW(TAG, "no enclosure front end: SR-11 stands down");
+        ESP_LOGW(TAG, "no enclosure front end: SWR-SAF-11 stands down");
     }
 
-    /* FR-CUR-12 refuses to start a run when this is unavailable unless
+    /* SWR-CUR-12 refuses to start a run when this is unavailable unless
      * monitoring has been explicitly disabled, so a failure here is reported
      * loudly rather than folded into a warning. */
     if (kiln_hal_current_init(&s_current_port) == KILN_OK) {
         ports.current = &s_current_port;
     } else {
         ESP_LOGE(TAG, "current front end unavailable: runs will be refused "
-                      "unless current monitoring is disabled (FR-CUR-12)");
+                      "unless current monitoring is disabled (SWR-CUR-12)");
     }
 
     if (kiln_hal_counters_init(&s_counters_port) == KILN_OK) {
         ports.counters = &s_counters_port;
     }
 
-    /* SR-31.  Whether a switch is actually fitted is an installation fact the
+    /* SWR-SAF-31.  Whether a switch is actually fitted is an installation fact the
      * board cannot read, so it is told: true here, and tasklist G4 moves it to
      * a configuration item.  Passing true on a kiln with no switch fitted and
      * J9 left open means the coil never closes, which is safe and extremely
@@ -739,14 +739,14 @@ extern "C" void app_main(void)
     kiln_hal_alarm_init(&s_alarm_hw_port);
     ports.alarm = &s_alarm_hw_port;
 
-    /* HR-04 and HR-05.  The display is bound even when the panel did not
-     * answer: FR-HMI-14 keeps the kiln running without one, and available()
+    /* SYS-HW-04 and SYS-HW-05.  The display is bound even when the panel did not
+     * answer: SWR-HMI-14 keeps the kiln running without one, and available()
      * is how warning 104 gets raised rather than inferred. */
     (void)kiln_hal_display_init(&s_display_port);
     (void)kiln_hal_input_init(&s_input_port);
 
     ESP_LOGW(TAG, "REAL HARDWARE: outputs are live. Fit the independent "
-                  "over-temperature cutout (HR-13) before firing.");
+                  "over-temperature cutout (SYS-HW-13) before firing.");
 #endif
 
     kiln_config_t cfg;
@@ -754,10 +754,10 @@ extern "C" void app_main(void)
     /* Gains for the *default simulated plant* -- 1500 degC of authority, a 40 min
      * time constant and 90 s of transport lag -- derived the way you would for
      * any FOPDT process and then checked against it: worst tracking error 5.7
-     * degC through the cone 6 example, against the 23.9 degC and a tripped SR-08
+     * degC through the cone 6 example, against the 23.9 degC and a tripped SWR-SAF-08
      * that a four-times-higher proportional gain produced.
      *
-     * They are not gains for a real kiln.  FR-TUN-11's warning 108 stands until
+     * They are not gains for a real kiln.  SWR-TUN-11's warning 108 stands until
      * one has actually been tuned, which is what FR-TUN exists for. */
     cfg.kp = 1.5f;
     cfg.ki = 0.006f;
@@ -770,21 +770,21 @@ extern "C" void app_main(void)
     }
 
 #ifndef CONFIG_KILN_PLANT_SIM
-    /* FR-NET-01..FR-NET-09, started after the application and never waited on.
-     * FR-NET-07 requires that losing the network cannot alter a running
+    /* SWR-NET-01..SWR-NET-09, started after the application and never waited on.
+     * SWR-NET-07 requires that losing the network cannot alter a running
      * firing, so the kiln is already fully operational before the radio is
      * touched and nothing above depends on this succeeding.
      *
      * It does not go into kiln_app_ports_t, because the application has no use
-     * for it: the network is read by the HMI's network screen (FR-HMI-07) and
+     * for it: the network is read by the HMI's network screen (SWR-HMI-07) and
      * by the web API, neither of which is a control path. */
     if (kiln_hal_net_init(&s_app.cfg, &s_net_port) != KILN_OK) {
         ESP_LOGE(TAG, "WiFi did not start; the kiln runs, the web does not");
     }
 
-    /* The REST API over HTTP (FR-WEB-19 to FR-WEB-26).  Read-only, so there is
+    /* The REST API over HTTP (SWR-WEB-19 to SWR-WEB-26).  Read-only, so there is
      * nothing to authenticate and no way for a client to reach the kiln.
-     * Started last and never waited on, for FR-NET-07's reason: the firing
+     * Started last and never waited on, for SWR-NET-07's reason: the firing
      * must not depend on any of this. */
     static kiln_api_ctx_t s_api;
     s_api.app       = &s_app;
@@ -798,9 +798,9 @@ extern "C" void app_main(void)
     }
 #endif
 
-    /* Configuration, seeded programs, the run-id sequence, SR-17's latched fault
-     * and FR-RUN-08's recovery decision.  The outage length is unknown here: a
-     * device with no RTC battery cannot tell how long it was off, and FR-RUN-08
+    /* Configuration, seeded programs, the run-id sequence, SWR-SAF-17's latched fault
+     * and SWR-RUN-08's recovery decision.  The outage length is unknown here: a
+     * device with no RTC battery cannot tell how long it was off, and SWR-RUN-08
      * treats an unknown outage as too long, which is the conservative reading. */
     const kiln_err_t be = kiln_app_boot(&s_app, cause, -1.0f);
     if (be != KILN_OK) {
@@ -816,7 +816,7 @@ extern "C" void app_main(void)
                  kiln_fault_label(s_app.fault), kiln_fault_cause(s_app.fault));
     }
 
-    /* FR-LOG-09: the ring only goes back so far, and a run whose samples have
+    /* SWR-LOG-09: the ring only goes back so far, and a run whose samples have
      * gone is marked so a chart with no data in it is not a mystery. */
     if (ports.filestore && ports.logstore) {
         uint8_t oldest[KILN_LOG_RECORD_BYTES];
@@ -833,15 +833,15 @@ extern "C" void app_main(void)
     /* Core 0 and low priority: the one task allowed to block on flash. */
     xTaskCreatePinnedToCore(logger_task, "logger", 3072, NULL, 8, NULL, 0);
 
-    /* AD-15: control and safety on core 1, where the WiFi stack cannot reach
+    /* SWA-15: control and safety on core 1, where the WiFi stack cannot reach
      * them.  Priorities from the table in architecture section 6.1. */
     xTaskCreatePinnedToCore(safety_task,  "safety",  3072, NULL, 20, NULL, 1);
     xTaskCreatePinnedToCore(acquire_task, "acquire", 3072, NULL, 19, NULL, 1);
     xTaskCreatePinnedToCore(control_task, "control", 4096, NULL, 18, NULL, 1);
 
 #ifndef CONFIG_KILN_PLANT_SIM
-    /* AD-15: the UI lives on core 0, where it cannot contend with control or
-     * safety.  Low priority: FR-HMI-14 says the display is the least important
+    /* SWA-15: the UI lives on core 0, where it cannot contend with control or
+     * safety.  Low priority: SWR-HMI-14 says the display is the least important
      * thing in the box. */
     xTaskCreatePinnedToCore(hmi_task, "hmi", 4096, NULL, 4, NULL, 0);
 #endif
@@ -860,7 +860,7 @@ extern "C" void app_main(void)
     xTaskCreatePinnedToCore(console_task, "console", 4096, NULL, 5, NULL, 0);
 
 #ifdef CONFIG_KILN_SIM_AUTOSTART
-    /* Let one acquisition cycle land first: FR-RUN-02's self-check refuses to
+    /* Let one acquisition cycle land first: SWR-RUN-02's self-check refuses to
      * start a run on a channel that has not answered yet. */
     vTaskDelay(pdMS_TO_TICKS(1000));
     start_example();

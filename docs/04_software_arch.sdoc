@@ -1,6 +1,6 @@
 [DOCUMENT]
-TITLE: Safe Kiln Controller, Architecture Decisions
-UID: SAFEKILN-AD
+TITLE: Safe Kiln Controller, Software Architecture
+UID: SAFEKILN-SWA
 OPTIONS:
   MARKUP: Markdown
   VIEW_STYLE: Table
@@ -55,224 +55,224 @@ here for a tool to check, and a diagram is better read rendered than quoted.
 <<<
 
 [DECISION]
-UID: AD-01
+UID: SWA-01
 STATEMENT: >>>
 **Ports and adapters** (hexagonal). A `kiln_core` component holds all decision logic; hardware is reached only through interface headers in `kiln_ports`; adapters in `kiln_hal_esp32s3` implement them.
 <<<
 RATIONALE: >>>
-Directly realises [LINK: TR-01], [LINK: TR-02]. Logic becomes ordinary C that a host compiler builds and a debugger steps through in microseconds.
+Directly realises [LINK: SWR-TST-01], [LINK: SWR-TST-02]. Logic becomes ordinary C that a host compiler builds and a debugger steps through in microseconds.
 <<<
 COMMENT: >>>
 One indirection on every hardware access; interfaces must be designed, not grown.
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: TR-01
+  VALUE: SWR-TST-01
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: TR-02
+  VALUE: SWR-TST-02
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-02
+UID: SWA-02
 STATEMENT: >>>
 **Time is injected**, never read. Core functions receive `dt` or take a `kiln_clock_t*`.
 <<<
 RATIONALE: >>>
-[LINK: TR-03]. A 168 h firing, a 15 min runaway timer and a 2 h autotune are all testable in milliseconds of wall time.
+[LINK: SWR-TST-03]. A 168 h firing, a 15 min runaway timer and a 2 h autotune are all testable in milliseconds of wall time.
 <<<
 COMMENT: >>>
 Every core API grows a time parameter; discipline needed to keep `esp_timer_get_time()` out of the core.
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: TR-03
+  VALUE: SWR-TST-03
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-03
+UID: SWA-03
 STATEMENT: >>>
 **Explicit context structs, no globals** in the core.
 <<<
 RATIONALE: >>>
-[LINK: TR-04]. Lets one test process run several controllers, and makes every test independent.
+[LINK: SWR-TST-04]. Lets one test process run several controllers, and makes every test independent.
 <<<
 COMMENT: >>>
 Slightly more verbose call sites.
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: TR-04
+  VALUE: SWR-TST-04
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-04
+UID: SWA-04
 STATEMENT: >>>
 **The safety supervisor is a separate, higher-priority task that owns the heat-enable output.** The control path can only *request* heat; safety alone grants it.
 <<<
 RATIONALE: >>>
-[LINK: SR-01], [LINK: SR-02], [LINK: SR-13]. A bug, deadlock or overrun anywhere in control, HMI, web or networking cannot produce heat.
+[LINK: SYS-SAF-01], [LINK: SYS-SAF-02], [LINK: SWR-SAF-13]. A bug, deadlock or overrun anywhere in control, HMI, web or networking cannot produce heat.
 <<<
 COMMENT: >>>
 Two components must agree on a shared view of the plant; that view is passed as an immutable snapshot, not shared state.
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: SR-01
+  VALUE: SYS-SAF-01
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: SR-02
+  VALUE: SYS-SAF-02
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: SR-13
+  VALUE: SWR-SAF-13
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-05
+UID: SWA-05
 STATEMENT: >>>
 **Heat enable is a software-generated square wave into a hardware charge pump**, not a static level.
 <<<
 RATIONALE: >>>
-[LINK: SR-02], [LINK: HR-07], and gives [LINK: SR-14] for free: a hung safety task stops toggling and the contactor drops in ~1 s with no code involved.
+[LINK: SYS-SAF-02], [LINK: SYS-HW-07], and gives [LINK: SWR-SAF-14] for free: a hung safety task stops toggling and the contactor drops in ~1 s with no code involved.
 <<<
 COMMENT: >>>
 Requires the RC/charge-pump circuit on the board; the toggle must never be delegated to a hardware PWM peripheral, or the property is lost.
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: SR-02
+  VALUE: SYS-SAF-02
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: HR-07
+  VALUE: SYS-HW-07
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: SR-14
+  VALUE: SWR-SAF-14
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-06
+UID: SWA-06
 STATEMENT: >>>
 **The setpoint generator is separate from the PID.** The program produces a moving setpoint; the PID only ever tracks the setpoint it is given.
 <<<
 RATIONALE: >>>
-[LINK: FR-CTL-09]. The two hardest pieces of behaviour, curve execution with hold-back, and loop tuning, become independently testable. Also makes manual mode and autotune trivially reuse the same PID.
+[LINK: SWR-CTL-09]. The two hardest pieces of behaviour, curve execution with hold-back, and loop tuning, become independently testable. Also makes manual mode and autotune trivially reuse the same PID.
 <<<
 COMMENT: >>>
 An extra component and an extra data hand-off per cycle.
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: FR-CTL-09
+  VALUE: SWR-CTL-09
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-07
+UID: SWA-07
 STATEMENT: >>>
 **The SSR window is driven by a 10 ms periodic timer callback** that reads a duty value published atomically by the control task.
 <<<
 RATIONALE: >>>
-[LINK: FR-CTL-07], [LINK: FR-CTL-08], [LINK: NFR-04]. Switching precision is decoupled from the 1 s control period and from any task scheduling delay.
+[LINK: SWR-CTL-07], [LINK: SWR-CTL-08], [LINK: SWR-NFR-04]. Switching precision is decoupled from the 1 s control period and from any task scheduling delay.
 <<<
 COMMENT: >>>
 The callback runs in a timer context: it must be allocation-free, lock-free and short.
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: FR-CTL-07
+  VALUE: SWR-CTL-07
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: FR-CTL-08
+  VALUE: SWR-CTL-08
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: NFR-04
+  VALUE: SWR-NFR-04
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-17
+UID: SWA-17
 STATEMENT: >>>
 **Heater current is measured gated to the commanded output state**, not continuously averaged: conduction current is sampled inside a commanded-on interval and leakage current inside a commanded-off interval, each after a settle delay.
 <<<
 RATIONALE: >>>
-[LINK: FR-CUR-04]. A time-proportional output at 2 % duty is off 98 % of the time; a blind average would read ~2 % of full current and make [LINK: SR-25]/[LINK: SR-26] meaningless. Gating is what turns the measurement into a statement about the *relay*.
+[LINK: SWR-CUR-04]. A time-proportional output at 2 % duty is off 98 % of the time; a blind average would read ~2 % of full current and make [LINK: SWR-SAF-25]/[LINK: SWR-SAF-26] meaningless. Gating is what turns the measurement into a statement about the *relay*.
 <<<
 COMMENT: >>>
-The sampler must know the window phase, so it is driven by the same 10 ms timer that owns the SSR pin ([LINK: AD-07]), not by an independent ADC loop. Windows too short to measure are skipped rather than mis-measured.
+The sampler must know the window phase, so it is driven by the same 10 ms timer that owns the SSR pin ([LINK: SWA-07]), not by an independent ADC loop. Windows too short to measure are skipped rather than mis-measured.
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: FR-CUR-04
+  VALUE: SWR-CUR-04
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: SR-25
+  VALUE: SWR-SAF-25
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: SR-26
+  VALUE: SWR-SAF-26
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-18
+UID: SWA-18
 STATEMENT: >>>
 **The log record grows from 16 to 20 bytes** to carry current and its validity flags.
 <<<
 RATIONALE: >>>
-[LINK: FR-CUR-09]. Current without a flag saying whether the sample was a conduction, leakage or skipped measurement is uninterpretable.
+[LINK: SWR-CUR-09]. Current without a flag saying whether the sample was a conduction, leakage or skipped measurement is uninterpretable.
 <<<
 COMMENT: >>>
-204 records per sector instead of 255; capacity falls from 362 h to **290 h** at the default interval, still well above the 150 h of [LINK: FR-LOG-07]. Recomputed in [§10.4](#104-flash-endurance-analysis).
+204 records per sector instead of 255; capacity falls from 362 h to **290 h** at the default interval, still well above the 150 h of [LINK: SWR-LOG-07]. Recomputed in [§10.4](#104-flash-endurance-analysis).
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: FR-CUR-09
+  VALUE: SWR-CUR-09
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-08
+UID: SWA-08
 STATEMENT: >>>
 **Sample logs live in a dedicated raw flash partition as a circular array of fixed 16-byte records**, not in a filesystem.
 <<<
 RATIONALE: >>>
-[LINK: FR-LOG-05]–[LINK: FR-LOG-08], [LINK: CON-03]. A filesystem adds metadata writes, fragmentation, and a torn-write failure mode across structures we do not control. A ring of fixed records has a trivially provable wear pattern ([§10.4](#104-flash-endurance-analysis)) and a reader that cannot be confused by a power cut.
+[LINK: SWR-LOG-05]–[LINK: SWR-LOG-08], [LINK: UR-CON-03]. A filesystem adds metadata writes, fragmentation, and a torn-write failure mode across structures we do not control. A ring of fixed records has a trivially provable wear pattern ([§10.4](#104-flash-endurance-analysis)) and a reader that cannot be confused by a power cut.
 <<<
 COMMENT: >>>
 A bespoke store to implement and test; no `ls` over logs. Mitigated by `tools/logdump`.
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: FR-LOG-05
+  VALUE: SWR-LOG-05
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: FR-LOG-08
+  VALUE: SWR-LOG-08
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: CON-03
+  VALUE: UR-CON-03
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-09
+UID: SWA-09
 STATEMENT: >>>
 **The log is also the power-loss journal.** Recovery state is reconstructed from the log tail rather than from a separate periodic write.
 <<<
 RATIONALE: >>>
-[LINK: FR-RUN-08], [LINK: FR-RUN-09], [LINK: NFR-14]. Removes a 60 000-write-per-run NVS hot spot; the data was already being written.
+[LINK: SWR-RUN-08], [LINK: SWR-RUN-09], [LINK: SWR-NFR-14]. Removes a 60 000-write-per-run NVS hot spot; the data was already being written.
 <<<
 COMMENT: >>>
-Recovery granularity equals the log sample interval (default 10 s), which is well inside the [LINK: FR-RUN-08] tolerance.
+Recovery granularity equals the log sample interval (default 10 s), which is well inside the [LINK: SWR-RUN-08] tolerance.
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: FR-RUN-08
+  VALUE: SWR-RUN-08
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: FR-RUN-09
+  VALUE: SWR-RUN-09
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: NFR-14
+  VALUE: SWR-NFR-14
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-10
+UID: SWA-10
 STATEMENT: >>>
-**Configuration in NVS; programs and run records in a raw partition of fixed slots.** Originally LittleFS, revised by [LINK: AD-21].
+**Configuration in NVS; programs and run records in a raw partition of fixed slots.** Originally LittleFS, revised by [LINK: SWA-21].
 <<<
 RATIONALE: >>>
 Config is small, typed, and benefits from NVS wear levelling. Programs and run records want names and atomic replace, which is what the slot store provides; they do not want a directory, because nothing addresses them by anything but a slot number.
@@ -282,193 +282,193 @@ Two storage mechanisms to initialise. No general filesystem on the device, so th
 <<<
 
 [DECISION]
-UID: AD-11
+UID: SWA-11
 STATEMENT: >>>
 **Web assets are gzipped and embedded in the application image**, not stored in a filesystem.
 <<<
 RATIONALE: >>>
-[LINK: FR-WEB-02], [LINK: FR-UPD-05]. Assets and firmware version can never disagree, and an OTA update is atomic across both.
+[LINK: SWR-WEB-02], [LINK: SWR-UPD-05]. Assets and firmware version can never disagree, and an OTA update is atomic across both.
 <<<
 COMMENT: >>>
 Asset size counts against the 2 MB OTA partition; budget in [§12.4](#124-asset-budget).
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: FR-WEB-02
+  VALUE: SWR-WEB-02
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: FR-UPD-05
+  VALUE: SWR-UPD-05
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-12
+UID: SWA-12
 STATEMENT: >>>
 **Live updates by Server-Sent Events**, not WebSocket.
 <<<
 RATIONALE: >>>
-[LINK: FR-WEB-05]. Telemetry is one-directional; SSE is plain HTTP, needs no framing layer, reconnects by itself, and costs one socket. Commands go over ordinary `POST`.
+[LINK: SWR-WEB-05]. Telemetry is one-directional; SSE is plain HTTP, needs no framing layer, reconnects by itself, and costs one socket. Commands go over ordinary `POST`.
 <<<
 COMMENT: >>>
 No client→server push channel; not needed, since no command is latency-critical.
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: FR-WEB-05
+  VALUE: SWR-WEB-05
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-13
+UID: SWA-13
 STATEMENT: >>>
 **Tasks communicate by queues and immutable snapshots**, with no mutex on the control path.
 <<<
 RATIONALE: >>>
-[LINK: NFR-01], [LINK: NFR-02]. Removes priority inversion and unbounded blocking as a class of failure.
+[LINK: SWR-NFR-01], [LINK: SWR-NFR-02]. Removes priority inversion and unbounded blocking as a class of failure.
 <<<
 COMMENT: >>>
 Snapshot copying each cycle; at ~64 bytes per snapshot this is negligible.
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: NFR-01
+  VALUE: SWR-NFR-01
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: NFR-02
+  VALUE: SWR-NFR-02
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-14
+UID: SWA-14
 STATEMENT: >>>
 **Dual-target build**: the same core sources compile as ESP-IDF components and as a plain CMake library for host tests.
 <<<
 RATIONALE: >>>
-[LINK: TR-01], [LINK: TR-13], [LINK: TR-19]. Coverage and sanitisers are available where the logic actually lives.
+[LINK: SWR-TST-01], [LINK: SWR-TST-13], [LINK: SWR-TST-19]. Coverage and sanitisers are available where the logic actually lives.
 <<<
 COMMENT: >>>
 The core may not include a single IDF header; enforced by a build check ([§14.5](#145-enforcement)).
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: TR-01
+  VALUE: SWR-TST-01
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: TR-13
+  VALUE: SWR-TST-13
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: TR-19
+  VALUE: SWR-TST-19
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-15
+UID: SWA-15
 STATEMENT: >>>
 **Core affinity split**: connectivity and UI on core 0, control and safety on core 1.
 <<<
 RATIONALE: >>>
-[LINK: NFR-01], [LINK: NFR-02]. WiFi (priority 23) and lwIP cannot preempt the control or safety task at all, so their deadlines do not depend on radio behaviour.
+[LINK: SWR-NFR-01], [LINK: SWR-NFR-02]. WiFi (priority 23) and lwIP cannot preempt the control or safety task at all, so their deadlines do not depend on radio behaviour.
 <<<
 COMMENT: >>>
-The core is tied to a dual-core target; [LINK: CON-02] fixes ESP32-S3, which is dual-core.
+The core is tied to a dual-core target; [LINK: UR-CON-02] fixes ESP32-S3, which is dual-core.
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: NFR-01
+  VALUE: SWR-NFR-01
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: NFR-02
+  VALUE: SWR-NFR-02
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-19
+UID: SWA-19
 STATEMENT: >>>
 **The log ring is `kiln_core/logring` over a `port_flash`**, not logic inside the log-store adapter.
 <<<
 RATIONALE: >>>
-Everything interesting about the ring is a decision with a failure mode [LINK: FR-LOG-06] and [LINK: FR-LOG-08] name explicitly: head discovery across 512 sector headers, erase-immediately-before-write ordering so a power cut cannot destroy data the index still claims, and terminating a sector scan at a torn record. Behind `esp_partition` none of it is testable; in the core it is driven by a fake that can cut power mid-write. Revises [§5.2](#52-ports)'s original placement.
+Everything interesting about the ring is a decision with a failure mode [LINK: SWR-LOG-06] and [LINK: SWR-LOG-08] name explicitly: head discovery across 512 sector headers, erase-immediately-before-write ordering so a power cut cannot destroy data the index still claims, and terminating a sector scan at a torn record. Behind `esp_partition` none of it is testable; in the core it is driven by a fake that can cut power mid-write. Revises [§5.2](#52-ports)'s original placement.
 <<<
 COMMENT: >>>
 One more port, and the core now provides an implementation of `port_logstore` rather than only consuming ports. The adapter in exchange has no logic left to get wrong, three calls that pass straight through.
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: FR-LOG-06
+  VALUE: SWR-LOG-06
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: FR-LOG-08
+  VALUE: SWR-LOG-08
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-20
+UID: SWA-20
 STATEMENT: >>>
 **The firmware is C++20, analysed by `clang-tidy` as a high-integrity profile.** Not MISRA: `clang-tidy` implements no MISRA checks, and the `hicpp-*` module that approximated High Integrity C++ has been removed from LLVM. The equivalent content is enabled under its current names (`cppcoreguidelines-*`, `bugprone-*`, `cert-*`, `clang-analyzer-*`).
 <<<
 RATIONALE: >>>
-[LINK: CON-05] permits C or C++; [LINK: NFR-25] requires a static analysis configuration and [LINK: TR-24] requires CI to run it, and the C toolchain offered no comparable check set. The migration cost was 9 compile errors across 22 597 lines, because the code already had no heap, no VLAs and explicit context structs. C++20 rather than C++17 because the 152 designated initialisers that name every safety default are a C99 feature C++ regained only in C++20.
+[LINK: UR-CON-05] permits C or C++; [LINK: SWR-NFR-25] requires a static analysis configuration and [LINK: SWR-TST-24] requires CI to run it, and the C toolchain offered no comparable check set. The migration cost was 9 compile errors across 22 597 lines, because the code already had no heap, no VLAs and explicit context structs. C++20 rather than C++17 because the 152 designated initialisers that name every safety default are a C99 feature C++ regained only in C++20.
 <<<
 COMMENT: >>>
 A `-std=gnu++20` floor on both build halves. Genuine MISRA C++ compliance is now a *commercial tooling* decision rather than a language one, and nothing in the repository may claim it. Three check groups are deferred rather than clean, `tasklist.md` section F.
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: CON-05
+  VALUE: UR-CON-05
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: NFR-25
+  VALUE: SWR-NFR-25
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: TR-24
+  VALUE: SWR-TST-24
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-21
+UID: SWA-21
 STATEMENT: >>>
-**`port_filestore` is `kiln_core/fileslots` over a `port_flash`, a fixed array of two-sector regions, not a filesystem.** Revises [LINK: AD-10].
+**`port_filestore` is `kiln_core/fileslots` over a `port_flash`, a fixed array of two-sector regions, not a filesystem.** Revises [LINK: SWA-10].
 <<<
 RATIONALE: >>>
-Two reasons, and either alone would be enough. The first is [LINK: CON-04]: LittleFS is not in the ESP-IDF tree, so it arrives either as a managed dependency, which [LINK: CON-04] forbids at build time, or as several thousand vendored lines to be maintained and licence-audited. The second is that nothing above it wants a filesystem. `program_store` and `run_index` address `/p/00` to `/p/19` and `/r/00` upward, and between them call read, write_atomic, remove and usage; `list` and `exists` have no caller at all. That is an array. [LINK: AD-08] already refused a filesystem for the log, on the grounds that it adds metadata writes, fragmentation and a torn-write mode across structures we do not control, and the same reasoning survives being applied to a second fixed-size store. The in-tree alternatives were considered and rejected: SPIFFS and FAT are both reachable without a fetch and neither is power-fail safe, which is the one property this store is required to have.
+Two reasons, and either alone would be enough. The first is [LINK: UR-CON-04]: LittleFS is not in the ESP-IDF tree, so it arrives either as a managed dependency, which [LINK: UR-CON-04] forbids at build time, or as several thousand vendored lines to be maintained and licence-audited. The second is that nothing above it wants a filesystem. `program_store` and `run_index` address `/p/00` to `/p/19` and `/r/00` upward, and between them call read, write_atomic, remove and usage; `list` and `exists` have no caller at all. That is an array. [LINK: SWA-08] already refused a filesystem for the log, on the grounds that it adds metadata writes, fragmentation and a torn-write mode across structures we do not control, and the same reasoning survives being applied to a second fixed-size store. The in-tree alternatives were considered and rejected: SPIFFS and FAT are both reachable without a fetch and neither is power-fail safe, which is the one property this store is required to have.
 <<<
 COMMENT: >>>
 One file occupies one region of two erase sectors and alternates between them, so the copy being replaced is never the copy being erased. A name maps to a region through an index built at mount, 64 entries of 72 bytes. The cost is capacity: 40 files in 512 kB where a filesystem would hold hundreds of small ones, which is irrelevant at a fixed 20 programs and 20 run records and would not be if that ever stopped being fixed. See [§10.6](#106-the-file-store).
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: CON-04
+  VALUE: UR-CON-04
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-16
+UID: SWA-16
 STATEMENT: >>>
 **The web UI is served only through the public REST API** it documents.
 <<<
 RATIONALE: >>>
-[LINK: FR-WEB-19]. The API is exercised by the UI on every use, so it cannot rot; and the UI is replaceable.
+[LINK: SWR-WEB-19]. The API is exercised by the UI on every use, so it cannot rot; and the UI is replaceable.
 <<<
 COMMENT: >>>
 No shortcuts for the UI; occasionally a slightly chattier interaction.
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: FR-WEB-19
+  VALUE: SWR-WEB-19
   ROLE: Satisfies
 
 [DECISION]
-UID: AD-22
+UID: SWA-22
 STATEMENT: >>>
 **The absolute over-temperature trip and the thermocouple-fault trip move to a
 second microcontroller**, an STM32, which owns the chamber front end and one
 series element in the contactor coil. The lid is not among them: its switch
-breaks the coil in hardware (`HR-21`) and `SR-31`'s latch needs run state that
+breaks the coil in hardware (`SYS-HW-21`) and `SWR-SAF-31`'s latch needs run state that
 only the ESP32 has, so the lid sense stays on the ESP32. It reports temperature
 and status to the ESP32 over a point-to-point serial link and takes no
 instruction from it. Every other function stays in the ESP32.
 <<<
 RATIONALE: >>>
-`SR-09` and `SR-04`, and the independence claim of
+`SWR-SAF-09` and `SWR-SAF-04`, and the independence claim of
 [`safety.md`](safety.md) section 6, which currently has to admit that L1 to L4
-all share one MCU and that the only fully independent layer is `HR-13`, the
+all share one MCU and that the only fully independent layer is `SYS-HW-13`, the
 external cutout, which is outside this product.
 
 This is the first protection layer inside the product boundary that a defect in
 the ESP32 firmware cannot reach, including a defect in the safety supervisor
-task of [LINK: AD-04]. It also fixes what tasklist `K1` records about the
+task of [LINK: SWA-04]. It also fixes what tasklist `K1` records about the
 discrete fault chain: an open-drain output is closed when the front end is
 absent, and the MAX31856 reports no open circuit until its fault mask is
 configured, so that interlock is inert out of reset. A supervisor starts
@@ -486,25 +486,25 @@ no temperature, which means no heat. The chamber thermocouple remains shared,
 so the independence won is against software and MCU failure and not against a
 sensor that reads plausibly but wrongly.
 
-Supersedes `HR-24` and removes the discrete chain of tasklist section K
+Supersedes `SYS-HW-24` and removes the discrete chain of tasklist section K
 (`Q5`, `Q6`, `R28` to `R31`). The lid's series contact is kept, being the one
-element that depends on no firmware at all. Forces `SR-23`'s 1350 degC
+element that depends on no firmware at all. Forces `SWR-SAF-23`'s 1350 degC
 configurable ceiling to move, because a hard-coded backstop needs room above
 the highest configurable limit.
 
 Designed in [`safety-supervisor.md`](safety-supervisor.md), which carries the
-open questions. Does not replace `HR-13`.
+open questions. Does not replace `SYS-HW-13`.
 <<<
 RELATIONS:
 - TYPE: Parent
-  VALUE: SR-09
+  VALUE: SWR-SAF-09
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: SR-04
+  VALUE: SWR-SAF-04
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: NFR-04
+  VALUE: SWR-NFR-04
   ROLE: Satisfies
 - TYPE: Parent
-  VALUE: TR-29
+  VALUE: SWR-TST-29
   ROLE: Satisfies

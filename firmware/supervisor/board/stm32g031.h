@@ -9,8 +9,8 @@
  *
  * Only the peripherals the supervisor touches are here.  A vendored CMSIS
  * header would be ~10 000 lines of a part this firmware uses a dozen
- * registers of, and AD-22's whole argument is that this firmware can be read
- * in one sitting.  CON-04's vendoring rules are satisfied the same way: no
+ * registers of, and SWA-22's whole argument is that this firmware can be read
+ * in one sitting.  UR-CON-04's vendoring rules are satisfied the same way: no
  * build-time fetch, and what is checked in is small enough to review.
  */
 #ifndef STM32G031_H

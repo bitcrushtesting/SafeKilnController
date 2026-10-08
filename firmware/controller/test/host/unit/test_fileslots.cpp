@@ -1,8 +1,8 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * The named blob store behind kiln_port_filestore -- AD-10, FR-PRG-04,
- * FR-LOG-09, FR-RUN-08.
+ * The named blob store behind kiln_port_filestore -- SWA-10, SWR-PRG-04,
+ * SWR-LOG-09, SWR-RUN-08.
  *
  * Driven through the flash fake, which enforces NOR semantics and can cut power
  * part-way through a write.  That is the whole reason this store exists in the
@@ -64,7 +64,7 @@ static kiln_err_t get(rig_t *r, const char *path, void *out, size_t cap, size_t 
     return r->store.read(r->store.ctx, path, out, cap, n);
 }
 
-KILN_TEST(ad10_an_empty_medium_mounts_with_nothing_in_it)
+KILN_TEST(swa10_an_empty_medium_mounts_with_nothing_in_it)
 {
     rig_t *r = &g_rig;
     rig_init(r);
@@ -76,7 +76,7 @@ KILN_TEST(ad10_an_empty_medium_mounts_with_nothing_in_it)
     CHECK_ERR(get(r, "/p/00", buf, sizeof(buf), nullptr), KILN_ERR_NOT_FOUND);
 }
 
-KILN_TEST(ad10_a_file_reads_back_and_survives_a_remount)
+KILN_TEST(swa10_a_file_reads_back_and_survives_a_remount)
 {
     rig_t *r = &g_rig;
     rig_init(r);
@@ -98,7 +98,7 @@ KILN_TEST(ad10_a_file_reads_back_and_survives_a_remount)
     CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs), 1u);
 }
 
-KILN_TEST(ad10_rewriting_alternates_the_two_copies_of_the_region)
+KILN_TEST(swa10_rewriting_alternates_the_two_copies_of_the_region)
 {
     rig_t *r = &g_rig;
     rig_init(r);
@@ -229,7 +229,7 @@ KILN_TEST(fr_prg_04_twenty_programs_and_twenty_run_records_coexist)
     }
 }
 
-KILN_TEST(ad10_a_full_medium_refuses_a_new_file_and_still_takes_a_rewrite)
+KILN_TEST(swa10_a_full_medium_refuses_a_new_file_and_still_takes_a_rewrite)
 {
     rig_t *r = &g_rig;
     rig_init(r);
@@ -245,7 +245,7 @@ KILN_TEST(ad10_a_full_medium_refuses_a_new_file_and_still_takes_a_rewrite)
     CHECK_OK(put(r, "/p/00", "y", 2));
 }
 
-KILN_TEST(ad10_remove_frees_the_region_for_another_name)
+KILN_TEST(swa10_remove_frees_the_region_for_another_name)
 {
     rig_t *r = &g_rig;
     rig_init(r);
@@ -262,7 +262,7 @@ KILN_TEST(ad10_remove_frees_the_region_for_another_name)
     CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs), 0u);
 }
 
-KILN_TEST(ad10_a_payload_too_large_for_a_sector_is_refused)
+KILN_TEST(swa10_a_payload_too_large_for_a_sector_is_refused)
 {
     rig_t *r = &g_rig;
     rig_init(r);
@@ -280,7 +280,7 @@ KILN_TEST(ad10_a_payload_too_large_for_a_sector_is_refused)
     CHECK(memcmp(back, big, r->fs.payload_max) == 0);
 }
 
-KILN_TEST(ad10_a_payload_corrupted_under_the_store_is_not_served)
+KILN_TEST(swa10_a_payload_corrupted_under_the_store_is_not_served)
 {
     rig_t *r = &g_rig;
     rig_init(r);
@@ -299,7 +299,7 @@ KILN_TEST(ad10_a_payload_corrupted_under_the_store_is_not_served)
     CHECK_ERR(get(r, "/p/00", buf, sizeof(buf), nullptr), KILN_ERR_NOT_FOUND);
 }
 
-KILN_TEST(ad10_a_short_buffer_is_refused_rather_than_truncated)
+KILN_TEST(swa10_a_short_buffer_is_refused_rather_than_truncated)
 {
     rig_t *r = &g_rig;
     rig_init(r);
@@ -309,7 +309,7 @@ KILN_TEST(ad10_a_short_buffer_is_refused_rather_than_truncated)
     CHECK_ERR(get(r, "/p/00", small, sizeof(small), nullptr), KILN_ERR_RANGE);
 }
 
-KILN_TEST(ad10_usage_and_list_report_what_is_stored)
+KILN_TEST(swa10_usage_and_list_report_what_is_stored)
 {
     rig_t *r = &g_rig;
     rig_init(r);
@@ -336,7 +336,7 @@ KILN_TEST(ad10_usage_and_list_report_what_is_stored)
     CHECK_EQ_UINT(c.bytes, 4u);
 }
 
-KILN_TEST(ad10_format_empties_the_store)
+KILN_TEST(swa10_format_empties_the_store)
 {
     rig_t *r = &g_rig;
     rig_init(r);
@@ -350,7 +350,7 @@ KILN_TEST(ad10_format_empties_the_store)
     CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs), 0u);
 }
 
-KILN_TEST(ad10_the_store_validates_its_arguments)
+KILN_TEST(swa10_the_store_validates_its_arguments)
 {
     rig_t *r = &g_rig;
     rig_init(r);

@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * The REST API of architecture 12.1 -- FR-WEB-19, FR-WEB-20, and the
+ * The REST API of architecture 12.1 -- SWR-WEB-19, SWR-WEB-20, and the
  * request-handling rules of 12.2.
  *
  * Free of esp_http_server on purpose.  A handler takes a method, a path, a query
@@ -10,10 +10,10 @@
  * host harness that serves the UI without a device) while the target adapter
  * reduces to moving bytes between a socket and these functions.
  *
- * AD-16: the UI uses only this API, with no privileged back channel, so anything
+ * SWA-16: the UI uses only this API, with no privileged back channel, so anything
  * the UI can do is in this table and is documented by it.
  *
- * FR-WEB-26: this is an *observation* surface.  No route here can put heat into
+ * SWR-WEB-26: this is an *observation* surface.  No route here can put heat into
  * the kiln, write configuration or clear a latched fault -- and the handlers
  * that used to are deleted, not disabled, so the capability is absent from the
  * image rather than switched off in it.  Program authoring is the one write
@@ -22,7 +22,7 @@
  *
  * 12.2's rules, which are the security-relevant ones:
  *   - every handler writes into a caller-owned buffer and reports truncation;
- *     nothing accumulates and nothing allocates proportionally to input (NFR-19)
+ *     nothing accumulates and nothing allocates proportionally to input (SWR-NFR-19)
  *   - long responses stream in bounded chunks rather than being built whole
  *   - handlers never reach into kiln_core; they go through kiln_app
  */
@@ -40,7 +40,7 @@
 /* 12.2: a declared maximum body size per handler, enforced before parsing. */
 constexpr size_t KILN_API_MAX_BODY   = 2048;
 constexpr size_t KILN_API_MAX_TOKENS = 192;
-constexpr size_t KILN_API_MAX_POINTS = 2000;  /* FR-LOG-10's caller budget, bounded */
+constexpr size_t KILN_API_MAX_POINTS = 2000;  /* SWR-LOG-10's caller budget, bounded */
 
 typedef enum {
     KILN_HTTP_GET = 0,
@@ -59,7 +59,7 @@ typedef struct {
     const kiln_port_net_t       *net;
     const kiln_port_update_t    *update;
 
-    /* FR-LOG-15 reports store health, which only the ring itself knows. */
+    /* SWR-LOG-15 reports store health, which only the ring itself knows. */
     kiln_logring_t *ring;
 } kiln_api_ctx_t;
 
@@ -69,8 +69,8 @@ typedef struct {
     const char        *query;       /* may be NULL */
     const char        *body;        /* may be NULL */
     size_t             body_len;
-    /* FR-WEB-23: the transport decides this, because only it can see the header
-     * and apply the constant-time comparison and back-off of NFR-19. */
+    /* SWR-WEB-23: the transport decides this, because only it can see the header
+     * and apply the constant-time comparison and back-off of SWR-NFR-19. */
     bool               authenticated;
 } kiln_api_req_t;
 
@@ -92,14 +92,14 @@ typedef struct {
 kiln_err_t kiln_api_handle(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
                            kiln_api_resp_t *resp);
 
-/* FR-WEB-20: `{"error":{"code":"...","message":"..."}}`.  Exposed because the
+/* SWR-WEB-20: `{"error":{"code":"...","message":"..."}}`.  Exposed because the
  * transport needs it for the errors it generates itself -- an oversized body, a
  * failed authentication -- and two spellings of an error envelope is one too
  * many. */
 void kiln_api_error(kiln_api_resp_t *resp, int status, const char *code,
                     const char *message);
 
-/* --- the log stream (FR-LOG-10, FR-WEB-18) ------------------------------ */
+/* --- the log stream (SWR-LOG-10, SWR-WEB-18) ------------------------------ */
 
 /* Push, not pull, and that is the whole design.
  *
@@ -130,17 +130,17 @@ kiln_err_t kiln_api_log_stream(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
 bool kiln_api_query_get(const char *query, const char *key, char *out, size_t cap);
 bool kiln_api_query_uint(const char *query, const char *key, uint32_t *out);
 
-/* FR-WEB-23: which routes change state and therefore need authentication.
+/* SWR-WEB-23: which routes change state and therefore need authentication.
  * Decided here rather than in the transport, so adding a route cannot
  * accidentally leave it unprotected.
  *
- * After FR-WEB-26 the set of state-changing routes is program authoring alone;
+ * After SWR-WEB-26 the set of state-changing routes is program authoring alone;
  * everything else non-GET is refused outright.  The method test is kept rather
  * than narrowed to those routes, because it still fails safe: a new write route
  * is authenticated by default. */
 bool kiln_api_needs_auth(const kiln_api_req_t *req);
 
-/* The SSE payload for one telemetry event (FR-WEB-05).  Separate from
+/* The SSE payload for one telemetry event (SWR-WEB-05).  Separate from
  * /api/status only in that it is what the stream pushes; the shape is identical,
  * so the UI has one parser. */
 size_t kiln_api_telemetry_event(kiln_api_ctx_t *ctx, char *buf, size_t cap);

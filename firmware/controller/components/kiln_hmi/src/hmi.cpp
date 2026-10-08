@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Screens and the menu state machine (FR-HMI-02..FR-HMI-15).
+ * Screens and the menu state machine (SWR-HMI-02..SWR-HMI-15).
  *
  * Pure: a frame and an action out, a view and an event in.  See hmi.h for why.
  */
@@ -17,7 +17,7 @@ namespace {
 
 float to_display_c(const kiln_hmi_view_t *v, float c)
 {
-    /* FR-HMI-13: degF is a display conversion and nothing else.  Every stored,
+    /* SWR-HMI-13: degF is a display conversion and nothing else.  Every stored,
      * logged and transmitted value stays in degC. */
     return v->fahrenheit ? (c * 9.0f / 5.0f + 32.0f) : c;
 }
@@ -30,7 +30,7 @@ const char *unit_str(const kiln_hmi_view_t *v)
 void fmt_temp(char *buf, size_t n, const kiln_hmi_view_t *v, float c, bool valid)
 {
     if (!valid) {
-        /* FR-ACQ-12: inside the grace window there is no measurement, and
+        /* SWR-ACQ-12: inside the grace window there is no measurement, and
          * showing the last one as though it were current is how an operator
          * ends up trusting a number the firmware has already disowned. */
         (void)snprintf(buf, n, "---");
@@ -49,7 +49,7 @@ void fmt_hms(char *buf, size_t n, uint32_t s)
 
 const char *state_text(const kiln_hmi_view_t *v)
 {
-    /* NFR-23 / FR-HMI-15: the one table, in the configured language. */
+    /* SWR-NFR-23 / SWR-HMI-15: the one table, in the configured language. */
     return kiln_state_label((kiln_state_t)v->snap.state);
 }
 
@@ -59,21 +59,21 @@ void draw_main(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 {
     char buf[32];
 
-    /* FR-HMI-03: the chamber temperature in the largest font on the screen.
+    /* SWR-HMI-03: the chamber temperature in the largest font on the screen.
      * Scale 3 is 15x21 pixels per glyph, which is what "legible at 2 m" comes
      * to on a 128x64 panel of this size. */
     fmt_temp(buf, sizeof(buf), v, v->snap.kiln_c, v->snap.kiln_valid);
     kiln_fb_text(&h->fb, 0, 2, buf, 3, true);
     kiln_fb_text(&h->fb, kiln_fb_text_width(buf, 3) + 4, 2, unit_str(v), 1, true);
 
-    /* FR-HMI-02: the target, simultaneously and unambiguously.  Prefixed, so
+    /* SWR-HMI-02: the target, simultaneously and unambiguously.  Prefixed, so
      * the two numbers cannot be read as one. */
     char t[16];
     fmt_temp(t, sizeof(t), v, v->snap.setpoint_c, true);
     (void)snprintf(buf, sizeof(buf), "SET %s", t);
     kiln_fb_text_right(&h->fb, KILN_DISPLAY_W - 1, 2, buf, 1);
 
-    /* FR-HMI-04: state, and the segment when there is one. */
+    /* SWR-HMI-04: state, and the segment when there is one. */
     if (v->snap.segment_count > 0u) {
         (void)snprintf(buf, sizeof(buf), "%s %u/%u", state_text(v),
                        (unsigned)(v->snap.segment_index + 1u),
@@ -107,7 +107,7 @@ void draw_main(kiln_hmi_t *h, const kiln_hmi_view_t *v)
     if (v->snap.holdback_active) { kiln_fb_text(&h->fb, 62, 40, "HOLD", 1, true); }
     if (v->awaiting_ack)         { kiln_fb_text(&h->fb, 94, 40, "ACK?", 1, true); }
 
-    /* FR-HMI-04's progress indication: segment position through the program. */
+    /* SWR-HMI-04's progress indication: segment position through the program. */
     uint8_t pct = 0;
     if (v->snap.segment_count > 0u) {
         pct = (uint8_t)(((uint32_t)v->snap.segment_index * 100u) /
@@ -116,7 +116,7 @@ void draw_main(kiln_hmi_t *h, const kiln_hmi_view_t *v)
     kiln_fb_progress(&h->fb, 0, 52, KILN_DISPLAY_W, 10, pct);
 
     /* A warning is not a fault and must not take the screen, but it must be
-     * visible (FR-WEB-24's local counterpart). */
+     * visible (SWR-WEB-24's local counterpart). */
     if (v->warnings != 0u) {
         kiln_fb_text(&h->fb, 2, 54, "!", 1, false);
     }
@@ -124,12 +124,12 @@ void draw_main(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 
 void draw_fault(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 {
-    /* FR-HMI-06: takes precedence over everything and is not dismissible while
+    /* SWR-HMI-06: takes precedence over everything and is not dismissible while
      * the condition holds.  Inverted, because a fault screen that looks like
      * every other screen is a fault screen somebody walks past. */
     kiln_fb_fill(&h->fb, 0, 0, KILN_DISPLAY_W, 12, true);
 
-    /* AD-22: when the supervisor is the reason, say so on the banner and show
+    /* SWA-22: when the supervisor is the reason, say so on the banner and show
      * *its* instruction instead of the controller's.  The two are cleared
      * differently -- the supervisor's by the button on the panel -- and an
      * operator shown the wrong instruction will press the wrong thing. */
@@ -229,7 +229,7 @@ const char *program_label(uint8_t i, const kiln_hmi_view_t *v)
 
 void draw_confirm(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 {
-    /* FR-HMI-11: starting and aborting both require this step. */
+    /* SWR-HMI-11: starting and aborting both require this step. */
     const char *what = (h->pending == KILN_HMI_ACT_START) ? "Start firing?" : "Abort firing?";
     kiln_fb_text(&h->fb, 0, 4, what, 1, true);
 
@@ -249,7 +249,7 @@ void draw_confirm(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 
 void draw_network(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 {
-    /* FR-HMI-07: where the web interface is, which is the question an operator
+    /* SWR-HMI-07: where the web interface is, which is the question an operator
      * standing at the kiln actually has. */
     kiln_fb_text(&h->fb, 0, 0, "NETWORK", 1, true);
     kiln_fb_hline(&h->fb, 0, 9, KILN_DISPLAY_W, true);
@@ -272,7 +272,7 @@ void draw_diag(kiln_hmi_t *h, const kiln_hmi_view_t *v)
     (void)snprintf(buf, sizeof(buf), "amps  %.1f", (double)v->snap.current_a);
     kiln_fb_text(&h->fb, 0, 23, buf, 1, true);
 
-    /* FR-CUR-07, in the units a kiln owner thinks in. */
+    /* SWR-CUR-07, in the units a kiln owner thinks in. */
     (void)snprintf(buf, sizeof(buf), "power %.2fkW", v->power_w / 1000.0);
     kiln_fb_text(&h->fb, 0, 33, buf, 1, true);
     (void)snprintf(buf, sizeof(buf), "used  %.2fkWh", v->energy_wh / 1000.0);
@@ -299,7 +299,7 @@ void draw_info(kiln_hmi_t *h, const kiln_hmi_view_t *v)
     (void)snprintf(buf, sizeof(buf), "D%.0f", (double)v->kd);
     kiln_fb_text(&h->fb, 0, 43, buf, 1, true);
 
-    /* FR-TUN-11: factory gains are not gains for *this* kiln, and the screen
+    /* SWR-TUN-11: factory gains are not gains for *this* kiln, and the screen
      * that shows them is the right place to say so. */
     kiln_fb_text(&h->fb, 0, 53, v->gains_tuned ? "tuned" : "UNTUNED defaults", 1, true);
 }
@@ -344,7 +344,7 @@ kiln_hmi_action_t kiln_hmi_update(kiln_hmi_t *h, const kiln_hmi_view_t *view,
     kiln_hmi_action_t act = none();
     const bool faulted = (view->fault != KILN_FAULT_NONE);
 
-    /* FR-HMI-12: the dim timeout, suspended while a fault is up.  A kiln that
+    /* SWR-HMI-12: the dim timeout, suspended while a fault is up.  A kiln that
      * blanked its own fault screen would be worse than one with no screen. */
     if (ev != KILN_INPUT_NONE || faulted) {
         h->idle_ms = 0;
@@ -356,7 +356,7 @@ kiln_hmi_action_t kiln_hmi_update(kiln_hmi_t *h, const kiln_hmi_view_t *view,
         if (h->dimmed != was) { h->dirty = true; }
     }
 
-    /* FR-HMI-06: the fault screen takes precedence over everything, including
+    /* SWR-HMI-06: the fault screen takes precedence over everything, including
      * whatever menu the operator was halfway through. */
     if (faulted && h->screen != KILN_HMI_SCREEN_FAULT) {
         h->screen = KILN_HMI_SCREEN_FAULT;
@@ -368,8 +368,8 @@ kiln_hmi_action_t kiln_hmi_update(kiln_hmi_t *h, const kiln_hmi_view_t *view,
 
         switch (h->screen) {
         case KILN_HMI_SCREEN_FAULT:
-            /* FR-HMI-10: acknowledging is one of the things the local input
-             * must be able to do.  Whether it is *allowed* is SR-18's
+            /* SWR-HMI-10: acknowledging is one of the things the local input
+             * must be able to do.  Whether it is *allowed* is SWR-SAF-18's
              * decision, made in kiln_app, not here: the HMI asks. */
             if (ev == KILN_INPUT_PRESS) { act.kind = KILN_HMI_ACT_ACK_FAULT; }
             break;
@@ -402,7 +402,7 @@ kiln_hmi_action_t kiln_hmi_update(kiln_hmi_t *h, const kiln_hmi_view_t *view,
                     h->screen = KILN_HMI_SCREEN_MAIN;
                     break;
                 case 2:
-                    /* FR-HMI-11: abort confirms. */
+                    /* SWR-HMI-11: abort confirms. */
                     h->pending     = KILN_HMI_ACT_ABORT;
                     h->confirm_yes = false;   /* default to the safe answer */
                     h->screen      = KILN_HMI_SCREEN_CONFIRM;
@@ -419,7 +419,7 @@ kiln_hmi_action_t kiln_hmi_update(kiln_hmi_t *h, const kiln_hmi_view_t *view,
             else if (ev == KILN_INPUT_CCW) { step(&h->prog_sel, view->program_count, false); }
             else if (ev == KILN_INPUT_LONG_PRESS) { h->screen = KILN_HMI_SCREEN_MENU; }
             else if (ev == KILN_INPUT_PRESS && view->program_count > 0u) {
-                /* FR-HMI-11: starting confirms. */
+                /* SWR-HMI-11: starting confirms. */
                 h->pending         = KILN_HMI_ACT_START;
                 h->pending_program = h->prog_sel;
                 h->confirm_yes     = false;
@@ -453,7 +453,7 @@ kiln_hmi_action_t kiln_hmi_update(kiln_hmi_t *h, const kiln_hmi_view_t *view,
     }
 
     /* The fault screen is only left when the fault has actually gone, which is
-     * FR-HMI-06's "not dismissible while the condition persists". */
+     * SWR-HMI-06's "not dismissible while the condition persists". */
     if (!faulted && h->screen == KILN_HMI_SCREEN_FAULT) {
         h->screen = KILN_HMI_SCREEN_MAIN;
         h->dirty  = true;
@@ -462,7 +462,7 @@ kiln_hmi_action_t kiln_hmi_update(kiln_hmi_t *h, const kiln_hmi_view_t *view,
     /* --- render ---------------------------------------------------------- */
     kiln_fb_clear(&h->fb);
     if (h->dimmed) {
-        return act;              /* blank, and nothing to draw (FR-HMI-12) */
+        return act;              /* blank, and nothing to draw (SWR-HMI-12) */
     }
 
     switch (h->screen) {

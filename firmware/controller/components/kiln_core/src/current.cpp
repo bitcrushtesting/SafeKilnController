@@ -8,34 +8,34 @@
 void kiln_current_cfg_defaults(kiln_current_cfg_t *cfg)
 {
     const kiln_current_cfg_t d = {
-        .enabled            = true,       /* FR-CUR-12: mandatory by default   */
-        .sample_rate_hz     = 4000u,      /* FR-CUR-03; see tasklist A4 on the
+        .enabled            = true,       /* SWR-CUR-12: mandatory by default   */
+        .sample_rate_hz     = 4000u,      /* SWR-CUR-03; see tasklist A4 on the
                                            * anti-alias corner that must match */
         .mains_hz           = 50u,
         .cycles_per_burst   = 2u,
-        .settle_ms          = 20u,        /* FR-CUR-04 default                 */
+        .settle_ms          = 20u,        /* SWR-CUR-04 default                 */
         .remeasure_ms       = 250u,
 
-        /* A 60 A / 0.5 V RMS voltage-output CT (HR-16), which is the rescaling
+        /* A 60 A / 0.5 V RMS voltage-output CT (SYS-HW-16), which is the rescaling
          * tasklist A5 asks for: 120 A per volt. */
         .ct_a_per_v         = 120.0f,
         .adc_v_per_count    = 3.3f / 4095.0f,
 
-        .cal_gain           = 1.0f,       /* FR-CUR-06                         */
+        .cal_gain           = 1.0f,       /* SWR-CUR-06                         */
         .zero_offset_a      = 0.0f,
 
-        .noise_floor_counts = 1.0f,       /* FR-CUR-11                         */
+        .noise_floor_counts = 1.0f,       /* SWR-CUR-11                         */
         .bias_min_counts    = 1600u,      /* mid rail 2048 +/- 450 counts      */
         .bias_max_counts    = 2500u,
 
-        .mains_v            = 230.0f,     /* FR-CUR-07                         */
+        .mains_v            = 230.0f,     /* SWR-CUR-07                         */
 
         .nominal_a          = 30.0f,
-        .ref_cold_max_c     = 200.0f,     /* FR-CUR-08 "while cold"            */
+        .ref_cold_max_c     = 200.0f,     /* SWR-CUR-08 "while cold"            */
         .ref_min_frac       = 0.25f,
         .ref_max_frac       = 2.00f,
 
-        .element_tc_per_c   = 0.0f,       /* SR-28, OQ-07: off until entered   */
+        .element_tc_per_c   = 0.0f,       /* SWR-SAF-28, OQ-07: off until entered   */
     };
     *cfg = d;
 }
@@ -43,7 +43,7 @@ void kiln_current_cfg_defaults(kiln_current_cfg_t *cfg)
 namespace {
 
 /* Clamp the configuration into the ranges the requirements state, and report
- * whether anything had to be moved -- NFR-17 calls a silently corrected
+ * whether anything had to be moved -- SWR-NFR-17 calls a silently corrected
  * configuration a defect, so the caller is told. */
 bool clamp_cfg(kiln_current_cfg_t *c)
 {
@@ -66,7 +66,7 @@ bool clamp_cfg(kiln_current_cfg_t *c)
         moved               = true;
     }
     if (c->settle_ms > 200u) {
-        c->settle_ms = 200u; /* FR-CUR-04 */
+        c->settle_ms = 200u; /* SWR-CUR-04 */
         moved        = true;
     }
     if (c->remeasure_ms == 0u) {
@@ -74,7 +74,7 @@ bool clamp_cfg(kiln_current_cfg_t *c)
         moved           = true;
     }
 
-    moved |= kiln_clampf_moved(&c->cal_gain, 0.50f, 2.00f); /* FR-CUR-06 */
+    moved |= kiln_clampf_moved(&c->cal_gain, 0.50f, 2.00f); /* SWR-CUR-06 */
     if (!kiln_is_finite(c->zero_offset_a)) {
         c->zero_offset_a = 0.0f;
         moved            = true;
@@ -106,7 +106,7 @@ bool clamp_cfg(kiln_current_cfg_t *c)
 
 void derive(kiln_current_t *c)
 {
-    /* FR-CUR-03: a whole number of mains cycles.  Rounded up, so the burst is
+    /* SWR-CUR-03: a whole number of mains cycles.  Rounded up, so the burst is
      * never short of a cycle; the reduction trims to whole cycles using the rate
      * the front end actually achieved. */
     const uint32_t per_cycle = (c->cfg.sample_rate_hz + c->cfg.mains_hz - 1u) / c->cfg.mains_hz;
@@ -181,7 +181,7 @@ void kiln_current_begin_run(kiln_current_t *c)
     c->since_measure_ms = 0.0f;
 }
 
-/* --- gating, FR-CUR-04 and FR-CUR-05 ------------------------------------ */
+/* --- gating, SWR-CUR-04 and SWR-CUR-05 ------------------------------------ */
 
 namespace {
 
@@ -215,7 +215,7 @@ kiln_cur_action_t kiln_current_tick(kiln_current_t *c,
         return KILN_CUR_ACT_NONE;
     }
 
-    if (!c->cfg.enabled) {           /* FR-CUR-12 */
+    if (!c->cfg.enabled) {           /* SWR-CUR-12 */
         c->flags     = 0;
         c->current_a = 0.0f;
         return KILN_CUR_ACT_NONE;
@@ -223,7 +223,7 @@ kiln_cur_action_t kiln_current_tick(kiln_current_t *c,
 
     const uint32_t b_ms = burst_ms(c);
 
-    /* A new commanded interval.  FR-CUR-05: decide here whether it can be
+    /* A new commanded interval.  SWR-CUR-05: decide here whether it can be
      * measured at all, so a window too short to hold a settle plus a whole
      * mains cycle is *skipped* and never reported as zero current. */
     if (!c->have_window || window != c->window) {
@@ -283,14 +283,14 @@ kiln_cur_action_t kiln_current_tick(kiln_current_t *c,
     }
 }
 
-/* --- reduction, FR-CUR-02, FR-CUR-03, FR-CUR-11 ------------------------- */
+/* --- reduction, SWR-CUR-02, SWR-CUR-03, SWR-CUR-11 ------------------------- */
 
 namespace {
 
 /* True RMS of the AC component.  The DC bias is measured rather than assumed,
- * because HR-17's mid-rail divider is a real resistor pair whose centre moves
+ * because SYS-HW-17's mid-rail divider is a real resistor pair whose centre moves
  * with temperature and supply -- and because where it sits is itself the
- * FR-CUR-11 evidence that a transformer is connected at all. */
+ * SWR-CUR-11 evidence that a transformer is connected at all. */
 void reduce(const kiln_cur_burst_t *b, uint16_t n,
                    float *bias_out, float *rms_out)
 {
@@ -332,7 +332,7 @@ void ref_pool_insert(kiln_current_t *c, float a)
         const float hi = c->cfg.nominal_a * c->cfg.ref_max_frac;
 
         /* See ref_min_frac: a reference learned from a kiln that is not drawing
-         * current would make SR-26 agree with the fault. */
+         * current would make SWR-SAF-26 agree with the fault. */
         if (median >= lo && median <= hi) {
             c->ref_a      = median;
             c->ref_temp_c = c->plant_c;
@@ -367,7 +367,7 @@ kiln_err_t kiln_current_push_burst(kiln_current_t *c, const kiln_cur_burst_t *b)
                               ? KILN_CURF_CONDUCTION : KILN_CURF_LEAKAGE;
 
     if (b->truncated || b->count < 2u) {
-        /* FR-CUR-05 again, after the fact: the interval closed under the burst. */
+        /* SWR-CUR-05 again, after the fact: the interval closed under the burst. */
         mark_skipped(c);
         c->flags = (uint8_t)(c->flags | window_flag);
         return KILN_OK;
@@ -375,7 +375,7 @@ kiln_err_t kiln_current_push_burst(kiln_current_t *c, const kiln_cur_burst_t *b)
 
     uint16_t n = b->count > KILN_CUR_BURST_MAX ? KILN_CUR_BURST_MAX : b->count;
 
-    /* FR-CUR-03: trim to a whole number of mains cycles at the rate the front
+    /* SWR-CUR-03: trim to a whole number of mains cycles at the rate the front
      * end actually achieved, not the one that was requested -- that is the whole
      * reason the burst reports its own rate. */
     const uint32_t rate = (b->sample_rate_hz != 0u) ? b->sample_rate_hz : c->cfg.sample_rate_hz;
@@ -393,7 +393,7 @@ kiln_err_t kiln_current_push_burst(kiln_current_t *c, const kiln_cur_burst_t *b)
     c->since_measure_ms = 0.0f;
     c->measurements++;
 
-    /* FR-CUR-11.  Two independent symptoms of "no transformer", neither of which
+    /* SWR-CUR-11.  Two independent symptoms of "no transformer", neither of which
      * a genuine zero current produces: the input has left the bias window the
      * conditioning holds it in (an open input has no DC path -- tasklist A6), or
      * there is no AC at all, not even the noise floor a live winding always
@@ -408,7 +408,7 @@ kiln_err_t kiln_current_push_burst(kiln_current_t *c, const kiln_cur_burst_t *b)
         return KILN_OK;
     }
 
-    /* FR-CUR-02 / FR-CUR-06 */
+    /* SWR-CUR-02 / SWR-CUR-06 */
     float amps = rms * c->amps_per_count * c->cfg.cal_gain - c->cfg.zero_offset_a;
     if (!kiln_is_finite(amps) || amps < 0.0f) {
         amps = 0.0f;
@@ -419,9 +419,9 @@ kiln_err_t kiln_current_push_burst(kiln_current_t *c, const kiln_cur_burst_t *b)
 
     if (window_flag == KILN_CURF_CONDUCTION) {
         c->conduction_a = amps;
-        c->apparent_va  = amps * c->cfg.mains_v;      /* FR-CUR-07 */
+        c->apparent_va  = amps * c->cfg.mains_v;      /* SWR-CUR-07 */
 
-        /* FR-CUR-08: the reference is the median of conduction measurements
+        /* SWR-CUR-08: the reference is the median of conduction measurements
          * taken while the elements are cold and fully on.  Both conditions
          * matter -- cold because of the temperature coefficient, fully on
          * because a partial window measures a different thing. */
@@ -449,7 +449,7 @@ void kiln_current_note_plant(kiln_current_t *c, float kiln_c,
         return;
     }
 
-    /* FR-CUR-07.  Current only flows during the commanded-on fraction of the
+    /* SWR-CUR-07.  Current only flows during the commanded-on fraction of the
      * window, so the integral is weighted by duty rather than by wall time.  A
      * resistive load is assumed, which is stated wherever the figure appears. */
     const float duty_frac = (float)c->plant_duty_permille / (float)KILN_DUTY_MAX;
@@ -474,7 +474,7 @@ kiln_err_t kiln_current_calibrate(kiln_current_t *c, float known_a)
         return KILN_ERR_INVALID_ARG;
     }
 
-    /* FR-CUR-06 is a one-point calibration against a *load*: it needs a
+    /* SWR-CUR-06 is a one-point calibration against a *load*: it needs a
      * conduction measurement that is actually valid.  Calibrating against a
      * leakage window, a skipped window or a CT fault would produce a gain with
      * no relation to anything, and would do it silently. */
@@ -490,7 +490,7 @@ kiln_err_t kiln_current_calibrate(kiln_current_t *c, float known_a)
 
     const float gain = (known_a + c->cfg.zero_offset_a) / uncal;
     if (gain < 0.50f || gain > 2.00f) {
-        return KILN_ERR_RANGE; /* FR-CUR-06 */
+        return KILN_ERR_RANGE; /* SWR-CUR-06 */
     }
 
     c->cfg.cal_gain = gain;
@@ -518,7 +518,7 @@ bool kiln_current_deviation(const kiln_current_t *c, float *deviation_out)
         return false;
     }
 
-    /* SR-28: elements gain resistance as they heat, so the expected current at
+    /* SWR-SAF-28: elements gain resistance as they heat, so the expected current at
      * temperature is below the cold reference.  Comparing against the raw cold
      * figure would accuse a perfectly good kiln of having lost a group. */
     float expected = c->ref_a;

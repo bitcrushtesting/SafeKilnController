@@ -3,7 +3,7 @@
 #
 # Host tests for the supervisor.  Plain CMake, no ARM toolchain needed: the
 # trip logic and the wire format are the whole safety function and both are
-# platform-free by construction (AD-22), so both are exercised here.
+# platform-free by construction (SWA-22), so both are exercised here.
 cmake_minimum_required(VERSION 3.16)
 project(kiln_supervisor_tests CXX)
 
@@ -23,7 +23,7 @@ target_include_directories(sup_core PUBLIC
     ${SUP_ROOT}/protocol/include)
 
 # The ESP32 project's test harness: 120 lines of macros and no product code, so
-# sharing it shares nothing AD-22 cares about.  Reinventing it would be worse.
+# sharing it shares nothing SWA-22 cares about.  Reinventing it would be worse.
 add_library(sup_check STATIC ${FW_ROOT}/test/host/support/kiln_check.cpp)
 target_include_directories(sup_check PUBLIC ${FW_ROOT}/test/host/support)
 

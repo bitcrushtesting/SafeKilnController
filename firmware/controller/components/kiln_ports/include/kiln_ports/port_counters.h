@@ -1,13 +1,13 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Persisted switching-operation counters -- FR-CUR-13, feeding the wear warning
- * of SR-30.
+ * Persisted switching-operation counters -- SWR-CUR-13, feeding the wear warning
+ * of SWR-SAF-30.
  *
  * A separate port rather than a key in port_kvstore because the write pattern is
  * the problem these counters pose, not the storage: a 2 s window at 50 % duty
  * switches 1800 times an hour, and committing each one would burn through the
- * NFR-14 endurance budget by itself.  The adapter therefore accumulates in RAM
+ * SWR-NFR-14 endurance budget by itself.  The adapter therefore accumulates in RAM
  * and flushes on a coarse boundary (run end, a count delta, shutdown), and the
  * port's shape says so -- `add` is cheap, `flush` is not.
  */
@@ -19,7 +19,7 @@
 
 typedef struct {
     uint32_t contactor_ops;
-    uint32_t ssr_ops[KILN_HEAT_CHANNELS];   /* HR-12: per switched channel */
+    uint32_t ssr_ops[KILN_HEAT_CHANNELS];   /* SYS-HW-12: per switched channel */
 } kiln_switch_counters_t;
 
 typedef struct kiln_port_counters {

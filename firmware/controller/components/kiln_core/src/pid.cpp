@@ -91,7 +91,7 @@ uint16_t kiln_pid_update(kiln_pid_t *pid, float sp_c, float pv_c, float dt_s)
 
     const float u_max = duty_max_pct(pid);
 
-    /* NFR-17 / SR-01.  A non-finite setpoint or measurement, or a non-positive
+    /* SWR-NFR-17 / SYS-SAF-01.  A non-finite setpoint or measurement, or a non-positive
      * dt, is a defect upstream; the fail-safe answer is no heat, not the previous
      * duty.  A NaN would otherwise enter integral_pct and stay there, and
      * kiln_clampf cannot save a value that is already NaN on both sides of the
@@ -107,13 +107,13 @@ uint16_t kiln_pid_update(kiln_pid_t *pid, float sp_c, float pv_c, float dt_s)
 
     const float p = pid->cfg.kp * e;
 
-    /* FR-CTL-04: derivative on the measurement, so a setpoint step cannot
+    /* SWR-CTL-04: derivative on the measurement, so a setpoint step cannot
      * produce a derivative kick.  Negated because d(pv) opposes d(error). */
     const float d = pid->primed
                   ? -pid->cfg.kd * (pv_c - pid->pv_prev_c) / dt_s
                   : 0.0f;
 
-    /* FR-CTL-05: integrate tentatively, then withdraw it if the output is
+    /* SWR-CTL-05: integrate tentatively, then withdraw it if the output is
      * saturated and this error would only drive it further out. */
     const float i_candidate = pid->integral_pct + pid->cfg.ki * e * dt_s;
     const float u_tentative = p + i_candidate + d;

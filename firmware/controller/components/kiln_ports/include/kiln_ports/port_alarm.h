@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
- * Buzzer / auxiliary relay (HR-09).  SR-20 requires fault and completion to be
+ * Buzzer / auxiliary relay (SYS-HW-09).  SWR-SAF-20 requires fault and completion to be
  * audibly distinguishable, hence a pattern rather than a level.
  */
 #ifndef KILN_PORT_ALARM_H
