@@ -66,6 +66,37 @@ AddressSanitizer/UBSan, a coverage gate, the `esp32s3` build with a size report,
 and a QEMU job that boots the real image and watches it fire. Tagging `v*`
 builds a release.
 
+## Putting a unit into production
+
+Two tools, in this order, because the order is not interchangeable:
+
+```sh
+tools/prod-data.py flash --serial SK1-2026-000042   # identity, a plain write
+tools/secure-boot.py provision --key keys/prod.pem  # dry run; add --commit
+```
+
+The production data block first, while the device is still freely writable.
+Then signing, flashing and lockdown.
+
+The two differ in what they do by default, and the difference is the point.
+`prod-data.py` writes unless told `--dry-run`, because its write is a plain
+flash write that a reflash undoes. `secure-boot.py` does *nothing* unless told
+`--commit`, because most of what it does cannot be undone at all. Both carry a
+`--self-test` that needs neither a board nor ESP-IDF.
+
+**`secure-boot.py` burns eFuses, and three of its four steps cannot be undone.**
+It refuses to touch a board until its pre-flight passes, demands a differently
+worded confirmation for each irreversible step, and sequences them so the device
+is left bootable at every point. Read the header of
+[`firmware/sdkconfig.secure`](firmware/sdkconfig.secure) before the first run;
+the short version is that **losing the signing key means the unit can never run
+new firmware again**, and that secure boot stops hostile code running but does
+nothing about secrets being read off the flash (`SRR-05`).
+
+It deliberately does not burn `DIS_DOWNLOAD_MODE`. `SRR-11` records that this
+device has no field update path, so serial download is the only route a security
+fix can take; closing it as well would make a unit permanently unfixable.
+
 | Document | Contents |
 |---|---|
 | [`docs/requirements.sdoc`](docs/requirements.sdoc) | Requirements specification, functional, safety, non-functional, hardware-interface and testability requirements, each with an identifier and a verification method. |

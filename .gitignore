@@ -35,3 +35,18 @@ dependencies.lock
 .history/
 .vscode/
 .DS_Store
+
+# Secure boot signing keys (tools/secure-boot.py, SEC-05).
+#
+# A committed signing key is worse than no secure boot at all: it makes every
+# device that trusts it signable by anyone who can read the repository, and the
+# eFuse that trusts it cannot be un-burnt. Patterns rather than one filename,
+# because the next person will name it something else.
+*.pem
+*secure_boot_signing_key*
+*_signing_key*
+secure_boot_digest.bin
+
+# Python bytecode from the tools/ scripts.
+__pycache__/
+*.pyc

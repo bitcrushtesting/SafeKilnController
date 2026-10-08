@@ -1,0 +1,71 @@
+# SPDX-FileCopyrightText: 2026 Bitcrush Testing
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Overlay that builds a SIGNED image for Secure Boot V2 (SEC-05, SRR-04, OQ-S2).
+#
+#   idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.secure" \
+#          set-target esp32s3 build
+#
+# Then drive the rest with tools/secure-boot.py, which signs, flashes, burns the
+# key digest, enables secure boot and disables JTAG, in that order and with a
+# pre-flight check in front of each irreversible step.
+#
+# ---------------------------------------------------------------------------
+# READ THIS BEFORE USING IT
+# ---------------------------------------------------------------------------
+# Secure boot is a ONE-WAY door, burnt into eFuses. Three consequences the
+# documentation should state rather than let somebody discover:
+#
+# 1. LOSE THE PRIVATE KEY AND THE DEVICE CAN NEVER RUN NEW FIRMWARE AGAIN.
+#    There is no recovery, no override and no Espressif back door. The key is
+#    the single most important artefact in the project once this is on.
+#
+# 2. This answers OQ-S2, which asks whether images should be signed and secure
+#    boot enabled, and which notes the real field-recovery cost for an
+#    open-source device users are expected to build themselves. A user who
+#    builds their own firmware needs their own key and their own un-fused
+#    board. Enabling this on a unit you ship is a decision about who may ever
+#    update it.
+#
+# 3. It does NOT encrypt flash. The WiFi password stays readable to anyone who
+#    can pull the chip (SRR-05, OQ-S3, ADV-3/ADV-4). Secure boot stops hostile
+#    code running; it does not stop secrets being read.
+#
+# ---------------------------------------------------------------------------
+# What is deliberately NOT set here
+# ---------------------------------------------------------------------------
+# CONFIG_SECURE_DISABLE_ROM_DL_MODE is left OFF, and that is a considered
+# choice rather than an omission. SRR-11 records that removing OTA left this
+# device with no field update path at all; serial download mode is therefore
+# the ONLY way a security fix ever reaches a unit. Burning DIS_DOWNLOAD_MODE on
+# top of secure boot would make the device permanently unfixable, which trades
+# a small attack surface for an unbounded one.
+#
+# CONFIG_SECURE_ENABLE_SECURE_ROM_DL_MODE is the middle option, and is worth
+# considering once somebody answers OQ-S3: it keeps flashing possible but stops
+# the ROM reading flash back, which is a partial answer to SRR-05. It is left
+# off here because it interacts with flash encryption and that decision is not
+# made yet.
+#
+# CONFIG_SECURE_FLASH_ENC_ENABLED is left off: that is OQ-S3, not this.
+
+CONFIG_SECURE_BOOT=y
+CONFIG_SECURE_BOOT_V2_ENABLED=y
+
+# Sign during the build, from a key the build can see.
+#
+# For a production line that keeps the key in an HSM or on an offline machine,
+# set CONFIG_SECURE_BOOT_BUILD_SIGNED_BINARIES=n instead and use
+# `tools/secure-boot.py sign` afterwards; the tool supports both, and the
+# pre-flight check verifies the signature either way rather than trusting the
+# configuration to have done it.
+CONFIG_SECURE_BOOT_BUILD_SIGNED_BINARIES=y
+CONFIG_SECURE_BOOT_SIGNING_KEY="secure_boot_signing_key.pem"
+
+# RSA-3072 rather than ECDSA: it is the scheme the ESP32-S3 ROM verifies in
+# hardware, and CONFIG_SECURE_BOOT_V2_RSA_SUPPORTED is already y for this part.
+CONFIG_SECURE_SIGNED_APPS_RSA_SCHEME=y
+
+# Both of these are the insecure development escapes. They must stay off.
+# CONFIG_SECURE_BOOT_INSECURE is not set
+# CONFIG_SECURE_BOOT_ALLOW_JTAG is not set
