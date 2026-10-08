@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Bitcrush Testing
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The supervisor's suites inherit the root profile and relax two checks, both
+# of which fire on the test harness rather than on anything a person wrote.
+# This is deliberately SHORTER than firmware/controller/test/.clang-tidy: that
+# file disables six more checks for negative tests that cast out-of-range
+# values to enums and pass deliberately hostile bytes, and the supervisor's
+# suites do neither, so none of those exemptions is carried over.  Nothing here
+# is disabled for firmware/supervisor/core, protocol, board or src.
+#
+#   use-anonymous-namespace  162 findings, every one of them the two static
+#   use-internal-linkage ... functions KILN_TEST() expands to.  The diagnostic
+#                            lands on the expansion site, so a NOLINT cannot
+#                            reach it, and the macro cannot open a namespace
+#                            because it has no way to emit the closing brace
+#                            after the caller's `{ body }`.  Same reasoning,
+#                            and the same macro, as the controller's suites.
+#
+# Everything else the root profile asks for is met: the four suites are clean
+# under it with no other exemption, const-correctness included.
+InheritParentConfig: true
+Checks: >
+  -misc-use-anonymous-namespace,
+  -misc-use-internal-linkage

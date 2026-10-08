@@ -679,14 +679,82 @@ either the supervisor's pin count or a requirement.
   on every cold load. So `SWR-SAF-31` and `SYS-HW-21` are unchanged, the lid sense stays
   on the ESP32, and `Q5`'s branch is the only one section K loses.
 
-- [ ] **R10. Consider making the supervisor integer-only.** It currently uses
-  `float` for the chamber temperature, which on a Cortex-M0+ means every
-  compare and multiply is a libgcc soft-float call, and that is why the target
-  link needs `--specs=nano.specs` rather than `-nostdlib`. The MAX31856
-  already reports a signed integer in 2^-7 degC units and the wire format is
-  integer tenths, so nothing in the path actually requires a float: the
-  backstop comparison could be done in raw LSBs. Smaller, more deterministic,
-  and it removes a library dependency from a safety function.
+- [x] **R10. The supervisor is integer-only.** Done. The internal unit is q7,
+  1/128 degC in an `int32_t`, which is the MAX31856's own LSB, so the decode is
+  a shift and nothing else; the wire stays integer tenths and the one scaling
+  step is `sup_q7_to_dc`, which has its own tests. `nm` on the linked image
+  finds no `__aeabi_f*` symbol and no `lroundf`, and the text segment went from
+  6 736 to 3 488 bytes: the soft-float helpers were 2.7 kB of a 6.7 kB image.
+
+  Three things worth carrying forward. **Every NaN case is gone rather than
+  passing**, because an `int32_t` has no NaN, which also removed the `dt`
+  sign guard in `sup_step` (a `uint32_t` interval cannot be negative) and two
+  tests that existed only to pin NaN behaviour. **Timers saturate rather than
+  wrap**, via `add_ms`, because a latch timer that wrapped would fall back below
+  its threshold and un-arm a live condition. And `disagreeing` now takes its
+  magnitude in unsigned arithmetic, so neither a signed overflow nor negating
+  `INT32_MIN` is reachable even for inputs the decode cannot produce.
+
+  `--specs=nano.specs` **stays**, and the reason changed: the only remaining
+  C library dependency is `memcpy` and `memset`, which the compiler emits for
+  the zero-initialised structs rather than anything anyone wrote. Verified by
+  trying `-nostdlib`, which now fails on exactly those two symbols and nothing
+  else. Supplying them locally is a decision with its own review, not a flag
+  change, so it is not done here.
+
+- [x] **R12. The supervisor's tests run under ASan and UBSan**, and the
+  controller's sanitiser job was found to be reporting findings while passing.
+  `SWR-TST-20` only ever said the build shall *support* the sanitisers, and the
+  supervisor's did not; it does now, through the same `ENABLE_ASAN` option name
+  the controller's host build uses, plus a second `ctest` step in the
+  `supervisor` CI job.
+
+  The part worth recording is what adding it uncovered. **UBSan's default is to
+  print a runtime error and carry on**, leaving the exit code at zero, so
+  `ctest` reports PASSED for a test that triggered real undefined behaviour.
+  The controller's `asan+ubsan` matrix leg had been green on exactly those
+  terms since it was written, over three genuine findings. Both builds now pass
+  `-fno-sanitize-recover=undefined`.
+
+  Those three findings turned out to be one class and not defects: `test_faults`
+  casting 999 to a fault code, `test_safety_current` casting 200, and
+  `test_suplink` feeding 200 as a wire trip reason, each deliberately, to prove
+  an out-of-range value from outside is rejected. It is the same behaviour
+  `firmware/controller/test/.clang-tidy` already exempts `EnumCastOutOfRange`
+  for, so UBSan's `enum` check is excluded in both CMakeLists with that reason
+  written down. Everything else UBSan checks now aborts.
+
+  Verified the way the tidy canary is: reintroducing the signed `hi - lo` that
+  `disagreeing` avoids makes the sanitised step fail with "signed integer
+  overflow" and leaves the plain step passing. A gate that has not been shown
+  to fail is not known to be a gate.
+
+- [x] **R11. The supervisor is inside the static-analysis gate.** Found while
+  writing `docs/coding-standard.md`: `SWR-NFR-25` says code shall pass the
+  project's static analysis configuration, and `firmware/supervisor` passed
+  through no analyser at all. `.clang-tidy`'s `HeaderFilterRegex` named only
+  `firmware/controller/...`, `tools/tidy.sh` built databases only from the
+  controller's two host projects, and `tools/tidy-target.sh` hardcodes
+  `kiln_hal_esp32s3`. C11 records the same hole for `main.cpp` and `httpd.cpp`
+  and did not mention the supervisor, so the one component whose argument is
+  independent reviewability was the one component clang-tidy had never seen.
+
+  `tools/tidy.sh` now drives four databases, 65 translation units. The
+  supervisor's two target-only units need no ARM toolchain: they include
+  nothing but `<stdint.h>` and the project's own headers, so they are analysed
+  against a synthesised database with clang's `thumbv6m-none-eabi` target and
+  `-ffreestanding`, with the same vacuous-pass canary `tidy-target.sh` carries.
+
+  It reported 207 findings, all in the supervisor, and the split is the useful
+  part. 46 were `macro-to-enum` in the core headers and were **fixed**, every
+  object-like macro in `core/` and `protocol/` becoming `constexpr`. 7 were
+  `const-correctness` in the suites and were fixed. 3 were narrow false
+  positives and carry a `NOLINTNEXTLINE` with the reason. The remaining ~150
+  were one class, memory-mapped register access, in `board/` and `src/` only,
+  and are exempted by two directory-scoped `.clang-tidy` files on the same
+  grounds `kiln_hal_esp32s3` already has one. **Nothing is relaxed for
+  `core/` or `protocol/`**, which is the half that matters: the safety function
+  is clean under the unmodified root profile.
 
 - [ ] **R8. The supervisor's firmware, and its own test strategy.** Small
   enough to read in one sitting, which is a design constraint and not an

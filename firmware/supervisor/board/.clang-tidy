@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: 2026 Bitcrush Testing
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The STM32G031 register layer, held to the root profile except for the checks
+# that forbid writing a register layer at all.  Same arrangement, and the same
+# reasoning, as firmware/controller/components/kiln_hal_esp32s3/.clang-tidy:
+# findings that are inherent to the hardware boundary are exempted THERE and
+# nowhere else.
+#
+# What this does NOT relax is the point of it.  firmware/supervisor/core and
+# firmware/supervisor/protocol -- the trip logic, the front-end decode, the
+# self-diagnostics and the wire format, which is the whole safety function --
+# are gated by the unmodified root profile and are clean under it with no
+# exemption of any kind.  So is firmware/supervisor/src beyond this same set.
+#
+# ---------------------------------------------------------------------------
+# WHAT IS SWITCHED OFF, AND WHY
+# ---------------------------------------------------------------------------
+#   no-int-to-ptr ............ A memory-mapped peripheral IS an integer address
+#   pro-type-cstyle-cast ..... turned into a pointer.  0x40021000 is where RCC
+#   pro-type-reinterpret-cast  is, and there is no way to reach it that these
+#                              three checks accept: they are asking the board
+#                              layer not to be a board layer.  Every one of the
+#                              addresses is generated into board/stm32g031.h
+#                              from ST's own CMSIS-SVD, which is the control
+#                              that actually matters here and is stronger than
+#                              a cast style -- no address in that file is
+#                              anybody's recollection.
+#
+#   macro-to-enum ............ pins.h and cortex_m0plus.h are pin numbers,
+#                              alternate-function numbers and core register
+#                              offsets, each traceable to a line of ST's
+#                              datasheet or ARM's architecture manual.  The
+#                              core headers were converted to constexpr and are
+#                              gated by this check; these two are the
+#                              vendor-data boundary, where a name must read
+#                              exactly as the document spells it.
+#
+#   use-internal-linkage ..... main() is the entry point.  It cannot be static
+#                              and it cannot move into an anonymous namespace,
+#                              which is the same false positive the root
+#                              profile's note about main() records.
+InheritParentConfig: true
+Checks: >
+  -performance-no-int-to-ptr,
+  -cppcoreguidelines-pro-type-cstyle-cast,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-macro-to-enum,
+  -misc-use-internal-linkage

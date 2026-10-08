@@ -7,6 +7,7 @@
  * every way the link can lie or fall silent has to end up somewhere the safety
  * rules already understand.
  */
+#include <math.h>
 #include <string.h>
 
 #include "kiln_check.h"
@@ -15,13 +16,16 @@
 
 namespace {
 
+/* `c` stays in degrees, because every caller below is asserting about degrees
+ * at the port.  The report struct is tenths, as the wire is, so the scaling to
+ * the supervisor's own encoding happens here rather than in each test. */
 sup_report_t rep(uint8_t seq, float c)
 {
     sup_report_t r = {};
     r.version     = SUP_VERSION;
     r.seq         = seq;
-    r.chamber_c   = c;
-    r.cj_c        = 25.0f;
+    r.chamber_dc  = (int16_t)lroundf(c * (float)SUP_DC_PER_C);
+    r.cj_dc       = (int16_t)(25 * SUP_DC_PER_C);
     r.fault_bits  = 0u;
     r.flags = (uint8_t)(SUP_FLAG_PERMIT | SUP_FLAG_TC_VALID | SUP_FLAG_SELFTEST_OK);
     r.trip_reason = SUP_TRIP_NONE;

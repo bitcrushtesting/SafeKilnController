@@ -44,11 +44,19 @@ target_compile_options(supervisor.elf PRIVATE
 target_link_options(supervisor.elf PRIVATE
     -mcpu=cortex-m0plus -mthumb
     -T${CMAKE_CURRENT_LIST_DIR}/board/stm32g031k8.ld
-    # -nostartfiles, not -nostdlib: the Cortex-M0+ has no FPU, so every float
-    # compare and multiply is a libgcc soft-float helper call, and -nostdlib
-    # takes libgcc away along with the C library.  newlib-nano supplies
-    # lroundf.  Tasklist R10 proposes removing the floats entirely, which would
-    # let this go back to -nostdlib.
+    # -nostartfiles, not -nostdlib.  The reason used to be soft float: with the
+    # temperatures in a float, every compare and multiply on this FPU-less core
+    # was a libgcc helper call and lroundf came from newlib-nano.  Tasklist R10
+    # is done and none of that is linked any more -- `nm | grep aeabi` finds
+    # nothing, and the image lost 3 248 bytes, nearly half of it.
+    #
+    # What still needs a C library is `memcpy` and `memset`, which the compiler
+    # emits for the zero-initialised structs in startup.cpp, trip.cpp and
+    # main.cpp rather than anything anyone wrote.  Going to -nostdlib therefore
+    # means supplying those two functions here, and a hand-written memset
+    # inside a safety image is a decision rather than a flag change: it wants
+    # its own tests and its own review.  Left as it is, deliberately, and this
+    # comment is the record of what the remaining dependency actually is.
     -nostartfiles --specs=nano.specs
     -Wl,--gc-sections,--print-memory-usage
     -Wl,-Map=supervisor.map)

@@ -35,21 +35,32 @@
  *
  * --- the hard-coded thresholds ------------------------------------------
  *
- * SUP_OVERTEMP_C must agree with KILN_SUPERVISOR_TRIP_C on the ESP32 side, and
+ * Every temperature here is q7, 1/128 degC, and every interval is whole
+ * milliseconds.  There is no floating point anywhere in this component, and
+ * that is a property to preserve rather than an accident of how it was
+ * written: this processor has no FPU, so a float comparison is a call into a
+ * libgcc helper, and the backstop should not depend on a library the project
+ * does not build or test.  docs/coding-standard.md section 5 has the argument.
+ *
+ * Thresholds are written as whole degrees through sup_c_to_q7 so they stay
+ * readable as the numbers the safety concept states, and the multiply is the
+ * compiler's.
+ *
+ * SUP_OVERTEMP must agree with KILN_SUPERVISOR_TRIP_C on the ESP32 side, and
  * must stay above that side's KILN_TEMP_CEILING_C of 1300 degC.  The 50 degC
  * between them is the margin (SWR-SAF-23); see safety-supervisor.md section 4 for
  * why the ceiling moved down rather than this moving up. */
-#define SUP_OVERTEMP_C      1350.0f
+constexpr int32_t SUP_OVERTEMP = sup_c_to_q7(1350);
 
 /* A reported front-end fault, or an unusable reading, must persist before it
  * latches: a single bad conversion on a noisy bus is not a dead sensor.  Heat
  * is withheld immediately either way, so the grace delays the *latch*, not the
  * protection. */
-#define SUP_FAULT_GRACE_S   1.0f
+constexpr uint32_t SUP_FAULT_GRACE_MS = 1000u;
 
 /* How long the clear button must be held.  Long enough to be deliberate, short
  * enough not to be a puzzle.  See the note on edge triggering below. */
-#define SUP_CLEAR_HOLD_S    0.5f
+constexpr uint32_t SUP_CLEAR_HOLD_MS = 500u;
 
 /* SWR-SAF-37: how far the two chamber couples may disagree, and for how long.
  *
@@ -69,8 +80,8 @@
  * enough that the comparison is about the sensors and not about the kiln. Two
  * probes at opposite ends of a chamber would need a band so wide as to detect
  * nothing. SWR-SAF-37 says so, and the commissioning documentation has to. */
-#define SUP_DISAGREE_C      50.0f
-#define SUP_DISAGREE_S      10.0f
+constexpr int32_t  SUP_DISAGREE    = sup_c_to_q7(50);
+constexpr uint32_t SUP_DISAGREE_MS = 10000u;
 
 /* SWR-SAF-38: how long after withdrawing the permit the coil may still read as
  * energised before it counts as stuck.
@@ -78,16 +89,16 @@
  * Longer than the contactor's drop-out plus the readback divider's settling, and
  * shorter than anything that matters. 2 s matches the interval SWR-SAF-27 already
  * uses for the ESP32's weld discrimination, for the same physical reason. */
-#define SUP_PERMIT_SETTLE_S 2.0f
+constexpr uint32_t SUP_PERMIT_SETTLE_MS = 2000u;
 
 typedef struct {
-    float    chamber_c;     /* couple 1, linearised, degC                    */
+    int32_t  chamber_q7;    /* couple 1, linearised, 1/128 degC              */
     bool     chamber_valid; /* a conversion completed and was in range        */
     /* SWR-SAF-37: the second chamber couple, on its own SPI bus and its own
      * front end. Zero-initialised to invalid, so a caller that does not fit a
      * second couple gets single-channel behaviour rather than a false
      * agreement between a reading and a zero. */
-    float    chamber2_c;
+    int32_t  chamber2_q7;
     bool     chamber2_valid;
     uint16_t fault_bits;    /* KILN_TC_FAULT_*, 0 for none                    */
     bool     clear_pressed; /* the local clear button, debounced by the cycle */
@@ -119,7 +130,7 @@ typedef struct {
     bool              tripped;     /* latched, needs a local clear            */
     sup_trip_reason_t reason;      /* why, latched with the trip              */
     bool              selftest_ok;
-    float             fault_s;     /* how long the fault has persisted        */
+    uint32_t          fault_ms;    /* how long the fault has persisted        */
     /* Whether a usable reading has *ever* arrived.  Before the first one the
      * supervisor withholds permission but does not latch: "the sensor never
      * got going" and "the sensor was working and stopped" are different, and
@@ -140,20 +151,28 @@ typedef struct {
      * (`clear_armed`), and it has to be held (`clear_s`).  A shorted line
      * never arms, because it is never seen released, including at power-on. */
     bool              clear_armed;
-    float             clear_s;
+    uint32_t          clear_ms;
     /* How long the two couples have disagreed, and how long the coil has read
      * energised while the permit was withdrawn. Both delay the LATCH, not the
      * protection: heat is withheld on the first cycle either way. */
-    float             disagree_s;
-    float             permit_stuck_s;
+    uint32_t          disagree_ms;
+    uint32_t          permit_stuck_ms;
 } sup_t;
 
 /* Comes up refusing heat: chamber_valid is false until a conversion has been
  * seen, and permit is conjunctive, so absence of evidence is not permission. */
 void sup_init(sup_t *s, bool selftest_ok);
 
-/* One cycle.  dt_s is the elapsed time since the previous call. */
-void sup_step(sup_t *s, const sup_input_t *in, float dt_s);
+/* One cycle.  dt_ms is the elapsed time since the previous call, in whole
+ * milliseconds.
+ *
+ * Unsigned, which removes a guard rather than hiding one: the float version had
+ * to begin by rejecting a negative or NaN interval, because either would have
+ * run the latch timers backwards or stalled them for ever.  Neither value
+ * exists in a uint32_t, so the condition is now unrepresentable instead of
+ * checked.  The timers saturate rather than wrap, so an interval of any size is
+ * safe too. */
+void sup_step(sup_t *s, const sup_input_t *in, uint32_t dt_ms);
 
 /* Clears a latched trip.
  *

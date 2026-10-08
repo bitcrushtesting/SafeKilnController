@@ -5,17 +5,26 @@
  * sharing a test harness does not share product code, and reinventing one
  * would be the only thing worse.
  */
-#include <math.h>
-
 #include "kiln_check.h"
 #include "sup/trip.h"
 
 namespace {
 
-sup_input_t ok_at(float c)
+/* One cycle of the supervisor's own 10 Hz loop, in the unit sup_step takes.
+ * The suites step in whole cycles so that a stated duration is an exact number
+ * of them: the float version advanced by 0.1f and accumulated the error, which
+ * put a "run for exactly the grace period" case either side of the boundary
+ * depending on how many cycles it took to get there. */
+constexpr uint32_t STEP_MS = 100u;
+
+/* Readings are q7, 1/128 degC.  Tests say what they mean in degrees through
+ * sup_c_to_q7 and, where a boundary is the point, in LSBs either side of a
+ * threshold, which is a sharper test than a fraction of a degree: it is the
+ * smallest difference the front end can actually report. */
+sup_input_t ok_at(int32_t q7)
 {
     sup_input_t in = {};
-    in.chamber_c     = c;
+    in.chamber_q7    = q7;
     in.chamber_valid = true;
     in.fault_bits    = 0u;
     in.diag_ok       = true;
@@ -23,10 +32,10 @@ sup_input_t ok_at(float c)
 }
 
 /* Run for a while at one input, 10 Hz, the supervisor's own cycle. */
-void run_for(sup_t *s, const sup_input_t *in, float seconds)
+void run_for(sup_t *s, const sup_input_t *in, uint32_t ms)
 {
-    for (float t = 0.0f; t < seconds; t += 0.1f) {
-        sup_step(s, in, 0.1f);
+    for (uint32_t t = 0; t < ms; t += STEP_MS) {
+        sup_step(s, in, STEP_MS);
     }
 }
 
@@ -48,7 +57,7 @@ KILN_TEST(swa22_comes_up_refusing_heat_before_any_conversion)
     sup_input_t in = {};
     in.chamber_valid = false;
     in.diag_ok       = true;      /* isolate what this test is about */
-    sup_step(&s, &in, 0.1f);
+    sup_step(&s, &in, STEP_MS);
     CHECK(!s.permit);
 }
 
@@ -59,8 +68,8 @@ KILN_TEST(swa22_permits_heat_once_a_good_reading_arrives)
 {
     sup_t s;
     sup_init(&s, true);
-    const sup_input_t in = ok_at(600.0f);
-    sup_step(&s, &in, 0.1f);
+    const sup_input_t in = ok_at(sup_c_to_q7(600));
+    sup_step(&s, &in, STEP_MS);
     CHECK(s.permit);
     CHECK(!s.tripped);
     CHECK_EQ_INT(s.reason, SUP_TRIP_NONE);
@@ -74,8 +83,8 @@ KILN_TEST(swrsaf23_latches_above_the_backstop_without_waiting)
     /* A backstop does not have a grace period. */
     sup_t s;
     sup_init(&s, true);
-    const sup_input_t hot = ok_at(SUP_OVERTEMP_C + 0.5f);
-    sup_step(&s, &hot, 0.1f);
+    const sup_input_t hot = ok_at(SUP_OVERTEMP + 1);
+    sup_step(&s, &hot, STEP_MS);
     CHECK(!s.permit);
     CHECK(s.tripped);
     CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);
@@ -90,13 +99,13 @@ KILN_TEST(swrsaf23_does_not_trip_at_the_ceiling_or_just_below_the_backstop)
      * that fires at the top of the usable range is a broken product. */
     sup_t s;
     sup_init(&s, true);
-    const sup_input_t at_ceiling = ok_at(1300.0f);
-    run_for(&s, &at_ceiling, 10.0f);
+    const sup_input_t at_ceiling = ok_at(sup_c_to_q7(1300));
+    run_for(&s, &at_ceiling, 10000u);
     CHECK(s.permit);
     CHECK(!s.tripped);
 
-    const sup_input_t just_under = ok_at(SUP_OVERTEMP_C);
-    sup_step(&s, &just_under, 0.1f);
+    const sup_input_t just_under = ok_at(SUP_OVERTEMP);
+    sup_step(&s, &just_under, STEP_MS);
     CHECK(s.permit);        /* the comparison is strictly greater-than */
     CHECK(!s.tripped);
 }
@@ -108,12 +117,12 @@ KILN_TEST(swrsaf23_overtemp_does_not_unlatch_when_it_cools)
 {
     sup_t s;
     sup_init(&s, true);
-    const sup_input_t hot = ok_at(SUP_OVERTEMP_C + 10.0f);
-    sup_step(&s, &hot, 0.1f);
+    const sup_input_t hot = ok_at(SUP_OVERTEMP + sup_c_to_q7(10));
+    sup_step(&s, &hot, STEP_MS);
     CHECK(s.tripped);
 
-    const sup_input_t cool = ok_at(200.0f);
-    run_for(&s, &cool, 60.0f);
+    const sup_input_t cool = ok_at(sup_c_to_q7(200));
+    run_for(&s, &cool, 60000u);
     CHECK(s.tripped);
     CHECK(!s.permit);
     CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);
@@ -126,17 +135,17 @@ KILN_TEST(swrsaf04_withholds_heat_at_once_on_a_fault_and_latches_after_the_grace
 {
     sup_t s;
     sup_init(&s, true);
-    const sup_input_t good = ok_at(500.0f);
-    sup_step(&s, &good, 0.1f);
+    const sup_input_t good = ok_at(sup_c_to_q7(500));
+    sup_step(&s, &good, STEP_MS);
     CHECK(s.permit);
 
     sup_input_t faulted = good;
     faulted.fault_bits = 1u;            /* open circuit */
-    sup_step(&s, &faulted, 0.1f);
+    sup_step(&s, &faulted, STEP_MS);
     CHECK(!s.permit);                   /* immediately */
     CHECK(!s.tripped);                  /* but not yet latched */
 
-    run_for(&s, &faulted, SUP_FAULT_GRACE_S + 0.2f);
+    run_for(&s, &faulted, SUP_FAULT_GRACE_MS + 200u);
     CHECK(s.tripped);
     CHECK_EQ_INT(s.reason, SUP_TRIP_TC_FAULT);
 }
@@ -148,16 +157,16 @@ KILN_TEST(swrsaf04_a_transient_fault_shorter_than_the_grace_does_not_latch)
 {
     sup_t s;
     sup_init(&s, true);
-    const sup_input_t good = ok_at(500.0f);
-    sup_step(&s, &good, 0.1f);
+    const sup_input_t good = ok_at(sup_c_to_q7(500));
+    sup_step(&s, &good, STEP_MS);
 
     sup_input_t faulted = good;
     faulted.fault_bits = 2u;
-    sup_step(&s, &faulted, 0.3f);       /* well under the grace */
+    sup_step(&s, &faulted, 300u);       /* well under the grace */
     CHECK(!s.permit);
     CHECK(!s.tripped);
 
-    sup_step(&s, &good, 0.1f);          /* recovers */
+    sup_step(&s, &good, STEP_MS);          /* recovers */
     CHECK(s.permit);
     CHECK(!s.tripped);
 }
@@ -172,12 +181,12 @@ KILN_TEST(swa22_an_unusable_reading_latches_as_stale_not_as_a_fault)
      * not a front end that never started. */
     sup_t s;
     sup_init(&s, true);
-    const sup_input_t good = ok_at(500.0f);
-    sup_step(&s, &good, 0.1f);
+    const sup_input_t good = ok_at(sup_c_to_q7(500));
+    sup_step(&s, &good, STEP_MS);
 
     sup_input_t stale = good;
     stale.chamber_valid = false;
-    run_for(&s, &stale, SUP_FAULT_GRACE_S + 0.2f);
+    run_for(&s, &stale, SUP_FAULT_GRACE_MS + 200u);
     CHECK(s.tripped);
     CHECK_EQ_INT(s.reason, SUP_TRIP_SENSOR_STALE);
 }
@@ -185,19 +194,43 @@ KILN_TEST(swa22_an_unusable_reading_latches_as_stale_not_as_a_fault)
 /*
  * @relation(SWA-22, scope=function)
  */
-KILN_TEST(swa22_a_nan_reading_is_stale_and_never_permits)
+KILN_TEST(swa22_every_representable_reading_yields_a_decision)
 {
-    /* The comparison against the backstop is false for a NaN whichever way it
-     * is written, so a non-finite reading must be caught by validity and not
-     * by the threshold.  This is the failure the ESP32 side hit in enc_temp. */
+    /* This replaces a test for a NaN reading, and the replacement is the
+     * point: with the readings int32_t there is no NaN to defend against, so
+     * what is checked now is that the decision is TOTAL.  Every value the type
+     * can hold has to produce a defined permit and no undefined arithmetic,
+     * including values no thermocouple path can generate, because the struct is
+     * public and the next thing to fill it may not be the decode.
+     *
+     * INT32_MIN and INT32_MAX together are the pair that catches the two ways
+     * this could have been written wrongly: a signed subtraction in the
+     * disagreement check overflows for them, and negating INT32_MIN to take a
+     * magnitude is undefined on its own.  Neither is reachable through
+     * sup_tc_decode's 19 bits, which is exactly why it is worth pinning here. */
     sup_t s;
     sup_init(&s, true);
-    sup_input_t nan_in = ok_at(NAN);
-    sup_step(&s, &nan_in, 0.1f);
-    CHECK(!s.permit);
 
-    /* Declared valid *and* NaN is a caller bug, and must still not permit. */
-    CHECK(!(nan_in.chamber_c <= SUP_OVERTEMP_C));
+    sup_input_t extreme = ok_at(INT32_MAX);
+    extreme.chamber2_q7    = INT32_MIN;
+    extreme.chamber2_valid = true;
+    sup_step(&s, &extreme, STEP_MS);
+    /* Above the backstop on the higher of the two, so it trips at once, and
+     * the pair disagrees by more than any band, so heat is withheld twice
+     * over. */
+    CHECK(!s.permit);
+    CHECK(s.tripped);
+    CHECK_EQ_UINT((unsigned)s.reason, (unsigned)SUP_TRIP_OVERTEMP);
+
+    /* And the other way round, which exercises the same magnitude with the
+     * operands swapped. */
+    sup_t s2;
+    sup_init(&s2, true);
+    sup_input_t extreme2 = ok_at(INT32_MIN);
+    extreme2.chamber2_q7    = INT32_MAX;
+    extreme2.chamber2_valid = true;
+    sup_step(&s2, &extreme2, STEP_MS);
+    CHECK(!s2.permit);
 }
 
 /*
@@ -210,8 +243,8 @@ KILN_TEST(swa22_a_failed_selftest_never_permits_and_cannot_be_cleared)
     CHECK(s.tripped);
     CHECK_EQ_INT(s.reason, SUP_TRIP_SELF_TEST);
 
-    const sup_input_t good = ok_at(500.0f);
-    run_for(&s, &good, 10.0f);
+    const sup_input_t good = ok_at(sup_c_to_q7(500));
+    run_for(&s, &good, 10000u);
     CHECK(!s.permit);
 
     sup_clear(&s);                      /* an operator must not be able to */
@@ -226,8 +259,8 @@ KILN_TEST(swa22_clearing_a_trip_does_not_permit_until_conditions_are_re_establis
 {
     sup_t s;
     sup_init(&s, true);
-    sup_input_t in = ok_at(SUP_OVERTEMP_C + 5.0f);
-    sup_step(&s, &in, 0.1f);
+    sup_input_t in = ok_at(SUP_OVERTEMP + sup_c_to_q7(5));
+    sup_step(&s, &in, STEP_MS);
     CHECK(s.tripped);
 
     sup_clear(&s);
@@ -235,13 +268,13 @@ KILN_TEST(swa22_clearing_a_trip_does_not_permit_until_conditions_are_re_establis
     CHECK(!s.permit);                   /* not until a step says so */
 
     /* Still hot: it latches straight back. */
-    sup_step(&s, &in, 0.1f);
+    sup_step(&s, &in, STEP_MS);
     CHECK(s.tripped);
     CHECK(!s.permit);
 
     sup_clear(&s);
-    in = ok_at(400.0f);
-    sup_step(&s, &in, 0.1f);
+    in = ok_at(sup_c_to_q7(400));
+    sup_step(&s, &in, STEP_MS);
     CHECK(s.permit);
 }
 
@@ -252,8 +285,8 @@ KILN_TEST(swa22_flags_describe_what_the_supervisor_is_doing)
 {
     sup_t s;
     sup_init(&s, true);
-    sup_input_t in = ok_at(500.0f);
-    sup_step(&s, &in, 0.1f);
+    const sup_input_t in = ok_at(sup_c_to_q7(500));
+    sup_step(&s, &in, STEP_MS);
     const uint8_t f = sup_flags(&s, &in);
     CHECK((f & SUP_FLAG_PERMIT) != 0u);
     CHECK((f & SUP_FLAG_TC_VALID) != 0u);
@@ -264,13 +297,13 @@ KILN_TEST(swa22_flags_describe_what_the_supervisor_is_doing)
 /*
  * @relation(SWR-NFR-17, scope=function)
  */
-KILN_TEST(swrnfr17_null_and_negative_time_are_refused_not_faulted)
+KILN_TEST(swrnfr17_null_arguments_and_an_extreme_interval_are_refused_not_faulted)
 {
     sup_t s;
     sup_init(&s, true);
-    const sup_input_t in = ok_at(500.0f);
-    sup_step(nullptr, &in, 0.1f);       /* must not fault */
-    sup_step(&s, nullptr, 0.1f);
+    const sup_input_t in = ok_at(sup_c_to_q7(500));
+    sup_step(nullptr, &in, STEP_MS);       /* must not fault */
+    sup_step(&s, nullptr, STEP_MS);
     sup_clear(nullptr);
     /* Both halves of each guard, independently.  A guard where only the first
      * condition has ever been exercised is a guard half tested, which is what
@@ -278,13 +311,18 @@ KILN_TEST(swrnfr17_null_and_negative_time_are_refused_not_faulted)
     CHECK_EQ_UINT(sup_flags(nullptr, &in), 0u);
     CHECK_EQ_UINT(sup_flags(&s, nullptr), 0u);
 
-    /* A negative or NaN dt must not wind a timer backwards. */
+    /* The float version checked here that a negative or a NaN interval could
+     * not wind a timer backwards.  A uint32_t can be neither, so what is left
+     * to check is the one pathological interval that still exists: an enormous
+     * one, which must saturate the timer rather than wrap it back below the
+     * threshold and un-arm a condition that is still present. */
     sup_input_t faulted = in;
     faulted.fault_bits = 1u;
-    sup_step(&s, &faulted, -5.0f);
-    CHECK_NEAR(s.fault_s, 0.0f, 1e-6);
-    sup_step(&s, &faulted, NAN);
-    CHECK_NEAR(s.fault_s, 0.0f, 1e-6);
+    sup_step(&s, &faulted, UINT32_MAX);
+    CHECK_EQ_UINT(s.fault_ms, UINT32_MAX);
+    sup_step(&s, &faulted, UINT32_MAX);
+    CHECK_EQ_UINT(s.fault_ms, UINT32_MAX);      /* saturated, not wrapped */
+    CHECK(s.tripped);
 }
 
 /* --- the clear button (R4) ---------------------------------------------- */
@@ -296,20 +334,20 @@ KILN_TEST(swrsaf32_a_held_button_clears_the_latch_once_the_hold_elapses)
 {
     sup_t s;
     sup_init(&s, true);
-    sup_input_t in = ok_at(SUP_OVERTEMP_C + 5.0f);
-    sup_step(&s, &in, 0.1f);
+    sup_input_t in = ok_at(SUP_OVERTEMP + sup_c_to_q7(5));
+    sup_step(&s, &in, STEP_MS);
     CHECK(s.tripped);
 
     /* Released first, so the button arms, then cooled, then held. */
-    in = ok_at(300.0f);
-    sup_step(&s, &in, 0.1f);
+    in = ok_at(sup_c_to_q7(300));
+    sup_step(&s, &in, STEP_MS);
     CHECK(s.tripped);
 
     in.clear_pressed = true;
-    sup_step(&s, &in, 0.1f);
+    sup_step(&s, &in, STEP_MS);
     CHECK(s.tripped);                   /* not yet: it must be held */
 
-    run_for(&s, &in, SUP_CLEAR_HOLD_S + 0.2f);
+    run_for(&s, &in, SUP_CLEAR_HOLD_MS + 200u);
     CHECK(!s.tripped);
     CHECK_EQ_INT(s.reason, SUP_TRIP_NONE);
 }
@@ -321,15 +359,15 @@ KILN_TEST(swrsaf32_a_tap_shorter_than_the_hold_does_not_clear)
 {
     sup_t s;
     sup_init(&s, true);
-    sup_input_t in = ok_at(SUP_OVERTEMP_C + 5.0f);
-    sup_step(&s, &in, 0.1f);
-    in = ok_at(300.0f);
-    sup_step(&s, &in, 0.1f);            /* arm */
+    sup_input_t in = ok_at(SUP_OVERTEMP + sup_c_to_q7(5));
+    sup_step(&s, &in, STEP_MS);
+    in = ok_at(sup_c_to_q7(300));
+    sup_step(&s, &in, STEP_MS);            /* arm */
 
     in.clear_pressed = true;
-    sup_step(&s, &in, 0.2f);            /* well short of the hold */
+    sup_step(&s, &in, 200u);            /* well short of the hold */
     in.clear_pressed = false;
-    sup_step(&s, &in, 0.1f);
+    sup_step(&s, &in, STEP_MS);
     CHECK(s.tripped);
 }
 
@@ -343,15 +381,15 @@ KILN_TEST(swrsaf32_a_line_stuck_low_never_clears_the_latch)
      * never seen released, so it never arms. */
     sup_t s;
     sup_init(&s, true);
-    sup_input_t in = ok_at(SUP_OVERTEMP_C + 5.0f);
+    sup_input_t in = ok_at(SUP_OVERTEMP + sup_c_to_q7(5));
     in.clear_pressed = true;            /* shorted from the very first cycle */
-    sup_step(&s, &in, 0.1f);
+    sup_step(&s, &in, STEP_MS);
     CHECK(s.tripped);
 
     /* Hold it low for a minute at a safe temperature. */
-    sup_input_t cool = ok_at(300.0f);
+    sup_input_t cool = ok_at(sup_c_to_q7(300));
     cool.clear_pressed = true;
-    run_for(&s, &cool, 60.0f);
+    run_for(&s, &cool, 60000u);
     CHECK(s.tripped);                   /* still latched */
     CHECK(!s.permit);
 }
@@ -365,27 +403,27 @@ KILN_TEST(swrsaf32_clearing_disarms_until_the_button_is_released_again)
      * supervisor re-latched, which is the stuck-line failure in slow motion. */
     sup_t s;
     sup_init(&s, true);
-    sup_input_t cool = ok_at(300.0f);
-    sup_step(&s, &cool, 0.1f);          /* arm: released and safe */
+    const sup_input_t cool = ok_at(sup_c_to_q7(300));
+    sup_step(&s, &cool, STEP_MS);          /* arm: released and safe */
 
-    sup_input_t hot = ok_at(SUP_OVERTEMP_C + 5.0f);
-    sup_step(&s, &hot, 0.1f);
+    sup_input_t hot = ok_at(SUP_OVERTEMP + sup_c_to_q7(5));
+    sup_step(&s, &hot, STEP_MS);
     CHECK(s.tripped);
 
     /* Hold the button down and stay hot: it clears once, re-latches, and must
      * not clear again while still held. */
     hot.clear_pressed = true;
-    run_for(&s, &hot, SUP_CLEAR_HOLD_S + 0.2f);
+    run_for(&s, &hot, SUP_CLEAR_HOLD_MS + 200u);
     CHECK(s.tripped);                   /* re-latched on the same input */
 
-    run_for(&s, &hot, 10.0f);           /* still held, still hot */
+    run_for(&s, &hot, 10000u);           /* still held, still hot */
     CHECK(s.tripped);
 
     /* Release, cool, press again: now it clears. */
-    sup_input_t cool2 = ok_at(300.0f);
-    sup_step(&s, &cool2, 0.1f);
+    sup_input_t cool2 = ok_at(sup_c_to_q7(300));
+    sup_step(&s, &cool2, STEP_MS);
     cool2.clear_pressed = true;
-    run_for(&s, &cool2, SUP_CLEAR_HOLD_S + 0.2f);
+    run_for(&s, &cool2, SUP_CLEAR_HOLD_MS + 200u);
     CHECK(!s.tripped);
 }
 
@@ -396,10 +434,10 @@ KILN_TEST(swrsaf32_the_button_cannot_clear_a_failed_selftest)
 {
     sup_t s;
     sup_init(&s, false);
-    sup_input_t in = ok_at(300.0f);
-    sup_step(&s, &in, 0.1f);            /* arm */
+    sup_input_t in = ok_at(sup_c_to_q7(300));
+    sup_step(&s, &in, STEP_MS);            /* arm */
     in.clear_pressed = true;
-    run_for(&s, &in, 5.0f);
+    run_for(&s, &in, 5000u);
     CHECK(s.tripped);
     CHECK_EQ_INT(s.reason, SUP_TRIP_SELF_TEST);
     CHECK(!s.permit);
@@ -414,15 +452,15 @@ KILN_TEST(swrsaf32_the_button_cannot_clear_a_condition_that_still_holds)
      * so the button cannot be held down to keep firing. */
     sup_t s;
     sup_init(&s, true);
-    sup_input_t cool = ok_at(700.0f);
-    sup_step(&s, &cool, 0.1f);          /* arm, permitted */
+    const sup_input_t cool = ok_at(sup_c_to_q7(700));
+    sup_step(&s, &cool, STEP_MS);          /* arm, permitted */
 
-    sup_input_t hot = ok_at(SUP_OVERTEMP_C + 5.0f);
-    sup_step(&s, &hot, 0.1f);
+    sup_input_t hot = ok_at(SUP_OVERTEMP + sup_c_to_q7(5));
+    sup_step(&s, &hot, STEP_MS);
     CHECK(s.tripped);
 
     hot.clear_pressed = true;
-    run_for(&s, &hot, SUP_CLEAR_HOLD_S + 0.5f);
+    run_for(&s, &hot, SUP_CLEAR_HOLD_MS + 500u);
     CHECK(!s.permit);
     CHECK(s.tripped);
 }
@@ -441,8 +479,8 @@ KILN_TEST(syshw21_the_supervisor_has_no_lid_input_so_loading_cold_cannot_trip_it
      * test exists so that stays true. */
     sup_t s;
     sup_init(&s, true);
-    const sup_input_t in = ok_at(300.0f);
-    run_for(&s, &in, 300.0f);           /* five minutes of loading the kiln */
+    const sup_input_t in = ok_at(sup_c_to_q7(300));
+    run_for(&s, &in, 300000u);           /* five minutes of loading the kiln */
     CHECK(s.permit);
     CHECK(!s.tripped);
     CHECK_EQ_INT(s.reason, SUP_TRIP_NONE);
@@ -461,17 +499,17 @@ KILN_TEST(swa22_a_front_end_still_starting_up_withholds_heat_without_latching)
      * with nothing actually wrong. */
     sup_t s;
     sup_init(&s, true);
-    sup_input_t starting = ok_at(0.0f);
+    sup_input_t starting = ok_at(sup_c_to_q7(0));
     starting.chamber_valid = false;
 
-    run_for(&s, &starting, 30.0f);      /* far beyond the grace */
+    run_for(&s, &starting, 30000u);      /* far beyond the grace */
     CHECK(!s.permit);
     CHECK(!s.tripped);
     CHECK(!s.seen_valid);
 
     /* Then it comes up, and heat is permitted with no acknowledgement. */
-    const sup_input_t good = ok_at(400.0f);
-    sup_step(&s, &good, 0.1f);
+    const sup_input_t good = ok_at(sup_c_to_q7(400));
+    sup_step(&s, &good, STEP_MS);
     CHECK(s.permit);
     CHECK(!s.tripped);
     CHECK(s.seen_valid);
@@ -486,17 +524,17 @@ KILN_TEST(swa22_a_reading_that_was_working_and_stopped_does_latch)
      * acknowledge rather than a slow start. */
     sup_t s;
     sup_init(&s, true);
-    const sup_input_t good = ok_at(400.0f);
-    sup_step(&s, &good, 0.1f);
+    const sup_input_t good = ok_at(sup_c_to_q7(400));
+    sup_step(&s, &good, STEP_MS);
     CHECK(s.seen_valid);
 
     sup_input_t lost = good;
     lost.chamber_valid = false;
-    sup_step(&s, &lost, 0.1f);
+    sup_step(&s, &lost, STEP_MS);
     CHECK(!s.permit);                   /* immediately */
     CHECK(!s.tripped);
 
-    run_for(&s, &lost, SUP_FAULT_GRACE_S + 0.2f);
+    run_for(&s, &lost, SUP_FAULT_GRACE_MS + 200u);
     CHECK(s.tripped);
     CHECK_EQ_INT(s.reason, SUP_TRIP_SENSOR_STALE);
 }
@@ -511,11 +549,11 @@ KILN_TEST(swa22_a_reported_fault_latches_even_before_a_first_reading)
      * conversion ever arrived. */
     sup_t s;
     sup_init(&s, true);
-    sup_input_t faulted = ok_at(0.0f);
+    sup_input_t faulted = ok_at(sup_c_to_q7(0));
     faulted.chamber_valid = false;
     faulted.fault_bits    = 1u;         /* open circuit */
 
-    run_for(&s, &faulted, SUP_FAULT_GRACE_S + 0.2f);
+    run_for(&s, &faulted, SUP_FAULT_GRACE_MS + 200u);
     CHECK(s.tripped);
     CHECK_EQ_INT(s.reason, SUP_TRIP_TC_FAULT);
 }
@@ -530,13 +568,13 @@ KILN_TEST(swrsaf36_a_failed_diagnostic_withholds_heat_immediately)
 
     /* Establish a healthy cycle first, so the test shows the diagnostic taking
      * permission away rather than never having granted it. */
-    const sup_input_t good = ok_at(500.0f);
-    sup_step(&s, &good, 0.1f);
+    const sup_input_t good = ok_at(sup_c_to_q7(500));
+    sup_step(&s, &good, STEP_MS);
     CHECK(s.permit);
 
     sup_input_t bad = good;
     bad.diag_ok = false;
-    sup_step(&s, &bad, 0.1f);
+    sup_step(&s, &bad, STEP_MS);
     CHECK(!s.permit);
     CHECK(s.tripped);
     CHECK_EQ_INT(s.reason, SUP_TRIP_SELF_TEST);
@@ -554,17 +592,17 @@ KILN_TEST(swrsaf36_a_failed_diagnostic_is_not_clearable_by_the_button)
     sup_t s;
     sup_init(&s, true);
 
-    sup_input_t bad = ok_at(500.0f);
+    sup_input_t bad = ok_at(sup_c_to_q7(500));
     bad.diag_ok = false;
-    sup_step(&s, &bad, 0.1f);
+    sup_step(&s, &bad, STEP_MS);
     CHECK(s.tripped);
 
     /* Release, then hold the button well past the hold time, on a now-healthy
      * reading. It must not clear. */
-    sup_input_t good = ok_at(500.0f);
-    sup_step(&s, &good, 0.1f);
+    sup_input_t good = ok_at(sup_c_to_q7(500));
+    sup_step(&s, &good, STEP_MS);
     good.clear_pressed = true;
-    run_for(&s, &good, SUP_CLEAR_HOLD_S * 4.0f);
+    run_for(&s, &good, SUP_CLEAR_HOLD_MS * 4u);
 
     CHECK(s.tripped);
     CHECK(!s.permit);
@@ -586,13 +624,13 @@ KILN_TEST(swrsaf36_a_diagnostic_failure_does_not_unlatch_when_it_passes_again)
     sup_t s;
     sup_init(&s, true);
 
-    sup_input_t bad = ok_at(400.0f);
+    sup_input_t bad = ok_at(sup_c_to_q7(400));
     bad.diag_ok = false;
-    sup_step(&s, &bad, 0.1f);
+    sup_step(&s, &bad, STEP_MS);
     CHECK(s.tripped);
 
-    const sup_input_t good = ok_at(400.0f);
-    run_for(&s, &good, 10.0f);
+    const sup_input_t good = ok_at(sup_c_to_q7(400));
+    run_for(&s, &good, 10000u);
     CHECK(s.tripped);
     CHECK(!s.permit);
     CHECK_EQ_INT(s.reason, SUP_TRIP_SELF_TEST);
@@ -609,10 +647,10 @@ KILN_TEST(swrsaf36_a_zero_initialised_input_withholds_heat)
     sup_init(&s, true);
 
     sup_input_t forgotten = {};
-    forgotten.chamber_c     = 500.0f;
+    forgotten.chamber_q7    = sup_c_to_q7(500);
     forgotten.chamber_valid = true;
     /* diag_ok deliberately not set */
-    sup_step(&s, &forgotten, 0.1f);
+    sup_step(&s, &forgotten, STEP_MS);
     CHECK(!s.permit);
     CHECK_EQ_INT(s.reason, SUP_TRIP_SELF_TEST);
 }
@@ -627,10 +665,10 @@ KILN_TEST(swrsaf36_a_diagnostic_failure_outranks_a_thermocouple_fault)
     sup_t s;
     sup_init(&s, true);
 
-    sup_input_t both = ok_at(500.0f);
+    sup_input_t both = ok_at(sup_c_to_q7(500));
     both.diag_ok    = false;
     both.fault_bits = 1u;
-    run_for(&s, &both, SUP_FAULT_GRACE_S * 3.0f);
+    run_for(&s, &both, SUP_FAULT_GRACE_MS * 3u);
 
     CHECK(s.tripped);
     CHECK(!s.permit);
@@ -641,11 +679,11 @@ KILN_TEST(swrsaf36_a_diagnostic_failure_outranks_a_thermocouple_fault)
 
 namespace {
 
-/* Both couples valid and agreeing, at `c`. */
-sup_input_t pair_at(float c)
+/* Both couples valid and agreeing, at `q7`. */
+sup_input_t pair_at(int32_t q7)
 {
-    sup_input_t in = ok_at(c);
-    in.chamber2_c     = c;
+    sup_input_t in = ok_at(q7);
+    in.chamber2_q7    = q7;
     in.chamber2_valid = true;
     return in;
 }
@@ -665,10 +703,10 @@ KILN_TEST(swrsaf37_a_low_reading_couple_cannot_mask_a_hot_kiln)
     sup_t s;
     sup_init(&s, true);
 
-    sup_input_t in = pair_at(200.0f);
-    in.chamber_c  = SUP_OVERTEMP_C + 20.0f;   /* couple 1 sees the truth  */
-    in.chamber2_c = 200.0f;                   /* couple 2 reads far low   */
-    sup_step(&s, &in, 0.1f);
+    sup_input_t in = pair_at(sup_c_to_q7(200));
+    in.chamber_q7  = SUP_OVERTEMP + sup_c_to_q7(20); /* couple 1 sees the truth */
+    in.chamber2_q7 = sup_c_to_q7(200);              /* couple 2 reads far low  */
+    sup_step(&s, &in, STEP_MS);
 
     CHECK(!s.permit);
     CHECK(s.tripped);
@@ -677,10 +715,10 @@ KILN_TEST(swrsaf37_a_low_reading_couple_cannot_mask_a_hot_kiln)
     /* and the other way round, because neither couple is privileged */
     sup_t s2;
     sup_init(&s2, true);
-    sup_input_t flipped = pair_at(200.0f);
-    flipped.chamber_c  = 200.0f;
-    flipped.chamber2_c = SUP_OVERTEMP_C + 20.0f;
-    sup_step(&s2, &flipped, 0.1f);
+    sup_input_t flipped = pair_at(sup_c_to_q7(200));
+    flipped.chamber_q7  = sup_c_to_q7(200);
+    flipped.chamber2_q7 = SUP_OVERTEMP + sup_c_to_q7(20);
+    sup_step(&s2, &flipped, STEP_MS);
     CHECK(!s2.permit);
     CHECK_EQ_INT(s2.reason, SUP_TRIP_OVERTEMP);
 }
@@ -692,8 +730,8 @@ KILN_TEST(swrsaf37_agreeing_couples_permit_heat_and_set_both_flags)
 {
     sup_t s;
     sup_init(&s, true);
-    const sup_input_t in = pair_at(600.0f);
-    sup_step(&s, &in, 0.1f);
+    const sup_input_t in = pair_at(sup_c_to_q7(600));
+    sup_step(&s, &in, STEP_MS);
     CHECK(s.permit);
     CHECK(!s.tripped);
 
@@ -710,16 +748,16 @@ KILN_TEST(swrsaf37_disagreement_withholds_heat_at_once_and_latches_after_the_win
     sup_t s;
     sup_init(&s, true);
 
-    sup_input_t apart = pair_at(500.0f);
-    apart.chamber2_c = 500.0f + SUP_DISAGREE_C + 10.0f;
+    sup_input_t apart = pair_at(sup_c_to_q7(500));
+    apart.chamber2_q7 = sup_c_to_q7(500) + SUP_DISAGREE + sup_c_to_q7(10);
 
     /* Heat goes away on the first cycle; the window only delays the latch,
      * which is the same shape every confirmed rule in this firmware uses. */
-    sup_step(&s, &apart, 0.1f);
+    sup_step(&s, &apart, STEP_MS);
     CHECK(!s.permit);
     CHECK(!s.tripped);
 
-    run_for(&s, &apart, SUP_DISAGREE_S);
+    run_for(&s, &apart, SUP_DISAGREE_MS);
     CHECK(s.tripped);
     CHECK_EQ_INT(s.reason, SUP_TRIP_TC_DISAGREE);
 }
@@ -735,9 +773,9 @@ KILN_TEST(swrsaf37_a_gradient_inside_the_band_is_not_a_disagreement)
     sup_t s;
     sup_init(&s, true);
 
-    sup_input_t near = pair_at(900.0f);
-    near.chamber2_c = 900.0f + SUP_DISAGREE_C - 1.0f;
-    run_for(&s, &near, SUP_DISAGREE_S * 3.0f);
+    sup_input_t near = pair_at(sup_c_to_q7(900));
+    near.chamber2_q7 = sup_c_to_q7(900) + SUP_DISAGREE - 1;   /* one LSB inside the band */
+    run_for(&s, &near, SUP_DISAGREE_MS * 3u);
 
     CHECK(s.permit);
     CHECK(!s.tripped);
@@ -751,18 +789,18 @@ KILN_TEST(swrsaf37_a_transient_disagreement_does_not_latch)
     sup_t s;
     sup_init(&s, true);
 
-    sup_input_t apart = pair_at(500.0f);
-    apart.chamber2_c = 500.0f + SUP_DISAGREE_C + 10.0f;
-    run_for(&s, &apart, SUP_DISAGREE_S * 0.5f);
+    sup_input_t apart = pair_at(sup_c_to_q7(500));
+    apart.chamber2_q7 = sup_c_to_q7(500) + SUP_DISAGREE + sup_c_to_q7(10);
+    run_for(&s, &apart, (SUP_DISAGREE_MS * 5u) / 10u);
     CHECK(!s.tripped);
 
-    const sup_input_t together = pair_at(500.0f);
-    run_for(&s, &together, 1.0f);
+    const sup_input_t together = pair_at(sup_c_to_q7(500));
+    run_for(&s, &together, 1000u);
     CHECK(!s.tripped);
     CHECK(s.permit);
 
     /* and the timer restarted rather than resuming where it left off */
-    run_for(&s, &apart, SUP_DISAGREE_S * 0.6f);
+    run_for(&s, &apart, (SUP_DISAGREE_MS * 6u) / 10u);
     CHECK(!s.tripped);
 }
 
@@ -778,10 +816,10 @@ KILN_TEST(swrsaf37_one_usable_couple_keeps_protecting_without_a_cross_check)
     sup_t s;
     sup_init(&s, true);
 
-    sup_input_t one = pair_at(600.0f);
+    sup_input_t one = pair_at(sup_c_to_q7(600));
     one.chamber2_valid = false;
-    one.chamber2_c     = 0.0f;         /* a zero that must not be compared */
-    sup_step(&s, &one, 0.1f);
+    one.chamber2_q7    = 0;            /* a zero that must not be compared */
+    sup_step(&s, &one, STEP_MS);
 
     CHECK(s.permit);
     CHECK(!s.tripped);
@@ -789,8 +827,8 @@ KILN_TEST(swrsaf37_one_usable_couple_keeps_protecting_without_a_cross_check)
 
     /* and it still trips on temperature using the couple it has */
     sup_input_t hot = one;
-    hot.chamber_c = SUP_OVERTEMP_C + 5.0f;
-    sup_step(&s, &hot, 0.1f);
+    hot.chamber_q7 = SUP_OVERTEMP + sup_c_to_q7(5);
+    sup_step(&s, &hot, STEP_MS);
     CHECK(s.tripped);
     CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);
 }
@@ -803,14 +841,14 @@ KILN_TEST(swrsaf37_only_the_second_couple_usable_still_protects)
     sup_t s;
     sup_init(&s, true);
 
-    sup_input_t two_only = pair_at(600.0f);
+    sup_input_t two_only = pair_at(sup_c_to_q7(600));
     two_only.chamber_valid = false;
-    two_only.chamber_c     = 0.0f;
-    sup_step(&s, &two_only, 0.1f);
+    two_only.chamber_q7    = 0;
+    sup_step(&s, &two_only, STEP_MS);
     CHECK(s.permit);
 
-    two_only.chamber2_c = SUP_OVERTEMP_C + 5.0f;
-    sup_step(&s, &two_only, 0.1f);
+    two_only.chamber2_q7 = SUP_OVERTEMP + sup_c_to_q7(5);
+    sup_step(&s, &two_only, STEP_MS);
     CHECK(!s.permit);
     CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);
 }
@@ -818,18 +856,29 @@ KILN_TEST(swrsaf37_only_the_second_couple_usable_still_protects)
 /*
  * @relation(SWR-SAF-37, scope=function)
  */
-KILN_TEST(swrsaf37_a_nan_on_one_couple_cannot_win_the_comparison)
+KILN_TEST(swrsaf37_a_negative_couple_cannot_win_the_comparison)
 {
+    /* This was a NaN on couple 2 and is now the integer equivalent: a reading
+     * far BELOW zero, which is the value that would win the comparison if the
+     * maximum were ever written as a minimum, and the one the sign-extending
+     * shift in the decode exists to produce correctly.  Couple 1 decides, the
+     * kiln is below the backstop, and the pair is far enough apart to be caught
+     * by the disagreement rule rather than by the backstop. */
     sup_t s;
     sup_init(&s, true);
 
-    sup_input_t nan2 = pair_at(600.0f);
-    nan2.chamber2_c = NAN;
-    /* Marked valid, which is the caller lying, and the arithmetic still must not
-     * produce a NaN effective temperature or report a disagreement. */
-    sup_step(&s, &nan2, 0.1f);
-    CHECK(s.permit);          /* 600 degC is below the backstop */
-    CHECK(!s.tripped);
+    sup_input_t cold2 = pair_at(sup_c_to_q7(600));
+    cold2.chamber2_q7 = sup_c_to_q7(-150);
+    sup_step(&s, &cold2, STEP_MS);
+    CHECK(!s.permit);                 /* they disagree by 750 degC */
+    CHECK(!s.tripped);                /* but not yet long enough to latch */
+
+    /* The effective reading is couple 1's 600 degC and not couple 2's -150, so
+     * once they agree again heat is permitted rather than the pair being
+     * dragged down. */
+    const sup_input_t together = pair_at(sup_c_to_q7(600));
+    sup_step(&s, &together, STEP_MS);
+    CHECK(s.permit);
 }
 
 /* --- SWR-SAF-38: the permit readback ------------------------------------ */
@@ -846,14 +895,14 @@ KILN_TEST(swrsaf38_a_coil_that_stays_on_after_the_permit_is_withdrawn_latches)
     sup_init(&s, true);
 
     /* Trip on temperature so the permit is withdrawn, then hold the sense high. */
-    sup_input_t hot = pair_at(SUP_OVERTEMP_C + 5.0f);
-    sup_step(&s, &hot, 0.1f);
+    const sup_input_t hot = pair_at(SUP_OVERTEMP + sup_c_to_q7(5));
+    sup_step(&s, &hot, STEP_MS);
     CHECK(!s.permit);
     CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);
 
-    sup_input_t stuck = pair_at(300.0f);
+    sup_input_t stuck = pair_at(sup_c_to_q7(300));
     stuck.permit_sense = true;
-    run_for(&s, &stuck, SUP_PERMIT_SETTLE_S + 1.0f);
+    run_for(&s, &stuck, SUP_PERMIT_SETTLE_MS + 1000u);
 
     CHECK(s.tripped);
     /* It REPLACES the over-temperature reason, which is the one place in this
@@ -876,15 +925,15 @@ KILN_TEST(swrsaf38_a_stuck_coil_does_not_override_a_failed_diagnostic)
     sup_t s;
     sup_init(&s, true);
 
-    sup_input_t diag_bad = pair_at(300.0f);
+    sup_input_t diag_bad = pair_at(sup_c_to_q7(300));
     diag_bad.diag_ok = false;
-    sup_step(&s, &diag_bad, 0.1f);
+    sup_step(&s, &diag_bad, STEP_MS);
     CHECK_EQ_INT(s.reason, SUP_TRIP_SELF_TEST);
 
-    sup_input_t stuck = pair_at(300.0f);
+    sup_input_t stuck = pair_at(sup_c_to_q7(300));
     stuck.diag_ok      = false;
     stuck.permit_sense = true;
-    run_for(&s, &stuck, SUP_PERMIT_SETTLE_S + 1.0f);
+    run_for(&s, &stuck, SUP_PERMIT_SETTLE_MS + 1000u);
 
     CHECK(s.tripped);
     CHECK_EQ_INT(s.reason, SUP_TRIP_SELF_TEST);
@@ -898,16 +947,16 @@ KILN_TEST(swrsaf38_a_slow_contactor_inside_the_settle_window_is_not_a_fault)
     sup_t s;
     sup_init(&s, true);
 
-    sup_input_t hot = pair_at(SUP_OVERTEMP_C + 5.0f);
-    sup_step(&s, &hot, 0.1f);
+    const sup_input_t hot = pair_at(SUP_OVERTEMP + sup_c_to_q7(5));
+    sup_step(&s, &hot, STEP_MS);
 
-    sup_input_t dropping = pair_at(300.0f);
+    sup_input_t dropping = pair_at(sup_c_to_q7(300));
     dropping.permit_sense = true;
-    run_for(&s, &dropping, SUP_PERMIT_SETTLE_S * 0.5f);
+    run_for(&s, &dropping, (SUP_PERMIT_SETTLE_MS * 5u) / 10u);
     CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);   /* not yet the readback */
 
     dropping.permit_sense = false;
-    run_for(&s, &dropping, 1.0f);
+    run_for(&s, &dropping, 1000u);
     CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);   /* and never becomes it */
 }
 
@@ -923,9 +972,9 @@ KILN_TEST(swrsaf38_a_commanded_permit_that_is_not_sensed_is_not_a_fault)
     sup_t s;
     sup_init(&s, true);
 
-    sup_input_t open_path = pair_at(500.0f);
+    sup_input_t open_path = pair_at(sup_c_to_q7(500));
     open_path.permit_sense = false;          /* permitted, but nothing flows */
-    run_for(&s, &open_path, SUP_PERMIT_SETTLE_S * 5.0f);
+    run_for(&s, &open_path, SUP_PERMIT_SETTLE_MS * 5u);
 
     CHECK(s.permit);
     CHECK(!s.tripped);
@@ -942,10 +991,10 @@ KILN_TEST(swrsaf38_a_board_with_no_readback_fitted_reports_no_fault)
     sup_t s;
     sup_init(&s, true);
 
-    sup_input_t no_sense = pair_at(SUP_OVERTEMP_C + 5.0f);
-    sup_step(&s, &no_sense, 0.1f);            /* trips on temperature */
-    sup_input_t cool = pair_at(300.0f);       /* permit_sense stays false */
-    run_for(&s, &cool, SUP_PERMIT_SETTLE_S * 5.0f);
+    const sup_input_t no_sense = pair_at(SUP_OVERTEMP + sup_c_to_q7(5));
+    sup_step(&s, &no_sense, STEP_MS);            /* trips on temperature */
+    const sup_input_t cool = pair_at(sup_c_to_q7(300));       /* permit_sense stays false */
+    run_for(&s, &cool, SUP_PERMIT_SETTLE_MS * 5u);
 
     CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);
 }

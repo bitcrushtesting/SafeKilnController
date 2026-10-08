@@ -19,7 +19,7 @@ The design, the failure analysis and the open questions are in
 |---|---|
 | Part | STM32G031K8T6 |
 | Core | Cortex-M0+ at 16 MHz from HSI16, no crystal |
-| Memory | 64 KB flash (3.5 KB used), 8 KB RAM |
+| Memory | 64 KB flash (3.4 KB used), 8 KB RAM |
 | Package | LQFP32, 0.8 mm pitch |
 | Uses | SPI1, USART2, IWDG, 8 GPIO |
 
@@ -79,7 +79,7 @@ Why this one:
   probed, which matters for a part whose whole argument is that it can be
   verified independently. `SYS-HW-19` already requires top-side test points for the
   same reason.
-- **64 KB of flash against a firmware that currently uses 3.5 KB.** The
+- **64 KB of flash against a firmware that currently uses 3.4 KB.** The
   headroom is not for features. It is for self-tests, and for the fact that a
   part running at 5 % of its flash will still build in ten years.
 - Cheap, long-lived and widely stocked, which for a safety part matters more
@@ -138,8 +138,19 @@ it is anybody's recollection.
 ## What is done, and what is not
 
 **Done and tested:** the trip logic, the wire format, the MAX31856 register
-decode and the self-diagnostics: 68 host tests over four suites, with MC/DC at
-100 % over all of it against an 80 % floor.
+decode and the self-diagnostics: 81 host tests over four suites, with MC/DC at
+100 % over all of it against an 80 % floor. `clang-tidy` reaches this component
+too, as of the tidy.sh widening: core, protocol and the suites from the host
+compile database, and `src/main.cpp` and `board/startup.cpp` against a
+synthesised bare-metal one, so no file here is outside the project's gates. The
+standard it is held to is [`docs/coding-standard.md`](../docs/coding-standard.md).
+
+**No floating point.** The temperatures are fixed point throughout: 1/128 degC
+inside, the MAX31856's own LSB, and tenths of a degree on the wire. On a
+Cortex-M0+ a float compare is a libgcc soft-float call, so the previous version
+linked 2.7 kB of helpers and newlib's `lroundf` into a safety function, and
+every comparison needed a NaN case. The image is 3 488 bytes of text now against
+6 736 before. See [`docs/coding-standard.md` §5](../docs/coding-standard.md).
 
 One coverage gap is worth naming rather than leaving to be found. The two
 failure returns inside the RAM pattern test are unreachable from a host test,

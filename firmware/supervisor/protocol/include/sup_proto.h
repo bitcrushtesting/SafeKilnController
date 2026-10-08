@@ -53,7 +53,43 @@ constexpr uint8_t SUP_VERSION     = 1u;
 
 /* Temperatures travel as tenths of a degree, the same encoding the log record
  * uses, so the two never need converting between each other. */
-constexpr float SUP_TEMP_SCALE = 10.0f;
+constexpr int32_t SUP_DC_PER_C = 10;
+
+/* --- the supervisor's internal temperature unit ---------------------------
+ *
+ * 1/128 degC, signed, held in an int32_t, and called q7 after the seven
+ * fractional bits.  Everything inside the supervisor measures temperature in
+ * it: the decode produces it, the trip logic compares it, and the only
+ * conversion is to tenths at the wire.
+ *
+ * It is the MAX31856's own unit, which is the whole reason to pick it.  The
+ * part reports the linearised hot junction as a 19-bit signed value with
+ * 2^-7 degC per LSB, so the decode is a shift and nothing else: no scaling, no
+ * rounding, and no value that the part can produce and this cannot hold.  The
+ * cold junction's 2^-6 degC becomes q7 by a left shift of one, which is exact.
+ *
+ * This is here, in the header both the trip core and the front-end decode
+ * include, because a unit named in two places is a unit that eventually means
+ * two things.  It is not on the wire: the wire is tenths, as above.
+ *
+ * Why integers at all, since this used to be float: on a Cortex-M0+ there is no
+ * FPU, so every compare and multiply was a libgcc soft-float call, and the
+ * supervisor's safety function depended on a library it did not build.  See
+ * docs/coding-standard.md section 5. */
+constexpr int32_t SUP_Q7_PER_C = 128;
+
+/* Degrees to q7, for a threshold written as a whole number of degrees.
+ *
+ * A constexpr function rather than a macro: it is typed, it is scoped, and it
+ * evaluates its argument once, none of which a macro can promise.  The whole
+ * supervisor is written this way now -- there is not one object-like macro left
+ * in core or protocol -- because a macro has no type for the compiler to check
+ * and the high-integrity profile says so (cppcoreguidelines-macro-to-enum).
+ * There is deliberately no float overload. */
+constexpr int32_t sup_c_to_q7(int32_t c)
+{
+    return c * SUP_Q7_PER_C;
+}
 
 /* Reported in every frame, including after a trip: the supervisor keeps talking
  * so the ESP32 can say *why* the heat went away. */
@@ -102,15 +138,36 @@ constexpr uint32_t SUP_FLAG_SELFTEST_OK = 1u << 3u;
  * ESP32 should say so rather than let a degraded state look like a healthy one. */
 constexpr uint32_t SUP_FLAG_TC2_VALID   = 1u << 4u;
 
+/* Tenths of a degree, as on the wire, rather than degrees in a float.
+ *
+ * The struct carries the encoded unit so that sup_encode is a byte copy and
+ * holds no arithmetic at all: the one place a temperature is scaled is
+ * sup_q7_to_dc below, which is where the rounding and the saturation can be
+ * tested on their own.  The consumer converts to whatever it wants at its own
+ * boundary, which on the ESP32 is a processor with an FPU. */
 typedef struct {
     uint8_t           version;
     uint8_t           seq;
-    float             chamber_c;
-    float             cj_c;
+    int16_t           chamber_dc;
+    int16_t           cj_dc;
     uint16_t          fault_bits;
     uint8_t           flags;
     sup_trip_reason_t trip_reason;
 } sup_report_t;
+
+/* q7 to tenths of a degree: rounded to nearest, away from zero at the half,
+ * and saturating at the ends of int16_t.
+ *
+ * Total by construction, which is the property that matters and the reason it
+ * is a function with its own tests rather than an expression at the call site.
+ * The float version it replaces had to begin by asking whether its argument was
+ * a NaN, because the cast of one is undefined; an int32_t has no such value, so
+ * every input now has a defined output and the check is gone rather than merely
+ * passing.
+ *
+ * The scaling needs no division: 10/128 is 5/64 exactly, so it is a multiply by
+ * five and a shift of six. */
+int16_t sup_q7_to_dc(int32_t q7);
 
 /* CCITT-FALSE, the same polynomial and seed the log records use.  Carried here
  * rather than shared with kiln_core so the supervisor depends on nothing of

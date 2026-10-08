@@ -111,6 +111,7 @@ fix can take; closing it as well would make a unit permanently unfixable.
 | [`docs/architecture.md`](docs/architecture.md) | Architecture prose: component decomposition, task and timing design, control and safety algorithms, persistence and flash-endurance design, REST API, and the build and test architecture. |
 | [`docs/test-concept.md`](docs/test-concept.md) | How the product is verified: unit, integration, system and hardware-in-the-loop, what each level can and cannot prove, the HIL fixture design, and an honest status against every testability requirement. |
 | [`docs/safety-supervisor.md`](docs/safety-supervisor.md) | The independent safety supervisor (`SWA-22`): a second microcontroller holding the absolute over-temperature, thermocouple-fault and lid trips, what moves and what stays, the link, the failure modes, and the questions still open. |
+| [`docs/coding-standard.md`](docs/coding-standard.md) | The coding standard: which safety standards actually reach the source code and what each asks for, the language subset and the flags that enforce it, why the supervisor contains no floating point, how a deviation is recorded, and what is not met yet. |
 | [`docs/simulation.md`](docs/simulation.md) | Running the firmware against a simulated kiln, on the host and under QEMU, including fault injection. |
 | [`tasklist.md`](tasklist.md) | Outstanding work, by priority. |
 

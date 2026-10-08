@@ -155,5 +155,13 @@ CheckOptions:
   misc-const-correctness.AnalyzeParameters: false
 
 WarningsAsErrors: '*'
-HeaderFilterRegex: 'firmware/controller/(components|host)/.*/include/.*\.h$'
+
+# The supervisor's headers are in here too, because SWA-22's whole argument is
+# that its firmware is independently reviewable, and a header no analyser looks
+# at is not that.  `board/stm32g031.h` is the one exclusion: it is *generated*
+# from ST's CMISIS-SVD by tools/gen-stm32g031-header.py, so a finding in it is a
+# finding against the generator, and editing the output is what the file's own
+# header tells you not to do.  `pins.h` and `cortex_m0plus.h` are hand-written
+# and are gated.
+HeaderFilterRegex: 'firmware/(controller/(components|host)/.*/include/.*|supervisor/(core|protocol)/include/.*|supervisor/board/(pins|cortex_m0plus))\.h$'
 FormatStyle: file

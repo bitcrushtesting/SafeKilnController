@@ -53,8 +53,8 @@ rule that is correct and also reads past an array is not correct.
 specific.** Its permit decision is a five-term conjunction:
 
 ```c
-permit = selftest_ok && !tripped && chamber_valid
-      && fault_bits == 0 && chamber_c <= SUP_OVERTEMP_C;
+permit = selftest_ok && !tripped && any_valid(in) && !disagreeing(in)
+      && fault_bits == 0 && effective_q7(in) <= SUP_OVERTEMP;
 ```
 
 One test with every term true and one with every term false gives 100 % line

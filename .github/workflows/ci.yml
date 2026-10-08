@@ -147,10 +147,21 @@ jobs:
         run: |
           cmake -B build-host -S firmware/controller/test/host -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
           cmake -B build-webhost -S firmware/controller/host/webhost -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          cmake -B build-sup-tidy -S firmware/supervisor/test/host -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
-      # Covers both databases: the host build and host/webhost, which is its own
-      # CMake project and went unanalysed until tasklist F1b.  The third, the
-      # ESP-IDF adapter layer, needs the target toolchain and is the job below.
+      # Covers four databases: the host build, host/webhost (its own CMake
+      # project, unanalysed until tasklist F1b), the supervisor's host project,
+      # and a synthesised one for the supervisor's two target-only units.
+      #
+      # The supervisor needs no ARM toolchain here.  src/main.cpp and
+      # board/startup.cpp include only <stdint.h> and the project's own headers,
+      # so tools/tidy.sh analyses them with clang's bare-metal thumbv6m target
+      # and -ffreestanding; STM32CubeCLT is needed to BUILD the image, not to
+      # parse it.  That script refuses to report those two clean unless it can
+      # prove it built an AST for both, for the same reason tidy-target.sh does.
+      #
+      # The fifth, the ESP-IDF adapter layer, needs the target toolchain and is
+      # the job below.
       - name: Analyse
         run: tools/tidy.sh
 
@@ -293,6 +304,33 @@ jobs:
           cmake -B build-sup -S firmware/supervisor/test/host
           cmake --build build-sup -j"$(nproc)"
           ctest --test-dir build-sup --output-on-failure
+
+      # SWR-TST-20.  A second run of the same four suites under ASan and UBSan,
+      # in its own build directory so the instrumented objects never mix with
+      # the plain ones.
+      #
+      # It is a separate step rather than a matrix leg, which the controller's
+      # host-tests job uses, because this job also owns the MC/DC measurement
+      # and that must run exactly once: a matrix would run it twice and publish
+      # two step summaries for the same numbers.
+      #
+      # Why the supervisor needs this at all, having gone without it: its
+      # arithmetic is now entirely fixed point.  A 19-bit field reassembled
+      # across three register bytes, a sign-extending shift, a magnitude taken
+      # in unsigned arithmetic and saturating millisecond timers each have an
+      # undefined-behaviour failure mode that is invisible at -O0 on x86 and
+      # would be a wrong temperature on the target.  Checked rather than
+      # assumed: reintroducing the signed subtraction that `disagreeing`
+      # deliberately avoids makes this step fail and leaves the step above
+      # passing.
+      #
+      # ENABLE_ASAN also turns off UBSan's recovery, so a finding aborts instead
+      # of printing and leaving the exit code at zero.  See the CMakeLists.
+      - name: Unit tests (asan+ubsan)
+        run: |
+          cmake -B build-sup-asan -S firmware/supervisor/test/host -DENABLE_ASAN=ON
+          cmake --build build-sup-asan -j"$(nproc)"
+          ctest --test-dir build-sup-asan --output-on-failure
 
       - name: MC/DC
         env:

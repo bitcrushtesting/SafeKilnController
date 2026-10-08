@@ -1,37 +1,28 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <math.h>
-#include <string.h>
-
 #include "sup_proto.h"
+
+/* No <math.h> and no <string.h>: with the temperatures integer there is nothing
+ * left in this file that a C library supplies.  That is not tidiness, it is the
+ * point -- see docs/coding-standard.md section 5 on why a safety function
+ * should not depend on a library it did not build. */
 
 namespace {
 
-/* Tenths of a degree, saturating, and NaN-safe: a non-finite reading must not
- * reach the cast, which is undefined for it.
+/* The largest q7 that still fits int16_t tenths, and the saturation values.
  *
- * The NaN test comes first and on its own.  Folding it into the range check
- * relies on a NaN failing every comparison, which is true and is exactly the
- * kind of cleverness that gets simplified away by someone who does not know
- * why it was written. */
-constexpr float   ENC_LIMIT_C = 3276.7f;
-constexpr int16_t ENC_SAT_HI  = 32767;
-constexpr int16_t ENC_SAT_LO  = -32767;
-
-int16_t enc_temp(float c)
-{
-    if (isnan(c)) {
-        return 0;               /* a defined value; not a hot kiln */
-    }
-    if (c > ENC_LIMIT_C) {
-        return ENC_SAT_HI;
-    }
-    if (c < -ENC_LIMIT_C) {
-        return ENC_SAT_LO;
-    }
-    return static_cast<int16_t>(lroundf(c * SUP_TEMP_SCALE));
-}
+ * 3276.7 degC is the top of the encoded range; above it the reading saturates
+ * rather than wrapping, because a wrapped temperature is a plausible wrong
+ * number and a saturated one is obviously an extreme.  Nothing a type K couple
+ * and this front end can produce comes close: the clamp exists so that the
+ * function is defined for every int32_t, including a value no sensor path can
+ * generate, and so that the multiply below cannot overflow.
+ *
+ * 419417 is 3276.7 * 128, truncated. */
+constexpr int32_t ENC_LIMIT_Q7 = 419417;
+constexpr int16_t ENC_SAT_HI   = 32767;
+constexpr int16_t ENC_SAT_LO   = -32767;
 
 void put_u16(uint8_t *p, uint16_t v)
 {
@@ -47,6 +38,28 @@ uint16_t get_u16(const uint8_t *p)
 }
 
 }  // namespace
+
+int16_t sup_q7_to_dc(int32_t q7)
+{
+    /* Clamped before the multiply, which is what keeps the multiply in range:
+     * five times the limit is 2 097 085, well inside int32_t, and five times an
+     * unclamped int32_t would not be. */
+    if (q7 > ENC_LIMIT_Q7) {
+        return ENC_SAT_HI;
+    }
+    if (q7 < -ENC_LIMIT_Q7) {
+        return ENC_SAT_LO;
+    }
+
+    /* 10/128 == 5/64.  Rounded away from zero at the half, symmetrically, by
+     * adding half a divisor to the magnitude: C's division truncates towards
+     * zero, so the two signs have to be written out rather than sharing one
+     * expression.  Dividing a negative numerator and expecting a shift to do
+     * the right thing is the mistake this avoids. */
+    const int32_t num = q7 * 5;
+    const int32_t dc  = (num >= 0) ? ((num + 32) / 64) : -(((-num) + 32) / 64);
+    return (int16_t)dc;
+}
 
 uint16_t sup_crc16(const uint8_t *data, size_t len)
 {
@@ -74,8 +87,8 @@ size_t sup_encode(const sup_report_t *r, uint8_t *out, size_t cap)
     out[0] = (uint8_t)SUP_SOF;
     out[1] = (uint8_t)SUP_VERSION;
     out[2] = r->seq;
-    put_u16(&out[3], (uint16_t)enc_temp(r->chamber_c));
-    put_u16(&out[5], (uint16_t)enc_temp(r->cj_c));
+    put_u16(&out[3], (uint16_t)r->chamber_dc);
+    put_u16(&out[5], (uint16_t)r->cj_dc);
     put_u16(&out[7], r->fault_bits);
     out[9]  = r->flags;
     out[10] = (uint8_t)r->trip_reason;
@@ -105,8 +118,8 @@ size_t sup_decode(const uint8_t *buf, size_t len, sup_report_t *out, size_t *ski
         }
         out->version     = f[1];
         out->seq         = f[2];
-        out->chamber_c   = (float)(int16_t)get_u16(&f[3]) / SUP_TEMP_SCALE;
-        out->cj_c        = (float)(int16_t)get_u16(&f[5]) / SUP_TEMP_SCALE;
+        out->chamber_dc  = (int16_t)get_u16(&f[3]);
+        out->cj_dc       = (int16_t)get_u16(&f[5]);
         out->fault_bits  = get_u16(&f[7]);
         out->flags       = f[9];
         out->trip_reason = (sup_trip_reason_t)f[10];

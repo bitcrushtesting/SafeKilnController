@@ -32,11 +32,11 @@
  * with the reference manual, so every check below is phrased as an invariant
  * that holds whatever the encoding turns out to be.
  */
-#define SUP_RCC_CR_HSIRDY   (1u << 10)
-#define SUP_RCC_CR_PLLON    (1u << 24)
-#define SUP_RCC_CFGR_SW_Msk (7u << 0)
-#define SUP_RCC_CFGR_SWS_Pos 3u
-#define SUP_RCC_CFGR_SWS_Msk (7u << SUP_RCC_CFGR_SWS_Pos)
+constexpr uint32_t SUP_RCC_CR_HSIRDY   = 1u << 10u;
+constexpr uint32_t SUP_RCC_CR_PLLON    = 1u << 24u;
+constexpr uint32_t SUP_RCC_CFGR_SW_Msk = 7u << 0u;
+constexpr uint32_t SUP_RCC_CFGR_SWS_Pos = 3u;
+constexpr uint32_t SUP_RCC_CFGR_SWS_Msk = 7u << SUP_RCC_CFGR_SWS_Pos;
 
 /* True when the clock tree is the one the firmware was written against.
  *
@@ -80,7 +80,7 @@ uint32_t sup_crc32(const void *data, size_t len);
  * It is treated as a FAILURE and not as "skip the check", because an image that
  * reached a board without passing through the build step that stamps it is
  * exactly the image whose integrity is unknown. */
-#define SUP_CRC_UNPROGRAMMED 0xFFFFFFFFu
+constexpr uint32_t SUP_CRC_UNPROGRAMMED = 0xFFFFFFFFu;
 
 bool sup_flash_ok(const void *data, size_t len, uint32_t expected);
 
@@ -96,7 +96,12 @@ bool sup_flash_ok(const void *data, size_t len, uint32_t expected);
  * both states, and the address-dependent pair catches the failure a simple
  * all-ones/all-zeros pair misses: two words that are physically the same
  * storage because an address line is stuck. */
-#define SUP_RAM_PATTERN_COUNT 5u
+constexpr unsigned SUP_RAM_PATTERN_COUNT = 5u;
+/* A declaration, not a definition: the array is defined in selfcheck.cpp with
+ * its initialiser, so there is no initialisation of any kind in this header to
+ * be ordered against anything.  The check reports the extern declaration
+ * regardless.
+ * NOLINTNEXTLINE(bugprone-dynamic-static-initializers) */
 extern const uint32_t SUP_RAM_PATTERNS[SUP_RAM_PATTERN_COUNT];
 
 /* True when the block holds every pattern written to it.
@@ -141,7 +146,7 @@ bool sup_ram_next_block(uint32_t lo, uint32_t hi, size_t words,
  * storage reads as and a guard that matches the failure it looks for is no
  * guard at all.
  */
-#define SUP_STACK_GUARD_PATTERN 0xA5C3A5C3u
+constexpr uint32_t SUP_STACK_GUARD_PATTERN = 0xA5C3A5C3u;
 
 /* True when every word of the guard still holds the pattern. */
 bool sup_stack_guard_ok(const volatile uint32_t *guard, size_t words);
