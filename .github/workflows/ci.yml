@@ -56,7 +56,7 @@ jobs:
           # check over preprocessor output is tasklist C5; a grep already catches
           # every way this has actually happened.
           if grep -rnE '#include[[:space:]]*[<"](esp_|freertos/|driver/|soc/|hal/|nvs|sdkconfig)' \
-                  firmware/components/kiln_core firmware/components/kiln_ports; then
+                  firmware/controller/components/kiln_core firmware/controller/components/kiln_ports; then
             echo "::error::kiln_core or kiln_ports references a platform header"
             exit 1
           fi
@@ -64,7 +64,7 @@ jobs:
 
       - name: kiln_ports is headers only (architecture 4, rule 2)
         run: |
-          if find firmware/components/kiln_ports -name '*.cpp' | grep -q .; then
+          if find firmware/controller/components/kiln_ports -name '*.cpp' | grep -q .; then
             echo "::error::kiln_ports must contain no sources"
             exit 1
           fi
@@ -78,7 +78,7 @@ jobs:
               || { echo "::error file=$f::no SPDX header"; missing=1; }
           done < <(git ls-files \
                      '*.cpp' '*.h' '*.md' '*.sdoc' 'CMakeLists.txt' '*/CMakeLists.txt' \
-                     'firmware/**/Kconfig*' 'firmware/*.csv' 'firmware/sdkconfig.*' \
+                     'firmware/controller/**/Kconfig*' 'firmware/controller/*.csv' 'firmware/controller/sdkconfig.*' \
                      'tools/*.sh' '.github/workflows/*.yml' 'strictdoc.toml' \
                    | grep -v '^LICENSE')
           exit $missing
@@ -99,7 +99,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure
-        run: cmake -B build-host -S firmware/test/host ${{ matrix.cmake_flags }}
+        run: cmake -B build-host -S firmware/controller/test/host ${{ matrix.cmake_flags }}
 
       - name: Build
         run: cmake --build build-host -j"$(nproc)"
@@ -138,8 +138,8 @@ jobs:
 
       - name: Generate the compile databases
         run: |
-          cmake -B build-host -S firmware/test/host -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-          cmake -B build-webhost -S firmware/host/webhost -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          cmake -B build-host -S firmware/controller/test/host -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          cmake -B build-webhost -S firmware/controller/host/webhost -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
       # Covers both databases: the host build and host/webhost, which is its own
       # CMake project and went unanalysed until tasklist F1b.  The third, the
@@ -213,7 +213,7 @@ jobs:
 
       - name: Build instrumented and run
         run: |
-          cmake -B build-cov -S firmware/test/host -DENABLE_COVERAGE=ON
+          cmake -B build-cov -S firmware/controller/test/host -DENABLE_COVERAGE=ON
           cmake --build build-cov -j"$(nproc)"
           ctest --test-dir build-cov --output-on-failure
 
@@ -223,7 +223,7 @@ jobs:
           set -o pipefail
           mkdir -p coverage
           gcovr --root . \
-                --filter 'firmware/components/kiln_core/src/' \
+                --filter 'firmware/controller/components/kiln_core/src/' \
                 --exclude-unreachable-branches \
                 --fail-under-line 90 \
                 --txt coverage/report.txt \
@@ -283,7 +283,7 @@ jobs:
 
       - name: Unit tests
         run: |
-          cmake -B build-sup -S supervisor/test/host
+          cmake -B build-sup -S firmware/supervisor/test/host
           cmake --build build-sup -j"$(nproc)"
           ctest --test-dir build-sup --output-on-failure
 
@@ -433,7 +433,7 @@ jobs:
             echo
             echo 'NFR-13: the application must fit a 2 MB OTA slot.'
             echo '```'
-            cat firmware/build/size.txt
+            cat firmware/controller/build/size.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -441,14 +441,14 @@ jobs:
         with:
           name: firmware-esp32s3-simulated
           path: |
-            firmware/build/safekiln.bin
-            firmware/build/safekiln.elf
-            firmware/build/safekiln.map
-            firmware/build/bootloader/bootloader.bin
-            firmware/build/partition_table/partition-table.bin
-            firmware/build/flasher_args.json
-            firmware/build/size.txt
-            firmware/build/size-components.txt
+            firmware/controller/build/safekiln.bin
+            firmware/controller/build/safekiln.elf
+            firmware/controller/build/safekiln.map
+            firmware/controller/build/bootloader/bootloader.bin
+            firmware/controller/build/partition_table/partition-table.bin
+            firmware/controller/build/flasher_args.json
+            firmware/controller/build/size.txt
+            firmware/controller/build/size-components.txt
           if-no-files-found: error
 
   # --- architecture 14.6: boot the image and watch it fire ---------------
@@ -483,7 +483,7 @@ jobs:
 
       - name: Assert it booted and started firing
         run: |
-          log=firmware/qemu.log
+          log=firmware/controller/qemu.log
           test -s "$log" || { echo "::error::QEMU produced no output"; exit 1; }
 
           fail=0
@@ -531,5 +531,5 @@ jobs:
         if: always()
         with:
           name: qemu-log
-          path: firmware/qemu.log
+          path: firmware/controller/qemu.log
           if-no-files-found: warn

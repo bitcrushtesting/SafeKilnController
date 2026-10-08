@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Bitcrush Testing
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Host-only, and outside firmware/components/ for that reason: ESP-IDF treats
+# Host-only, and outside firmware/controller/components/ for that reason: ESP-IDF treats
 # every directory under components/ as part of the image, so a host adapter
 # living there is a build failure waiting for whoever next runs idf.py.  Keeping
 # it here makes the exclusion structural rather than a list someone has to

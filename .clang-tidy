@@ -79,10 +79,10 @@
 #                                already on a device's flash.
 #
 # Two component profiles narrow this further, each for a stated reason:
-# firmware/test/ (the KILN_TEST macro, and negative tests that cast 999 to an
-# enum on purpose) and firmware/components/kiln_hal_esp32s3/ (findings that
+# firmware/controller/test/ (the KILN_TEST macro, and negative tests that cast 999 to an
+# enum on purpose) and firmware/controller/components/kiln_hal_esp32s3/ (findings that
 # live inside ESP-IDF's own macros).  Read those files; neither relaxes
-# anything in firmware/components or firmware/main.
+# anything in firmware/controller/components or firmware/controller/main.
 
 Checks: >
   -*,
@@ -155,5 +155,5 @@ CheckOptions:
   misc-const-correctness.AnalyzeParameters: false
 
 WarningsAsErrors: '*'
-HeaderFilterRegex: 'firmware/(components|host)/.*/include/.*\.h$'
+HeaderFilterRegex: 'firmware/controller/(components|host)/.*/include/.*\.h$'
 FormatStyle: file

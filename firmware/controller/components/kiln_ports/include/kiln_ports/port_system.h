@@ -42,7 +42,7 @@ static inline bool kiln_reset_was_abnormal(kiln_reset_cause_t c)
 /* FR-UPD-06.
  *
  * `version` is semantic versioning derived from the release tag by the build
- * (firmware/CMakeLists.txt), so it is as long as "10.20.30+123.a1b2c3d.dirty":
+ * (firmware/controller/CMakeLists.txt), so it is as long as "10.20.30+123.a1b2c3d.dirty":
  * 32 rather than 24, because a version truncated in the middle of its build
  * metadata is worse than no build metadata. */
 typedef struct {

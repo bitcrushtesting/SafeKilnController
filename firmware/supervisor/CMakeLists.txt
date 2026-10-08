@@ -4,7 +4,7 @@
 # The supervisor's target build: STM32G031K8, arm-none-eabi, no vendor HAL.
 #
 #   cmake -B build-sup-target -S supervisor \
-#         -DCMAKE_TOOLCHAIN_FILE=supervisor/arm-none-eabi.cmake
+#         -DCMAKE_TOOLCHAIN_FILE=firmware/supervisor/arm-none-eabi.cmake
 #   cmake --build build-sup-target
 #
 # The host tests are a separate project under test/host and need no ARM

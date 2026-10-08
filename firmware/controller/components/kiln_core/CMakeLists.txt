@@ -22,7 +22,7 @@ set(KILN_CORE_SRCS
     src/suplink.cpp
     src/tempfilt.cpp
     src/window.cpp
-    # The supervisor link's wire format, owned by supervisor/protocol and
+    # The supervisor link's wire format, owned by firmware/supervisor/protocol and
     # compiled into both firmwares (AD-22).  Declarative plus a CRC, which is
     # the only behaviour the two ends share; a CRC that disagreed would show up
     # as rejected frames, which both sides already treat as silence.

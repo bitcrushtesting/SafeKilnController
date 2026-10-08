@@ -872,7 +872,7 @@ safekiln/
 │   ├── requirements.sdoc        the requirements (StrictDoc)
 │   ├── architecture.sdoc        the 21 architecture decisions (StrictDoc)
 │   └── architecture.md          this document
-├── firmware/
+├── firmware/controller/
 │   ├── CMakeLists.txt
 │   ├── sdkconfig.defaults
 │   ├── partitions.csv
@@ -904,7 +904,7 @@ safekiln/
 `ESP_PLATFORM` is defined. The host build is an ordinary CMake project:
 
 ```
-cmake -B build-host -S firmware/test/host -DENABLE_COVERAGE=ON -DENABLE_ASAN=ON
+cmake -B build-host -S firmware/controller/test/host -DENABLE_COVERAGE=ON -DENABLE_ASAN=ON
 cmake --build build-host && ctest --test-dir build-host
 ```
 

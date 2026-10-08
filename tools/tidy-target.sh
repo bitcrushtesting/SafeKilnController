@@ -41,11 +41,11 @@ cd "$(dirname "$0")/.."
 IDF_BUILD=${IDF_BUILD:-firmware/build}
 DB=$IDF_BUILD/compile_commands.json
 OUT=${OUT:-$IDF_BUILD/tidy-target}
-SRC_DIR=firmware/components/kiln_hal_esp32s3/src
+SRC_DIR=firmware/controller/components/kiln_hal_esp32s3/src
 FIX=0
 [[ ${1:-} == "--fix" ]] && FIX=1
 
-[[ -f $DB ]] || { echo "no $DB -- run 'idf.py build' in firmware/ first" >&2; exit 1; }
+[[ -f $DB ]] || { echo "no $DB -- run 'idf.py build' in firmware/controller/ first" >&2; exit 1; }
 
 # TIDY= overrides, which is how you reproduce CI's pinned version locally:
 #   TIDY=$(brew --prefix llvm@20)/bin/clang-tidy tools/tidy.sh

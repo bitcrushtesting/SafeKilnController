@@ -253,7 +253,7 @@ reused: gaps in the numbering are items that have been closed.
   and 82 in `main.cpp`. 54 of those are inside `ESP_LOGx` and
   `ESP_ERROR_CHECK` and want the same component-scoped exemption
   `kiln_hal_esp32s3` already carries, which for `main.cpp` is a clean
-  `firmware/main/.clang-tidy` but for `httpd.cpp` cannot be, because
+  `firmware/controller/main/.clang-tidy` but for `httpd.cpp` cannot be, because
   `kiln_web/src` also holds the host-analysed `api.cpp` and `json.cpp` and must
   keep those checks. The remaining ~48 are the ordinary `F2`/`F4`/`F5`/`F6`
   passes that never ran on these two files.
@@ -652,7 +652,7 @@ either the supervisor's pin count or a requirement.
 
 - [ ] **R6. Draw the supervisor.** The part and the pin map are settled:
   STM32G031K8T6, LQFP32, and the assignment is in
-  [`supervisor/README.md`](supervisor/README.md), taken from ST's own pinout
+  [`firmware/supervisor/README.md`](firmware/supervisor/README.md), taken from ST's own pinout
   and alternate-function database rather than assumed. What is left is the
   schematic.
 

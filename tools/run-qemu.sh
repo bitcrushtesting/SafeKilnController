@@ -10,7 +10,7 @@
 #     . $IDF_PATH/export.sh
 #     idf.py --preview install-qemu     # or: python -m idf_tools install qemu-xtensa
 #
-# What this exercises, and what it does not, is set out in firmware/sdkconfig.qemu.
+# What this exercises, and what it does not, is set out in firmware/controller/sdkconfig.qemu.
 # In short: the real control and safety path against a plant that responds, on
 # the target's own compiler and scheduler -- but no drivers and no charge pump.
 

@@ -23,7 +23,7 @@ No ESP-IDF needed. Plain CMake, seconds to build, and the whole suite runs in
 about four seconds.
 
 ```sh
-cmake -B build-host -S firmware/test/host
+cmake -B build-host -S firmware/controller/test/host
 cmake --build build-host
 ctest --test-dir build-host --output-on-failure
 ```

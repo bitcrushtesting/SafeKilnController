@@ -15,7 +15,7 @@
 #
 # Two things this tool refuses to guess:
 #
-#   The partition offset and size are read from firmware/partitions.csv, not
+#   The partition offset and size are read from firmware/controller/partitions.csv, not
 #   typed here. Writing a production block over `kilnlog` because two files
 #   disagreed about an offset is exactly the failure that a second copy of a
 #   constant invites.
@@ -40,7 +40,7 @@ import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-PARTITIONS = ROOT / "firmware" / "partitions.csv"
+PARTITIONS = ROOT / "firmware" / "controller" / "partitions.csv"
 
 PARTITION_LABEL = "prod"      # must match partitions.csv
 NAMESPACE = "prod"            # must match hal_prod.cpp

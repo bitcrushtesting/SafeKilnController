@@ -61,7 +61,7 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-FIRMWARE = ROOT / "firmware"
+FIRMWARE = ROOT / "firmware" / "controller"
 SDKCONFIG = FIRMWARE / "sdkconfig"
 BUILD_DIRS = ("build", "build-esp32s3", "build-hw")
 
@@ -700,7 +700,7 @@ def self_test():
     # a raised offset makes room, at the cost of moving every partition
     check("28673 B fits under 0xA000", bootloader_fits(28673, 0xA000), True)
 
-    # The parser, against a fixture rather than against firmware/sdkconfig.
+    # The parser, against a fixture rather than against firmware/controller/sdkconfig.
     #
     # sdkconfig is GENERATED and gitignored, so a self-test that reads it fails
     # on every clean checkout. The parser is what is worth testing anyway; the
@@ -725,7 +725,7 @@ def self_test():
     if SDKCONFIG.is_file():
         check("this project's partition table offset", partition_table_offset(), 0x8000)
     else:
-        print("  skip: firmware/sdkconfig absent (not built here), parser tested above")
+        print("  skip: firmware/controller/sdkconfig absent (not built here), parser tested above")
 
     # every irreversible step has its own distinct phrase
     phrases = list(CONFIRM.values())

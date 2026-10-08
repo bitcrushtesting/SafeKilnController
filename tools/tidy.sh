@@ -11,8 +11,8 @@
 # tree, because a file clang-tidy has no compile command for is analysed with
 # guessed flags and reports nonsense.  Two databases are therefore generated:
 #
-#   firmware/test/host  the host build, which is almost everything.
-#   firmware/host/webhost
+#   firmware/controller/test/host  the host build, which is almost everything.
+#   firmware/controller/host/webhost
 #                       a separate CMake project.  Its *own* file is the only
 #                       one taken from it; the components it links are already
 #                       covered above, and analysing them twice would just
@@ -49,12 +49,12 @@ if [[ $(uname) == Darwin ]] && command -v xcrun >/dev/null 2>&1; then
 fi
 
 if [[ ! -f $BUILD/compile_commands.json ]]; then
-    cmake -B "$BUILD" -S firmware/test/host -DCMAKE_EXPORT_COMPILE_COMMANDS=ON >/dev/null
+    cmake -B "$BUILD" -S firmware/controller/test/host -DCMAKE_EXPORT_COMPILE_COMMANDS=ON >/dev/null
 fi
 
 WEBHOST_BUILD=${WEBHOST_BUILD:-build-webhost}
 if [[ ! -f $WEBHOST_BUILD/compile_commands.json ]]; then
-    cmake -B "$WEBHOST_BUILD" -S firmware/host/webhost \
+    cmake -B "$WEBHOST_BUILD" -S firmware/controller/host/webhost \
           -DCMAKE_EXPORT_COMPILE_COMMANDS=ON >/dev/null
 fi
 

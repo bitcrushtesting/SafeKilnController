@@ -30,8 +30,8 @@ so they have separate unit suites, and they first meet each other at L4.
 
 ## 2. L1, unit tests
 
-**Where:** `firmware/test/host/unit/` (302 tests) and
-`supervisor/test/host/` (33 tests). Plain CMake, no ESP-IDF, no ARM toolchain,
+**Where:** `firmware/controller/test/host/unit/` (302 tests) and
+`firmware/supervisor/test/host/` (33 tests). Plain CMake, no ESP-IDF, no ARM toolchain,
 about four seconds for the lot.
 
 This level is cheap because of `AD-01` to `AD-03`, and those decisions exist
@@ -83,14 +83,14 @@ stopped, and its whole justification is that it can be read in full. Holding the
 other 30 000 lines to the same criterion would be a different and much larger
 argument.
 
-The fuzz suite (`firmware/test/host/fuzz/`) sits here too. It feeds the log
+The fuzz suite (`firmware/controller/test/host/fuzz/`) sits here too. It feeds the log
 record decoder deliberately hostile bytes, on the argument that the one thing
 reading data written by an earlier firmware version should survive is a record
 that makes no sense.
 
 ## 3. L2, integration tests
 
-**Where:** `firmware/test/host/integration/` (92 tests), in one process,
+**Where:** `firmware/controller/test/host/integration/` (92 tests), in one process,
 against the plant simulator and the fake ports of `kiln_hal_host`.
 
 This is where the real control, setpoint, safety and autotune code runs

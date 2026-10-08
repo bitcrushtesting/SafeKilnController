@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Bitcrush Testing
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Host-only development harness.  Outside firmware/components/ for the same
+# Host-only development harness.  Outside firmware/controller/components/ for the same
 # reason kiln_hal_host is: ESP-IDF would otherwise try to build it into the image.
 
 cmake_minimum_required(VERSION 3.16)

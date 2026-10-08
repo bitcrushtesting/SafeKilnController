@@ -12,7 +12,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_options(-Wall -Wextra -Werror -Wshadow)
 
 set(SUP_ROOT ${CMAKE_CURRENT_LIST_DIR}/../..)
-set(FW_ROOT  ${CMAKE_CURRENT_LIST_DIR}/../../../firmware)
+set(FW_ROOT  ${CMAKE_CURRENT_LIST_DIR}/../../../controller)
 
 add_library(sup_core STATIC
     ${SUP_ROOT}/core/src/trip.cpp

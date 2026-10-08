@@ -93,7 +93,7 @@ through the ESP32.
 ## Layout
 
 ```
-supervisor/
+firmware/supervisor/
   protocol/     the wire format, shared with the ESP32 adapter
   core/         the trip logic: the whole safety function, host-tested
   board/        STM32G031 registers, startup, linker script, pin map
@@ -116,7 +116,7 @@ the host test harness, which is macros.
 Host tests, which is where the safety logic is verified:
 
 ```sh
-cmake -B build-sup -S supervisor/test/host
+cmake -B build-sup -S firmware/supervisor/test/host
 cmake --build build-sup -j
 ctest --test-dir build-sup --output-on-failure
 ```
@@ -126,7 +126,7 @@ build time (`CON-04`):
 
 ```sh
 cmake -B build-sup-target -S supervisor \
-      -DCMAKE_TOOLCHAIN_FILE=$PWD/supervisor/arm-none-eabi.cmake
+      -DCMAKE_TOOLCHAIN_FILE=$PWD/firmware/supervisor/arm-none-eabi.cmake
 cmake --build build-sup-target -j
 ```
 

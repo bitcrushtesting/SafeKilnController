@@ -51,7 +51,7 @@ jobs:
       # release, and this is the cheap check: seconds, and it covers every SR.
       - name: Host tests must pass before anything is published
         run: |
-          cmake -B build-host -S firmware/test/host -DENABLE_ASAN=ON
+          cmake -B build-host -S firmware/controller/test/host -DENABLE_ASAN=ON
           cmake --build build-host -j"$(nproc)"
           ctest --test-dir build-host --output-on-failure
 
@@ -78,19 +78,19 @@ jobs:
           base="safekiln-${tag}-esp32s3-SIMULATED"
           mkdir -p dist
 
-          cp firmware/build/safekiln-merged.bin  "dist/${base}-merged.bin"
-          cp firmware/build/safekiln.bin         "dist/${base}-app.bin"
-          cp firmware/build/safekiln.elf         "dist/${base}.elf"
-          cp firmware/build/safekiln.map         "dist/${base}.map"
-          cp firmware/build/bootloader/bootloader.bin \
+          cp firmware/controller/build/safekiln-merged.bin  "dist/${base}-merged.bin"
+          cp firmware/controller/build/safekiln.bin         "dist/${base}-app.bin"
+          cp firmware/controller/build/safekiln.elf         "dist/${base}.elf"
+          cp firmware/controller/build/safekiln.map         "dist/${base}.map"
+          cp firmware/controller/build/bootloader/bootloader.bin \
                                                     "dist/${base}-bootloader.bin"
-          cp firmware/build/partition_table/partition-table.bin \
+          cp firmware/controller/build/partition_table/partition-table.bin \
                                                     "dist/${base}-partition-table.bin"
-          cp firmware/build/flasher_args.json       "dist/${base}-flasher_args.json"
-          cp firmware/build/size.txt                "dist/${base}-size.txt"
-          cp firmware/build/size-components.txt     "dist/${base}-size-components.txt"
+          cp firmware/controller/build/flasher_args.json       "dist/${base}-flasher_args.json"
+          cp firmware/controller/build/size.txt                "dist/${base}-size.txt"
+          cp firmware/controller/build/size-components.txt     "dist/${base}-size-components.txt"
           # The resolved configuration, so the image can be reproduced.
-          cp firmware/sdkconfig                     "dist/${base}-sdkconfig"
+          cp firmware/controller/sdkconfig                     "dist/${base}-sdkconfig"
 
           ( cd dist && sha256sum ./* > SHA256SUMS )
           ls -l dist

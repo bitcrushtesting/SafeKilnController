@@ -57,7 +57,7 @@ tools/run-qemu.sh          # the firmware on an emulated ESP32-S3, kiln simulate
 or run the logic tests directly:
 
 ```sh
-cmake -B build-host -S firmware/test/host && cmake --build build-host
+cmake -B build-host -S firmware/controller/test/host && cmake --build build-host
 ctest --test-dir build-host
 ```
 
@@ -88,7 +88,7 @@ flash write that a reflash undoes. `secure-boot.py` does *nothing* unless told
 It refuses to touch a board until its pre-flight passes, demands a differently
 worded confirmation for each irreversible step, and sequences them so the device
 is left bootable at every point. Read the header of
-[`firmware/sdkconfig.secure`](firmware/sdkconfig.secure) before the first run;
+[`firmware/controller/sdkconfig.secure`](firmware/controller/sdkconfig.secure) before the first run;
 the short version is that **losing the signing key means the unit can never run
 new firmware again**, and that secure boot stops hostile code running but does
 nothing about secrets being read off the flash (`SRR-05`).
@@ -118,7 +118,7 @@ document cites it throughout.
 
 ```
 docs/       requirements and architecture
-firmware/   ESP-IDF application (not yet implemented)
+firmware/controller/   ESP-IDF application (not yet implemented)
 hardware/   schematic, PCB, pin map
 housing/    enclosure
 ```

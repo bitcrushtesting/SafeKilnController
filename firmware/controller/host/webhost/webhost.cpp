@@ -11,11 +11,11 @@
  * differently.
  *
  * Deliberately NOT a production web server.  It is single-threaded, serves one
- * request at a time, has no TLS, and lives in firmware/host/ where nothing can
+ * request at a time, has no TLS, and lives in firmware/controller/host/ where nothing can
  * link it into an image.  esp_http_server is the real transport; this is for
  * seeing the UI and for driving the API suite by hand.
  *
- *   firmware/host/webhost/build.sh && ./webhost --port 8080 --accel 60
+ *   firmware/controller/host/webhost/build.sh && ./webhost --port 8080 --accel 60
  */
 
 #include <errno.h>

@@ -70,19 +70,19 @@ rm -rf "$OUT"; mkdir -p "$OUT"
 
 FLAGS=(-std=c++20 -fprofile-instr-generate -fcoverage-mapping -fcoverage-mcdc
        -O0 -g -Wall -Wextra -Werror
-       -Isupervisor/core/include -Isupervisor/protocol/include
-       -Ifirmware/test/host/support)
+       -Ifirmware/supervisor/core/include -Ifirmware/supervisor/protocol/include
+       -Ifirmware/controller/test/host/support)
 # The host test harness needs the macOS SDK when the compiler is not Apple's.
 if [[ $(uname) == Darwin ]] && command -v xcrun >/dev/null 2>&1; then
     FLAGS+=(-isysroot "$(xcrun --show-sdk-path)")
 fi
 
-UNDER=(supervisor/core/src/trip.cpp supervisor/core/src/max31856.cpp
-       supervisor/protocol/src/sup_proto.cpp)
+UNDER=(firmware/supervisor/core/src/trip.cpp firmware/supervisor/core/src/max31856.cpp
+       firmware/supervisor/protocol/src/sup_proto.cpp)
 for suite in test_trip test_proto test_max31856; do
     "$CLANGXX" "${FLAGS[@]}" "${UNDER[@]}" \
-        firmware/test/host/support/kiln_check.cpp \
-        "supervisor/test/host/$suite.cpp" -o "$OUT/$suite"
+        firmware/controller/test/host/support/kiln_check.cpp \
+        "firmware/supervisor/test/host/$suite.cpp" -o "$OUT/$suite"
     ( cd "$OUT" && LLVM_PROFILE_FILE="$suite.profraw" "./$suite" >/dev/null )
 done
 

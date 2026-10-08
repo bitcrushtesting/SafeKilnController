@@ -4,7 +4,7 @@
 # Test code inherits the root profile and relaxes the checks that only make
 # sense against production code.  Every one of these is disabled because the
 # test is *deliberately* doing the thing the check objects to -- which is what
-# a negative test is.  None of them is disabled in firmware/components.
+# a negative test is.  None of them is disabled in firmware/controller/components.
 #
 #   EnumCastOutOfRange ..... test_faults casts 999 and 99 to a fault code, and
 #                            test_safety_current casts 200, precisely to prove
@@ -29,8 +29,8 @@
 #                            The remaining 94 are hand-written fixtures, and
 #                            `static` at file scope is correct C++ for them --
 #                            the check prefers an anonymous namespace, which is
-#                            a style, not a defect.  firmware/components and
-#                            firmware/main are gated by both checks and carry
+#                            a style, not a defect.  firmware/controller/components and
+#                            firmware/controller/main are gated by both checks and carry
 #                            no `static` free functions at all.
 InheritParentConfig: true
 Checks: >

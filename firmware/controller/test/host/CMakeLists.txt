@@ -5,7 +5,7 @@
 # plain C++20, so it builds in seconds and runs under a debugger, ASan/UBSan (TR-20)
 # and gcov (TR-19).
 #
-#   cmake -B build-host -S firmware/test/host -DENABLE_COVERAGE=ON -DENABLE_ASAN=ON
+#   cmake -B build-host -S firmware/controller/test/host -DENABLE_COVERAGE=ON -DENABLE_ASAN=ON
 #   cmake --build build-host && ctest --test-dir build-host
 
 cmake_minimum_required(VERSION 3.16)

@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Bitcrush Testing
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Regenerate supervisor/board/stm32g031.h from ST's own CMSIS-SVD.
+# Regenerate firmware/supervisor/board/stm32g031.h from ST's own CMSIS-SVD.
 #
 #   tools/gen-stm32g031-header.py [path/to/STM32G031.svd]
 #
@@ -13,7 +13,7 @@ import sys, pathlib, xml.etree.ElementTree as ET
 
 DEFAULT_SVD = ('/opt/St/STM32CubeCLT_1.17.0/STMicroelectronics_CMSIS_SVD/'
                'STM32G031.svd')
-OUT = pathlib.Path(__file__).resolve().parent.parent / 'supervisor/board/stm32g031.h'
+OUT = pathlib.Path(__file__).resolve().parent.parent / 'firmware/supervisor/board/stm32g031.h'
 
 # Only what the supervisor touches.  Add a register here, regenerate, review.
 WANT = {
