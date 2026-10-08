@@ -194,6 +194,8 @@ kiln_sup_reason_t kiln_suplink_reason(const kiln_suplink_t *s)
     case SUP_TRIP_TC_FAULT:     return KILN_SUP_TC_FAULT;
     case SUP_TRIP_SENSOR_STALE: return KILN_SUP_SENSOR_STALE;
     case SUP_TRIP_SELF_TEST:    return KILN_SUP_SELF_TEST;
+    case SUP_TRIP_TC_DISAGREE:  return KILN_SUP_TC_DISAGREE;
+    case SUP_TRIP_PERMIT_STUCK: return KILN_SUP_OUTPUT_STUCK;
     case SUP_TRIP_COUNT:
     default:
         /* A reason this firmware does not know about, from a supervisor

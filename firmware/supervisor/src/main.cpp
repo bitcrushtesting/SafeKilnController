@@ -134,25 +134,55 @@ void board_clocks_init()
     /* Reset defaults are kept: HSI16, flash latency 0, which is valid at
      * 16 MHz.  Stated rather than written, so a later change to the clock has
      * to come back here and reconsider the latency. */
-    RCC_IOPENR  |= SUP_RCC_IOPENR_PORTA;
+    RCC_IOPENR  |= SUP_RCC_IOPENR_PORTA | SUP_RCC_IOPENR_PORTB;
     RCC_APBENR2 |= SUP_RCC_APBENR2_SPI1;
-    RCC_APBENR1 |= SUP_RCC_APBENR1_USART2;
+    RCC_APBENR1 |= SUP_RCC_APBENR1_USART2 | SUP_RCC_APBENR1_SPI2;
 }
 
-void pin_mode(unsigned pin, unsigned mode, unsigned pull)
+/* A port, as the four registers the bring-up touches.
+ *
+ * Introduced because the second thermocouple's bus is on port B: the helpers
+ * were GPIOA-only, and a second copy of each differing in one identifier is how
+ * the two drift apart. The register macros expand to dereferences, so taking
+ * their address gives back the constant pointer. */
+struct gpio_port {
+    volatile uint32_t *moder;
+    volatile uint32_t *pupdr;
+    volatile uint32_t *afrl;
+    volatile uint32_t *afrh;
+    volatile uint32_t *bsrr;
+    volatile uint32_t *idr;
+};
+
+const gpio_port PORT_A = { &GPIOA_MODER, &GPIOA_PUPDR, &GPIOA_AFRL,
+                           &GPIOA_AFRH, &GPIOA_BSRR, &GPIOA_IDR };
+const gpio_port PORT_B = { &GPIOB_MODER, &GPIOB_PUPDR, &GPIOB_AFRL,
+                           &GPIOB_AFRH, &GPIOB_BSRR, &GPIOB_IDR };
+
+void pin_mode(const gpio_port &g, unsigned pin, unsigned mode, unsigned pull)
 {
-    GPIOA_MODER = (GPIOA_MODER & ~(3u << (pin * 2u))) | (mode << (pin * 2u));
-    GPIOA_PUPDR = (GPIOA_PUPDR & ~(3u << (pin * 2u))) | (pull << (pin * 2u));
+    *g.moder = (*g.moder & ~(3u << (pin * 2u))) | (mode << (pin * 2u));
+    *g.pupdr = (*g.pupdr & ~(3u << (pin * 2u))) | (pull << (pin * 2u));
 }
 
-void pin_af(unsigned pin, unsigned af)
+void pin_af(const gpio_port &g, unsigned pin, unsigned af)
 {
     if (pin < 8u) {
-        GPIOA_AFRL = (GPIOA_AFRL & ~(0xFu << (pin * 4u))) | (af << (pin * 4u));
+        *g.afrl = (*g.afrl & ~(0xFu << (pin * 4u))) | (af << (pin * 4u));
     } else {
         const unsigned p = pin - 8u;
-        GPIOA_AFRH = (GPIOA_AFRH & ~(0xFu << (p * 4u))) | (af << (p * 4u));
+        *g.afrh = (*g.afrh & ~(0xFu << (p * 4u))) | (af << (p * 4u));
     }
+}
+
+void pin_set(const gpio_port &g, unsigned pin, bool high)
+{
+    *g.bsrr = high ? (1u << pin) : (1u << (pin + 16u));
+}
+
+bool pin_is_high(const gpio_port &g, unsigned pin)
+{
+    return (*g.idr & (1u << pin)) != 0u;
 }
 
 void board_gpio_init()
@@ -160,22 +190,42 @@ void board_gpio_init()
     /* The permit line was already driven low in reset_handler, before .data
      * was copied.  Re-stating the mode here is harmless and keeps this
      * function a complete description of the pin states. */
-    pin_mode(SUP_PIN_PERMIT, 1u, 0u);           /* output, no pull */
-    pin_mode(SUP_PIN_TC_CS,  1u, 0u);
-    GPIOA_BSRR = (1u << SUP_PIN_TC_CS);         /* ~CS idle high */
+    pin_mode(PORT_A, SUP_PIN_PERMIT, 1u, 0u);           /* output, no pull */
+    pin_mode(PORT_A, SUP_PIN_TC_CS,  1u, 0u);
+    pin_set(PORT_A, SUP_PIN_TC_CS, true);               /* ~CS idle high */
 
-    pin_mode(SUP_PIN_TC_FAULT, 0u, 1u);         /* input, pull-up */
-    pin_mode(SUP_PIN_CLEAR,    0u, 1u);
+    pin_mode(PORT_A, SUP_PIN_TC_FAULT, 0u, 1u);         /* input, pull-up */
+    pin_mode(PORT_A, SUP_PIN_CLEAR,    0u, 1u);
 
-    pin_af(SUP_PIN_SPI_SCK,  SUP_AF_SPI1);
-    pin_af(SUP_PIN_SPI_MISO, SUP_AF_SPI1);
-    pin_af(SUP_PIN_SPI_MOSI, SUP_AF_SPI1);
-    pin_mode(SUP_PIN_SPI_SCK,  2u, 0u);         /* alternate function */
-    pin_mode(SUP_PIN_SPI_MISO, 2u, 0u);
-    pin_mode(SUP_PIN_SPI_MOSI, 2u, 0u);
+    /* SWR-SAF-38: the permit readback. No pull, because the board's divider
+     * defines the level and a pull would fight it. */
+    pin_mode(PORT_A, SUP_PIN_PERMIT_SENSE, 0u, 0u);
 
-    pin_af(SUP_PIN_UART_TX, SUP_AF_USART2);
-    pin_mode(SUP_PIN_UART_TX, 2u, 0u);
+    pin_af(PORT_A, SUP_PIN_SPI_SCK,  SUP_AF_SPI1);
+    pin_af(PORT_A, SUP_PIN_SPI_MISO, SUP_AF_SPI1);
+    pin_af(PORT_A, SUP_PIN_SPI_MOSI, SUP_AF_SPI1);
+    pin_mode(PORT_A, SUP_PIN_SPI_SCK,  2u, 0u);         /* alternate function */
+    pin_mode(PORT_A, SUP_PIN_SPI_MISO, 2u, 0u);
+    pin_mode(PORT_A, SUP_PIN_SPI_MOSI, 2u, 0u);
+
+    pin_af(PORT_A, SUP_PIN_UART_TX, SUP_AF_USART2);
+    pin_mode(PORT_A, SUP_PIN_UART_TX, 2u, 0u);
+
+    /* --- port B: the second couple's bus (SWR-SAF-37) -------------------
+     *
+     * Three DIFFERENT alternate function numbers, which is the trap here and the
+     * reason pins.h shouts about it: MISO is AF4 while SCK and MOSI are AF1.
+     * One shared constant would configure MISO as something else entirely and
+     * the bus would read nothing, with no error reported anywhere. */
+    pin_mode(PORT_B, SUP_PIN_TC2_CS, 1u, 0u);
+    pin_set(PORT_B, SUP_PIN_TC2_CS, true);              /* ~CS idle high */
+
+    pin_af(PORT_B, SUP_PIN_SPI2_SCK,  SUP_AF_SPI2_SCK);
+    pin_af(PORT_B, SUP_PIN_SPI2_MISO, SUP_AF_SPI2_MISO);
+    pin_af(PORT_B, SUP_PIN_SPI2_MOSI, SUP_AF_SPI2_MOSI);
+    pin_mode(PORT_B, SUP_PIN_SPI2_SCK,  2u, 0u);
+    pin_mode(PORT_B, SUP_PIN_SPI2_MISO, 2u, 0u);
+    pin_mode(PORT_B, SUP_PIN_SPI2_MOSI, 2u, 0u);
 
     /* USART2_RX would be PA3, and PA3 is the ~FAULT input instead.  The link
      * is simplex and the receiver is unwired, not merely unused. */
@@ -194,7 +244,7 @@ void board_uart_init()
     USART2_CR1 = (1u << 3) | (1u << 0);         /* TE | UE */
 }
 
-void board_spi_init()
+void spi_configure(volatile uint32_t *cr1, volatile uint32_t *cr2)
 {
     /* SPI1 as master, mode 1, 2 MHz, 8-bit, chip select driven by software.
      *
@@ -227,10 +277,24 @@ void board_spi_init()
     constexpr uint32_t CR2_DS_8BIT = (7u << 8);
     constexpr uint32_t CR2_FRXTH   = (1u << 12);
 
-    SPI1_CR1 = 0u;                      /* disable while configuring */
-    SPI1_CR2 = CR2_DS_8BIT | CR2_FRXTH;
-    SPI1_CR1 = CR1_CPHA | CR1_MSTR | CR1_BR_DIV8 | CR1_SSI | CR1_SSM;
-    SPI1_CR1 |= CR1_SPE;
+    *cr1 = 0u;                          /* disable while configuring */
+    *cr2 = CR2_DS_8BIT | CR2_FRXTH;
+    *cr1 = CR1_CPHA | CR1_MSTR | CR1_BR_DIV8 | CR1_SSI | CR1_SSM;
+    *cr1 |= CR1_SPE;
+}
+
+/* Both buses, identically configured.
+ *
+ * SPI2 is a separate peripheral on separate pins, which is the point: a shared
+ * bus would have made the second couple's reading depend on the same shift
+ * register, the same clock divider and the same chip select logic as the first,
+ * and a common-cause failure there would take both readings at once. Two buses
+ * cost three pins and buy independence of everything between the MCU core and
+ * the two front ends. */
+void board_spi_init()
+{
+    spi_configure(&SPI1_CR1, &SPI1_CR2);
+    spi_configure(&SPI2_CR1, &SPI2_CR2);
 }
 
 void board_systick_init()
@@ -419,12 +483,21 @@ void wait_for_cycle_end()
     }
 }
 
-bool pin_low(unsigned pin) { return (GPIOA_IDR & (1u << pin)) == 0u; }
+bool pin_low(unsigned pin) { return !pin_is_high(PORT_A, pin); }
+
+/* SWR-SAF-38: the coil drive node as the supervisor sees it. */
+bool permit_sensed()
+{
+#if SUP_PERMIT_SENSE_ACTIVE_HIGH
+    return pin_is_high(PORT_A, SUP_PIN_PERMIT_SENSE);
+#else
+    return !pin_is_high(PORT_A, SUP_PIN_PERMIT_SENSE);
+#endif
+}
 
 void permit(bool allow)
 {
-    GPIOA_BSRR = allow ? (1u << SUP_PIN_PERMIT)
-                       : (1u << (SUP_PIN_PERMIT + 16u));
+    pin_set(PORT_A, SUP_PIN_PERMIT, allow);
 }
 
 /* One byte takes about 139 us at 115200 baud, which is 2 224 cycles at 16 MHz.
@@ -454,17 +527,24 @@ void uart_write(const uint8_t *b, uint32_t n)
 
 /* --- the thermocouple front end, unverified ----------------------------- */
 
-/* DR has to be reached 8 bits at a time.  With DS set to 8-bit, a 16-bit access
- * pushes two bytes into the transmit FIFO and a 32-bit one is not meaningful at
- * all, so the generated header's 32-bit accessor is the wrong width here.  This
- * is the same cast SUP_REG32 performs, at the width this register needs. */
-inline volatile uint8_t *spi1_dr8()
-{
-    return reinterpret_cast<volatile uint8_t *>(SPI1_BASE + 0xCu);
-}
+/* One front end: its bus, its chip select, its port. Introduced so the second
+ * couple is the same code with a different descriptor rather than a second copy
+ * of it: two copies of a register sequence differing in one identifier is how
+ * the two front ends come to be configured differently. */
+struct tc_dev {
+    volatile uint32_t *sr;
+    volatile uint8_t  *dr8;
+    const gpio_port   *cs_port;
+    unsigned           cs_pin;
+};
 
-void cs_low()  { GPIOA_BSRR = (1u << (SUP_PIN_TC_CS + 16u)); }
-void cs_high() { GPIOA_BSRR = (1u << SUP_PIN_TC_CS); }
+const tc_dev TC1 = { &SPI1_SR, reinterpret_cast<volatile uint8_t *>(SPI1_BASE + 0xCu),
+                     &PORT_A, SUP_PIN_TC_CS };
+const tc_dev TC2 = { &SPI2_SR, reinterpret_cast<volatile uint8_t *>(SPI2_BASE + 0xCu),
+                     &PORT_B, SUP_PIN_TC2_CS };
+
+void cs_low(const tc_dev &d)  { pin_set(*d.cs_port, d.cs_pin, false); }
+void cs_high(const tc_dev &d) { pin_set(*d.cs_port, d.cs_pin, true); }
 
 /* Exchange one byte.  Full duplex: every byte clocked out clocks one in, which
  * is why a read sends dummy bytes and a write discards what arrives.
@@ -476,38 +556,38 @@ void cs_high() { GPIOA_BSRR = (1u << SUP_PIN_TC_CS); }
  * of 0x00 is exactly what sup_tc_decode reports as a comms fault. */
 constexpr uint32_t SPI_SPINS = 10000u;
 
-uint8_t spi_xfer(uint8_t out)
+uint8_t spi_xfer(const tc_dev &d, uint8_t out)
 {
     constexpr uint32_t SR_RXNE = (1u << 0);
     constexpr uint32_t SR_TXE  = (1u << 1);
 
     uint32_t spins = 0;
-    while ((SPI1_SR & SR_TXE) == 0u) {
+    while ((*d.sr & SR_TXE) == 0u) {
         if (++spins >= SPI_SPINS) { return 0x00u; }
     }
-    *spi1_dr8() = out;
+    *d.dr8 = out;
 
     spins = 0;
-    while ((SPI1_SR & SR_RXNE) == 0u) {
+    while ((*d.sr & SR_RXNE) == 0u) {
         if (++spins >= SPI_SPINS) { return 0x00u; }
     }
-    return *spi1_dr8();
+    return *d.dr8;
 }
 
-void tc_write_reg(uint8_t reg, uint8_t value)
+void tc_write_reg(const tc_dev &d, uint8_t reg, uint8_t value)
 {
-    cs_low();
-    (void)spi_xfer((uint8_t)(reg | SUP_TC_REG_WRITE));
-    (void)spi_xfer(value);
-    cs_high();
+    cs_low(d);
+    (void)spi_xfer(d, (uint8_t)(reg | SUP_TC_REG_WRITE));
+    (void)spi_xfer(d, value);
+    cs_high(d);
 }
 
-uint8_t tc_read_reg(uint8_t reg)
+uint8_t tc_read_reg(const tc_dev &d, uint8_t reg)
 {
-    cs_low();
-    (void)spi_xfer(reg);                /* address, read when bit 7 is clear */
-    const uint8_t v = spi_xfer(0x00u);
-    cs_high();
+    cs_low(d);
+    (void)spi_xfer(d, reg);                /* address, read when bit 7 is clear */
+    const uint8_t v = spi_xfer(d, 0x00u);
+    cs_high(d);
     return v;
 }
 
@@ -522,20 +602,20 @@ struct tc_reading {
  * Split across two transactions the temperature and the fault status could
  * straddle a conversion, and the reading would be disowned by fault bits that
  * describe a different sample. */
-void tc_burst(uint8_t out[SUP_TC_BURST_BYTES])
+void tc_burst(const tc_dev &d, uint8_t out[SUP_TC_BURST_BYTES])
 {
-    cs_low();
-    (void)spi_xfer(SUP_TC_REG_CJTH);
+    cs_low(d);
+    (void)spi_xfer(d, SUP_TC_REG_CJTH);
     for (unsigned i = 0; i < SUP_TC_BURST_BYTES; i++) {
-        out[i] = spi_xfer(0x00u);
+        out[i] = spi_xfer(d, 0x00u);
     }
-    cs_high();
+    cs_high(d);
 }
 
-tc_reading tc_read()
+tc_reading tc_read(const tc_dev &d)
 {
     uint8_t regs[SUP_TC_BURST_BYTES] = {};
-    tc_burst(regs);
+    tc_burst(d, regs);
 
     sup_tc_sample_t sample = {};
     sup_tc_decode(regs, &sample);       /* the decode is in sup_core, tested */
@@ -566,13 +646,13 @@ tc_reading tc_read()
  *   registers read zero, which decodes as a plausible 0 degC with no fault bits:
  *   the one reading that would permit heat on a kiln whose temperature is not yet
  *   known. */
-bool tc_init()
+bool tc_init(const tc_dev &d)
 {
-    tc_write_reg(SUP_TC_REG_MASK, SUP_TC_MASK_VALUE);
-    tc_write_reg(SUP_TC_REG_CR1,  SUP_TC_CR1_VALUE);
-    tc_write_reg(SUP_TC_REG_CR0,  SUP_TC_CR0_VALUE);
+    tc_write_reg(d, SUP_TC_REG_MASK, SUP_TC_MASK_VALUE);
+    tc_write_reg(d, SUP_TC_REG_CR1,  SUP_TC_CR1_VALUE);
+    tc_write_reg(d, SUP_TC_REG_CR0,  SUP_TC_CR0_VALUE);
 
-    if (!sup_tc_cr1_ok(tc_read_reg(SUP_TC_REG_CR1))) {
+    if (!sup_tc_cr1_ok(tc_read_reg(d, SUP_TC_REG_CR1))) {
         return false;
     }
 
@@ -585,7 +665,7 @@ bool tc_init()
          * immediately after a wait_for_cycle_end() for that reason. */
         wait_for_cycle_end();
         watchdog_feed();
-        const tc_reading r = tc_read();
+        const tc_reading r = tc_read(d);
         /* Either answer ends the wait. A valid reading is the one wanted; a
          * reported fault is also a completed conversion, and it is the trip
          * logic's business rather than the self-test's: SUP_TRIP_SELF_TEST is
@@ -629,7 +709,15 @@ int main()
     /* The start-up RAM pass covers the free region in one go, which the
      * periodic walk then re-covers a block at a time (SWR-SAF-33). */
     const bool ram = ram_startup_ok();
-    const bool selftest_ok = clk && img && ram && tc_init();
+    /* Both front ends must configure. A board with only one couple fitted will
+     * fail here, which is correct: SWR-SAF-37 makes the second couple part of
+     * the product, not an option, and a supervisor that silently ran
+     * single-channel would be claiming a cross-check it does not have. Losing a
+     * couple LATER is degraded operation and allowed; never having one is a
+     * build fault. */
+    const bool tc1_ok = tc_init(TC1);
+    const bool tc2_ok = tc_init(TC2);
+    const bool selftest_ok = clk && img && ram && tc1_ok && tc2_ok;
 
     sup_t sup;
     sup_init(&sup, selftest_ok);
@@ -645,13 +733,24 @@ int main()
     for (;;) {
         sup_flow_begin(&flow);
 
-        const tc_reading tc = tc_read();
+        const tc_reading tc  = tc_read(TC1);
+        const tc_reading tc2 = tc_read(TC2);
         sup_flow_mark(&flow, SUP_FLOW_READ);
 
         sup_input_t in = {};
         in.chamber_c     = tc.chamber_c;
         in.chamber_valid = tc.valid && !pin_low(SUP_PIN_TC_FAULT);
-        in.fault_bits    = tc.fault_bits;
+        /* No hardware ~FAULT pin for the second front end: its status register
+         * carries the same information over SPI, and the pin on the first is a
+         * legacy of the discrete chain the supervisor replaced. One pin saved,
+         * nothing lost. */
+        in.chamber2_c     = tc2.chamber_c;
+        in.chamber2_valid = tc2.valid;
+        /* The union, so a fault on either front end is reported and acted on.
+         * The trip logic does not need to know which one; the flags say which
+         * couple is usable and that is what the ESP32 shows. */
+        in.fault_bits    = static_cast<uint16_t>(tc.fault_bits | tc2.fault_bits);
+        in.permit_sense  = permit_sensed();
         /* The button is a level on a pin; whether it *means* anything is
          * sup_step's decision, because it is edge triggered and held and that
          * belongs in the part that has tests. */

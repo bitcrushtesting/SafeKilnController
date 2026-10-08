@@ -36,6 +36,8 @@ typedef enum {
     KILN_SUP_SENSOR_STALE,      /* a reading was working and stopped         */
     KILN_SUP_SELF_TEST,         /* start-up self-test failed; never permits  */
     KILN_SUP_LINK_DEAD,         /* inferred here: nothing is arriving        */
+    KILN_SUP_TC_DISAGREE,       /* SWR-SAF-37: the two couples do not agree  */
+    KILN_SUP_OUTPUT_STUCK,      /* SWR-SAF-38: permit withdrawn, coil still on */
     KILN_SUP_REASON_COUNT
 } kiln_sup_reason_t;
 

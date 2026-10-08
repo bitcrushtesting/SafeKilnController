@@ -20,8 +20,15 @@ WANT = {
     'RCC':    ['CR', 'CFGR', 'IOPENR', 'APBENR1', 'APBENR2'],
     'GPIOA':  ['MODER', 'OTYPER', 'OSPEEDR', 'PUPDR', 'IDR', 'ODR', 'BSRR',
                'LCKR', 'AFRL', 'AFRH', 'BRR'],
-    'GPIOB':  [], 'GPIOC': [],
+    # GPIOB carries the second thermocouple's SPI bus (SWR-SAF-37): PB6, PB7
+    # and PB8 are the only SPI2 pins on this package that collide with nothing
+    # and avoid the PA9..PA12 remap trap, so port B is now in use and needs its
+    # registers rather than only its base address.
+    'GPIOB':  ['MODER', 'OTYPER', 'OSPEEDR', 'PUPDR', 'IDR', 'ODR', 'BSRR',
+               'LCKR', 'AFRL', 'AFRH', 'BRR'],
+    'GPIOC':  [],
     'SPI1':   ['CR1', 'CR2', 'SR', 'DR'],
+    'SPI2':   ['CR1', 'CR2', 'SR', 'DR'],
     'USART1': [],
     'USART2': ['CR1', 'CR2', 'CR3', 'BRR', 'ISR', 'ICR', 'RDR', 'TDR'],
     'IWDG':   ['KR', 'PR', 'RLR', 'SR', 'WINR'],

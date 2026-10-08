@@ -51,11 +51,55 @@
  * enough not to be a puzzle.  See the note on edge triggering below. */
 #define SUP_CLEAR_HOLD_S    0.5f
 
+/* SWR-SAF-37: how far the two chamber couples may disagree, and for how long.
+ *
+ * 50 degC is wide, and deliberately so. Two type-K couples are each accurate to
+ * a few degrees at kiln temperatures, but a kiln chamber is not isothermal: two
+ * probes at different positions genuinely differ, by tens of degrees during a
+ * ramp. A band tight enough to catch a small drift would stop healthy firings,
+ * and HZ-10 is about what that leads to.
+ *
+ * The consequence has to be stated rather than left implicit: THIS CHECK CATCHES
+ * A GROSSLY WRONG COUPLE, NOT A DRIFTING ONE. It covers the failure HZ-03 is
+ * about, a couple reading plausibly but far from the truth, and it does not cover
+ * a couple reading five degrees low.
+ *
+ * It also places a requirement on the installation that the band's width cannot
+ * substitute for: the two couples must sit in the same thermowell, or close
+ * enough that the comparison is about the sensors and not about the kiln. Two
+ * probes at opposite ends of a chamber would need a band so wide as to detect
+ * nothing. SWR-SAF-37 says so, and the commissioning documentation has to. */
+#define SUP_DISAGREE_C      50.0f
+#define SUP_DISAGREE_S      10.0f
+
+/* SWR-SAF-38: how long after withdrawing the permit the coil may still read as
+ * energised before it counts as stuck.
+ *
+ * Longer than the contactor's drop-out plus the readback divider's settling, and
+ * shorter than anything that matters. 2 s matches the interval SWR-SAF-27 already
+ * uses for the ESP32's weld discrimination, for the same physical reason. */
+#define SUP_PERMIT_SETTLE_S 2.0f
+
 typedef struct {
-    float    chamber_c;     /* linearised, degC                              */
+    float    chamber_c;     /* couple 1, linearised, degC                    */
     bool     chamber_valid; /* a conversion completed and was in range        */
+    /* SWR-SAF-37: the second chamber couple, on its own SPI bus and its own
+     * front end. Zero-initialised to invalid, so a caller that does not fit a
+     * second couple gets single-channel behaviour rather than a false
+     * agreement between a reading and a zero. */
+    float    chamber2_c;
+    bool     chamber2_valid;
     uint16_t fault_bits;    /* KILN_TC_FAULT_*, 0 for none                    */
     bool     clear_pressed; /* the local clear button, debounced by the cycle */
+    /* SWR-SAF-38: the coil drive node, sensed. True means energised.
+     *
+     * Positive logic again, but note what the safe default is here: a
+     * zero-initialised input reads "not energised", which is the BENIGN value,
+     * because the dangerous direction is a coil that stays on after the permit
+     * is withdrawn. A board with no readback fitted therefore reports no fault
+     * rather than a permanent one, and SWR-SAF-38 is explicit that the
+     * diagnostic is absent on such a board rather than passing. */
+    bool     permit_sense;
     /* SWR-SAF-36: every self-diagnostic passed this cycle.
      *
      * POSITIVE logic, so that a zero-initialised input means "not proven
@@ -97,6 +141,11 @@ typedef struct {
      * never arms, because it is never seen released, including at power-on. */
     bool              clear_armed;
     float             clear_s;
+    /* How long the two couples have disagreed, and how long the coil has read
+     * energised while the permit was withdrawn. Both delay the LATCH, not the
+     * protection: heat is withheld on the first cycle either way. */
+    float             disagree_s;
+    float             permit_stuck_s;
 } sup_t;
 
 /* Comes up refusing heat: chamber_valid is false until a conversion has been

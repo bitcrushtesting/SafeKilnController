@@ -324,6 +324,29 @@ constexpr struct {
           "Kammertemperatur und keine Heizung. Das ist das Fehlen der "
           "Rueckfallebene, nicht ihr Ansprechen: pruefen, ob der Waechter "
           "versorgt und die Verbindung angeschlossen ist." } },
+    { KILN_SUP_TC_DISAGREE,
+        { "SUPERVISOR PROBES DISAGREE", "WAECHTER FUEHLER UNEINIG" },
+        { "The supervisor's two chamber probes are reporting temperatures too "
+          "far apart to be measuring the same thing, so one of them is wrong "
+          "and there is no way to tell which. Check both probes and their "
+          "wiring, then press the supervisor's clear button on the panel.",
+          "Die zwei Kammerfuehler des Waechters melden zu weit "
+          "auseinanderliegende Temperaturen, um dasselbe zu messen; einer ist "
+          "also falsch und es ist nicht erkennbar welcher. Beide Fuehler und "
+          "ihre Verdrahtung pruefen, dann Quittiertaste des Waechters am "
+          "Bedienfeld druecken." } },
+    { KILN_SUP_OUTPUT_STUCK,
+        { "SUPERVISOR CANNOT CUT POWER", "WAECHTER KANN NICHT ABSCHALTEN" },
+        { "The supervisor withdrew permission to heat and the coil stayed "
+          "energised, so it cannot interrupt the heater. ISOLATE THE KILN AT "
+          "ITS SUPPLY. Do not rely on the controller or on the supervisor's "
+          "clear button; the switching hardware needs attention before the kiln "
+          "is used again.",
+          "Der Waechter hat die Heizfreigabe entzogen und die Spule blieb "
+          "bestromt, er kann die Heizung also nicht unterbrechen. OFEN AN DER "
+          "ZULEITUNG FREISCHALTEN. Nicht auf Steuerung oder Quittiertaste "
+          "verlassen; die Schalttechnik muss geprueft werden, bevor der Ofen "
+          "wieder benutzt wird." } },
 };
 
 }  // namespace

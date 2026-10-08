@@ -34,6 +34,14 @@
  *   7    2     fault_bits   uint16 LE, KILN_TC_FAULT_* values
  *   9    1     flags        SUP_FLAG_*
  *   10   1     trip_reason  sup_trip_reason_t
+ *
+ * Two trip reasons were appended for the second couple and the permit readback.
+ * The LAYOUT is unchanged and so is SUP_VERSION: appending enum values is
+ * backward compatible, and the ESP32's decoder already treats a reason it does
+ * not recognise as a trip rather than as OK. The second couple's reading is not
+ * carried separately; chamber_dc is the higher of the two, which is the value
+ * the backstop acts on. Reporting both would widen the frame, and nothing on the
+ * ESP32 side needs the pair yet.
  *   11   2     crc16 LE     CCITT-FALSE over bytes 0..10
  *
  * 13 bytes at 10 Hz is 130 B/s, which is nothing at 115200 baud.  Fixed length
@@ -55,6 +63,8 @@ typedef enum {
     SUP_TRIP_TC_FAULT,      /* front end reported a fault, past its grace     */
     SUP_TRIP_SENSOR_STALE,  /* a reading was working and stopped              */
     SUP_TRIP_SELF_TEST,     /* start-up self-test failed; never permits       */
+    SUP_TRIP_TC_DISAGREE,   /* the two chamber couples do not agree           */
+    SUP_TRIP_PERMIT_STUCK,  /* the permit was withdrawn and the coil stayed on */
     SUP_TRIP_COUNT
 } sup_trip_reason_t;
 
@@ -87,6 +97,10 @@ constexpr uint32_t SUP_FLAG_PERMIT      = 1u << 0u; /* permitting heat now     *
 constexpr uint32_t SUP_FLAG_TRIPPED     = 1u << 1u; /* latched; local clear    */
 constexpr uint32_t SUP_FLAG_TC_VALID    = 1u << 2u; /* reading is usable       */
 constexpr uint32_t SUP_FLAG_SELFTEST_OK = 1u << 3u;
+/* SWR-SAF-37: the second chamber couple is usable. Clear means the supervisor is
+ * running on one channel: still protecting, but with no cross-check, so the
+ * ESP32 should say so rather than let a degraded state look like a healthy one. */
+constexpr uint32_t SUP_FLAG_TC2_VALID   = 1u << 4u;
 
 typedef struct {
     uint8_t           version;

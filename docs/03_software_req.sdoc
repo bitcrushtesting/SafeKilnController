@@ -2278,6 +2278,49 @@ The clear button exists so an operator can acknowledge a condition they can see 
 PRIORITY: M
 VERIFICATION: T
 
+[REQUIREMENT]
+UID: SWR-SAF-37
+STATEMENT: >>>
+**Two chamber thermocouples, compared.** The independent safety supervisor shall read **two** chamber thermocouples, each through its **own front end on its own SPI bus**, and shall:
+
+- act on the **higher** of the two valid readings, never on an average and never on a fixed preference;
+- latch a fault when both readings are valid and differ by more than a compiled-in band (50 °C) for a compiled-in confirmation period (10 s);
+- continue to protect using whichever couple remains valid if the other becomes unusable, and report that it is doing so;
+- refuse to start up at all if either front end fails to configure.
+
+The installation shall place the two couples so that the comparison is a statement about the sensors rather than about the kiln: in the same thermowell, or close enough that chamber gradients stay inside the band.
+<<<
+RATIONALE: >>>
+This is the requirement that answers [LINK: HZ-03] by **comparison** rather than only by interrogation, and it reverses the decision recorded in section 9 of `safety-supervisor.md`, which declined a second couple on installation grounds. Those grounds were about product convenience; this is about the only hazard the design previously admitted defeated both channels.
+
+Acting on the higher reading is the half that does the safety work. A couple reading low is the dangerous failure, because it lets a hot kiln look cool. An average would let a couple reading 200 °C low pull the pair 100 °C low, which is the failure dressed as redundancy.
+
+Two SPI buses rather than two chip selects on one: a shared bus makes both readings depend on the same shift register, clock divider and chip-select logic, and a common-cause failure there takes both at once. Three pins buys independence of everything between the core and the two front ends.
+
+The band is wide, and the limitation has to be stated rather than implied: it catches a **grossly** wrong couple, which is the [LINK: HZ-03] failure, and not a couple reading five degrees low. A band tight enough for that would stop healthy firings, and [LINK: HZ-10] is about where that leads.
+<<<
+PRIORITY: M
+VERIFICATION: T
+
+[REQUIREMENT]
+UID: SWR-SAF-38
+STATEMENT: >>>
+**Permit readback.** The supervisor shall sense the state of the coil drive it commands, and shall latch a fault when the permit has been withdrawn and the drive is still sensed energised after a compiled-in settle period (2 s). This fault shall **replace** the reason of any existing trip other than a failed self-test, because a supervisor that cannot interrupt the heater supersedes whatever it was interrupting it for.
+
+A permit that is commanded and **not** sensed shall not be a fault: that is heat not being delivered, which the lid interlock and the front ends' fault outputs do deliberately.
+
+Where no readback is fitted the diagnostic shall report as **absent** rather than as passing or failing.
+<<<
+RATIONALE: >>>
+Without it the output stage is the one part of the chain with no diagnostic at all: the supervisor could command the coil open for an hour against a shorted drive transistor and report everything healthy.
+
+The escalation is the same reasoning [LINK: SWR-SAF-27] uses to make a welded contactor the more severe of its pair. An operator shown "over-temperature" presses the clear button; one shown "permit stuck" is told to isolate at the supply, which is the only thing that helps. A failed self-test is the exception, because a supervisor that has failed its own diagnostics cannot be trusted to have concluded correctly that the coil is stuck.
+
+This places a requirement on the hardware that the board does not yet carry: a divider from the coil drive node to the supervisor's sense input, scaled to 3V3 and referenced to its ground.
+<<<
+PRIORITY: M
+VERIFICATION: T
+
 [[/SECTION]]
 
 [[SECTION]]

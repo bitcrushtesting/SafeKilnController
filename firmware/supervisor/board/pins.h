@@ -13,10 +13,16 @@
  * ---------------------------------------------------------------------------
  * Three properties this assignment holds on purpose
  * ---------------------------------------------------------------------------
- * 1. EVERYTHING IS ON PORT A.  startup.cpp drives the permit line low before
- *    .data is copied, and to do that it enables exactly one GPIO clock.  A
- *    function that moved to port B would silently break that, because the
- *    permit pin would be driven before its port had a clock.
+ * 1. THE PERMIT LINE IS ON PORT A, AND MUST STAY THERE.  startup.cpp drives it
+ *    low before .data is copied, and to do that it enables exactly one GPIO
+ *    clock.  A permit pin that moved to port B would silently break that,
+ *    because it would be driven before its port had a clock.
+ *
+ *    Port B is now in use for the second thermocouple's SPI bus, which is
+ *    fine: nothing on port B is touched before main() enables IOPBEN.  The
+ *    property that matters is specifically about the permit pin, and it is
+ *    stated that way now rather than as "everything on port A", which was the
+ *    shape of the rule rather than its reason.
  *
  * 2. PA9 TO PA12 ARE AVOIDED ENTIRELY.  On this package PA11/PA12 can be
  *    remapped to behave as PA9/PA10 through SYSCFG_CFGR1, and positions 19 and
@@ -37,22 +43,43 @@
  *
  *   pin   pos  function                        mode
  *   PA0     7  clear button                    input, pull-up
+ *   PA1     8  coil permit readback            input, no pull
  *   PA2     9  UART TX to the ESP32            AF1, USART2_TX
- *   PA3    10  MAX31856 ~FAULT                 input, pull-up
- *   PA4    11  MAX31856 ~CS                    output, idle high
+ *   PA3    10  TC1 ~FAULT                      input, pull-up
+ *   PA4    11  TC1 ~CS                         output, idle high
  *   PA5    12  SPI1 SCK                        AF0
  *   PA6    13  SPI1 MISO                       AF0
  *   PA7    14  SPI1 MOSI                       AF0
  *   PA8    18  coil permit                     output, low = coil open
+ *   PB5    29  TC2 ~CS                         output, idle high
+ *   PB6    30  SPI2 MISO                       AF4   <- note the AF
+ *   PB7    31  SPI2 MOSI                       AF1
+ *   PB8    32  SPI2 SCK                        AF1
  *   PA13   24  SWDIO                           reserved, do not use
  *   PA14   25  SWCLK                           reserved, do not use
  *   PF2     6  NRST
  *
- * PA5/PA6/PA7 are adjacent and all AF0, which puts the whole SPI bus on three
- * neighbouring pins next to the chip select on PA4.  Free for later: PA1,
- * PA15, PB0 to PB9, PC6, PC14, PC15. */
+ * PA5/PA6/PA7 are adjacent and all AF0, which puts the first SPI bus on three
+ * neighbouring pins next to its chip select on PA4.  PB6/PB7/PB8 do the same
+ * for the second, next to its chip select on PB5.
+ *
+ * THE SPI2 ALTERNATE FUNCTIONS ARE NOT ALL THE SAME NUMBER.  MISO is AF4 while
+ * SCK and MOSI are AF1, which is unlike SPI1 where all three are AF0.  Taken
+ * from the GPIO modes database, and worth the shouting: a single SUP_AF_SPI2
+ * constant applied to all three would configure MISO as something else
+ * entirely and the bus would read nothing, with no error anywhere.
+ *
+ * Why PB6/PB7/PB8 and not somewhere on port A: on this package the only SPI2
+ * pins are PA0/PB8 for SCK, PA3/PB2/PA9/PA11/PB6 for MISO, PA4/PA10/PA12/PB7
+ * for MOSI and PB9/PA8 for NSS.  Every port A option is either already taken
+ * (PA0 clear, PA3 fault, PA4 chip select, PA8 permit) or inside the PA9..PA12
+ * range that property 2 below refuses to depend on.  Port B is what is left,
+ * and it is adjacent and contiguous.
+ *
+ * Free for later: PA15, PB0 to PB4, PB9, PC6, PC14, PC15. */
 
 #define SUP_PIN_CLEAR        0u   /* PA0,  pos 7   */
+#define SUP_PIN_PERMIT_SENSE 1u   /* PA1,  pos 8   */
 #define SUP_PIN_UART_TX      2u   /* PA2,  pos 9   */
 #define SUP_PIN_TC_FAULT     3u   /* PA3,  pos 10  */
 #define SUP_PIN_TC_CS        4u   /* PA4,  pos 11  */
@@ -61,13 +88,27 @@
 #define SUP_PIN_SPI_MOSI     7u   /* PA7,  pos 14  */
 #define SUP_PIN_PERMIT       8u   /* PA8,  pos 18  */
 
-/* From the GPIO modes database for this part, not assumed. */
+/* --- port B: the second thermocouple's bus (SWR-SAF-37) ----------------- */
+#define SUP_PIN_TC2_CS       5u   /* PB5,  pos 29  */
+#define SUP_PIN_SPI2_MISO    6u   /* PB6,  pos 30  */
+#define SUP_PIN_SPI2_MOSI    7u   /* PB7,  pos 31  */
+#define SUP_PIN_SPI2_SCK     8u   /* PB8,  pos 32  */
+
+/* From the GPIO modes database for this part, not assumed.
+ *
+ * Three separate constants for SPI2 because the three pins genuinely use three
+ * different alternate functions.  See the warning in the header comment. */
 #define SUP_AF_SPI1          0u   /* SCK, MISO, MOSI on PA5/PA6/PA7 */
 #define SUP_AF_USART2        1u   /* TX on PA2                      */
+#define SUP_AF_SPI2_SCK      1u   /* PB8                            */
+#define SUP_AF_SPI2_MOSI     1u   /* PB7                            */
+#define SUP_AF_SPI2_MISO     4u   /* PB6, and NOT 1                 */
 
 /* Peripheral clock enables, bit positions from the SVD. */
 #define SUP_RCC_IOPENR_PORTA     (1u << 0)    /* IOPAEN   */
+#define SUP_RCC_IOPENR_PORTB     (1u << 1)    /* IOPBEN   */
 #define SUP_RCC_APBENR2_SPI1     (1u << 12)   /* SPI1EN   */
+#define SUP_RCC_APBENR1_SPI2     (1u << 14)   /* SPI2EN   */
 #define SUP_RCC_APBENR1_USART2   (1u << 17)   /* USART2EN */
 
 /* Used by startup.cpp before .data exists; see property 1 above. */
@@ -84,5 +125,25 @@
  * leaks to, which is the inverse of the open-drain problem tasklist K1 records
  * about the chain this replaces. */
 #define SUP_PERMIT_ACTIVE_HIGH 1
+
+/* --- the permit readback (SWR-SAF-38) -----------------------------------
+ *
+ * PA1 senses the coil side of the permit path, so the supervisor can tell
+ * whether the line it drove actually did anything.  Without it the output stage
+ * is the one part of the chain with no diagnostic at all: the supervisor could
+ * command the coil open for an hour against a shorted drive transistor and
+ * report everything healthy.
+ *
+ * This places a requirement on the board, which does not yet carry it: a divider
+ * from the coil drive node to PA1, scaled to 3V3 logic and referenced to the
+ * supervisor's ground.  No pull is configured, because the divider defines the
+ * level and a pull-up would fight it.
+ *
+ * Sense polarity is stated here rather than inferred: HIGH means the drive node
+ * is energised, which is to say the permit is being delivered.  A board that
+ * inverts it must change this, and the firmware checks sense against command, so
+ * getting it backwards fails loudly on the first cycle rather than quietly
+ * agreeing half the time. */
+#define SUP_PERMIT_SENSE_ACTIVE_HIGH 1
 
 #endif /* SUP_PINS_H */

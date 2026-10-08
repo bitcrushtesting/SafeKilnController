@@ -636,3 +636,316 @@ KILN_TEST(swrsaf36_a_diagnostic_failure_outranks_a_thermocouple_fault)
     CHECK(!s.permit);
     CHECK_EQ_INT(s.reason, SUP_TRIP_SELF_TEST);
 }
+
+/* --- SWR-SAF-37: the second chamber couple ------------------------------ */
+
+namespace {
+
+/* Both couples valid and agreeing, at `c`. */
+sup_input_t pair_at(float c)
+{
+    sup_input_t in = ok_at(c);
+    in.chamber2_c     = c;
+    in.chamber2_valid = true;
+    return in;
+}
+
+}  // namespace
+
+/*
+ * @relation(SWR-SAF-37, scope=function)
+ */
+KILN_TEST(swrsaf37_a_low_reading_couple_cannot_mask_a_hot_kiln)
+{
+    /* The whole reason the second sensor is worth a second SPI bus. The backstop
+     * acts on the HIGHER of the two, so a couple reading cold cannot hide a
+     * chamber that is not. An average would let it: a couple reading 200 degC low
+     * would pull the pair 100 degC low, which is the failure wearing redundancy
+     * as a disguise. */
+    sup_t s;
+    sup_init(&s, true);
+
+    sup_input_t in = pair_at(200.0f);
+    in.chamber_c  = SUP_OVERTEMP_C + 20.0f;   /* couple 1 sees the truth  */
+    in.chamber2_c = 200.0f;                   /* couple 2 reads far low   */
+    sup_step(&s, &in, 0.1f);
+
+    CHECK(!s.permit);
+    CHECK(s.tripped);
+    CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);
+
+    /* and the other way round, because neither couple is privileged */
+    sup_t s2;
+    sup_init(&s2, true);
+    sup_input_t flipped = pair_at(200.0f);
+    flipped.chamber_c  = 200.0f;
+    flipped.chamber2_c = SUP_OVERTEMP_C + 20.0f;
+    sup_step(&s2, &flipped, 0.1f);
+    CHECK(!s2.permit);
+    CHECK_EQ_INT(s2.reason, SUP_TRIP_OVERTEMP);
+}
+
+/*
+ * @relation(SWR-SAF-37, scope=function)
+ */
+KILN_TEST(swrsaf37_agreeing_couples_permit_heat_and_set_both_flags)
+{
+    sup_t s;
+    sup_init(&s, true);
+    const sup_input_t in = pair_at(600.0f);
+    sup_step(&s, &in, 0.1f);
+    CHECK(s.permit);
+    CHECK(!s.tripped);
+
+    const uint8_t f = sup_flags(&s, &in);
+    CHECK((f & SUP_FLAG_TC_VALID) != 0u);
+    CHECK((f & SUP_FLAG_TC2_VALID) != 0u);
+}
+
+/*
+ * @relation(SWR-SAF-37, scope=function)
+ */
+KILN_TEST(swrsaf37_disagreement_withholds_heat_at_once_and_latches_after_the_window)
+{
+    sup_t s;
+    sup_init(&s, true);
+
+    sup_input_t apart = pair_at(500.0f);
+    apart.chamber2_c = 500.0f + SUP_DISAGREE_C + 10.0f;
+
+    /* Heat goes away on the first cycle; the window only delays the latch,
+     * which is the same shape every confirmed rule in this firmware uses. */
+    sup_step(&s, &apart, 0.1f);
+    CHECK(!s.permit);
+    CHECK(!s.tripped);
+
+    run_for(&s, &apart, SUP_DISAGREE_S);
+    CHECK(s.tripped);
+    CHECK_EQ_INT(s.reason, SUP_TRIP_TC_DISAGREE);
+}
+
+/*
+ * @relation(SWR-SAF-37, scope=function)
+ */
+KILN_TEST(swrsaf37_a_gradient_inside_the_band_is_not_a_disagreement)
+{
+    /* A kiln chamber is not isothermal and two probes genuinely differ during a
+     * ramp. A band that tripped on that would stop healthy firings, which HZ-10
+     * names as how protections come to be switched off. */
+    sup_t s;
+    sup_init(&s, true);
+
+    sup_input_t near = pair_at(900.0f);
+    near.chamber2_c = 900.0f + SUP_DISAGREE_C - 1.0f;
+    run_for(&s, &near, SUP_DISAGREE_S * 3.0f);
+
+    CHECK(s.permit);
+    CHECK(!s.tripped);
+}
+
+/*
+ * @relation(SWR-SAF-37, scope=function)
+ */
+KILN_TEST(swrsaf37_a_transient_disagreement_does_not_latch)
+{
+    sup_t s;
+    sup_init(&s, true);
+
+    sup_input_t apart = pair_at(500.0f);
+    apart.chamber2_c = 500.0f + SUP_DISAGREE_C + 10.0f;
+    run_for(&s, &apart, SUP_DISAGREE_S * 0.5f);
+    CHECK(!s.tripped);
+
+    const sup_input_t together = pair_at(500.0f);
+    run_for(&s, &together, 1.0f);
+    CHECK(!s.tripped);
+    CHECK(s.permit);
+
+    /* and the timer restarted rather than resuming where it left off */
+    run_for(&s, &apart, SUP_DISAGREE_S * 0.6f);
+    CHECK(!s.tripped);
+}
+
+/*
+ * @relation(SWR-SAF-37, scope=function)
+ */
+KILN_TEST(swrsaf37_one_usable_couple_keeps_protecting_without_a_cross_check)
+{
+    /* Degraded operation, deliberately allowed. Losing one couple mid-firing
+     * should not stop the firing: the remaining one still provides the backstop.
+     * What is lost is the comparison, and the flag says so, so the ESP32 can
+     * annunciate a degraded supervisor rather than showing a healthy one. */
+    sup_t s;
+    sup_init(&s, true);
+
+    sup_input_t one = pair_at(600.0f);
+    one.chamber2_valid = false;
+    one.chamber2_c     = 0.0f;         /* a zero that must not be compared */
+    sup_step(&s, &one, 0.1f);
+
+    CHECK(s.permit);
+    CHECK(!s.tripped);
+    CHECK((sup_flags(&s, &one) & SUP_FLAG_TC2_VALID) == 0u);
+
+    /* and it still trips on temperature using the couple it has */
+    sup_input_t hot = one;
+    hot.chamber_c = SUP_OVERTEMP_C + 5.0f;
+    sup_step(&s, &hot, 0.1f);
+    CHECK(s.tripped);
+    CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);
+}
+
+/*
+ * @relation(SWR-SAF-37, scope=function)
+ */
+KILN_TEST(swrsaf37_only_the_second_couple_usable_still_protects)
+{
+    sup_t s;
+    sup_init(&s, true);
+
+    sup_input_t two_only = pair_at(600.0f);
+    two_only.chamber_valid = false;
+    two_only.chamber_c     = 0.0f;
+    sup_step(&s, &two_only, 0.1f);
+    CHECK(s.permit);
+
+    two_only.chamber2_c = SUP_OVERTEMP_C + 5.0f;
+    sup_step(&s, &two_only, 0.1f);
+    CHECK(!s.permit);
+    CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);
+}
+
+/*
+ * @relation(SWR-SAF-37, scope=function)
+ */
+KILN_TEST(swrsaf37_a_nan_on_one_couple_cannot_win_the_comparison)
+{
+    sup_t s;
+    sup_init(&s, true);
+
+    sup_input_t nan2 = pair_at(600.0f);
+    nan2.chamber2_c = NAN;
+    /* Marked valid, which is the caller lying, and the arithmetic still must not
+     * produce a NaN effective temperature or report a disagreement. */
+    sup_step(&s, &nan2, 0.1f);
+    CHECK(s.permit);          /* 600 degC is below the backstop */
+    CHECK(!s.tripped);
+}
+
+/* --- SWR-SAF-38: the permit readback ------------------------------------ */
+
+/*
+ * @relation(SWR-SAF-38, scope=function)
+ */
+KILN_TEST(swrsaf38_a_coil_that_stays_on_after_the_permit_is_withdrawn_latches)
+{
+    /* The output stage was the one part of the chain with no diagnostic at all:
+     * the supervisor could command the coil open for an hour against a shorted
+     * drive and report everything healthy. */
+    sup_t s;
+    sup_init(&s, true);
+
+    /* Trip on temperature so the permit is withdrawn, then hold the sense high. */
+    sup_input_t hot = pair_at(SUP_OVERTEMP_C + 5.0f);
+    sup_step(&s, &hot, 0.1f);
+    CHECK(!s.permit);
+    CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);
+
+    sup_input_t stuck = pair_at(300.0f);
+    stuck.permit_sense = true;
+    run_for(&s, &stuck, SUP_PERMIT_SETTLE_S + 1.0f);
+
+    CHECK(s.tripped);
+    /* It REPLACES the over-temperature reason, which is the one place in this
+     * firmware where a later cause overwrites an earlier one. An operator shown
+     * "over-temperature" would press the clear button; one shown "permit stuck"
+     * is told to isolate at the supply, which is the only thing that helps when
+     * the supervisor cannot open the coil. */
+    CHECK_EQ_INT(s.reason, SUP_TRIP_PERMIT_STUCK);
+}
+
+/*
+ * @relation(SWR-SAF-38, scope=function)
+ */
+KILN_TEST(swrsaf38_a_stuck_coil_does_not_override_a_failed_diagnostic)
+{
+    /* The limit of the escalation. A supervisor that has failed its own
+     * diagnostics cannot be trusted to have concluded correctly that the coil is
+     * stuck, so the diagnostic stays the reported reason: it is what makes every
+     * other conclusion doubtful. */
+    sup_t s;
+    sup_init(&s, true);
+
+    sup_input_t diag_bad = pair_at(300.0f);
+    diag_bad.diag_ok = false;
+    sup_step(&s, &diag_bad, 0.1f);
+    CHECK_EQ_INT(s.reason, SUP_TRIP_SELF_TEST);
+
+    sup_input_t stuck = pair_at(300.0f);
+    stuck.diag_ok      = false;
+    stuck.permit_sense = true;
+    run_for(&s, &stuck, SUP_PERMIT_SETTLE_S + 1.0f);
+
+    CHECK(s.tripped);
+    CHECK_EQ_INT(s.reason, SUP_TRIP_SELF_TEST);
+}
+
+/*
+ * @relation(SWR-SAF-38, scope=function)
+ */
+KILN_TEST(swrsaf38_a_slow_contactor_inside_the_settle_window_is_not_a_fault)
+{
+    sup_t s;
+    sup_init(&s, true);
+
+    sup_input_t hot = pair_at(SUP_OVERTEMP_C + 5.0f);
+    sup_step(&s, &hot, 0.1f);
+
+    sup_input_t dropping = pair_at(300.0f);
+    dropping.permit_sense = true;
+    run_for(&s, &dropping, SUP_PERMIT_SETTLE_S * 0.5f);
+    CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);   /* not yet the readback */
+
+    dropping.permit_sense = false;
+    run_for(&s, &dropping, 1.0f);
+    CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);   /* and never becomes it */
+}
+
+/*
+ * @relation(SWR-SAF-38, scope=function)
+ */
+KILN_TEST(swrsaf38_a_commanded_permit_that_is_not_sensed_is_not_a_fault)
+{
+    /* The other direction is heat NOT being delivered, which is the lid switch
+     * or a front end's fault transistor doing its job. That is not heat the
+     * supervisor cannot stop, and the ESP32's own rules notice a kiln that will
+     * not heat. Tripping here would be a nuisance trip on a working interlock. */
+    sup_t s;
+    sup_init(&s, true);
+
+    sup_input_t open_path = pair_at(500.0f);
+    open_path.permit_sense = false;          /* permitted, but nothing flows */
+    run_for(&s, &open_path, SUP_PERMIT_SETTLE_S * 5.0f);
+
+    CHECK(s.permit);
+    CHECK(!s.tripped);
+}
+
+/*
+ * @relation(SWR-SAF-38, scope=function)
+ */
+KILN_TEST(swrsaf38_a_board_with_no_readback_fitted_reports_no_fault)
+{
+    /* permit_sense zero-initialises to "not energised", which is the benign
+     * value. A board without the divider therefore reports the diagnostic as
+     * absent rather than as permanently failing, and SWR-SAF-38 says so. */
+    sup_t s;
+    sup_init(&s, true);
+
+    sup_input_t no_sense = pair_at(SUP_OVERTEMP_C + 5.0f);
+    sup_step(&s, &no_sense, 0.1f);            /* trips on temperature */
+    sup_input_t cool = pair_at(300.0f);       /* permit_sense stays false */
+    run_for(&s, &cool, SUP_PERMIT_SETTLE_S * 5.0f);
+
+    CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);
+}

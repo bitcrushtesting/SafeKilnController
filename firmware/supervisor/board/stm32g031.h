@@ -28,6 +28,7 @@
 #define IWDG_BASE      0x40003000u
 #define RCC_BASE       0x40021000u
 #define SPI1_BASE      0x40013000u
+#define SPI2_BASE      0x40003800u
 #define USART1_BASE    0x40013800u
 #define USART2_BASE    0x40004400u
 
@@ -46,6 +47,19 @@
 #define GPIOA_AFRL       SUP_REG32(GPIOA_BASE + 0x20u)
 #define GPIOA_AFRH       SUP_REG32(GPIOA_BASE + 0x24u)
 #define GPIOA_BRR        SUP_REG32(GPIOA_BASE + 0x28u)
+
+/* --- GPIOB ---------------------------------------------------------- */
+#define GPIOB_MODER      SUP_REG32(GPIOB_BASE + 0x0u)
+#define GPIOB_OTYPER     SUP_REG32(GPIOB_BASE + 0x4u)
+#define GPIOB_OSPEEDR    SUP_REG32(GPIOB_BASE + 0x8u)
+#define GPIOB_PUPDR      SUP_REG32(GPIOB_BASE + 0xCu)
+#define GPIOB_IDR        SUP_REG32(GPIOB_BASE + 0x10u)
+#define GPIOB_ODR        SUP_REG32(GPIOB_BASE + 0x14u)
+#define GPIOB_BSRR       SUP_REG32(GPIOB_BASE + 0x18u)
+#define GPIOB_LCKR       SUP_REG32(GPIOB_BASE + 0x1Cu)
+#define GPIOB_AFRL       SUP_REG32(GPIOB_BASE + 0x20u)
+#define GPIOB_AFRH       SUP_REG32(GPIOB_BASE + 0x24u)
+#define GPIOB_BRR        SUP_REG32(GPIOB_BASE + 0x28u)
 
 /* --- IWDG ---------------------------------------------------------- */
 #define IWDG_KR          SUP_REG32(IWDG_BASE + 0x0u)
@@ -66,6 +80,12 @@
 #define SPI1_CR2         SUP_REG32(SPI1_BASE + 0x4u)
 #define SPI1_SR          SUP_REG32(SPI1_BASE + 0x8u)
 #define SPI1_DR          SUP_REG32(SPI1_BASE + 0xCu)
+
+/* --- SPI2 ---------------------------------------------------------- */
+#define SPI2_CR1         SUP_REG32(SPI2_BASE + 0x0u)
+#define SPI2_CR2         SUP_REG32(SPI2_BASE + 0x4u)
+#define SPI2_SR          SUP_REG32(SPI2_BASE + 0x8u)
+#define SPI2_DR          SUP_REG32(SPI2_BASE + 0xCu)
 
 /* --- USART2 ---------------------------------------------------------- */
 #define USART2_CR1       SUP_REG32(USART2_BASE + 0x0u)

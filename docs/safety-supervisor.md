@@ -278,9 +278,32 @@ being told anything. See section 5.
 
 ## 9. The remaining common cause: one thermocouple
 
-**Decided: one chamber couple, owned by the supervisor, relayed to the ESP32
-over the link.** The option below of giving the supervisor a second couple is
-declined.
+> **REVERSED.** This section decided on one chamber couple and declined a
+> second. That decision has been taken back: the supervisor now reads **two**
+> chamber couples on **two separate SPI buses**, and `SWR-SAF-37` is the
+> requirement. The reasoning below is kept because it is why the reversal
+> matters, and because the installation objections it raises are real and now
+> fall on the installer rather than being avoided.
+>
+> What changed the answer was not new information but the question being asked
+> differently. The analysis below treats a second couple as a feature with a
+> cost. Asked instead what caps the safety claim, the single couple is the
+> answer: it is the one failure this section admits defeats both channels, and
+> no amount of diagnostics elsewhere raises the ceiling it sets. A gap analysis
+> against EN ISO 13849-1 put a single-channel sensing path at Category 2 and
+> PL d at best, with nothing to compare against.
+>
+> Two things from the reversal are worth carrying forward. The supervisor acts
+> on the **higher** of the two readings, because a couple reading low is the
+> dangerous failure and an average would let one hide the other. And the
+> installation requirement the section below worried about is now explicit
+> rather than dodged: the two probes have to sit close enough that the
+> comparison is about the sensors and not about the kiln, which `SWR-SAF-37`
+> states and the commissioning documentation has to carry.
+
+**Superseded, and kept for the record: one chamber couple, owned by the
+supervisor, relayed to the ESP32 over the link.** The option below of giving the
+supervisor a second couple was declined.
 
 So the independence this buys is against **software and MCU failure**, which
 was the point, and is explicitly *not* independence against a sensor that reads
@@ -306,9 +329,9 @@ It is now load-bearing, and `SWR-CUR-12`'s refusal to start a firing without a
 fitted CT carries more weight than it did when it was written. Anyone proposing
 to make the CT optional should be sent here first.
 
-### The option that was declined
+### The option that was declined, and has now been taken
 
-For the record, since it may come up again. The enclosure channel `TC2` is, on
+For the record, since this is the analysis the reversal overturned. The enclosure channel `TC2` is, on
 the analysis in [`bom-optimisation.md` §1](bom-optimisation.md), a MAX31856
 bought for a `FAULT` pin it no longer needs. Repurposed as a second chamber
 couple read only by the supervisor, the two MCUs could have been made to
