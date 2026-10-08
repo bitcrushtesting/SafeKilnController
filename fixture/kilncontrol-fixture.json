@@ -1,0 +1,240 @@
+{
+  "name": "kilncontrol-fixture",
+  "description": "Bed-of-nails fixture for the Safe Kiln Controller, drafted by `pinside init` and then reviewed by hand. Directions are set from the schematic's net names: every signal the DUT drives is an observed input, and only the six the DUT reads are driven. The schematic is the authority; see fixture/README.md for what is still open.",
+  "target": {
+    "mcu": "rp2350b",
+    "board": "bare",
+    "clock_hz": 150000000,
+    "usb": {
+      "product": "kilncontrol-fixture fixture"
+    }
+  },
+  "fixture": {
+    "probe": "millmax_0906",
+    "mirror": "x"
+  },
+  "dut": {
+    "board": "/Users/bernhardtrinnes/Developer/Bitcrush/kilncontrol/hardware/kilncontrol.kicad_pcb",
+    "logic_voltage": 3.3,
+    "require_all_test_points": true
+  },
+  "uart": [
+    {
+      "name": "supervisor_uart",
+      "description": "SUPERVISOR serial link",
+      "peripheral": 0,
+      "baud": 115200,
+      "pins": {
+        "rx": 1
+      },
+      "probes": {
+        "rx": "SUPERVISOR_TX"
+      },
+      "stream": true
+    }
+  ],
+  "i2c": [
+    {
+      "name": "i2c_i2c",
+      "description": "I2C two-wire bus",
+      "peripheral": 0,
+      "hz": 400000,
+      "pins": {
+        "scl": 5,
+        "sda": 0
+      },
+      "probes": {
+        "scl": "I2C_SCL",
+        "sda": "I2C_SDA"
+      },
+      "pullups": false
+    }
+  ],
+  "spi": [
+    {
+      "name": "spi_spi",
+      "description": "SPI SPI bus",
+      "peripheral": 0,
+      "hz": 1000000,
+      "mode": 0,
+      "role": "master",
+      "pins": {
+        "rx": 4,
+        "tx": 3,
+        "sck": 2
+      },
+      "probes": {
+        "rx": "SPI_MISO",
+        "tx": "SPI_MOSI",
+        "sck": "SPI_SCK"
+      }
+    }
+  ],
+  "gpio": [
+    {
+      "name": "tc1_cs",
+      "description": "TC1_CS -- DUT output: the controller drives chip select. Mastering this bus from the fixture requires the DUT held in reset via ESP32_EN first, and is not configured here",
+      "pin": 6,
+      "probe": "TC1_CS",
+      "direction": "input"
+    },
+    {
+      "name": "tc1_drdy",
+      "description": "TC1_DRDY -- front-end output: MAX31856 data-ready",
+      "pin": 7,
+      "probe": "TC1_DRDY",
+      "direction": "input"
+    },
+    {
+      "name": "tc1_fault",
+      "description": "TC1_FAULT -- front-end output: MAX31856 ~FAULT. Already an input in the draft, and correct",
+      "pin": 8,
+      "probe": "TC1_FAULT",
+      "direction": "input"
+    },
+    {
+      "name": "ssr1",
+      "description": "SSR1 -- DUT output: SSR gate drive from the controller",
+      "pin": 9,
+      "probe": "SSR1",
+      "direction": "input"
+    },
+    {
+      "name": "heat_en",
+      "description": "HEAT_EN -- DUT output: the charge-pump square wave (SYS-SAF-02)",
+      "pin": 10,
+      "probe": "HEAT_EN",
+      "direction": "input"
+    },
+    {
+      "name": "pump_node",
+      "description": "PUMP_NODE -- DUT output: charge-pump node, and analogue rather than logic",
+      "pin": 11,
+      "probe": "PUMP_NODE",
+      "direction": "input"
+    },
+    {
+      "name": "heat_en_dc",
+      "description": "HEAT_EN_DC -- DUT output: the rectified charge-pump rail, analogue",
+      "pin": 12,
+      "probe": "HEAT_EN_DC",
+      "direction": "input"
+    },
+    {
+      "name": "coil_drv",
+      "description": "COIL_DRV -- DUT output: contactor coil drive",
+      "pin": 13,
+      "probe": "COIL_DRV",
+      "direction": "input"
+    },
+    {
+      "name": "alarm",
+      "description": "ALARM -- DUT output: buzzer drive",
+      "pin": 14,
+      "probe": "ALARM",
+      "direction": "input"
+    },
+    {
+      "name": "enc_a",
+      "description": "ENC_A -- DUT input: encoder channel A, simulated by the fixture",
+      "pin": 15,
+      "probe": "ENC_A",
+      "direction": "open_drain",
+      "active_low": true,
+      "initial": "released"
+    },
+    {
+      "name": "enc_b",
+      "description": "ENC_B -- DUT input: encoder channel B, simulated by the fixture",
+      "pin": 16,
+      "probe": "ENC_B",
+      "direction": "open_drain",
+      "active_low": true,
+      "initial": "released"
+    },
+    {
+      "name": "enc_btn",
+      "description": "ENC_BTN -- DUT input: encoder push button",
+      "pin": 17,
+      "probe": "ENC_BTN",
+      "direction": "open_drain",
+      "active_low": true,
+      "initial": "released"
+    },
+    {
+      "name": "tc1_p",
+      "description": "TC1_P -- thermocouple input, millivolts. NEVER driven. Injecting a temperature needs a calibrated mV source the fixture does not have; the probe is placed so one can be added",
+      "pin": 18,
+      "probe": "TC1_P",
+      "direction": "input"
+    },
+    {
+      "name": "tc1_n",
+      "description": "TC1_N -- thermocouple input, millivolts. NEVER driven, as TC1_P",
+      "pin": 19,
+      "probe": "TC1_N",
+      "direction": "input"
+    },
+    {
+      "name": "curr_sense",
+      "description": "CURR_SENSE -- CT conditioning output, analogue. Should become an ADC channel once the divider scale is taken from the schematic; left as an observed input rather than inventing a scale",
+      "pin": 20,
+      "probe": "CURR_SENSE",
+      "direction": "input"
+    },
+    {
+      "name": "esp32_en",
+      "description": "ESP32_EN -- DUT input: controller reset, active low",
+      "pin": 21,
+      "probe": "ESP32_EN",
+      "direction": "open_drain",
+      "active_low": true,
+      "initial": "released"
+    },
+    {
+      "name": "esp32_io0",
+      "description": "ESP32_IO0 -- DUT input: controller boot strap, active low",
+      "pin": 22,
+      "probe": "ESP32_IO0",
+      "direction": "open_drain",
+      "active_low": true,
+      "initial": "released"
+    },
+    {
+      "name": "coil_permit",
+      "description": "COIL_PERMIT -- DUT output: the supervisor's permit line (SWR-SAF-38)",
+      "pin": 23,
+      "probe": "COIL_PERMIT",
+      "direction": "input"
+    },
+    {
+      "name": "supervisor_reset",
+      "description": "SUPERVISOR_RESET -- DUT input: supervisor reset, active low",
+      "pin": 24,
+      "probe": "SUPERVISOR_RESET",
+      "direction": "open_drain",
+      "active_low": true,
+      "initial": "released"
+    }
+  ],
+  "adc": [
+    {
+      "name": "ch_5v",
+      "description": "+5V rail, through a 2:1 divider",
+      "pin": 40,
+      "probe": "+5V",
+      "divider": 2.0,
+      "nominal_v": 3.3,
+      "tolerance_v": 0.165
+    },
+    {
+      "name": "ch_3_3v",
+      "description": "+3.3V rail, through a 2:1 divider",
+      "pin": 41,
+      "probe": "+3.3V",
+      "divider": 2.0,
+      "nominal_v": 3.3,
+      "tolerance_v": 0.165
+    }
+  ]
+}

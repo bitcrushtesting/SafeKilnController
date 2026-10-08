@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "board": "hardware/kilncontrol.kicad_pcb",
+  "accepted": [
+    {
+      "code": "PS022",
+      "refs": [
+        "TP19 1.75mm",
+        "TP20 1.75mm",
+        "TP22 1.75mm"
+      ],
+      "note": "Accepted. TP19 HEAT_EN, TP20 PUMP_NODE and TP22 COIL_DRV sit 1.75 mm from the board edge, inside the 2.0 mm the fixture wall wants. The wall is relieved locally at those three positions rather than the pads moved: they are charge-pump and coil-drive nodes whose routing is deliberate (SYS-SAF-02), and a relief is cheaper than re-laying that corner. Check the relief against the printed 1:1 SVG before ordering the fixture."
+    },
+    {
+      "code": "PS033",
+      "refs": [
+        "VBUS"
+      ],
+      "note": "Accepted. VBUS is the USB input, upstream of the regulator, and is not a rail the firmware depends on: +5V (TP1) and +3.3V (TP2) are both probed and are what prove the board came up. A VBUS pad would only tell us the USB cable is plugged in, which the fixture knows because it is the thing plugged in."
+    }
+  ],
+  "_comment": "Findings on the DUT that have been looked at and accepted, each with the reason. PS031 (one ground test point) and PS050 (no mounting holes) are deliberately NOT here: they are the two findings that say the fixture cannot work yet, they are the same problem seen twice, and a baseline that absorbed them would hide it. See fixture/README.md."
+}

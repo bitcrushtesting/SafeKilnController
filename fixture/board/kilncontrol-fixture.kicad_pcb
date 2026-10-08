@@ -1,0 +1,2024 @@
+(kicad_pcb
+	(version 20260206)
+	(generator "pinside")
+	(generator_version "10.0")
+	(general
+		(thickness 1.6)
+		(legacy_teardrops no)
+	)
+	(paper "A3")
+	(layers
+		(0 "F.Cu" signal)
+		(2 "B.Cu" signal)
+		(9 "F.Adhes" user "F.Adhesive")
+		(11 "B.Adhes" user "B.Adhesive")
+		(13 "F.Paste" user)
+		(15 "B.Paste" user)
+		(5 "F.SilkS" user "F.Silkscreen")
+		(7 "B.SilkS" user "B.Silkscreen")
+		(1 "F.Mask" user)
+		(3 "B.Mask" user)
+		(17 "Dwgs.User" user "User.Drawings")
+		(19 "Cmts.User" user "User.Comments")
+		(21 "Eco1.User" user "User.Eco1")
+		(23 "Eco2.User" user "User.Eco2")
+		(25 "Edge.Cuts" user)
+		(27 "Margin" user)
+		(31 "F.CrtYd" user "F.Courtyard")
+		(29 "B.CrtYd" user "B.Courtyard")
+		(35 "F.Fab" user)
+		(33 "B.Fab" user)
+	)
+	(setup
+		(pad_to_mask_clearance 0)
+		(allow_soldermask_bridges_in_footprints no)
+		(pcbplotparams
+			(layerselection 0x00000000_00000000_55555555_5755f5ff)
+			(plot_on_all_layers_selection 0x00000000_00000000_00000000_00000000)
+			(disableapertmacros no)
+			(usegerberextensions no)
+			(usegerberattributes yes)
+			(usegerberadvancedattributes yes)
+			(creategerberjobfile yes)
+			(dashed_line_dash_ratio 12)
+			(dashed_line_gap_ratio 3)
+			(svgprecision 4)
+			(plotframeref no)
+			(mode 1)
+			(useauxorigin no)
+			(dxfpolygonmode yes)
+			(dxfimperialunits yes)
+			(dxfusepcbnewfont yes)
+			(psnegative no)
+			(psa4output no)
+			(plot_black_and_white yes)
+			(sketchpadsonfab no)
+			(plotpadnumbers no)
+			(hidednponfab no)
+			(sketchdnponfab yes)
+			(crossoutdnponfab yes)
+			(subtractmaskfromsilk no)
+			(outputformat 1)
+			(mirror no)
+			(drillshape 1)
+			(scaleselection 1)
+			(outputdirectory "")
+		)
+	)
+	(net 0 "")
+	(net 1 "GND")
+	(net 2 "PROBE_TC1_CS")
+	(net 3 "PROBE_TC1_DRDY")
+	(net 4 "PROBE_TC1_FAULT")
+	(net 5 "PROBE_SSR1")
+	(net 6 "PROBE_HEAT_EN")
+	(net 7 "PROBE_PUMP_NODE")
+	(net 8 "PROBE_HEAT_EN_DC")
+	(net 9 "PROBE_COIL_DRV")
+	(net 10 "PROBE_ALARM")
+	(net 11 "PROBE_ENC_A")
+	(net 12 "PROBE_ENC_B")
+	(net 13 "PROBE_ENC_BTN")
+	(net 14 "PROBE_TC1_P")
+	(net 15 "PROBE_TC1_N")
+	(net 16 "PROBE_CURR_SENSE")
+	(net 17 "PROBE_ESP32_EN")
+	(net 18 "PROBE_ESP32_IO0")
+	(net 19 "PROBE_COIL_PERMIT")
+	(net 20 "PROBE_SUPERVISOR_RESET")
+	(net 21 "PROBE_CH_5V")
+	(net 22 "PROBE_CH_3_3V")
+	(net 23 "PROBE_SUPERVISOR_UART_RX")
+	(net 24 "PROBE_I2C_I2C_SCL")
+	(net 25 "PROBE_I2C_I2C_SDA")
+	(net 26 "PROBE_SPI_SPI_RX")
+	(net 27 "PROBE_SPI_SPI_SCK")
+	(net 28 "PROBE_SPI_SPI_TX")
+	(gr_line
+		(start 100 0)
+		(end 0 0)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(layer "Edge.Cuts")
+		(uuid "b1a945a2-d846-517b-a04e-84fd562da479")
+	)
+	(gr_line
+		(start 0 0)
+		(end 0 70)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(layer "Edge.Cuts")
+		(uuid "a2a75561-b915-5be9-aa82-fa50abd8b10f")
+	)
+	(gr_line
+		(start 0 70)
+		(end 100 70)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(layer "Edge.Cuts")
+		(uuid "702eb3e4-b684-5419-bf88-23c02ec2d892")
+	)
+	(gr_line
+		(start 100 70)
+		(end 100 0)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(layer "Edge.Cuts")
+		(uuid "c6f44d18-c6e5-5b02-b971-6a92c730e1e3")
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "be6addd1-bb0e-5536-b9e0-b32d84d32c5e")
+		(at 23.3 55.8)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/b03e65c9-6447-5c10-893f-e9355a4e2fe0")
+		(property
+			"Reference"
+			"TP1"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"TC1_CS"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 2 "PROBE_TC1_CS")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "646d65aa-9da2-5ec4-9625-7a83772ae872")
+		(at 13.9 55)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/2fe08bab-3926-5d8f-ae4f-66d26d892c7b")
+		(property
+			"Reference"
+			"TP2"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"TC1_DRDY"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 3 "PROBE_TC1_DRDY")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "a16b8ea0-8cc1-56c3-8265-168be0d03487")
+		(at 23.3 65.9)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/56d8cb89-aee4-58ca-b952-39570d075094")
+		(property
+			"Reference"
+			"TP3"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"TC1_FAULT"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 4 "PROBE_TC1_FAULT")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "1ad057c0-9694-5374-8f7a-346909d9a965")
+		(at 12.0325 16.75)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/ffb9553a-8627-58e2-aed9-175dc3d0b3ea")
+		(property
+			"Reference"
+			"TP4"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"SSR1"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 5 "PROBE_SSR1")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "ee542550-2724-5c31-b1f7-1b5c2775bf10")
+		(at 15.25 1.75)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/837cdc9c-ec36-5279-989b-88ebe2f8a47f")
+		(property
+			"Reference"
+			"TP5"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"HEAT_EN"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 6 "PROBE_HEAT_EN")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "894ac471-86a1-5c47-b464-9023a6b63e4a")
+		(at 12.75 1.75)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/c78c4ff7-9a18-5772-ae1b-808b34ac1ca7")
+		(property
+			"Reference"
+			"TP6"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"PUMP_NODE"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 7 "PROBE_PUMP_NODE")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "317b0bcb-850f-567f-9af3-e69acaee7849")
+		(at 25.75 4.25)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/74202acb-7a0a-552d-a970-351bce8a7a8e")
+		(property
+			"Reference"
+			"TP7"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"HEAT_EN_DC"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 8 "PROBE_HEAT_EN_DC")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "36e597af-815e-5c86-a76b-dc5f7f5efa9e")
+		(at 10.25 1.75)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/18417707-cf20-5466-a5bd-6abe6ee18aaa")
+		(property
+			"Reference"
+			"TP8"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"COIL_DRV"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 9 "PROBE_COIL_DRV")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "357e77d7-0844-5802-b628-83d1e5a27731")
+		(at 70.925 37.175)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/7583c2a0-e07d-5e1d-92e1-61c715746573")
+		(property
+			"Reference"
+			"TP9"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"ALARM"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 10 "PROBE_ALARM")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "ef2a88a2-cab1-59e5-a30b-259ab6bb5655")
+		(at 95.65 45.8)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/06981890-056a-599a-b320-4f518bc55566")
+		(property
+			"Reference"
+			"TP10"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"ENC_A"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 11 "PROBE_ENC_A")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "fc78264b-c4e4-5121-8c74-617e5eb707fd")
+		(at 91.15 45.8)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/df14d70b-2f4d-5d5d-9817-200ade9ca781")
+		(property
+			"Reference"
+			"TP11"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"ENC_B"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 12 "PROBE_ENC_B")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "f340d501-b52e-5966-a019-c962e26443cb")
+		(at 95.65 41.8)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/22dbae1b-2bf2-5b75-aaa1-c506b1d3a17c")
+		(property
+			"Reference"
+			"TP12"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"ENC_BTN"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 13 "PROBE_ENC_BTN")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "19a979e1-2d14-5f83-b205-f5ab14f1975a")
+		(at 10.15 55)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/27fbbfac-9dae-5f1f-ad73-cc86885a9cb3")
+		(property
+			"Reference"
+			"TP13"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"TC1_P"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 14 "PROBE_TC1_P")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "e020d8d3-9692-5fb1-aa50-dc5468a06453")
+		(at 10.15 63.45)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/379c971a-7b14-5bdc-929f-651626fe2e57")
+		(property
+			"Reference"
+			"TP14"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"TC1_N"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 15 "PROBE_TC1_N")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "894a3391-540e-5495-8591-de62d38872b4")
+		(at 9.95 50.2)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/b07a6f5f-92fe-5507-a881-2a8051f4ea51")
+		(property
+			"Reference"
+			"TP15"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"CURR_SENSE"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 16 "PROBE_CURR_SENSE")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "328ef2b3-eff7-54b0-9f33-14da2ce9bf6c")
+		(at 53 45.25)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/b3a2fc7d-9b8b-523f-bd6b-a89515ed9cc7")
+		(property
+			"Reference"
+			"TP16"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"ESP32_EN"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 17 "PROBE_ESP32_EN")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "66ba20f3-88cf-5e42-8828-58844856d054")
+		(at 32.25 43)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/c21dafc9-09cb-5c1d-bf6f-acbf43234977")
+		(property
+			"Reference"
+			"TP17"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"ESP32_IO0"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 18 "PROBE_ESP32_IO0")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "7f61e947-aaee-5f2c-8f49-72563b030a21")
+		(at 28.25 4.25)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/fadff3b4-993a-5698-a212-e3131f8c3d5b")
+		(property
+			"Reference"
+			"TP18"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"COIL_PERMIT"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 19 "PROBE_COIL_PERMIT")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "48840ac4-63fa-555d-a792-4e6614983dc0")
+		(at 53 42.75)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/638622a2-ba76-597c-839b-7a5801e82913")
+		(property
+			"Reference"
+			"TP19"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"SUPERVISOR_RESET"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 20 "PROBE_SUPERVISOR_RESET")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "05a5b1a2-eace-5f8b-a08f-c60ba49bf53c")
+		(at 90.75 16)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/040d7473-572d-58f1-b9bc-63f05cfcfed8")
+		(property
+			"Reference"
+			"TP20"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"+5V"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 21 "PROBE_CH_5V")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "498acc2b-d88b-5d95-b45b-16648508b75d")
+		(at 77.1 20.5)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/c56b9dc5-5199-50dc-8dae-2aa224f24532")
+		(property
+			"Reference"
+			"TP21"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"+3.3V"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 22 "PROBE_CH_3_3V")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "6d15d75a-f960-5183-9f5c-1de34fb9fe14")
+		(at 23.3 53.25)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/fc9b46f3-a348-5ab5-adaa-a47e0e87df2e")
+		(property
+			"Reference"
+			"TP22"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"SUPERVISOR_TX"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 23 "PROBE_SUPERVISOR_UART_RX")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "f53d2ae9-522b-585e-9ccf-76fa41f273cf")
+		(at 65.15 59.55)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/0a1b08b2-6ac4-5130-a04c-1d13ec029f72")
+		(property
+			"Reference"
+			"TP23"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"I2C_SCL"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 24 "PROBE_I2C_I2C_SCL")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "f5b515c8-6e82-5319-b32b-5c906a0d3009")
+		(at 65.15 57.05)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/9e6c74eb-0b4c-5749-a03d-e10bcf8c6a76")
+		(property
+			"Reference"
+			"TP24"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"I2C_SDA"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 25 "PROBE_I2C_I2C_SDA")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "67050c13-0dfc-5344-a389-823f7e47c027")
+		(at 23.3 60.85)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/492c5871-1bd6-50b8-8a88-d0a2c99adc0b")
+		(property
+			"Reference"
+			"TP25"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"SPI_MISO"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 26 "PROBE_SPI_SPI_RX")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "55804895-d9bc-5812-92fd-3e6e33635f9f")
+		(at 23.3 58.3)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/9aa088f5-0e2a-5cb2-a4c7-e0462e169f60")
+		(property
+			"Reference"
+			"TP26"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"SPI_SCK"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 27 "PROBE_SPI_SPI_SCK")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(footprint
+		"pinside:PogoPin_millmax_0906"
+		(layer "F.Cu")
+		(uuid "46ecc4cb-9feb-50ce-ae38-3752633c10f1")
+		(at 23.3 63.35)
+		(descr "Mill-Max 0906 receptacle with a 0850 series spring pin, 1.91 mm pitch. 0906-0-15-20-76-14-11-0 receptacle + 0850-0-15-20-82-14-11-0 pin, 1.02 mm hole on a 1.91 mm minimum pitch. Mounting: press-fit.")
+		(tags "pogo spring pin test fixture bed-of-nails")
+		(attr through_hole)
+		(path "/b7e30227-a008-5d24-ad9f-0911704a157e")
+		(property
+			"Reference"
+			"TP27"
+			(at 0 -1.835 0)
+			(layer "F.SilkS")
+			(uuid "9b10b05d-38ae-542d-a6b6-1488eebfdec8")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property
+			"Value"
+			"SPI_MOSI"
+			(at 0 1.835 0)
+			(layer "F.Fab")
+			(uuid "bf4a44a3-2cc2-5b9b-b94e-c5bb670bef5d")
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.785 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "86e6d46d-70af-59d2-8695-e7d419fed4ca")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 0.885 0)
+			(stroke
+				(width 0.05)
+				(type default)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "e32d2e6f-c715-556b-93a1-b1978b691c54")
+		)
+		(pad
+			"1"
+			thru_hole
+			circle
+			(at 0 0)
+			(size 1.7 1.7)
+			(drill 1.02)
+			(layers "*.Cu" "*.Mask")
+			(remove_unused_layers no)
+			(net 28 "PROBE_SPI_SPI_TX")
+			(uuid "6ce366be-4452-5ec3-a154-17369e2dcaba")
+		)
+	)
+	(zone
+		(net 1)
+		(net_name "GND")
+		(layers "F.Cu" "B.Cu")
+		(uuid "e72f1475-9d5b-5216-99ac-82b7b2d6b535")
+		(name "GND pour")
+		(hatch edge 0.5)
+		(connect_pads
+			(clearance 0.5)
+		)
+		(min_thickness 0.25)
+		(filled_areas_thickness no)
+		(fill
+			yes
+			(thermal_gap 0.5)
+			(thermal_bridge_width 0.5)
+		)
+		(polygon
+			(pts
+				(xy 0.5 0.5)
+				(xy 99.5 0.5)
+				(xy 99.5 69.5)
+				(xy 0.5 69.5)
+			)
+		)
+	)
+	(gr_text
+		"kilncontrol-fixture"
+		(at 2 -6 0)
+		(layer "F.SilkS")
+		(uuid "7842218e-d51c-5e2e-8f6d-090f54b2caf2")
+		(effects
+			(font
+				(size 2.5 2.5)
+			)
+			(justify left)
+		)
+	)
+	(gr_text
+		"probes 27  |  0906-0-15-20-76-14-11-0  |  DUT /Users/bernhardtrinnes/Developer/Bitcrush/kilncontrol/hardware/kilncontrol.kicad_pcb"
+		(at 2 -2 0)
+		(layer "F.SilkS")
+		(uuid "fb894dd8-e326-5ddf-ab3c-0ae642fe5aed")
+		(effects
+			(font
+				(size 1.2 1.2)
+			)
+			(justify left)
+		)
+	)
+	(embedded_fonts no)
+)

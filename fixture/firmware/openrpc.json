@@ -1,0 +1,489 @@
+{
+  "openrpc": "1.2.6",
+  "info": {
+    "title": "kilncontrol-fixture fixture",
+    "version": "0.2.0",
+    "description": "Bed-of-nails fixture for the Safe Kiln Controller, drafted by `pinside init` and then reviewed by hand. Directions are set from the schematic's net names: every signal the DUT drives is an observed input, and only the six the DUT reads are driven. The schematic is the authority; see fixture/README.md for what is still open.\n\nJSON-RPC 2.0 over USB CDC, one request per line. The fixture also sends unsolicited notifications: fixture.ready once at start-up, and uart.data for every bus configured to stream.\n\nConfig hash 3db150410419. Compare it against fixture.info before trusting a run."
+  },
+  "x-pinside": {
+    "config_hash": "3db150410419",
+    "mcu": "rp2350b",
+    "dut_board": "/Users/bernhardtrinnes/Developer/Bitcrush/kilncontrol/hardware/kilncontrol.kicad_pcb",
+    "channels": [
+      {
+        "name": "supervisor_uart",
+        "kind": "uart",
+        "probe": ""
+      },
+      {
+        "name": "i2c_i2c",
+        "kind": "i2c",
+        "probe": ""
+      },
+      {
+        "name": "spi_spi",
+        "kind": "spi",
+        "probe": ""
+      },
+      {
+        "name": "tc1_cs",
+        "kind": "gpio",
+        "probe": "TC1_CS"
+      },
+      {
+        "name": "tc1_drdy",
+        "kind": "gpio",
+        "probe": "TC1_DRDY"
+      },
+      {
+        "name": "tc1_fault",
+        "kind": "gpio",
+        "probe": "TC1_FAULT"
+      },
+      {
+        "name": "ssr1",
+        "kind": "gpio",
+        "probe": "SSR1"
+      },
+      {
+        "name": "heat_en",
+        "kind": "gpio",
+        "probe": "HEAT_EN"
+      },
+      {
+        "name": "pump_node",
+        "kind": "gpio",
+        "probe": "PUMP_NODE"
+      },
+      {
+        "name": "heat_en_dc",
+        "kind": "gpio",
+        "probe": "HEAT_EN_DC"
+      },
+      {
+        "name": "coil_drv",
+        "kind": "gpio",
+        "probe": "COIL_DRV"
+      },
+      {
+        "name": "alarm",
+        "kind": "gpio",
+        "probe": "ALARM"
+      },
+      {
+        "name": "enc_a",
+        "kind": "gpio",
+        "probe": "ENC_A"
+      },
+      {
+        "name": "enc_b",
+        "kind": "gpio",
+        "probe": "ENC_B"
+      },
+      {
+        "name": "enc_btn",
+        "kind": "gpio",
+        "probe": "ENC_BTN"
+      },
+      {
+        "name": "tc1_p",
+        "kind": "gpio",
+        "probe": "TC1_P"
+      },
+      {
+        "name": "tc1_n",
+        "kind": "gpio",
+        "probe": "TC1_N"
+      },
+      {
+        "name": "curr_sense",
+        "kind": "gpio",
+        "probe": "CURR_SENSE"
+      },
+      {
+        "name": "esp32_en",
+        "kind": "gpio",
+        "probe": "ESP32_EN"
+      },
+      {
+        "name": "esp32_io0",
+        "kind": "gpio",
+        "probe": "ESP32_IO0"
+      },
+      {
+        "name": "coil_permit",
+        "kind": "gpio",
+        "probe": "COIL_PERMIT"
+      },
+      {
+        "name": "supervisor_reset",
+        "kind": "gpio",
+        "probe": "SUPERVISOR_RESET"
+      },
+      {
+        "name": "ch_5v",
+        "kind": "adc",
+        "probe": "+5V"
+      },
+      {
+        "name": "ch_3_3v",
+        "kind": "adc",
+        "probe": "+3.3V"
+      }
+    ]
+  },
+  "methods": [
+    {
+      "name": "fixture.info",
+      "summary": "Identify the fixture",
+      "description": "Returns the fixture name, firmware version, target, DUT board and the config hash the firmware was generated from.",
+      "params": [],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "fixture.channels",
+      "summary": "List every channel and the DUT signal it probes",
+      "description": "",
+      "params": [],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "name": "gpio.read",
+      "summary": "Read one GPIO channel",
+      "description": "Reports both the electrical level and whether that means asserted, which differ on an active-low line.",
+      "params": [
+        {
+          "name": "channel",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "gpio.write",
+      "summary": "Drive or release one GPIO channel",
+      "description": "An open-drain channel is released to high-Z rather than driven high, so the fixture never fights a pull-up on the DUT.",
+      "params": [
+        {
+          "name": "channel",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "assert",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "gpio.snapshot",
+      "summary": "Read every GPIO channel at once",
+      "description": "",
+      "params": [],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "name": "adc.read",
+      "summary": "Read one analogue channel",
+      "description": "millivolts is at the DUT, with the fixture's divider ratio already applied.",
+      "params": [
+        {
+          "name": "channel",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "adc.snapshot",
+      "summary": "Read every analogue channel at once",
+      "description": "",
+      "params": [],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "name": "uart.write",
+      "summary": "Transmit on a UART channel",
+      "description": "",
+      "params": [
+        {
+          "name": "channel",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "hex",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "string",
+            "pattern": "^([0-9a-fA-F]{2})*$"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "uart.read",
+      "summary": "Drain a UART channel's receive buffer",
+      "description": "",
+      "params": [
+        {
+          "name": "channel",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "max",
+          "required": false,
+          "description": "",
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "uart.configure",
+      "summary": "Change a UART channel's baud rate",
+      "description": "",
+      "params": [
+        {
+          "name": "channel",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "baud",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "i2c.scan",
+      "summary": "Find the devices answering on an I2C channel",
+      "description": "Probes 0x08-0x77; the addresses either side are reserved.",
+      "params": [
+        {
+          "name": "channel",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "i2c.write",
+      "summary": "Write to an I2C device",
+      "description": "",
+      "params": [
+        {
+          "name": "channel",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "address",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "name": "hex",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "string",
+            "pattern": "^([0-9a-fA-F]{2})*$"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "i2c.read",
+      "summary": "Read from an I2C device",
+      "description": "",
+      "params": [
+        {
+          "name": "channel",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "address",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "name": "length",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "spi.transfer",
+      "summary": "Clock bytes out of and into a SPI channel",
+      "description": "",
+      "params": [
+        {
+          "name": "channel",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "hex",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "string",
+            "pattern": "^([0-9a-fA-F]{2})*$"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    }
+  ],
+  "x-notifications": [
+    {
+      "name": "fixture.ready",
+      "summary": "Sent once when the fixture has configured its pins"
+    },
+    {
+      "name": "uart.data",
+      "summary": "Bytes received on a streaming UART channel, pushed without being asked"
+    }
+  ]
+}

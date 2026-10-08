@@ -80,7 +80,14 @@ jobs:
                      '*.cpp' '*.h' '*.md' '*.sdoc' 'CMakeLists.txt' '*/CMakeLists.txt' \
                      'firmware/controller/**/Kconfig*' 'firmware/controller/*.csv' 'firmware/controller/sdkconfig.*' \
                      'tools/*.sh' '.github/workflows/*.yml' 'strictdoc.toml' \
-                   | grep -v '^LICENSE')
+                   | grep -v '^LICENSE' \
+                   | grep -vE '^fixture/(board|firmware)/')
+            # fixture/board and fixture/firmware are generated verbatim by
+            # pinside, which is MIT licensed. Stamping GPL-3.0-or-later headers
+            # on another project's output would be a licensing misstatement, and
+            # they would be overwritten by the next `pinside generate` anyway.
+            # The inputs this project owns are NOT excluded:
+            # fixture/kilncontrol-fixture.json and fixture/README.md.
           exit $missing
 
   # --- architecture 14.4: unit, integration and fuzz, on the host --------
