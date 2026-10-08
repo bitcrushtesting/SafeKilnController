@@ -187,6 +187,9 @@ KILN_TEST(the_setpoint_is_tracked_through_the_ramp_not_just_at_the_end)
     CHECK_MSG(worst < 25.0f, "worst tracking error was %.1f degC", (double)worst);
 }
 
+/*
+ * @relation(SWR-CUR-08, scope=function)
+ */
 KILN_TEST(swrcur08_a_reference_current_is_learned_during_the_cold_climb)
 {
     rig_t r;
@@ -208,6 +211,9 @@ KILN_TEST(swrcur08_a_reference_current_is_learned_during_the_cold_climb)
     CHECK(kiln_current_energy_wh(&r.app.cur) > 0.0);
 }
 
+/*
+ * @relation(SWR-CUR-04, scope=function)
+ */
 KILN_TEST(swrcur04_measurements_are_gated_to_the_commanded_window)
 {
     rig_t r;
@@ -244,6 +250,9 @@ KILN_TEST(swrcur04_measurements_are_gated_to_the_commanded_window)
 
 /* --- electrical fault injection, SWR-TST-27 ---------------------------------- */
 
+/*
+ * @relation(SWR-SAF-25, scope=function)
+ */
 KILN_TEST(swrsaf25_a_relay_stuck_on_cannot_pass_current_while_the_contactor_is_open)
 {
     /* Worth asserting rather than assuming: at idle the contactor is open, so a
@@ -263,6 +272,9 @@ KILN_TEST(swrsaf25_a_relay_stuck_on_cannot_pass_current_while_the_contactor_is_o
     CHECK_NEAR(kiln_sim_temperature(&r.sim), 20.0f, 1.0f);
 }
 
+/*
+ * @relation(SWR-SAF-25, scope=function)
+ */
 KILN_TEST(swrsaf25_a_relay_stuck_on_is_caught_during_a_firing)
 {
     /* The case that matters: the contactor is closed because the kiln is meant
@@ -294,6 +306,9 @@ KILN_TEST(swrsaf25_a_relay_stuck_on_is_caught_during_a_firing)
     CHECK(!r.app.heat_authorised);
 }
 
+/*
+ * @relation(SWR-SAF-27, scope=function)
+ */
 KILN_TEST(swrsaf27_discriminates_a_welded_contactor_from_a_shorted_ssr)
 {
     /* The same symptom, two very different instructions to the operator. */
@@ -328,6 +343,9 @@ KILN_TEST(swrsaf27_discriminates_a_welded_contactor_from_a_shorted_ssr)
     CHECK_EQ_INT(weld.app.fault, KILN_FAULT_CONTACTOR_WELDED);
 }
 
+/*
+ * @relation(SWR-SAF-26, scope=function)
+ */
 KILN_TEST(swrsaf26_relay_fail_off_is_caught_long_before_the_thermal_backstop)
 {
     rig_t r;
@@ -350,6 +368,9 @@ KILN_TEST(swrsaf26_relay_fail_off_is_caught_long_before_the_thermal_backstop)
     CHECK_MSG(took < 60.0, "SWR-SAF-26 took %.1f s", took);
 }
 
+/*
+ * @relation(SWR-SAF-26, scope=function)
+ */
 KILN_TEST(swrsaf26_also_catches_fully_open_elements)
 {
     rig_t r;
@@ -363,6 +384,9 @@ KILN_TEST(swrsaf26_also_catches_fully_open_elements)
     CHECK_EQ_INT(rig_run_until_fault(&r, 300.0), KILN_FAULT_NO_HEATER_CURRENT);
 }
 
+/*
+ * @relation(SWR-SAF-29, scope=function)
+ */
 KILN_TEST(swrsaf29_overcurrent_is_caught)
 {
     rig_t r;
@@ -377,6 +401,9 @@ KILN_TEST(swrsaf29_overcurrent_is_caught)
     CHECK_EQ_INT(rig_run_until_fault(&r, 60.0), KILN_FAULT_OVERCURRENT);
 }
 
+/*
+ * @relation(SWR-CUR-11, scope=function)
+ */
 KILN_TEST(swrcur11_a_disconnected_transformer_is_detected_and_refuses_a_start)
 {
     rig_t r;
@@ -396,6 +423,9 @@ KILN_TEST(swrcur11_a_disconnected_transformer_is_detected_and_refuses_a_start)
     CHECK(!(r.app.warnings & KILN_WARN_BIT(KILN_WARN_CURRENT_OFF)));
 }
 
+/*
+ * @relation(SWR-CUR-12, scope=function)
+ */
 KILN_TEST(swrcur12_a_run_may_start_without_monitoring_when_it_is_disabled)
 {
     rig_t r;
@@ -418,6 +448,9 @@ KILN_TEST(swrcur12_a_run_may_start_without_monitoring_when_it_is_disabled)
     CHECK_EQ_INT(r.app.fault, KILN_FAULT_NONE);
 }
 
+/*
+ * @relation(SWR-SAF-28, scope=function)
+ */
 KILN_TEST(swrsaf28_partial_element_failure_shows_up_in_the_current)
 {
     rig_t r;
@@ -453,6 +486,9 @@ KILN_TEST(swrsaf28_partial_element_failure_shows_up_in_the_current)
 
 /* --- sensing and thermal injections ------------------------------------ */
 
+/*
+ * @relation(SWR-SAF-04, scope=function)
+ */
 KILN_TEST(swrsaf04_an_open_thermocouple_latches_after_the_grace_period)
 {
     rig_t r;
@@ -475,6 +511,9 @@ KILN_TEST(swrsaf04_an_open_thermocouple_latches_after_the_grace_period)
     CHECK_EQ_INT(r.app.state, KILN_STATE_IDLE);
 }
 
+/*
+ * @relation(SWR-SAF-05, scope=function)
+ */
 KILN_TEST(swrsaf05_a_reversed_thermocouple_is_caught)
 {
     rig_t r;
@@ -494,6 +533,9 @@ KILN_TEST(swrsaf05_a_reversed_thermocouple_is_caught)
     CHECK_EQ_INT(rig_run_until_fault(&r, 600.0), KILN_FAULT_TC_REVERSED);
 }
 
+/*
+ * @relation(SWR-SAF-11, scope=function)
+ */
 KILN_TEST(swrsaf11_an_over_hot_enclosure_stops_the_firing)
 {
     rig_t r;
@@ -510,6 +552,9 @@ KILN_TEST(swrsaf11_an_over_hot_enclosure_stops_the_firing)
     CHECK_EQ_INT(rig_run_until_fault(&r, 6000.0), KILN_FAULT_CASE_OVERTEMP);
 }
 
+/*
+ * @relation(SWR-SAF-09, scope=function)
+ */
 KILN_TEST(swrsaf09_the_configured_maximum_is_not_exceeded_by_the_margin)
 {
     rig_t r;
@@ -544,6 +589,9 @@ KILN_TEST(swrsaf09_the_configured_maximum_is_not_exceeded_by_the_margin)
 
 /* --- run control -------------------------------------------------------- */
 
+/*
+ * @relation(SWR-RUN-03, scope=function)
+ */
 KILN_TEST(swrrun03_pause_freezes_the_program_and_stops_the_heat)
 {
     rig_t r;
@@ -568,6 +616,9 @@ KILN_TEST(swrrun03_pause_freezes_the_program_and_stops_the_heat)
     CHECK(kiln_setpoint_value(&r.app.sp) > sp);
 }
 
+/*
+ * @relation(SWR-RUN-04, scope=function)
+ */
 KILN_TEST(swrrun04_abort_de_energises_promptly_from_any_state)
 {
     rig_t r;
@@ -590,6 +641,9 @@ KILN_TEST(swrrun04_abort_de_energises_promptly_from_any_state)
     CHECK(!kiln_sim_contactor(&r.sim));
 }
 
+/*
+ * @relation(SWR-RUN-10, scope=function)
+ */
 KILN_TEST(swrrun10_a_run_is_refused_while_a_fault_is_latched)
 {
     rig_t r;
@@ -605,6 +659,9 @@ KILN_TEST(swrrun10_a_run_is_refused_while_a_fault_is_latched)
     CHECK_ERR(kiln_app_autotune(&r.app, 600.0f), KILN_ERR_STATE);
 }
 
+/*
+ * @relation(SWR-RUN-02, scope=function)
+ */
 KILN_TEST(swrrun02_a_run_is_refused_while_the_chamber_channel_is_silent)
 {
     rig_t r;
@@ -616,6 +673,9 @@ KILN_TEST(swrrun02_a_run_is_refused_while_the_chamber_channel_is_silent)
     CHECK_ERR(kiln_app_start(&r.app, &p), KILN_ERR_STATE);
 }
 
+/*
+ * @relation(SWR-PRG-05, scope=function)
+ */
 KILN_TEST(swrprg05_an_invalid_program_is_refused_at_the_start_gate)
 {
     rig_t r;
@@ -631,6 +691,9 @@ KILN_TEST(swrprg05_an_invalid_program_is_refused_at_the_start_gate)
     CHECK_ERR(kiln_app_start(&r.app, &p), KILN_ERR_RANGE);
 }
 
+/*
+ * @relation(SWR-CTL-13, scope=function)
+ */
 KILN_TEST(swrctl13_a_cooling_segment_is_executed_passively)
 {
     rig_t r;
@@ -663,6 +726,9 @@ KILN_TEST(swrctl13_a_cooling_segment_is_executed_passively)
     CHECK(saw_cooling);
 }
 
+/*
+ * @relation(SWR-CUR-13, scope=function)
+ */
 KILN_TEST(swrcur13_switching_operations_are_counted_across_a_firing)
 {
     rig_t r;
@@ -682,6 +748,9 @@ KILN_TEST(swrcur13_switching_operations_are_counted_across_a_firing)
     CHECK(r.app.record.ssr_ops[0] > 0u);
 }
 
+/*
+ * @relation(SWR-RUN-06, scope=function)
+ */
 KILN_TEST(swrrun06_completion_sounds_the_alarm_for_its_configured_duration)
 {
     rig_t r;
@@ -703,6 +772,9 @@ KILN_TEST(swrrun06_completion_sounds_the_alarm_for_its_configured_duration)
     CHECK_OK(kiln_app_idle(&r.app));
 }
 
+/*
+ * @relation(SWA-05, scope=function)
+ */
 KILN_TEST(swa05_a_stopped_safety_cycle_releases_the_contactor)
 {
     /* The central safety property of the whole design: the coil is held up by a
@@ -733,6 +805,9 @@ KILN_TEST(swa05_a_stopped_safety_cycle_releases_the_contactor)
     CHECK_NEAR(kiln_sim_current(&r.sim), 0.0f, 0.05f);
 }
 
+/*
+ * @relation(SWR-SAF-16, scope=function)
+ */
 KILN_TEST(swrsaf16_withdrawing_authority_de_energises_without_waiting_for_a_window_edge)
 {
     rig_t r;
@@ -750,6 +825,9 @@ KILN_TEST(swrsaf16_withdrawing_authority_de_energises_without_waiting_for_a_wind
     CHECK_NEAR(kiln_sim_current(&r.sim), 0.0f, 0.05f);
 }
 
+/*
+ * @relation(SWR-CFG-08, scope=function)
+ */
 KILN_TEST(swrcfg08_safety_configuration_cannot_change_during_a_firing)
 {
     rig_t r;

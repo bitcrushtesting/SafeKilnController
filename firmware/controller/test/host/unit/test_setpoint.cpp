@@ -28,6 +28,9 @@ static kiln_program_t prog_of(uint8_t n, const kiln_segment_t *segs)
 
 /* --- SWR-CTL-09, SWR-CTL-10 ---------------------------------------------- */
 
+/*
+ * @relation(SWR-CTL-09, scope=function)
+ */
 KILN_TEST(swrctl09_the_setpoint_ramps_rather_than_stepping)
 {
     const kiln_segment_t segs[] = { { 600, 360, 0, 0, 0 } };   /* 360 degC/h */
@@ -45,6 +48,9 @@ KILN_TEST(swrctl09_the_setpoint_ramps_rather_than_stepping)
     CHECK_NEAR(kiln_setpoint_value(&st), 30.0f, 0.2f);
 }
 
+/*
+ * @relation(SWR-CTL-10, scope=function)
+ */
 KILN_TEST(swrctl10_rate_zero_means_as_fast_as_the_kiln_allows)
 {
     const kiln_segment_t segs[] = { { 600, 0, 0, 0, 0 } };
@@ -59,6 +65,9 @@ KILN_TEST(swrctl10_rate_zero_means_as_fast_as_the_kiln_allows)
 
 /* --- SWR-CTL-11, SWR-CTL-12 ---------------------------------------------- */
 
+/*
+ * @relation(SWR-CTL-11, scope=function)
+ */
 KILN_TEST(swrctl11_holdback_freezes_the_curve_while_the_kiln_lags)
 {
     const kiln_segment_t segs[] = { { 600, 360, 0, 0, 0 } };
@@ -83,6 +92,9 @@ KILN_TEST(swrctl11_holdback_freezes_the_curve_while_the_kiln_lags)
     CHECK(!kiln_setpoint_holdback(&st));
 }
 
+/*
+ * @relation(SWR-CTL-12, scope=function)
+ */
 KILN_TEST(swrctl12_dwell_accrues_only_while_the_kiln_is_within_tolerance)
 {
     const kiln_segment_t segs[] = { { 100, 0, 1, 0, 0 } };   /* 1 minute dwell */
@@ -109,6 +121,9 @@ KILN_TEST(swrctl12_dwell_accrues_only_while_the_kiln_is_within_tolerance)
 
 /* --- SWR-CTL-13: the clamping consistency that B9 fixed ----------------- */
 
+/*
+ * @relation(SWR-CTL-13, scope=function)
+ */
 KILN_TEST(swrctl13_a_cooling_ramp_is_passive)
 {
     const kiln_segment_t segs[] = { { 400, 100, 0, 0, 0 } };
@@ -120,6 +135,9 @@ KILN_TEST(swrctl13_a_cooling_ramp_is_passive)
     CHECK(!kiln_setpoint_heat_allowed(&st));
 }
 
+/*
+ * @relation(SWR-CTL-13, scope=function)
+ */
 KILN_TEST(swrctl13_heat_allowed_uses_the_same_clamped_target_as_the_executor)
 {
     /* The executor ramps toward clamp(target, 0, max); heat_allowed used to
@@ -164,6 +182,9 @@ KILN_TEST(swrctl13_heat_allowed_uses_the_same_clamped_target_as_the_executor)
     CHECK(saw_cooling);
 }
 
+/*
+ * @relation(SWR-SAF-23, scope=function)
+ */
 KILN_TEST(swrsaf23_the_configured_maximum_and_the_ceiling_both_bind)
 {
     const kiln_segment_t segs[] = { { 1340, 0, 0, 0, 0 } };
@@ -180,6 +201,9 @@ KILN_TEST(swrsaf23_the_configured_maximum_and_the_ceiling_both_bind)
 
 /* --- SWR-PRG-03 --------------------------------------------------------- */
 
+/*
+ * @relation(SWR-PRG-03, scope=function)
+ */
 KILN_TEST(swrprg03_a_segment_can_wait_for_an_operator)
 {
     const kiln_segment_t segs[] = {
@@ -271,6 +295,9 @@ static void check_prediction_matches_oracle(const kiln_program_t *p, float start
     }
 }
 
+/*
+ * @relation(SWR-PRG-06, scope=function)
+ */
 KILN_TEST(swrprg06_closed_form_prediction_agrees_with_the_simulation_oracle)
 {
     const kiln_segment_t a[] = { { 600, 100, 30, 0, 0 } };
@@ -298,6 +325,9 @@ KILN_TEST(swrprg06_closed_form_prediction_agrees_with_the_simulation_oracle)
     check_prediction_matches_oracle(&pc, 20.0f, 700.0f);
 }
 
+/*
+ * @relation(SWR-PRG-06, scope=function)
+ */
 KILN_TEST(swrprg06_prediction_stops_at_a_segment_that_waits_on_a_human)
 {
     const kiln_segment_t segs[] = {
@@ -316,6 +346,9 @@ KILN_TEST(swrprg06_prediction_stops_at_a_segment_that_waits_on_a_human)
     CHECK_EQ_UINT(remaining, predict_by_simulation(&st, false));
 }
 
+/*
+ * @relation(SWR-PRG-06, scope=function)
+ */
 KILN_TEST(swrprg06_prediction_is_zero_once_there_is_nothing_to_predict)
 {
     kiln_setpoint_t st = {};
@@ -334,6 +367,9 @@ KILN_TEST(swrprg06_prediction_is_zero_once_there_is_nothing_to_predict)
 
 /* --- SWR-PRG-10 --------------------------------------------------------- */
 
+/*
+ * @relation(SWR-PRG-10, scope=function)
+ */
 KILN_TEST(swrprg10_only_segments_that_have_not_started_may_be_replaced)
 {
     const kiln_segment_t segs[] = {
@@ -370,6 +406,9 @@ KILN_TEST(swrprg10_only_segments_that_have_not_started_may_be_replaced)
 
 /* --- SWR-NFR-17 ------------------------------------------------------------ */
 
+/*
+ * @relation(SWR-NFR-17, scope=function)
+ */
 KILN_TEST(swrnfr17_tick_reports_what_it_refused_to_do)
 {
     const kiln_segment_t segs[] = { { 100, 0, 0, 0, 0 } };

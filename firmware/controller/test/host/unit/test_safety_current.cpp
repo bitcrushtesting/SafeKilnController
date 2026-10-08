@@ -51,6 +51,9 @@ static void conduction(kiln_safety_input_t *in, float amps)
 
 /* --- SWR-SAF-25 / SWR-SAF-27 ------------------------------------------------------ */
 
+/*
+ * @relation(SWR-SAF-25, scope=function)
+ */
 KILN_TEST(swrsaf25_latches_nothing_before_the_configured_window_count)
 {
     kiln_safety_t s;
@@ -69,6 +72,9 @@ KILN_TEST(swrsaf25_latches_nothing_before_the_configured_window_count)
     CHECK_EQ_UINT(s.fail_on_count, 1u);
 }
 
+/*
+ * @relation(SWR-SAF-25, scope=function)
+ */
 KILN_TEST(swrsaf25_withholds_heat_and_drops_the_contactor_on_the_second_window)
 {
     kiln_safety_t s;
@@ -91,6 +97,9 @@ KILN_TEST(swrsaf25_withholds_heat_and_drops_the_contactor_on_the_second_window)
     CHECK_EQ_INT(s.weld_phase, KILN_WELD_WAIT_DROPOUT);
 }
 
+/*
+ * @relation(SWR-SAF-27, scope=function)
+ */
 KILN_TEST(swrsaf27_latches_ssr_shorted_when_current_stops_with_the_contactor_open)
 {
     kiln_safety_t s;
@@ -128,6 +137,9 @@ KILN_TEST(swrsaf27_latches_ssr_shorted_when_current_stops_with_the_contactor_ope
     CHECK(s.weld_timer_s <= c.weld_verdict_s);
 }
 
+/*
+ * @relation(SWR-SAF-27, scope=function)
+ */
 KILN_TEST(swrsaf27_latches_contactor_welded_when_current_persists)
 {
     kiln_safety_t s;
@@ -154,6 +166,9 @@ KILN_TEST(swrsaf27_latches_contactor_welded_when_current_persists)
     CHECK(!v.heat_permitted);
 }
 
+/*
+ * @relation(SWR-SAF-27, scope=function)
+ */
 KILN_TEST(swrsaf27_takes_the_severe_verdict_when_no_measurement_arrives_in_time)
 {
     kiln_safety_t s;
@@ -176,6 +191,9 @@ KILN_TEST(swrsaf27_takes_the_severe_verdict_when_no_measurement_arrives_in_time)
     CHECK_EQ_INT(got, KILN_FAULT_CONTACTOR_WELDED);
 }
 
+/*
+ * @relation(SWR-SAF-25, scope=function)
+ */
 KILN_TEST(swrsaf25_stands_down_while_heating_is_commanded_on)
 {
     kiln_safety_t s;
@@ -197,6 +215,9 @@ KILN_TEST(swrsaf25_stands_down_while_heating_is_commanded_on)
 
 /* --- SWR-SAF-26 ------------------------------------------------------------- */
 
+/*
+ * @relation(SWR-SAF-26, scope=function)
+ */
 KILN_TEST(swrsaf26_latches_no_heater_current_after_the_configured_period)
 {
     kiln_safety_t s;
@@ -220,6 +241,9 @@ KILN_TEST(swrsaf26_latches_no_heater_current_after_the_configured_period)
     CHECK_NEAR(elapsed, c.fail_off_window_s, 0.3f);
 }
 
+/*
+ * @relation(SWR-SAF-26, scope=function)
+ */
 KILN_TEST(swrsaf26_uses_the_nominal_floor_before_a_reference_exists)
 {
     /* SWR-CUR-08's reference is learned during the cold full-power stretch at the
@@ -244,6 +268,9 @@ KILN_TEST(swrsaf26_uses_the_nominal_floor_before_a_reference_exists)
     CHECK_EQ_INT(got, KILN_FAULT_NO_HEATER_CURRENT);
 }
 
+/*
+ * @relation(SWR-SAF-26, scope=function)
+ */
 KILN_TEST(swrsaf26_needs_a_run_of_low_windows_and_not_just_an_elapsed_timer)
 {
     /* Elapsed time alone can be tipped over by one unrepresentative measurement
@@ -280,6 +307,9 @@ KILN_TEST(swrsaf26_needs_a_run_of_low_windows_and_not_just_an_elapsed_timer)
     CHECK_EQ_INT(kiln_safety_eval(&s, &in, 0.1f).fault, KILN_FAULT_NO_HEATER_CURRENT);
 }
 
+/*
+ * @relation(SWR-SAF-26, scope=function)
+ */
 KILN_TEST(swrsaf26_a_single_good_window_clears_the_accumulated_evidence)
 {
     /* The first on-window of a run can be caught while the contactor is still
@@ -305,6 +335,9 @@ KILN_TEST(swrsaf26_a_single_good_window_clears_the_accumulated_evidence)
     CHECK_NEAR(s.fail_off_timer_s, 0.0f, 0.001f);
 }
 
+/*
+ * @relation(SWR-SAF-26, scope=function)
+ */
 KILN_TEST(swrsaf26_does_not_trip_on_healthy_current)
 {
     kiln_safety_t s;
@@ -324,6 +357,9 @@ KILN_TEST(swrsaf26_does_not_trip_on_healthy_current)
 
 /* --- SWR-SAF-28 ------------------------------------------------------------- */
 
+/*
+ * @relation(SWR-SAF-28, scope=function)
+ */
 KILN_TEST(swrsaf28_warns_at_the_warning_band_without_withholding_heat)
 {
     kiln_safety_t s;
@@ -344,6 +380,9 @@ KILN_TEST(swrsaf28_warns_at_the_warning_band_without_withholding_heat)
     CHECK(v.warnings & KILN_WARN_BIT(KILN_WARN_CURRENT_DEV));
 }
 
+/*
+ * @relation(SWR-SAF-28, scope=function)
+ */
 KILN_TEST(swrsaf28_latches_current_deviation_at_the_fault_band)
 {
     kiln_safety_t s;
@@ -367,6 +406,9 @@ KILN_TEST(swrsaf28_latches_current_deviation_at_the_fault_band)
     CHECK_EQ_INT(got, KILN_FAULT_CURRENT_DEVIATION);
 }
 
+/*
+ * @relation(SWR-SAF-28, scope=function)
+ */
 KILN_TEST(swrsaf28_holds_its_timer_when_no_comparison_is_available)
 {
     kiln_safety_t s;
@@ -398,6 +440,9 @@ KILN_TEST(swrsaf28_holds_its_timer_when_no_comparison_is_available)
 
 /* --- SWR-SAF-29 ------------------------------------------------------------- */
 
+/*
+ * @relation(SWR-SAF-29, scope=function)
+ */
 KILN_TEST(swrsaf29_latches_overcurrent_after_the_configured_windows)
 {
     kiln_safety_t s;
@@ -419,6 +464,9 @@ KILN_TEST(swrsaf29_latches_overcurrent_after_the_configured_windows)
     CHECK(!v2.heat_permitted);
 }
 
+/*
+ * @relation(SWR-SAF-29, scope=function)
+ */
 KILN_TEST(swrsaf29_resets_its_count_on_a_single_clean_window)
 {
     kiln_safety_t s;
@@ -440,6 +488,9 @@ KILN_TEST(swrsaf29_resets_its_count_on_a_single_clean_window)
 
 /* --- SWR-SAF-30 ------------------------------------------------------------- */
 
+/*
+ * @relation(SWR-SAF-30, scope=function)
+ */
 KILN_TEST(swrsaf30_warns_when_a_relay_reaches_its_life_limit)
 {
     kiln_safety_t s;
@@ -458,6 +509,9 @@ KILN_TEST(swrsaf30_warns_when_a_relay_reaches_its_life_limit)
     CHECK(v.heat_permitted);     /* a relay at its life limit still works */
 }
 
+/*
+ * @relation(SWR-SAF-30, scope=function)
+ */
 KILN_TEST(swrsaf30_warns_on_intermittent_mismatches_that_self_clear)
 {
     kiln_safety_t s;
@@ -485,6 +539,9 @@ KILN_TEST(swrsaf30_warns_on_intermittent_mismatches_that_self_clear)
 
 /* --- SWR-CUR-11 and SWR-CUR-12 ------------------------------------------- */
 
+/*
+ * @relation(SWR-CUR-11, scope=function)
+ */
 KILN_TEST(swrcur11_latches_a_ct_fault_only_after_its_grace_period)
 {
     kiln_safety_t s;
@@ -509,6 +566,9 @@ KILN_TEST(swrcur11_latches_a_ct_fault_only_after_its_grace_period)
     CHECK_EQ_INT(got, KILN_FAULT_CT_FAULT);
 }
 
+/*
+ * @relation(SWR-CUR-11, scope=function)
+ */
 KILN_TEST(swrcur11_a_void_measurement_does_not_read_as_a_dead_element)
 {
     /* The dangerous confusion: 0 A reported by a CT that is not there must not
@@ -535,6 +595,9 @@ KILN_TEST(swrcur11_a_void_measurement_does_not_read_as_a_dead_element)
     CHECK_NEAR(s.fail_off_timer_s, 0.0f, 0.001f);
 }
 
+/*
+ * @relation(SWR-CUR-12, scope=function)
+ */
 KILN_TEST(swrcur12_warns_persistently_while_monitoring_is_disabled)
 {
     kiln_safety_t s;
@@ -558,6 +621,9 @@ KILN_TEST(swrcur12_warns_persistently_while_monitoring_is_disabled)
     CHECK(!(v.warnings & KILN_WARN_BIT(KILN_WARN_CURRENT_OFF)));
 }
 
+/*
+ * @relation(SWR-CUR-12, scope=function)
+ */
 KILN_TEST(swrcur12_current_rules_stand_down_when_monitoring_is_off)
 {
     kiln_safety_t s;
@@ -609,6 +675,9 @@ KILN_TEST(stale_and_skipped_measurements_are_not_evidence)
 
 /* --- SWR-SAF-17 / SWR-SAF-18: clearability --------------------------------------- */
 
+/*
+ * @relation(SWR-SAF-27, scope=function)
+ */
 KILN_TEST(swrsaf27_welded_contactor_is_never_clearable_by_acknowledgement)
 {
     const kiln_safety_cfg_t c = cfg();
@@ -621,6 +690,9 @@ KILN_TEST(swrsaf27_welded_contactor_is_never_clearable_by_acknowledgement)
     CHECK(!kiln_safety_can_clear(&c, KILN_FAULT_CONTACTOR_WELDED, &in));
 }
 
+/*
+ * @relation(SWR-SAF-18, scope=function)
+ */
 KILN_TEST(swrsaf18_can_clear_is_an_allow_list_not_a_deny_list)
 {
     const kiln_safety_cfg_t c = cfg();
@@ -634,6 +706,9 @@ KILN_TEST(swrsaf18_can_clear_is_an_allow_list_not_a_deny_list)
     CHECK(!kiln_safety_can_clear(&c, KILN_FAULT_TC_OPEN, NULL));
 }
 
+/*
+ * @relation(SWR-SAF-18, scope=function)
+ */
 KILN_TEST(swrsaf18_current_faults_clear_only_once_their_condition_has_gone)
 {
     const kiln_safety_cfg_t c = cfg();

@@ -8,6 +8,9 @@
 #include "kiln_core/configmodel.h"
 #include "kiln_core/logrec.h"   /* kiln_crc16, to forge a stored blob */
 
+/*
+ * @relation(SWR-CFG-01, scope=function)
+ */
 KILN_TEST(swrcfg01_every_item_is_reachable_and_its_default_is_in_range)
 {
     /* The table is the schema: a row whose offset or type is wrong would make
@@ -53,6 +56,9 @@ KILN_TEST(swrcfg01_every_item_is_reachable_and_its_default_is_in_range)
     }
 }
 
+/*
+ * @relation(SWR-CFG-01, scope=function)
+ */
 KILN_TEST(swrcfg01_no_two_items_share_a_key_or_an_offset)
 {
     const uint16_t n = kiln_config_item_count();
@@ -67,6 +73,9 @@ KILN_TEST(swrcfg01_no_two_items_share_a_key_or_an_offset)
     }
 }
 
+/*
+ * @relation(SWR-CFG-02, scope=function)
+ */
 KILN_TEST(swrcfg02_the_minimum_item_set_is_present)
 {
     /* The list SWR-CFG-02 enumerates, by group. */
@@ -95,6 +104,9 @@ KILN_TEST(swrcfg02_the_minimum_item_set_is_present)
     }
 }
 
+/*
+ * @relation(SWR-CFG-03, scope=function)
+ */
 KILN_TEST(swrcfg03_a_write_outside_the_declared_range_is_refused)
 {
     kiln_config_t cfg;
@@ -111,6 +123,9 @@ KILN_TEST(swrcfg03_a_write_outside_the_declared_range_is_refused)
     CHECK_NEAR(it->max, (double)KILN_TEMP_CEILING_C, 0.01);
 }
 
+/*
+ * @relation(SWR-CFG-03, scope=function)
+ */
 KILN_TEST(swrcfg03_the_whole_write_is_rejected_atomically)
 {
     kiln_config_t live, incoming;
@@ -130,6 +145,9 @@ KILN_TEST(swrcfg03_the_whole_write_is_rejected_atomically)
     CHECK_NEAR(live.holdback_band_c, 25.0f, 0.01f);
 }
 
+/*
+ * @relation(SWR-CFG-08, scope=function)
+ */
 KILN_TEST(swrcfg08_safety_items_are_refused_while_a_run_is_in_progress)
 {
     kiln_config_t live, incoming;
@@ -149,6 +167,9 @@ KILN_TEST(swrcfg08_safety_items_are_refused_while_a_run_is_in_progress)
     CHECK_NEAR(live.max_temp_c, 1100.0f, 0.01f);
 }
 
+/*
+ * @relation(SWR-CFG-08, scope=function)
+ */
 KILN_TEST(swrcfg08_an_unchanged_safety_item_does_not_block_an_unrelated_edit)
 {
     /* Every real API client sends the whole configuration back with one edit in
@@ -164,6 +185,9 @@ KILN_TEST(swrcfg08_an_unchanged_safety_item_does_not_block_an_unrelated_edit)
     CHECK_EQ_UINT(live.dim_timeout_s, 120u);
 }
 
+/*
+ * @relation(SWR-CFG-04, scope=function)
+ */
 KILN_TEST(swrcfg04_reboot_required_is_reported_for_the_items_that_need_one)
 {
     kiln_config_t a, b;
@@ -183,6 +207,9 @@ KILN_TEST(swrcfg04_reboot_required_is_reported_for_the_items_that_need_one)
     CHECK(kiln_config_reboot_required(&a, &b));
 }
 
+/*
+ * @relation(SWR-CFG-07, scope=function)
+ */
 KILN_TEST(swrcfg07_secrets_are_flagged_so_they_are_never_serialised_outward)
 {
     /* security.web_password was removed on 2026-10-06: SWR-WEB-26 left nothing
@@ -201,6 +228,9 @@ KILN_TEST(swrcfg07_secrets_are_flagged_so_they_are_never_serialised_outward)
     }
 }
 
+/*
+ * @relation(SWR-NFR-19, scope=function)
+ */
 KILN_TEST(swrnfr19_a_string_write_that_would_truncate_is_refused)
 {
     kiln_config_t cfg;
@@ -221,6 +251,9 @@ KILN_TEST(swrnfr19_a_string_write_that_would_truncate_is_refused)
     CHECK_STR_EQ(got, "my-kiln-network");
 }
 
+/*
+ * @relation(SWR-NFR-19, scope=function)
+ */
 KILN_TEST(swrnfr19_an_unterminated_stored_string_fails_validation)
 {
     kiln_config_t cfg;
@@ -256,6 +289,9 @@ KILN_TEST(typed_accessors_refuse_the_wrong_type)
 
 /* --- persistence, SWR-CFG-05 -------------------------------------------- */
 
+/*
+ * @relation(SWR-CFG-05, scope=function)
+ */
 KILN_TEST(swrcfg05_a_current_blob_round_trips)
 {
     kiln_config_t out, in;
@@ -274,6 +310,9 @@ KILN_TEST(swrcfg05_a_current_blob_round_trips)
     CHECK_STR_EQ(out.hostname, "kiln-a");
 }
 
+/*
+ * @relation(SWR-CFG-05, scope=function)
+ */
 KILN_TEST(swrcfg05_a_corrupt_blob_falls_back_to_defaults)
 {
     kiln_config_t in, out;
@@ -300,6 +339,9 @@ KILN_TEST(swrcfg05_a_corrupt_blob_falls_back_to_defaults)
     CHECK_OK(kiln_config_validate(&out, NULL));
 }
 
+/*
+ * @relation(SWR-CFG-05, scope=function)
+ */
 KILN_TEST(swrcfg05_an_older_schema_is_migrated_with_defaults_for_new_items)
 {
     kiln_config_t in, out;
@@ -328,6 +370,9 @@ KILN_TEST(swrcfg05_an_older_schema_is_migrated_with_defaults_for_new_items)
     CHECK_EQ_UINT(out.log_interval_s, 10u);
 }
 
+/*
+ * @relation(SWR-CFG-05, scope=function)
+ */
 KILN_TEST(swrcfg05_a_newer_schema_is_not_guessed_at)
 {
     kiln_config_t in, out;
@@ -348,6 +393,9 @@ KILN_TEST(swrcfg05_a_newer_schema_is_not_guessed_at)
     CHECK_OK(kiln_config_validate(&out, NULL));
 }
 
+/*
+ * @relation(SWR-CFG-05, scope=function)
+ */
 KILN_TEST(swrcfg05_a_value_outside_a_tightened_range_is_repaired)
 {
     kiln_config_t in, out;

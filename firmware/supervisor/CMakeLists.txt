@@ -20,6 +20,7 @@ add_executable(supervisor.elf
     board/startup.cpp
     core/src/trip.cpp
     core/src/max31856.cpp
+    core/src/selfcheck.cpp
     protocol/src/sup_proto.cpp)
 
 target_include_directories(supervisor.elf PRIVATE
@@ -52,3 +53,24 @@ target_link_options(supervisor.elf PRIVATE
 # The real budget is reviewability, but a hard number catches drift.
 add_custom_command(TARGET supervisor.elf POST_BUILD
     COMMAND ${CMAKE_SIZE} supervisor.elf)
+
+# Stamp the image with the CRC of its own program memory, and produce the .bin
+# that actually gets flashed.
+#
+# Part of the build rather than a step to remember: the firmware treats an
+# unstamped image as a failed self-test and refuses to permit heat, so an image
+# that skipped this does not run. Making it a build step means that cannot
+# happen by forgetting.
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    add_custom_command(TARGET supervisor.elf POST_BUILD
+        COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_LIST_DIR}/../../tools/sup-crc.py
+                $<TARGET_FILE:supervisor.elf>
+        COMMENT "Stamping the program-memory CRC")
+else()
+    message(WARNING
+        "No Python 3 found: supervisor.bin will not be stamped, and an "
+        "unstamped image fails its own integrity self-test and will refuse "
+        "to permit heat. Run tools/sup-crc.py by hand.")
+endif()

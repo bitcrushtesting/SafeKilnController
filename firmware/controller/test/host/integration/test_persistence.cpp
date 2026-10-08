@@ -174,6 +174,9 @@ static tally_t tally(boot_t *b, uint32_t run_id)
 
 /* --- SWR-LOG-01..04 ------------------------------------------------------ */
 
+/*
+ * @relation(SWR-LOG-01, scope=function)
+ */
 KILN_TEST(swrlog01_a_firing_is_logged_from_start_to_finish)
 {
     static medium_t m;
@@ -205,6 +208,9 @@ KILN_TEST(swrlog01_a_firing_is_logged_from_start_to_finish)
     CHECK_EQ_UINT(b.app.log_errors, 0u);
 }
 
+/*
+ * @relation(SWR-RUN-07, scope=function)
+ */
 KILN_TEST(swrrun07_the_run_record_is_persisted_when_the_firing_ends)
 {
     static medium_t m;
@@ -229,6 +235,9 @@ KILN_TEST(swrrun07_the_run_record_is_persisted_when_the_firing_ends)
     CHECK(r.start_wall_utc_s > 0u);      /* SWR-LOG-12: the clock was synced */
 }
 
+/*
+ * @relation(SWR-LOG-14, scope=function)
+ */
 KILN_TEST(swrlog14_a_log_store_that_fails_does_not_stop_the_firing)
 {
     static medium_t m;
@@ -255,6 +264,9 @@ KILN_TEST(swrlog14_a_log_store_that_fails_does_not_stop_the_firing)
     CHECK(b.app.warnings & KILN_WARN_BIT(KILN_WARN_LOG_UNAVAIL));
 }
 
+/*
+ * @relation(SWR-LOG-14, scope=function)
+ */
 KILN_TEST(swrlog14_a_queue_that_overflows_drops_and_counts)
 {
     static medium_t m;
@@ -285,6 +297,9 @@ KILN_TEST(swrlog14_a_queue_that_overflows_drops_and_counts)
 
 /* --- SWR-CFG-05 across a reboot ------------------------------------------ */
 
+/*
+ * @relation(SWR-CFG-05, scope=function)
+ */
 KILN_TEST(swrcfg05_configuration_survives_a_reboot)
 {
     static medium_t m;
@@ -308,6 +323,9 @@ KILN_TEST(swrcfg05_configuration_survives_a_reboot)
     CHECK_NEAR(b2.app.safety.cfg.max_temp_c, 1100.0f, 0.01f);
 }
 
+/*
+ * @relation(SWR-PRG-09, scope=function)
+ */
 KILN_TEST(swrprg09_the_examples_are_present_after_a_first_boot)
 {
     static medium_t m;
@@ -324,6 +342,9 @@ KILN_TEST(swrprg09_the_examples_are_present_after_a_first_boot)
 
 /* --- SWR-SAF-17 across a reboot ---------------------------------------------- */
 
+/*
+ * @relation(SWR-SAF-17, scope=function)
+ */
 KILN_TEST(swrsaf17_a_latched_fault_is_still_latched_after_a_power_cycle)
 {
     static medium_t m;
@@ -359,6 +380,9 @@ KILN_TEST(swrsaf17_a_latched_fault_is_still_latched_after_a_power_cycle)
     CHECK_ERR(kiln_app_start(&b2.app, &p), KILN_ERR_STATE);
 }
 
+/*
+ * @relation(SWR-SAF-18, scope=function)
+ */
 KILN_TEST(swrsaf18_clearing_a_fault_clears_the_stored_copy_too)
 {
     static medium_t m;
@@ -404,6 +428,9 @@ static void interrupt_mid_run(medium_t *m, boot_t *b, uint16_t target,
     /* Power vanishes.  Nothing is flushed, nothing is closed. */
 }
 
+/*
+ * @relation(SWR-RUN-08, scope=function)
+ */
 KILN_TEST(swrrun08_the_default_policy_aborts_an_interrupted_firing)
 {
     static medium_t m;
@@ -424,6 +451,9 @@ KILN_TEST(swrrun08_the_default_policy_aborts_an_interrupted_firing)
     CHECK(b2.app.recovery.reason && b2.app.recovery.reason[0]);
 }
 
+/*
+ * @relation(SWR-RUN-08, scope=function)
+ */
 KILN_TEST(swrrun08_resume_is_offered_when_the_policy_allows_and_the_kiln_is_in_band)
 {
     static medium_t m;
@@ -454,6 +484,9 @@ KILN_TEST(swrrun08_resume_is_offered_when_the_policy_allows_and_the_kiln_is_in_b
     CHECK(b2.app.recovery.t_rel_ms > 0u);
 }
 
+/*
+ * @relation(SWR-RUN-08, scope=function)
+ */
 KILN_TEST(swrrun08_a_kiln_that_has_cooled_out_of_band_is_refused_and_faults)
 {
     static medium_t m;
@@ -485,6 +518,9 @@ KILN_TEST(swrrun08_a_kiln_that_has_cooled_out_of_band_is_refused_and_faults)
     CHECK_EQ_INT(b3.app.fault, KILN_FAULT_RECOVERY_REFUSED);
 }
 
+/*
+ * @relation(SWR-RUN-08, scope=function)
+ */
 KILN_TEST(swrrun08_an_outage_longer_than_the_limit_is_refused)
 {
     static medium_t m;
@@ -510,6 +546,9 @@ KILN_TEST(swrrun08_an_outage_longer_than_the_limit_is_refused)
     CHECK_EQ_INT(b2.app.fault, KILN_FAULT_RECOVERY_REFUSED);
 }
 
+/*
+ * @relation(SWR-SAF-14, scope=function)
+ */
 KILN_TEST(swrsaf14_a_watchdog_reset_during_a_firing_is_never_resumed)
 {
     static medium_t m;
@@ -536,6 +575,9 @@ KILN_TEST(swrsaf14_a_watchdog_reset_during_a_firing_is_never_resumed)
     CHECK_EQ_INT(b2.app.fault, KILN_FAULT_WATCHDOG);
 }
 
+/*
+ * @relation(SWR-RUN-08, scope=function)
+ */
 KILN_TEST(swrrun08_a_clean_boot_after_a_completed_firing_is_an_ordinary_boot)
 {
     static medium_t m;
@@ -559,6 +601,9 @@ KILN_TEST(swrrun08_a_clean_boot_after_a_completed_firing_is_an_ordinary_boot)
     CHECK_EQ_INT(b2.app.state, KILN_STATE_IDLE);
 }
 
+/*
+ * @relation(SWR-RUN-08, scope=function)
+ */
 KILN_TEST(swrrun08_recovery_is_decided_at_many_different_instants)
 {
     /* Architecture 14.4 asks for power loss at random instants.  Cutting at a
@@ -597,6 +642,9 @@ KILN_TEST(swrrun08_recovery_is_decided_at_many_different_instants)
     }
 }
 
+/*
+ * @relation(SWA-09, scope=function)
+ */
 KILN_TEST(swa09_recovery_needs_no_write_of_its_own)
 {
     /* The whole point of SWA-09: a 10 s run-state write to NVS would have added

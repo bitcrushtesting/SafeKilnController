@@ -36,8 +36,30 @@
 #include "pins.h"
 #include "stm32g031.h"
 #include "sup/max31856.h"
+#include "sup/selfcheck.h"
 #include "sup/trip.h"
 #include "sup_proto.h"
+
+/* The expected CRC of the program image, stamped into .sup_crc after linking by
+ * tools/sup-crc.py.
+ *
+ * `const` and NOT `volatile const`, which is the opposite of the obvious
+ * choice and matters: a volatile object is emitted into a WRITABLE section, and
+ * a writable section in the flash region gives the output an RWX LOAD segment
+ * that the linker warns about. It is read through a volatile pointer at the use
+ * site instead, which stops the compiler folding the placeholder into the
+ * comparison and optimising the whole check away while keeping the datum in
+ * read-only memory where it belongs. */
+extern "C" {
+/* `extern` on the definition is load-bearing too: a `const` at namespace scope
+ * has INTERNAL linkage in C++, which would leave the stamping tool hunting a
+ * mangled local symbol instead of a plain name. */
+extern const uint32_t sup_expected_crc;
+__attribute__((section(".sup_crc"), used))
+const uint32_t sup_expected_crc = SUP_CRC_UNPROGRAMMED;
+extern const uint8_t _sup_crc_region_start[];
+extern const uint8_t _sup_crc_region_end[];
+}
 
 namespace {
 
@@ -81,6 +103,27 @@ static_assert(CYCLE_RELOAD <= SYST_RVR_MAX,
  * sup_clear deliberately refuses to clear, so this must not be a race that a
  * slow part can lose.  20 cycles is 2 s against an expected 0.3 s. */
 constexpr uint32_t TC_FIRST_CONVERSION_CYCLES = 20u;
+
+/* IWDG, in LSI ticks of nominally 2 ms (see board_watchdog_init).
+ *
+ *   reload 175  ->  352 ms timeout, which is comfortably longer than one cycle
+ *                   and comfortably shorter than NFR-04's 500 ms budget.
+ *   window 140  ->  a feed is refused until 35 ticks have elapsed, so a cycle
+ *                   much shorter than 70 ms resets.
+ *
+ * The window must stay ABOVE the worst-case counter value at feed time, which
+ * with a +/-10 % LSI is 130, or a healthy board resets itself. 140 is that plus
+ * 10 ticks of margin. */
+constexpr uint32_t IWDG_RELOAD = 175u;
+constexpr uint32_t IWDG_WINDOW = 140u;
+static_assert(IWDG_WINDOW < IWDG_RELOAD,
+              "a window at or above the reload refuses every feed");
+static_assert(IWDG_RELOAD - IWDG_WINDOW >= 20u,
+              "too little of the period is inside the window: a healthy cycle "
+              "would be rejected as early");
+static_assert(IWDG_WINDOW >= 135u,
+              "the window has to clear the worst-case counter at feed time, "
+              "which a 10 % fast LSI puts at 130");
 
 /* --- board, unverified -------------------------------------------------- */
 
@@ -226,11 +269,72 @@ void board_watchdog_init()
      * 150 ms of margin above, which holds even if the LSI is 10 % off in
      * either direction.  The 1 s this was first written with would have missed
      * SWR-NFR-04 outright. */
-    IWDG_KR  = 0x0000CCCCu;                     /* start                     */
-    IWDG_KR  = 0x00005555u;                     /* enable register access    */
-    IWDG_PR  = 4u;                              /* LSI / 64 -> 2 ms per tick */
-    IWDG_RLR = 175u;                            /* 350 ms                    */
-    IWDG_KR  = 0x0000AAAAu;                     /* reload                    */
+    IWDG_KR  = 0x0000CCCCu;                     /* start, also starts the LSI */
+    IWDG_KR  = 0x00005555u;                     /* enable register access     */
+    IWDG_PR  = 4u;                              /* LSI / 64 -> 2 ms per tick  */
+    IWDG_RLR = IWDG_RELOAD;                     /* 350 ms                    */
+
+    /* PVU and RVU must clear before WINR is written; the write to WINR then
+     * reloads the counter and re-locks the registers. */
+    while ((IWDG_SR & 0x7u) != 0u) {
+    }
+    IWDG_WINR = IWDG_WINDOW;
+}
+
+/* --- the clock cross-check ----------------------------------------------
+ *
+ * The windowed watchdog above IS the cross-check, and it is worth spelling out
+ * why, because it looks like nothing more than a watchdog.
+ *
+ * The IWDG counts down from a clock the system clock cannot influence: the LSI,
+ * its own RC oscillator. Feeding it late resets, which is the ordinary watchdog
+ * behaviour and catches a hung loop or a system clock running slow. The WINDOW
+ * adds the other direction: feeding it EARLY, while the counter is still above
+ * IWDG_WINDOW, also resets. So the supervisor's 100 ms cycle is now measured
+ * against an independent oscillator from both sides, and three failures that
+ * were previously silent are not:
+ *
+ *   A SYSTEM CLOCK RUNNING FAST. The loop comes round early, the counter has
+ *   not fallen far enough, and the feed resets. Previously undetected, and it
+ *   matters because every trip timer is derived from the system clock: a fast
+ *   clock shortens SUP_CLEAR_HOLD_S, which is the one of them whose shortening
+ *   is not in the safe direction.
+ *
+ *   A STOPPED LSI. The counter never leaves IWDG_RELOAD, which is above the
+ *   window, so the first feed resets. This is the failure that matters most and
+ *   was completely silent before: a dead LSI means a watchdog that never fires,
+ *   so the protection the whole design leans on would have been absent with no
+ *   indication. A reset loop is the correct outcome, because startup.cpp drives
+ *   the permit line low before .data is copied, so a resetting supervisor is a
+ *   supervisor that is not permitting heat.
+ *
+ *   A SLOW SYSTEM CLOCK OR A HUNG LOOP. The ordinary timeout, as before.
+ *
+ * WHAT IT DOES NOT CATCH, stated so nobody claims otherwise in an assessment:
+ * small drift. The detection band is set by the LSI's own tolerance, which is
+ * the widest thing in the calculation. Taking the LSI as 32 kHz +/-10 %, one
+ * 100 ms cycle is 45 to 55 ticks, so the counter at feed time is 120 to 130 and
+ * the window has to sit above that to avoid resetting a healthy board.
+ * IWDG_WINDOW of 140 leaves 10 ticks of margin for loop jitter and detects a
+ * system clock roughly 1.3x fast or worse. That is gross-failure detection. A
+ * 2 % drift is not caught and does not need to be: it does not threaten the
+ * safety function, whereas a nuisance reset of the supervisor would.
+ */
+bool clock_ok()
+{
+    return sup_clock_ok(RCC_CR, RCC_CFGR);
+}
+
+/* Program memory integrity, checked once before anything is permitted. */
+bool flash_ok()
+{
+    const size_t len = static_cast<size_t>(_sup_crc_region_end - _sup_crc_region_start);
+    /* Read through a volatile pointer: the compiler can see the placeholder
+     * initialiser and would otherwise be entitled to fold the comparison and
+     * delete the check. See the note on sup_expected_crc's type. */
+    const uint32_t expected =
+        *static_cast<const volatile uint32_t *>(&sup_expected_crc);
+    return sup_flash_ok(_sup_crc_region_start, len, expected);
 }
 
 void watchdog_feed() { IWDG_KR = 0x0000AAAAu; }
@@ -411,11 +515,14 @@ bool tc_init()
     }
 
     for (uint32_t i = 0; i < TC_FIRST_CONVERSION_CYCLES; i++) {
-        /* The watchdog is already running and expires at 350 ms, while this
-         * loop can run for 2 s. Without this feed the wait for a first
-         * conversion would reset the part, every boot, forever. */
-        watchdog_feed();
+        /* Wait, THEN feed, and in that order for two reasons. The watchdog is
+         * already running and expires at 350 ms while this loop can run for
+         * 2 s, so it has to be fed at all. And the window means feeding EARLY
+         * resets just as surely as feeding late, so the feed has to follow a
+         * full cycle rather than lead one. Every feed in this firmware sits
+         * immediately after a wait_for_cycle_end() for that reason. */
         wait_for_cycle_end();
+        watchdog_feed();
         const tc_reading r = tc_read();
         /* Either answer ends the wait. A valid reading is the one wanted; a
          * reported fault is also a completed conversion, and it is the trip
@@ -442,18 +549,26 @@ int main()
     board_systick_init();
     board_watchdog_init();
 
-    /* tc_init can take up to TC_FIRST_CONVERSION_CYCLES, which is 2 s against
-     * the watchdog's 350 ms, so the watchdog has to be fed while it waits. The
-     * feed is inside the wait loop rather than here. */
-    const bool selftest_ok = tc_init();
+    /* Three self-tests, all of which must pass before heat can be permitted,
+     * and all of which are latched as SUP_TRIP_SELF_TEST, which sup_clear
+     * deliberately refuses to clear.
+     *
+     * The order is deliberate: the clock is checked first because every
+     * subsequent timing depends on it, the image second because a corrupt image
+     * makes the rest of this function meaningless, and the front end last
+     * because it is the one that takes two seconds.
+     *
+     * tc_init can run for TC_FIRST_CONVERSION_CYCLES, which is 2 s against the
+     * watchdog's 350 ms, so the watchdog is fed inside its wait loop. */
+    const bool clk = clock_ok();
+    const bool img = flash_ok();
+    const bool selftest_ok = clk && img && tc_init();
 
     sup_t sup;
     sup_init(&sup, selftest_ok);
 
     uint8_t seq = 0;
     for (;;) {
-        watchdog_feed();
-
         const tc_reading tc = tc_read();
 
         sup_input_t in = {};
@@ -486,5 +601,9 @@ int main()
         }
 
         wait_for_cycle_end();
+        /* The only feed in the loop, and deliberately the last statement: it
+         * is the one place where a full cycle is known to have elapsed, which
+         * the watchdog's window now requires. */
+        watchdog_feed();
     }
 }

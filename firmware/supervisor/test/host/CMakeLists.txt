@@ -17,6 +17,7 @@ set(FW_ROOT  ${CMAKE_CURRENT_LIST_DIR}/../../../controller)
 add_library(sup_core STATIC
     ${SUP_ROOT}/core/src/trip.cpp
     ${SUP_ROOT}/core/src/max31856.cpp
+    ${SUP_ROOT}/core/src/selfcheck.cpp
     ${SUP_ROOT}/protocol/src/sup_proto.cpp)
 target_include_directories(sup_core PUBLIC
     ${SUP_ROOT}/core/include
@@ -28,7 +29,7 @@ add_library(sup_check STATIC ${FW_ROOT}/test/host/support/kiln_check.cpp)
 target_include_directories(sup_check PUBLIC ${FW_ROOT}/test/host/support)
 
 enable_testing()
-foreach(t test_trip test_proto test_max31856)
+foreach(t test_trip test_proto test_max31856 test_selfcheck)
     add_executable(${t} ${CMAKE_CURRENT_LIST_DIR}/${t}.cpp)
     target_link_libraries(${t} PRIVATE sup_core sup_check)
     add_test(NAME ${t} COMMAND ${t})

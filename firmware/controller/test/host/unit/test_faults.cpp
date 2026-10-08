@@ -11,6 +11,9 @@
 #include "kiln/err.h"
 #include "kiln_core/faults.h"
 
+/*
+ * @relation(SWR-SAF-19, scope=function)
+ */
 KILN_TEST(swrsaf19_every_fault_code_has_a_label_a_cause_and_a_requirement)
 {
     for (int c = KILN_FAULT_TC_OPEN; c < KILN_FAULT_MAX; c++) {
@@ -48,6 +51,9 @@ KILN_TEST(the_current_fault_codes_are_the_ones_appendix_a_allocates)
     CHECK_STR_EQ(kiln_fault_requirement(KILN_FAULT_CT_FAULT),            "SWR-CUR-11");
 }
 
+/*
+ * @relation(SWR-SAF-27, scope=function)
+ */
 KILN_TEST(swrsaf27_tells_the_operator_to_isolate_the_kiln)
 {
     /* The one fault whose operator instruction is an action on the supply, not a
@@ -111,6 +117,9 @@ KILN_TEST(every_error_code_has_a_message)
 
 /* --- SWR-NFR-23: German --------------------------------------------------- */
 
+/*
+ * @relation(SWR-NFR-23, scope=function)
+ */
 KILN_TEST(swrnfr23_every_fault_has_a_german_label_and_cause)
 {
     for (int c = 0; c < KILN_FAULT_MAX; c++) {
@@ -122,6 +131,9 @@ KILN_TEST(swrnfr23_every_fault_has_a_german_label_and_cause)
     }
 }
 
+/*
+ * @relation(SWR-NFR-23, scope=function)
+ */
 KILN_TEST(swrnfr23_every_warning_has_a_german_label_and_cause)
 {
     for (int b = 0; b < KILN_WARN_COUNT; b++) {
@@ -133,6 +145,9 @@ KILN_TEST(swrnfr23_every_warning_has_a_german_label_and_cause)
     }
 }
 
+/*
+ * @relation(SWR-NFR-23, scope=function)
+ */
 KILN_TEST(swrnfr23_german_text_actually_differs_from_english)
 {
     /* A table copied from the English column would pass the emptiness checks
@@ -149,6 +164,9 @@ KILN_TEST(swrnfr23_german_text_actually_differs_from_english)
     CHECK_MSG(same == 0, "%d fault causes are identical in both languages", same);
 }
 
+/*
+ * @relation(SWR-NFR-23, scope=function)
+ */
 KILN_TEST(swrnfr23_the_unsuffixed_calls_stay_english)
 {
     /* Diagnostics, the log and requirement traceability should read the same
@@ -159,6 +177,9 @@ KILN_TEST(swrnfr23_the_unsuffixed_calls_stay_english)
                  kiln_fault_label_in(KILN_FAULT_DOOR_OPEN, KILN_LANG_DE)) != 0);
 }
 
+/*
+ * @relation(SWR-NFR-23, scope=function)
+ */
 KILN_TEST(swrnfr23_an_unknown_language_falls_back_to_english)
 {
     /* An operator who sees English has a worse day than one who sees German;
@@ -169,6 +190,9 @@ KILN_TEST(swrnfr23_an_unknown_language_falls_back_to_english)
     CHECK_STR_EQ(kiln_lang_tag(KILN_LANG_DE), "de");
 }
 
+/*
+ * @relation(SWR-NFR-23, scope=function)
+ */
 KILN_TEST(swrnfr23_german_labels_still_fit_the_display)
 {
     /* FR-HMI: the label column is 16 characters on a 128 px display, and a

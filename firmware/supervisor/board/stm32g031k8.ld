@@ -15,6 +15,8 @@ MEMORY
 
 _estack = ORIGIN(RAM) + LENGTH(RAM);
 
+_sup_crc_region_start = ORIGIN(FLASH);
+
 ENTRY(reset_handler)
 
 SECTIONS
@@ -30,6 +32,29 @@ SECTIONS
     } > FLASH
 
     .ARM.exidx : { *(.ARM.exidx*) } > FLASH
+
+    /* --- the integrity-checked region ----------------------------------
+     *
+     * Everything from the vector table to here is covered by the CRC the
+     * supervisor checks at boot (sup_flash_ok). The expected value sits in
+     * .sup_crc immediately after, OUTSIDE the covered region, because a digest
+     * cannot cover itself.
+     *
+     * .data's load image is deliberately NOT covered. It is appended after
+     * .sup_crc by `AT > FLASH` below, and including it would mean the region
+     * end depended on a section placed after the digest, which is a circular
+     * layout that is easy to get subtly wrong. The supervisor has no
+     * initialised data today (the build reports data = 0), so nothing is lost;
+     * if that changes, extend the region and move .sup_crc after it rather
+     * than leaving this comment stale.
+     */
+    . = ALIGN(4);
+    _sup_crc_region_end = .;
+
+    .sup_crc :
+    {
+        KEEP(*(.sup_crc))
+    } > FLASH
 
     _sidata = LOADADDR(.data);
     .data :

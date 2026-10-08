@@ -35,6 +35,9 @@ sup_tc_sample_t decode(const uint8_t (&regs)[SUP_TC_BURST_BYTES])
 
 }  // namespace
 
+/*
+ * @relation(SWR-ACQ-02, scope=function)
+ */
 KILN_TEST(swracq02_the_config_is_type_k_with_open_circuit_detect_and_50hz)
 {
     /* SWR-ACQ-02 fixes the type, and the supervisor has no receive path to be
@@ -52,6 +55,9 @@ KILN_TEST(swracq02_the_config_is_type_k_with_open_circuit_detect_and_50hz)
     CHECK_EQ_UINT(SUP_TC_MASK_VALUE, 0u);
 }
 
+/*
+ * @relation(SWR-ACQ-02, scope=function)
+ */
 KILN_TEST(swracq02_cr1_readback_rejects_an_absent_part)
 {
     CHECK(sup_tc_cr1_ok(SUP_TC_CR1_VALUE));
@@ -63,6 +69,9 @@ KILN_TEST(swracq02_cr1_readback_rejects_an_absent_part)
     CHECK(!sup_tc_cr1_ok(SUP_TC_CR1_VALUE ^ 0x01u));   /* wrong type */
 }
 
+/*
+ * @relation(SWR-ACQ-04, scope=function)
+ */
 KILN_TEST(swracq04_known_temperatures_decode_to_the_values_they_encode)
 {
     static const vector v[] = {
@@ -80,6 +89,9 @@ KILN_TEST(swracq04_known_temperatures_decode_to_the_values_they_encode)
     }
 }
 
+/*
+ * @relation(SWR-SAF-05, scope=function)
+ */
 KILN_TEST(swrsaf05_a_negative_reading_stays_negative)
 {
     /* The reason the shift in the decoder is signed. A logical shift would read
@@ -102,6 +114,9 @@ KILN_TEST(swrsaf05_a_negative_reading_stays_negative)
     }
 }
 
+/*
+ * @relation(SWR-SAF-04, scope=function)
+ */
 KILN_TEST(swrsaf04_a_silent_front_end_is_a_comms_fault_not_a_reading_of_zero)
 {
     /* All zeros decodes arithmetically to 0 degC with no fault bits set, which
@@ -120,6 +135,9 @@ KILN_TEST(swrsaf04_a_silent_front_end_is_a_comms_fault_not_a_reading_of_zero)
     CHECK_EQ_UINT(o.fault_bits, (unsigned)SUP_TC_FAULT_COMMS);
 }
 
+/*
+ * @relation(SWR-SAF-04, scope=function)
+ */
 KILN_TEST(swrsaf04_a_null_burst_is_a_comms_fault_and_never_a_reading)
 {
     sup_tc_sample_t s = {};
@@ -131,6 +149,9 @@ KILN_TEST(swrsaf04_a_null_burst_is_a_comms_fault_and_never_a_reading)
     sup_tc_decode(nullptr, nullptr);    /* must not fault */
 }
 
+/*
+ * @relation(SWR-ACQ-10, scope=function)
+ */
 KILN_TEST(swracq10_every_status_bit_maps_to_its_fault)
 {
     CHECK_EQ_UINT(sup_tc_faults(0u), 0u);
@@ -152,6 +173,9 @@ KILN_TEST(swracq10_every_status_bit_maps_to_its_fault)
                   (unsigned)(SUP_TC_FAULT_OPEN | SUP_TC_FAULT_TC_RANGE));
 }
 
+/*
+ * @relation(SWR-SAF-04, scope=function)
+ */
 KILN_TEST(swrsaf04_a_fault_bit_makes_the_reading_unusable_however_plausible_it_is)
 {
     /* 1000 degC is a perfectly reasonable number. With OPEN asserted it is
@@ -168,6 +192,9 @@ KILN_TEST(swrsaf04_a_fault_bit_makes_the_reading_unusable_however_plausible_it_i
     CHECK_NEAR(s.chamber_c, 1000.0f, 0.01);
 }
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_a_decoded_reading_drives_the_trip_logic_end_to_end)
 {
     /* The two halves joined: bytes off the bus, through the decode, into the

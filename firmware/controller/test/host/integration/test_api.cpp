@@ -261,6 +261,9 @@ static void expect_error(kiln_api_resp_t r, int status, const char *code)
 
 /* --- status, info (SWR-RUN-05, SWR-UPD-06) ------------------------------- */
 
+/*
+ * @relation(SWR-RUN-05, scope=function)
+ */
 KILN_TEST(swrrun05_status_exposes_everything_the_requirement_lists)
 {
     static rig_t r;
@@ -290,6 +293,9 @@ KILN_TEST(swrrun05_status_exposes_everything_the_requirement_lists)
     CHECK(kiln_json_find(resp.body, g_toks, n, 0, "fault") > 0);
 }
 
+/*
+ * @relation(SWR-WEB-25, scope=function)
+ */
 KILN_TEST(swrweb25_validity_travels_with_the_value_so_stale_is_distinguishable)
 {
     static rig_t r;
@@ -312,6 +318,9 @@ KILN_TEST(swrweb25_validity_travels_with_the_value_so_stale_is_distinguishable)
     CHECK(!valid);
 }
 
+/*
+ * @relation(SWR-UPD-06, scope=function)
+ */
 KILN_TEST(swrupd06_info_reports_identity_and_gain_provenance)
 {
     static rig_t r;
@@ -365,6 +374,9 @@ kiln_err_t fake_prod_blank(void *ctx, kiln_prod_info_t *out)
 
 }  // namespace
 
+/*
+ * @relation(SWR-PROD-03, scope=function)
+ */
 KILN_TEST(swrprod03_info_reports_the_production_block_when_programmed)
 {
     static rig_t r;
@@ -395,6 +407,9 @@ KILN_TEST(swrprod03_info_reports_the_production_block_when_programmed)
     CHECK_STR_EQ(buf, "2026-10-07");
 }
 
+/*
+ * @relation(SWR-PROD-04, scope=function)
+ */
 KILN_TEST(swrprod04_an_unprogrammed_unit_says_so_rather_than_omitting_the_block)
 {
     static rig_t r;
@@ -418,6 +433,9 @@ KILN_TEST(swrprod04_an_unprogrammed_unit_says_so_rather_than_omitting_the_block)
     CHECK(!programmed);
 }
 
+/*
+ * @relation(SWR-PROD-04, scope=function)
+ */
 KILN_TEST(swrprod04_a_port_without_prod_info_still_answers_with_the_block)
 {
     static rig_t r;
@@ -438,6 +456,9 @@ KILN_TEST(swrprod04_a_port_without_prod_info_still_answers_with_the_block)
 
 /* --- configuration (FR-CFG, SWR-WEB-17) --------------------------------- */
 
+/*
+ * @relation(SWR-WEB-17, scope=function)
+ */
 KILN_TEST(swrweb17_config_is_generated_from_the_schema_with_units_and_ranges)
 {
     static rig_t r;
@@ -465,6 +486,9 @@ KILN_TEST(swrweb17_config_is_generated_from_the_schema_with_units_and_ranges)
     CHECK(kiln_json_find(resp.body, g_toks, n, first, "locked_while_running") > 0);
 }
 
+/*
+ * @relation(SWR-CFG-07, scope=function)
+ */
 KILN_TEST(swrcfg07_a_secret_is_never_returned_only_whether_it_is_set)
 {
     static rig_t r;
@@ -501,6 +525,9 @@ KILN_TEST(swrcfg07_a_secret_is_never_returned_only_whether_it_is_set)
     CHECK(found);
 }
 
+/*
+ * @relation(SWR-WEB-26, scope=function)
+ */
 KILN_TEST(swrweb26_configuration_cannot_be_written_over_the_api)
 {
     /* The configured maximum temperature and the safety thresholds live here,
@@ -521,6 +548,9 @@ KILN_TEST(swrweb26_configuration_cannot_be_written_over_the_api)
     CHECK_EQ_INT(call(&r, KILN_HTTP_GET, "/api/config", NULL, NULL).status, 200);
 }
 
+/*
+ * @relation(SWR-CFG-08, scope=function)
+ */
 KILN_TEST(swrcfg08_a_safety_item_is_still_refused_while_running_locally)
 {
     /* The restriction did not move with the interface: applying config at the
@@ -541,6 +571,9 @@ KILN_TEST(an_unknown_configuration_key_is_not_found)
     CHECK_ERR(local_set_cfg(&r, "safety.make_it_hotter", 1.0), KILN_ERR_NOT_FOUND);
 }
 
+/*
+ * @relation(SWR-CFG-05, scope=function)
+ */
 KILN_TEST(swrcfg05_configuration_written_locally_is_persisted)
 {
     static rig_t r;
@@ -556,6 +589,9 @@ KILN_TEST(swrcfg05_configuration_written_locally_is_persisted)
 
 /* --- programs (SWR-PRG-07, SWR-WEB-12, SWR-WEB-13) ------------------------ */
 
+/*
+ * @relation(SWR-PRG-09, scope=function)
+ */
 KILN_TEST(swrprg09_the_examples_are_listed_and_marked_readonly)
 {
     static rig_t r;
@@ -578,6 +614,9 @@ KILN_TEST(swrprg09_the_examples_are_listed_and_marked_readonly)
     CHECK(kiln_json_find(resp.body, g_toks, n, first, "peak_c") > 0);
 }
 
+/*
+ * @relation(SWR-WEB-26, scope=function)
+ */
 KILN_TEST(swrweb26_an_unknown_program_slot_is_404_and_not_an_empty_list)
 {
     /* Asking for a program that is not there is a different mistake from
@@ -588,6 +627,9 @@ KILN_TEST(swrweb26_an_unknown_program_slot_is_404_and_not_an_empty_list)
     expect_error(missing, 404, "not_found");
 }
 
+/*
+ * @relation(SWR-WEB-26, scope=function)
+ */
 KILN_TEST(swrweb26_programs_are_readable_and_nothing_more)
 {
     /* Authoring went the way of the other writes on 2026-10-06: the password
@@ -611,6 +653,9 @@ KILN_TEST(swrweb26_programs_are_readable_and_nothing_more)
     expect_read_only(&r, KILN_HTTP_POST,   "/api/programs/1/copy", NULL);
 }
 
+/*
+ * @relation(SWR-PRG-09, scope=function)
+ */
 KILN_TEST(swrprg09_a_read_only_example_is_marked_as_such)
 {
     /* SWR-PRG-09's protection is now moot over the API, since nothing can be
@@ -623,6 +668,9 @@ KILN_TEST(swrprg09_a_read_only_example_is_marked_as_such)
     CHECK(strstr(list.body, "readonly") != NULL);
 }
 
+/*
+ * @relation(SWR-WEB-26, scope=function)
+ */
 KILN_TEST(swrweb26_a_body_on_a_read_only_route_changes_nothing)
 {
     /* There is no parser left to confuse: the method is refused before the
@@ -638,6 +686,9 @@ KILN_TEST(swrweb26_a_body_on_a_read_only_route_changes_nothing)
 
 /* --- run control (FR-RUN) ---------------------------------------------- */
 
+/*
+ * @relation(SWR-WEB-26, scope=function)
+ */
 KILN_TEST(swrweb26_run_control_is_not_reachable_from_the_api)
 {
     /* SWR-WEB-26.  The lifecycle itself is unchanged and still tested -- at the
@@ -666,6 +717,9 @@ KILN_TEST(swrweb26_run_control_is_not_reachable_from_the_api)
     CHECK_EQ_INT(call(&r, KILN_HTTP_GET, "/api/status", NULL, NULL).status, 200);
 }
 
+/*
+ * @relation(SWR-WEB-26, scope=function)
+ */
 KILN_TEST(swrweb26_a_latched_fault_cannot_be_acknowledged_over_the_api)
 {
     /* SWR-SAF-17 and SWR-WEB-26 pull the same way: clearing a fault re-arms a kiln
@@ -694,6 +748,9 @@ KILN_TEST(swrweb26_a_latched_fault_cannot_be_acknowledged_over_the_api)
     CHECK_EQ_INT(r.app.fault, KILN_FAULT_NONE);
 }
 
+/*
+ * @relation(SWR-WEB-24, scope=function)
+ */
 KILN_TEST(swrweb24_the_banner_data_carries_the_operator_text)
 {
     static rig_t r;
@@ -718,6 +775,9 @@ KILN_TEST(swrweb24_the_banner_data_carries_the_operator_text)
     CHECK(strlen(msg) > 30);
 }
 
+/*
+ * @relation(SWR-WEB-26, scope=function)
+ */
 KILN_TEST(swrweb26_the_running_program_cannot_be_edited_from_the_api)
 {
     /* SWR-PRG-10 let the remaining segments of a running program be adjusted.
@@ -734,6 +794,9 @@ KILN_TEST(swrweb26_the_running_program_cannot_be_edited_from_the_api)
     CHECK_EQ_INT(r.app.state, KILN_STATE_RUNNING);
 }
 
+/*
+ * @relation(SWR-WEB-26, scope=function)
+ */
 KILN_TEST(swrweb26_manual_heating_is_not_reachable_from_the_api)
 {
     /* Manual mode puts duty straight into the elements; it is the most direct
@@ -756,6 +819,9 @@ KILN_TEST(swrweb26_manual_heating_is_not_reachable_from_the_api)
 
 /* --- tuning (SWR-TUN-09, SWR-TUN-10) ------------------------------------- */
 
+/*
+ * @relation(SWR-TUN-10, scope=function)
+ */
 KILN_TEST(swrtun10_tuning_progress_and_candidates_are_exposed)
 {
     static rig_t r;
@@ -782,6 +848,9 @@ KILN_TEST(swrtun10_tuning_progress_and_candidates_are_exposed)
     expect_read_only(&r, KILN_HTTP_POST, "/api/tune/cancel", NULL);
 }
 
+/*
+ * @relation(SWR-WEB-26, scope=function)
+ */
 KILN_TEST(swrweb26_autotune_cannot_be_started_from_the_api)
 {
     /* Autotune drives the kiln through relay oscillation at its setpoint: it is
@@ -806,7 +875,7 @@ KILN_TEST(swrweb26_autotune_cannot_be_started_from_the_api)
 
 /* --- current, storage, runs -------------------------------------------- */
 
-KILN_TEST(frcur_the_current_endpoint_reports_measurement_and_wear)
+KILN_TEST(swrcur_the_current_endpoint_reports_measurement_and_wear)
 {
     static rig_t r;
     rig_init(&r);
@@ -840,6 +909,9 @@ KILN_TEST(frcur_the_current_endpoint_reports_measurement_and_wear)
     expect_read_only(&r, KILN_HTTP_POST, "/api/current/calibrate", "{\"known_a\":0}");
 }
 
+/*
+ * @relation(SWR-LOG-15, scope=function)
+ */
 KILN_TEST(swrlog15_storage_health_is_reported)
 {
     static rig_t r;
@@ -862,6 +934,9 @@ KILN_TEST(swrlog15_storage_health_is_reported)
     CHECK(kiln_json_find(resp.body, g_toks, n, log, "write_errors") > 0);
 }
 
+/*
+ * @relation(SWR-LOG-09, scope=function)
+ */
 KILN_TEST(swrlog09_the_run_list_is_newest_first_and_marks_truncation)
 {
     static rig_t r;
@@ -942,6 +1017,9 @@ static uint32_t seed_a_run(rig_t *r)
     return run_id;
 }
 
+/*
+ * @relation(SWR-LOG-10, scope=function)
+ */
 KILN_TEST(swrlog10_a_log_query_decimates_to_the_requested_point_count)
 {
     static rig_t r;
@@ -975,6 +1053,9 @@ KILN_TEST(swrlog10_a_log_query_decimates_to_the_requested_point_count)
     CHECK(kiln_json_find(g_sink.buf, g_toks, n, 0, "columns") > 0);
 }
 
+/*
+ * @relation(SWR-LOG-11, scope=function)
+ */
 KILN_TEST(swrlog11_decimation_preserves_a_brief_excursion)
 {
     /* The property the whole chart rests on: a short spike must not be averaged
@@ -1002,6 +1083,9 @@ KILN_TEST(swrlog11_decimation_preserves_a_brief_excursion)
               "the excursion was averaged away: %.400s", g_sink.buf);
 }
 
+/*
+ * @relation(SWR-WEB-18, scope=function)
+ */
 KILN_TEST(swrweb18_csv_is_offered_with_a_header_row)
 {
     static rig_t r;
@@ -1027,6 +1111,9 @@ KILN_TEST(swrweb18_csv_is_offered_with_a_header_row)
     CHECK(rows <= 21);
 }
 
+/*
+ * @relation(SWR-WEB-11, scope=function)
+ */
 KILN_TEST(swrweb11_a_24_hour_run_is_served_as_a_few_hundred_points)
 {
     /* SWR-WEB-11 gives a mid-range phone 2 s to render a 24 h run, which is only
@@ -1119,6 +1206,9 @@ KILN_TEST(a_client_that_disconnects_stops_the_scan)
     CHECK(g_sink.len < 2000);
 }
 
+/*
+ * @relation(SWR-LOG-13, scope=function)
+ */
 KILN_TEST(swrlog13_the_log_can_be_erased)
 {
     static rig_t r;
@@ -1138,6 +1228,9 @@ KILN_TEST(swrlog13_the_log_can_be_erased)
 
 /* --- 12.2's request-handling rules ------------------------------------- */
 
+/*
+ * @relation(SWR-WEB-23, scope=function)
+ */
 KILN_TEST(swrweb23_state_changing_endpoints_require_authentication)
 {
     static rig_t r;
@@ -1192,6 +1285,9 @@ KILN_TEST(swrweb23_state_changing_endpoints_require_authentication)
     CHECK(!kiln_api_needs_auth(&rd));
 }
 
+/*
+ * @relation(SWR-NFR-19, scope=function)
+ */
 KILN_TEST(swrnfr19_an_oversized_body_is_refused_before_it_is_parsed)
 {
     static rig_t r;
@@ -1219,6 +1315,9 @@ KILN_TEST(swrnfr19_an_oversized_body_is_refused_before_it_is_parsed)
     expect_error(resp, 413, "body_too_large");
 }
 
+/*
+ * @relation(SWR-WEB-20, scope=function)
+ */
 KILN_TEST(swrweb20_unknown_routes_and_methods_use_the_error_envelope)
 {
     static rig_t r;
@@ -1274,6 +1373,9 @@ KILN_TEST(query_parameters_are_decoded_and_bounded)
     CHECK(!kiln_api_query_uint("max_points=", "max_points", &n));
 }
 
+/*
+ * @relation(SWR-WEB-05, scope=function)
+ */
 KILN_TEST(swrweb05_the_telemetry_event_matches_the_status_shape)
 {
     /* One shape, so the UI has one parser for the stream and the one-shot. */

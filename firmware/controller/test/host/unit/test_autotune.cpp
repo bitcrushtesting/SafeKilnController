@@ -19,6 +19,9 @@ static kiln_tune_cfg_t cfg(float sp)
 
 /* --- SWR-TUN-06: the published gain rules ------------------------------- */
 
+/*
+ * @relation(SWR-TUN-06, scope=function)
+ */
 KILN_TEST(swrtun06_ziegler_nichols_matches_the_published_rule)
 {
     /* Ku = 2, Tu = 100 s.  ZN PID: Kp = 0.6 Ku, Ti = 0.5 Tu, Td = 0.125 Tu. */
@@ -28,6 +31,9 @@ KILN_TEST(swrtun06_ziegler_nichols_matches_the_published_rule)
     CHECK_NEAR(g.kd, 1.2f * 12.5f, 0.001f);
 }
 
+/*
+ * @relation(SWR-TUN-06, scope=function)
+ */
 KILN_TEST(swrtun06_tyreus_luyben_matches_the_published_rule)
 {
     /* TL: Kp = Ku/2.2, Ti = 2.2 Tu, Td = Tu/6.3. */
@@ -37,6 +43,9 @@ KILN_TEST(swrtun06_tyreus_luyben_matches_the_published_rule)
     CHECK_NEAR(g.kd, (2.0f / 2.2f) * (100.0f / 6.3f), 0.01f);
 }
 
+/*
+ * @relation(SWR-TUN-06, scope=function)
+ */
 KILN_TEST(swrtun06_nonsense_inputs_give_zero_gains)
 {
     const kiln_gains_t a = kiln_autotune_gains_from(0.0f, 100.0f, KILN_TUNE_RULE_TL);
@@ -49,6 +58,9 @@ KILN_TEST(swrtun06_nonsense_inputs_give_zero_gains)
 
 /* --- SWR-SAF-23: the clamp that B4 moved into the component ----------------- */
 
+/*
+ * @relation(SWR-SAF-23, scope=function)
+ */
 KILN_TEST(swrsaf23_the_tuning_setpoint_is_clamped_to_the_configured_maximum)
 {
     /* SWR-SAF-23 names the tuning setpoint explicitly, so the clamp cannot be left to
@@ -76,7 +88,7 @@ KILN_TEST(swrsaf23_the_tuning_setpoint_is_clamped_to_the_configured_maximum)
 
 /* --- SWR-TUN-05: the settle test that B12 made usable ------------------- */
 
-KILN_TEST(frtun_settle_uses_the_filtered_rate_not_a_single_sample_difference)
+KILN_TEST(swrtun_settle_uses_the_filtered_rate_not_a_single_sample_difference)
 {
     /* At a 0.25 s cycle, 0.5 degC of sensor noise is 7200 degC/h against a
      * 30 degC/h threshold: computed from one sample difference the settle test
@@ -106,7 +118,7 @@ KILN_TEST(frtun_settle_uses_the_filtered_rate_not_a_single_sample_difference)
     CHECK(elapsed < 10.0f);
 }
 
-KILN_TEST(frtun_settle_still_gives_up_on_its_timeout)
+KILN_TEST(swrtun_settle_still_gives_up_on_its_timeout)
 {
     kiln_tune_cfg_t c = cfg(600.0f);
     c.settle_max_s = 60.0f;
@@ -155,6 +167,9 @@ static bool run_identification(kiln_autotune_t *at, float amp_c, float period_s,
     return true;
 }
 
+/*
+ * @relation(SWR-TUN-05, scope=function)
+ */
 KILN_TEST(swrtun05_identifies_ku_and_tu_from_a_qualified_oscillation)
 {
     kiln_autotune_t at;
@@ -200,6 +215,9 @@ static bool run_identification_noisy(kiln_autotune_t *at, float amp_c, float per
     return true;
 }
 
+/*
+ * @relation(SWR-TUN-05, scope=function)
+ */
 KILN_TEST(swrtun05_a_clean_oscillation_is_identified_exactly_at_any_threshold)
 {
     /* The expectation here is easy to get backwards.  An extreme is confirmed
@@ -219,6 +237,9 @@ KILN_TEST(swrtun05_a_clean_oscillation_is_identified_exactly_at_any_threshold)
     }
 }
 
+/*
+ * @relation(SWR-TUN-05, scope=function)
+ */
 KILN_TEST(swrtun05_the_peak_threshold_is_what_buys_noise_immunity)
 {
     /* What the threshold is actually for, measured: with half a degree of sensor
@@ -254,6 +275,9 @@ KILN_TEST(swrtun05_the_peak_threshold_is_what_buys_noise_immunity)
               "residual bias was %.1f %%", (double)(100.0f * (truth - ku) / truth));
 }
 
+/*
+ * @relation(SWR-TUN-05, scope=function)
+ */
 KILN_TEST(swrtun05_an_inconsistent_oscillation_does_not_qualify)
 {
     kiln_tune_cfg_t c = cfg(600.0f);
@@ -278,6 +302,9 @@ KILN_TEST(swrtun05_an_inconsistent_oscillation_does_not_qualify)
     CHECK_EQ_INT(at.fail_reason, KILN_FAULT_TUNE_NO_CONVERGE);
 }
 
+/*
+ * @relation(SWR-TUN-07, scope=function)
+ */
 KILN_TEST(swrtun07_the_timeout_covers_the_whole_procedure)
 {
     kiln_tune_cfg_t c = cfg(1200.0f);
@@ -295,6 +322,9 @@ KILN_TEST(swrtun07_the_timeout_covers_the_whole_procedure)
     CHECK_EQ_UINT(kiln_autotune_tick(&at, 300.0f, 0.0f, 0.25f), 0u);
 }
 
+/*
+ * @relation(SWR-TUN-09, scope=function)
+ */
 KILN_TEST(swrtun09_success_presents_results_and_stores_nothing)
 {
     kiln_autotune_t at;
@@ -351,6 +381,9 @@ KILN_TEST(cancel_fails_the_procedure_with_an_operator_abort)
     CHECK(!kiln_autotune_succeeded(&at));
 }
 
+/*
+ * @relation(SWR-NFR-17, scope=function)
+ */
 KILN_TEST(swrnfr17_a_non_finite_input_produces_no_duty_and_no_persistent_damage)
 {
     kiln_autotune_t at;

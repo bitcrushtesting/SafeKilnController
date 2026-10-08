@@ -65,6 +65,9 @@ static kiln_hmi_action_t feed(kiln_hmi_t *h, const kiln_hmi_view_t *v,
 
 /* --- the default screen -------------------------------------------------- */
 
+/*
+ * @relation(SWR-HMI-03, scope=function)
+ */
 KILN_TEST(swrhmi03_the_chamber_temperature_is_the_largest_thing_on_the_screen)
 {
     kiln_hmi_t h; kiln_hmi_init(&h, 0);
@@ -80,6 +83,9 @@ KILN_TEST(swrhmi03_the_chamber_temperature_is_the_largest_thing_on_the_screen)
     CHECK_MSG(big > 150, "the large temperature looks too small: %d pixels", big);
 }
 
+/*
+ * @relation(SWR-HMI-02, scope=function)
+ */
 KILN_TEST(swrhmi02_current_and_target_are_both_present)
 {
     kiln_hmi_t h; kiln_hmi_init(&h, 0);
@@ -94,6 +100,9 @@ KILN_TEST(swrhmi02_current_and_target_are_both_present)
               "the target is not rendered, or not where it was expected");
 }
 
+/*
+ * @relation(SWR-ACQ-12, scope=function)
+ */
 KILN_TEST(swracq12_an_invalid_reading_is_not_shown_as_a_temperature)
 {
     /* Inside the grace window there is no measurement.  Showing the last one
@@ -112,6 +121,9 @@ KILN_TEST(swracq12_an_invalid_reading_is_not_shown_as_a_temperature)
 
 /* --- fault precedence ---------------------------------------------------- */
 
+/*
+ * @relation(SWR-HMI-06, scope=function)
+ */
 KILN_TEST(swrhmi06_a_fault_takes_the_screen_from_any_other)
 {
     kiln_hmi_t h; kiln_hmi_init(&h, 0);
@@ -126,6 +138,9 @@ KILN_TEST(swrhmi06_a_fault_takes_the_screen_from_any_other)
               "a fault must take the screen even mid-menu");
 }
 
+/*
+ * @relation(SWR-HMI-06, scope=function)
+ */
 KILN_TEST(swrhmi06_the_fault_screen_cannot_be_dismissed_while_it_holds)
 {
     kiln_hmi_t h; kiln_hmi_init(&h, 0);
@@ -145,6 +160,9 @@ KILN_TEST(swrhmi06_the_fault_screen_cannot_be_dismissed_while_it_holds)
     CHECK_EQ_INT(h.screen, KILN_HMI_SCREEN_MAIN);
 }
 
+/*
+ * @relation(SWR-HMI-10, scope=function)
+ */
 KILN_TEST(swrhmi10_a_press_on_the_fault_screen_asks_to_acknowledge)
 {
     kiln_hmi_t h; kiln_hmi_init(&h, 0);
@@ -158,6 +176,9 @@ KILN_TEST(swrhmi10_a_press_on_the_fault_screen_asks_to_acknowledge)
     CHECK_EQ_INT(h.screen, KILN_HMI_SCREEN_FAULT);
 }
 
+/*
+ * @relation(SWR-HMI-06, scope=function)
+ */
 KILN_TEST(swrhmi06_the_fault_cause_is_rendered_in_the_configured_language)
 {
     kiln_hmi_t h; kiln_hmi_init(&h, 0);
@@ -176,6 +197,9 @@ KILN_TEST(swrhmi06_the_fault_cause_is_rendered_in_the_configured_language)
 
 /* --- starting a firing, which is the path that matters ------------------- */
 
+/*
+ * @relation(SWR-HMI-10, scope=function)
+ */
 KILN_TEST(swrhmi10_a_program_can_be_started_from_the_local_input_alone)
 {
     kiln_hmi_t h; kiln_hmi_init(&h, 0);
@@ -202,6 +226,9 @@ KILN_TEST(swrhmi10_a_program_can_be_started_from_the_local_input_alone)
     CHECK_EQ_INT(h.screen, KILN_HMI_SCREEN_MAIN);
 }
 
+/*
+ * @relation(SWR-HMI-11, scope=function)
+ */
 KILN_TEST(swrhmi11_starting_defaults_to_no_and_a_press_alone_does_nothing)
 {
     /* The confirmation is only worth having if the lazy answer is the safe
@@ -220,6 +247,9 @@ KILN_TEST(swrhmi11_starting_defaults_to_no_and_a_press_alone_does_nothing)
     CHECK_EQ_INT(a.kind, KILN_HMI_ACT_NONE);
 }
 
+/*
+ * @relation(SWR-HMI-11, scope=function)
+ */
 KILN_TEST(swrhmi11_aborting_also_confirms)
 {
     kiln_hmi_t h; kiln_hmi_init(&h, 0);
@@ -237,6 +267,9 @@ KILN_TEST(swrhmi11_aborting_also_confirms)
     CHECK_EQ_INT(a.kind, KILN_HMI_ACT_ABORT);
 }
 
+/*
+ * @relation(SWR-HMI-10, scope=function)
+ */
 KILN_TEST(swrhmi10_pause_and_resume_follow_the_run_state)
 {
     kiln_hmi_t h; kiln_hmi_init(&h, 0);
@@ -284,6 +317,9 @@ KILN_TEST(an_empty_program_store_cannot_start_anything)
 
 /* --- the other screens --------------------------------------------------- */
 
+/*
+ * @relation(SWR-HMI-07, scope=function)
+ */
 KILN_TEST(swrhmi07_the_network_screen_shows_where_the_web_interface_is)
 {
     kiln_hmi_t h; kiln_hmi_init(&h, 0);
@@ -300,6 +336,9 @@ KILN_TEST(swrhmi07_the_network_screen_shows_where_the_web_interface_is)
     CHECK(ink(&h, 0, 24, 128, 24) > 0);
 }
 
+/*
+ * @relation(SWR-HMI-08, scope=function)
+ */
 KILN_TEST(swrhmi08_diagnostics_and_info_render)
 {
     kiln_hmi_t h; kiln_hmi_init(&h, 0);
@@ -322,6 +361,9 @@ KILN_TEST(swrhmi08_diagnostics_and_info_render)
 
 /* --- SWR-HMI-12 ----------------------------------------------------------- */
 
+/*
+ * @relation(SWR-HMI-12, scope=function)
+ */
 KILN_TEST(swrhmi12_the_display_dims_when_idle_and_wakes_on_input)
 {
     kiln_hmi_t h; kiln_hmi_init(&h, 10);      /* 10 s */
@@ -338,6 +380,9 @@ KILN_TEST(swrhmi12_the_display_dims_when_idle_and_wakes_on_input)
     CHECK(ink(&h, 0, 0, 128, 64) > 0);
 }
 
+/*
+ * @relation(SWR-HMI-12, scope=function)
+ */
 KILN_TEST(swrhmi12_a_fault_suspends_the_dim_timeout)
 {
     /* A kiln that blanked its own fault screen would be worse than one with
@@ -351,6 +396,9 @@ KILN_TEST(swrhmi12_a_fault_suspends_the_dim_timeout)
     CHECK(ink(&h, 0, 0, 128, 64) > 0);
 }
 
+/*
+ * @relation(SWR-HMI-12, scope=function)
+ */
 KILN_TEST(swrhmi12_a_zero_timeout_never_dims)
 {
     kiln_hmi_t h; kiln_hmi_init(&h, 0);
@@ -361,6 +409,9 @@ KILN_TEST(swrhmi12_a_zero_timeout_never_dims)
 
 /* --- SWR-HMI-13 ----------------------------------------------------------- */
 
+/*
+ * @relation(SWR-HMI-13, scope=function)
+ */
 KILN_TEST(swrhmi13_fahrenheit_is_a_display_conversion_only)
 {
     kiln_hmi_t h; kiln_hmi_init(&h, 0);
@@ -402,6 +453,9 @@ KILN_TEST(drawing_clips_instead_of_running_off_the_buffer)
 
 /* --- the supervisor on the fault screen (SWA-22, R12) -------------------- */
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_the_fault_screen_differs_when_the_supervisor_tripped)
 {
     /* The two latches are cleared differently -- the supervisor's by the button
@@ -429,6 +483,9 @@ KILN_TEST(swa22_the_fault_screen_differs_when_the_supervisor_tripped)
                  KILN_DISPLAY_BYTES) != 0);
 }
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_a_missing_supervisor_is_shown_differently_from_one_that_tripped)
 {
     /* "The backstop fired" and "there is no backstop" are different sentences

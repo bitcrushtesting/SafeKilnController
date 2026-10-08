@@ -7,6 +7,42 @@
 # parse them as requirement documents and fail on the first one without an H1.
 [project]
 title = "Safe Kiln Controller"
+# Requirement-to-source traceability (SWR-TST-22, SWR-TST-26).
+#
+# A marker of the form
+#
+#     /*
+#      * @relation(SWR-SAF-09, scope=function)
+#      */
+#
+# ties a function to the requirement it implements or verifies, and `strictdoc
+# export` then FAILS if that requirement does not exist. That is the half the
+# naming convention could never do: a test called swrsaf09_... keeps compiling
+# after SWR-SAF-09 is renamed or deleted, and a marker does not.
+#
+# Two mechanical notes, both found the hard way:
+#
+#   A ONE-LINE /* @relation(...) */ IS SILENTLY IGNORED. The marker has to be a
+#   `//` comment or a multi-line block. This repository avoids `//`, so the block
+#   form is the one to use, and prose may share the block.
+#
+#   `source_root_path` is deliberately NOT set. A relative value there finds no
+#   files at all and reports no error; omitting it defaults to the input path,
+#   which is what is wanted.
+features = [
+  "TABLE_SCREEN",
+  "TRACEABILITY_SCREEN",
+  "DEEP_TRACEABILITY_SCREEN",
+  "TRACEABILITY_MATRIX_SCREEN",
+  "REQUIREMENT_TO_SOURCE_TRACEABILITY",
+]
+include_source_paths = [
+  "/firmware/supervisor/**",
+  "/firmware/controller/components/**",
+  "/firmware/controller/test/**",
+  "/firmware/controller/main/**",
+]
+
 include_doc_paths = [
   "docs/01_user_req.sdoc",
   "docs/02_system_req.sdoc",

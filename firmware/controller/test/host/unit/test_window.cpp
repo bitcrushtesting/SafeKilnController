@@ -32,6 +32,9 @@ static float on_fraction(kiln_window_t *w, uint16_t duty)
     return (float)on / (float)w->ticks_per_window;
 }
 
+/*
+ * @relation(SWR-CTL-07, scope=function)
+ */
 KILN_TEST(swrctl07_realises_the_requested_duty_over_a_window)
 {
     kiln_window_cfg_t c = base();
@@ -49,6 +52,9 @@ KILN_TEST(swrctl07_realises_the_requested_duty_over_a_window)
     }
 }
 
+/*
+ * @relation(SWR-CTL-07, scope=function)
+ */
 KILN_TEST(swrctl07_rejects_a_window_that_is_not_a_whole_number_of_ticks)
 {
     /* ticks_per_window is an integer division, so 2505 ms at a 10 ms tick used to
@@ -65,6 +71,9 @@ KILN_TEST(swrctl07_rejects_a_window_that_is_not_a_whole_number_of_ticks)
     CHECK_OK(kiln_window_init(&w, &c));
 }
 
+/*
+ * @relation(SWR-CTL-07, scope=function)
+ */
 KILN_TEST(swrctl07_bounds_the_window_period)
 {
     kiln_window_cfg_t c = base();
@@ -82,6 +91,9 @@ KILN_TEST(swrctl07_bounds_the_window_period)
     CHECK_ERR(kiln_window_init(&w, NULL), KILN_ERR_INVALID_ARG);
 }
 
+/*
+ * @relation(SWR-CTL-08, scope=function)
+ */
 KILN_TEST(swrctl08_quantises_away_an_unrealisable_on_time)
 {
     kiln_window_cfg_t c = base();
@@ -98,6 +110,9 @@ KILN_TEST(swrctl08_quantises_away_an_unrealisable_on_time)
     CHECK_EQ_UINT(kiln_window_quantise(&w, 500), 500u);
 }
 
+/*
+ * @relation(SWR-CUR-04, scope=function)
+ */
 KILN_TEST(swrcur04_a_measurable_off_interval_survives_quantisation)
 {
     /* The interaction worth writing down: promoting a near-full duty to 100 %
@@ -133,6 +148,9 @@ KILN_TEST(the_reserved_off_interval_must_be_realisable)
     CHECK_EQ_UINT(w.cfg.min_measure_off_ms, 200u);
 }
 
+/*
+ * @relation(SWR-SAF-16, scope=function)
+ */
 KILN_TEST(swrsaf16_withdrawing_authority_takes_effect_without_waiting_for_an_edge)
 {
     kiln_window_cfg_t c = base();
@@ -147,6 +165,9 @@ KILN_TEST(swrsaf16_withdrawing_authority_takes_effect_without_waiting_for_an_edg
     CHECK(!w.on);
 }
 
+/*
+ * @relation(SWR-CTL-08, scope=function)
+ */
 KILN_TEST(swrctl08_minimum_dwell_stops_the_ssr_chattering)
 {
     kiln_window_cfg_t c = base();
@@ -168,6 +189,9 @@ KILN_TEST(swrctl08_minimum_dwell_stops_the_ssr_chattering)
     CHECK(changes <= 11u);
 }
 
+/*
+ * @relation(SWR-CUR-05, scope=function)
+ */
 KILN_TEST(swrcur05_level_remaining_tells_the_sampler_what_it_needs)
 {
     kiln_window_cfg_t c = base();
@@ -188,6 +212,9 @@ KILN_TEST(swrcur05_level_remaining_tells_the_sampler_what_it_needs)
     CHECK_EQ_UINT(kiln_window_level_remaining_ms(&w, 500), 1000u);
 }
 
+/*
+ * @relation(SWR-CUR-13, scope=function)
+ */
 KILN_TEST(swrcur13_on_transitions_are_counted)
 {
     kiln_window_cfg_t c = base();

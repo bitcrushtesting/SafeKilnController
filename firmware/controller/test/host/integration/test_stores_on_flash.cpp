@@ -56,6 +56,9 @@ static kiln_program_t named(const char *name, uint16_t top_c)
     return p;
 }
 
+/*
+ * @relation(SWA-10, scope=function)
+ */
 KILN_TEST(swa10_the_seeded_examples_survive_a_reboot_on_flash)
 {
     rig_t *r = &g_rig;
@@ -75,7 +78,10 @@ KILN_TEST(swa10_the_seeded_examples_survive_a_reboot_on_flash)
     CHECK_EQ_UINT(kiln_program_store_count(&r->store), seeded);
 }
 
-KILN_TEST(fr_prg_04_a_saved_program_reloads_byte_for_byte_after_a_reboot)
+/*
+ * @relation(SWR-PRG-04, scope=function)
+ */
+KILN_TEST(swr_prg_04_a_saved_program_reloads_byte_for_byte_after_a_reboot)
 {
     rig_t *r = &g_rig;
     power_up_fresh(r);
@@ -91,7 +97,10 @@ KILN_TEST(fr_prg_04_a_saved_program_reloads_byte_for_byte_after_a_reboot)
     CHECK(memcmp(&back, &p, sizeof(p)) == 0);
 }
 
-KILN_TEST(fr_prg_04_the_store_fills_to_its_slot_count_and_then_refuses)
+/*
+ * @relation(SWR-PRG-04, scope=function)
+ */
+KILN_TEST(swr_prg_04_the_store_fills_to_its_slot_count_and_then_refuses)
 {
     rig_t *r = &g_rig;
     power_up_fresh(r);
@@ -114,7 +123,10 @@ KILN_TEST(fr_prg_04_the_store_fills_to_its_slot_count_and_then_refuses)
     CHECK_EQ_UINT(kiln_program_store_count(&r->store), KILN_PROGRAM_SLOTS);
 }
 
-KILN_TEST(fr_log_09_run_records_ring_and_survive_a_reboot_on_flash)
+/*
+ * @relation(SWR-LOG-09, scope=function)
+ */
+KILN_TEST(swr_log_09_run_records_ring_and_survive_a_reboot_on_flash)
 {
     rig_t *r = &g_rig;
     power_up_fresh(r);
@@ -140,7 +152,10 @@ KILN_TEST(fr_log_09_run_records_ring_and_survive_a_reboot_on_flash)
     CHECK_EQ_UINT(got.duration_s, (KILN_RUN_SLOTS + 3u) * 60u);
 }
 
-KILN_TEST(fr_prg_04_twenty_programs_and_twenty_runs_share_the_partition)
+/*
+ * @relation(SWR-PRG-04, scope=function)
+ */
+KILN_TEST(swr_prg_04_twenty_programs_and_twenty_runs_share_the_partition)
 {
     rig_t *r = &g_rig;
     power_up_fresh(r);
@@ -169,7 +184,10 @@ KILN_TEST(fr_prg_04_twenty_programs_and_twenty_runs_share_the_partition)
     CHECK_EQ_UINT(kiln_run_index_count(&r->store), KILN_RUN_SLOTS);
 }
 
-KILN_TEST(fr_run_08_a_power_cut_while_saving_a_program_keeps_the_old_one)
+/*
+ * @relation(SWR-RUN-08, scope=function)
+ */
+KILN_TEST(swr_run_08_a_power_cut_while_saving_a_program_keeps_the_old_one)
 {
     rig_t *r = &g_rig;
     power_up_fresh(r);
@@ -194,7 +212,10 @@ KILN_TEST(fr_run_08_a_power_cut_while_saving_a_program_keeps_the_old_one)
     CHECK_EQ_UINT(kiln_program_store_count(&r->store), 1u);
 }
 
-KILN_TEST(fr_run_08_a_power_cut_while_appending_a_run_keeps_the_earlier_runs)
+/*
+ * @relation(SWR-RUN-08, scope=function)
+ */
+KILN_TEST(swr_run_08_a_power_cut_while_appending_a_run_keeps_the_earlier_runs)
 {
     rig_t *r = &g_rig;
     power_up_fresh(r);

@@ -45,6 +45,9 @@ static kiln_fault_t run_for(kiln_safety_t *s, kiln_safety_input_t *in, float sec
 
 /* --- SWR-SAF-04 ------------------------------------------------------------- */
 
+/*
+ * @relation(SWR-SAF-04, scope=function)
+ */
 KILN_TEST(swrsaf04_tolerates_a_glitch_and_latches_a_persistent_tc_fault)
 {
     kiln_safety_t s;
@@ -69,6 +72,9 @@ KILN_TEST(swrsaf04_tolerates_a_glitch_and_latches_a_persistent_tc_fault)
     CHECK_EQ_INT(run_for(&s, &in, c.tc_grace_s + 1.0f), KILN_FAULT_TC_OPEN);
 }
 
+/*
+ * @relation(SWR-SAF-04, scope=function)
+ */
 KILN_TEST(swrsaf04_maps_each_fault_bit_to_its_own_code)
 {
     const kiln_safety_cfg_t c = cfg();
@@ -91,6 +97,9 @@ KILN_TEST(swrsaf04_maps_each_fault_bit_to_its_own_code)
     }
 }
 
+/*
+ * @relation(SWR-SAF-04, scope=function)
+ */
 KILN_TEST(swrsaf04_case_channel_reports_its_own_code)
 {
     kiln_safety_t s;
@@ -137,6 +146,9 @@ KILN_TEST(a_non_finite_reading_is_treated_as_an_invalid_one)
 
 /* --- SWR-SAF-05 / SWR-SAF-06 / SWR-SAF-07 / SWR-SAF-08 / SWR-SAF-10 ----------------------------- */
 
+/*
+ * @relation(SWR-SAF-05, scope=function)
+ */
 KILN_TEST(swrsaf05_latches_a_reversed_thermocouple)
 {
     kiln_safety_t s;
@@ -154,6 +166,9 @@ KILN_TEST(swrsaf05_latches_a_reversed_thermocouple)
     CHECK_EQ_INT(run_for(&s, &in, 2.0f), KILN_FAULT_TC_REVERSED);
 }
 
+/*
+ * @relation(SWR-SAF-05, scope=function)
+ */
 KILN_TEST(swrsaf05_does_not_trip_on_an_overshoot_that_recovers)
 {
     /* The false trip this confirmation window exists to prevent: the controller
@@ -183,6 +198,9 @@ KILN_TEST(swrsaf05_does_not_trip_on_an_overshoot_that_recovers)
     }
 }
 
+/*
+ * @relation(SWR-SAF-06, scope=function)
+ */
 KILN_TEST(swrsaf06_latches_a_stuck_sensor_after_its_window)
 {
     kiln_safety_t s;
@@ -195,6 +213,9 @@ KILN_TEST(swrsaf06_latches_a_stuck_sensor_after_its_window)
     CHECK_EQ_INT(run_for(&s, &in, c.stuck_window_s + 1.0f), KILN_FAULT_TC_STUCK);
 }
 
+/*
+ * @relation(SWR-SAF-06, scope=function)
+ */
 KILN_TEST(swrsaf06_holds_its_window_across_an_invalid_reading)
 {
     /* The reason the rules hold rather than reset: a sensor that glitches once
@@ -218,6 +239,9 @@ KILN_TEST(swrsaf06_holds_its_window_across_an_invalid_reading)
     CHECK_EQ_INT(run_for(&s, &in, c.stuck_window_s), KILN_FAULT_TC_STUCK);
 }
 
+/*
+ * @relation(SWR-SAF-06, scope=function)
+ */
 KILN_TEST(swrsaf06_does_not_record_an_invalid_reading_as_a_window_extreme)
 {
     /* A frozen value admitted into min/max is indistinguishable from a stuck
@@ -237,6 +261,9 @@ KILN_TEST(swrsaf06_does_not_record_an_invalid_reading_as_a_window_extreme)
     CHECK_NEAR(s.stuck.max_c, 500.0f, 0.001f);
 }
 
+/*
+ * @relation(SWR-SAF-07, scope=function)
+ */
 KILN_TEST(swrsaf07_latches_a_heating_failure)
 {
     kiln_safety_t s;
@@ -253,6 +280,9 @@ KILN_TEST(swrsaf07_latches_a_heating_failure)
     CHECK_EQ_INT(run_for(&s, &in, c.runaway_window_s + 1.0f), KILN_FAULT_RUNAWAY);
 }
 
+/*
+ * @relation(SWR-SAF-07, scope=function)
+ */
 KILN_TEST(swrsaf07_does_not_trip_while_the_kiln_is_rising)
 {
     kiln_safety_t s;
@@ -270,6 +300,9 @@ KILN_TEST(swrsaf07_does_not_trip_while_the_kiln_is_rising)
     }
 }
 
+/*
+ * @relation(SWR-SAF-08, scope=function)
+ */
 KILN_TEST(swrsaf08_latches_uncommanded_heating_after_the_settle_period)
 {
     kiln_safety_t s;
@@ -291,6 +324,9 @@ KILN_TEST(swrsaf08_latches_uncommanded_heating_after_the_settle_period)
     CHECK_EQ_INT(run_for(&s, &in, 1.0f), KILN_FAULT_UNCOMMANDED_HEAT);
 }
 
+/*
+ * @relation(SWR-SAF-08, scope=function)
+ */
 KILN_TEST(swrsaf08_is_not_fooled_by_a_cooling_kiln)
 {
     kiln_safety_t s;
@@ -310,6 +346,9 @@ KILN_TEST(swrsaf08_is_not_fooled_by_a_cooling_kiln)
     }
 }
 
+/*
+ * @relation(SWR-SAF-09, scope=function)
+ */
 KILN_TEST(swrsaf09_withholds_heat_at_the_limit_and_latches_beyond_the_margin)
 {
     kiln_safety_t s;
@@ -329,6 +368,9 @@ KILN_TEST(swrsaf09_withholds_heat_at_the_limit_and_latches_beyond_the_margin)
     CHECK_EQ_INT(v2.fault, KILN_FAULT_OVERTEMP);
 }
 
+/*
+ * @relation(SWR-SAF-09, scope=function)
+ */
 KILN_TEST(swrsaf09_binds_the_compile_time_ceiling_whatever_is_configured)
 {
     /* SWR-SAF-23: no configuration may exceed the compile-time ceiling. */
@@ -339,6 +381,9 @@ KILN_TEST(swrsaf09_binds_the_compile_time_ceiling_whatever_is_configured)
     CHECK_NEAR(s.cfg.max_temp_c, KILN_TEMP_CEILING_C, 0.01f);
 }
 
+/*
+ * @relation(SWR-SAF-10, scope=function)
+ */
 KILN_TEST(swrsaf10_latches_a_setpoint_excursion)
 {
     kiln_safety_t s;
@@ -351,6 +396,9 @@ KILN_TEST(swrsaf10_latches_a_setpoint_excursion)
     CHECK_EQ_INT(run_for(&s, &in, c.excursion_window_s + 1.0f), KILN_FAULT_SP_EXCURSION);
 }
 
+/*
+ * @relation(SWR-SAF-11, scope=function)
+ */
 KILN_TEST(swrsaf11_latches_an_over_hot_enclosure)
 {
     kiln_safety_t s;
@@ -365,6 +413,9 @@ KILN_TEST(swrsaf11_latches_an_over_hot_enclosure)
     CHECK_EQ_INT(v.fault, KILN_FAULT_CASE_OVERTEMP);
 }
 
+/*
+ * @relation(SWR-SAF-12, scope=function)
+ */
 KILN_TEST(swrsaf12_warns_when_a_band_costs_more_than_the_baseline)
 {
     kiln_safety_t s;
@@ -391,6 +442,9 @@ KILN_TEST(swrsaf12_warns_when_a_band_costs_more_than_the_baseline)
     CHECK(v.heat_permitted);     /* a warning never withholds heat */
 }
 
+/*
+ * @relation(SWR-SAF-13, scope=function)
+ */
 KILN_TEST(swrsaf13_reports_a_missed_deadline_and_withholds_heat)
 {
     kiln_safety_t s;

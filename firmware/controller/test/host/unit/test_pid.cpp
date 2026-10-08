@@ -15,6 +15,9 @@ static kiln_pid_t make(float kp, float ki, float kd)
     return p;
 }
 
+/*
+ * @relation(SWR-CTL-03, scope=function)
+ */
 KILN_TEST(swrctl03_proportional_term_is_percent_duty_per_degc)
 {
     kiln_pid_t p = make(2.0f, 0.0f, 0.0f);
@@ -23,6 +26,9 @@ KILN_TEST(swrctl03_proportional_term_is_percent_duty_per_degc)
     CHECK_NEAR(p.p_pct, 20.0f, 0.001f);
 }
 
+/*
+ * @relation(SWR-CTL-03, scope=function)
+ */
 KILN_TEST(swrctl03_integral_term_accumulates_in_percent_per_degc_second)
 {
     kiln_pid_t p = make(0.0f, 0.5f, 0.0f);
@@ -31,6 +37,9 @@ KILN_TEST(swrctl03_integral_term_accumulates_in_percent_per_degc_second)
     CHECK_EQ_UINT(kiln_pid_update(&p, 101.0f, 100.0f, 1.0f), 10u);
 }
 
+/*
+ * @relation(SWR-CTL-04, scope=function)
+ */
 KILN_TEST(swrctl04_derivative_is_on_the_measurement_so_a_setpoint_step_does_not_kick)
 {
     kiln_pid_t p = make(1.0f, 0.0f, 10.0f);
@@ -45,6 +54,9 @@ KILN_TEST(swrctl04_derivative_is_on_the_measurement_so_a_setpoint_step_does_not_
     CHECK_NEAR(p.d_pct, -20.0f, 0.001f);
 }
 
+/*
+ * @relation(SWR-CTL-05, scope=function)
+ */
 KILN_TEST(swrctl05_integral_does_not_wind_up_while_the_output_is_saturated)
 {
     kiln_pid_t p = make(10.0f, 1.0f, 0.0f);
@@ -66,6 +78,9 @@ KILN_TEST(swrctl05_integral_does_not_wind_up_while_the_output_is_saturated)
     CHECK(cycles < 50);
 }
 
+/*
+ * @relation(SWR-CTL-16, scope=function)
+ */
 KILN_TEST(swrctl16_duty_ceiling_is_honoured_and_has_one_range)
 {
     /* pid.h documents 100..1000, and both the initialiser and the setter now
@@ -90,6 +105,9 @@ KILN_TEST(swrctl16_duty_ceiling_is_honoured_and_has_one_range)
     CHECK_EQ_UINT(p.cfg.duty_max_permille, KILN_DUTY_MAX);
 }
 
+/*
+ * @relation(SWR-CTL-06, scope=function)
+ */
 KILN_TEST(swrctl06_bumpless_transfer_continues_from_the_present_output)
 {
     kiln_pid_t p = make(1.0f, 0.1f, 0.0f);
@@ -100,6 +118,9 @@ KILN_TEST(swrctl06_bumpless_transfer_continues_from_the_present_output)
     CHECK_NEAR((float)kiln_pid_update(&p, 110.0f, 100.0f, 0.0001f), 400.0f, 1.0f);
 }
 
+/*
+ * @relation(SWR-CTL-06, scope=function)
+ */
 KILN_TEST(swrctl06_bumpless_reports_a_transfer_it_cannot_make_bumplessly)
 {
     /* The integral the present output implies is negative, and an integral below
@@ -114,6 +135,9 @@ KILN_TEST(swrctl06_bumpless_reports_a_transfer_it_cannot_make_bumplessly)
     CHECK(!kiln_pid_bumpless(&p, 500, 100.0f, 100.0f + 100.0f));
 }
 
+/*
+ * @relation(SWR-NFR-17, scope=function)
+ */
 KILN_TEST(swrnfr17_a_non_finite_input_produces_no_heat_and_no_persistent_damage)
 {
     kiln_pid_t p = make(2.0f, 0.1f, 5.0f);

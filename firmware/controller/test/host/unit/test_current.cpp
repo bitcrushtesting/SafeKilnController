@@ -68,6 +68,9 @@ static uint16_t arm(kiln_current_t *c, kiln_cur_window_t window)
 
 /* --- SWR-CUR-02, SWR-CUR-03 ---------------------------------------------- */
 
+/*
+ * @relation(SWR-CUR-02, scope=function)
+ */
 KILN_TEST(swrcur02_measures_rms_to_the_required_accuracy)
 {
     const kiln_current_cfg_t cc = cfg();
@@ -91,6 +94,9 @@ KILN_TEST(swrcur02_measures_rms_to_the_required_accuracy)
     }
 }
 
+/*
+ * @relation(SWR-CUR-03, scope=function)
+ */
 KILN_TEST(swrcur03_result_is_independent_of_sampling_phase)
 {
     /* The point of whole mains cycles: start the burst anywhere in the waveform
@@ -129,6 +135,9 @@ KILN_TEST(swrcur03_result_is_independent_of_sampling_phase)
 
 /* --- SWR-CUR-04, SWR-CUR-05: gating -------------------------------------- */
 
+/*
+ * @relation(SWR-CUR-04, scope=function)
+ */
 KILN_TEST(swrcur04_waits_out_the_settle_delay_before_measuring)
 {
     kiln_current_cfg_t cc = cfg();
@@ -149,6 +158,9 @@ KILN_TEST(swrcur04_waits_out_the_settle_delay_before_measuring)
     CHECK(n > 0);
 }
 
+/*
+ * @relation(SWR-CUR-05, scope=function)
+ */
 KILN_TEST(swrcur05_skips_a_window_too_short_to_measure)
 {
     const kiln_current_cfg_t cc = cfg();
@@ -171,6 +183,9 @@ KILN_TEST(swrcur05_skips_a_window_too_short_to_measure)
     }
 }
 
+/*
+ * @relation(SWR-CUR-04, scope=function)
+ */
 KILN_TEST(swrcur04_aborts_a_burst_when_the_window_closes_under_it)
 {
     const kiln_current_cfg_t cc = cfg();
@@ -233,6 +248,9 @@ KILN_TEST(an_unbounded_off_window_is_remeasured_so_sr25_keeps_its_evidence)
 
 /* --- SWR-CUR-06 --------------------------------------------------------- */
 
+/*
+ * @relation(SWR-CUR-06, scope=function)
+ */
 KILN_TEST(swrcur06_one_point_calibration_makes_the_reading_match_the_meter)
 {
     const kiln_current_cfg_t cc = cfg();
@@ -254,6 +272,9 @@ KILN_TEST(swrcur06_one_point_calibration_makes_the_reading_match_the_meter)
     CHECK_NEAR(kiln_current_amps(&c), 22.0f, 0.7f);
 }
 
+/*
+ * @relation(SWR-CUR-06, scope=function)
+ */
 KILN_TEST(swrcur06_refuses_to_calibrate_against_a_measurement_that_is_not_one)
 {
     const kiln_current_cfg_t cc = cfg();
@@ -273,6 +294,9 @@ KILN_TEST(swrcur06_refuses_to_calibrate_against_a_measurement_that_is_not_one)
     CHECK_ERR(kiln_current_calibrate(&c, -5.0f), KILN_ERR_INVALID_ARG);
 }
 
+/*
+ * @relation(SWR-CUR-06, scope=function)
+ */
 KILN_TEST(swrcur06_refuses_a_calibration_gain_outside_its_range)
 {
     const kiln_current_cfg_t cc = cfg();
@@ -290,6 +314,9 @@ KILN_TEST(swrcur06_refuses_a_calibration_gain_outside_its_range)
 
 /* --- SWR-CUR-08 --------------------------------------------------------- */
 
+/*
+ * @relation(SWR-CUR-08, scope=function)
+ */
 KILN_TEST(swrcur08_learns_the_reference_from_cold_full_power_windows)
 {
     const kiln_current_cfg_t cc = cfg();
@@ -312,6 +339,9 @@ KILN_TEST(swrcur08_learns_the_reference_from_cold_full_power_windows)
     CHECK_NEAR(kiln_current_ref(&c), 30.2f, 0.6f);
 }
 
+/*
+ * @relation(SWR-CUR-08, scope=function)
+ */
 KILN_TEST(swrcur08_does_not_learn_a_reference_from_a_hot_or_partial_window)
 {
     const kiln_current_cfg_t cc = cfg();
@@ -341,6 +371,9 @@ KILN_TEST(swrcur08_does_not_learn_a_reference_from_a_hot_or_partial_window)
 
 /* --- SWR-SAF-28 deviation, with the temperature correction ------------------ */
 
+/*
+ * @relation(SWR-SAF-28, scope=function)
+ */
 KILN_TEST(swrsaf28_deviation_corrects_for_the_element_temperature_coefficient)
 {
     kiln_current_cfg_t cc = cfg();
@@ -394,6 +427,9 @@ KILN_TEST(deviation_is_unavailable_without_a_usable_comparison)
 
 /* --- SWR-CUR-07 --------------------------------------------------------- */
 
+/*
+ * @relation(SWR-CUR-07, scope=function)
+ */
 KILN_TEST(swrcur07_derives_apparent_power_and_accumulates_energy)
 {
     const kiln_current_cfg_t cc = cfg();
@@ -420,6 +456,9 @@ KILN_TEST(swrcur07_derives_apparent_power_and_accumulates_energy)
 
 /* --- SWR-CUR-11 --------------------------------------------------------- */
 
+/*
+ * @relation(SWR-CUR-11, scope=function)
+ */
 KILN_TEST(swrcur11_absent_transformer_is_distinguished_from_zero_current)
 {
     const kiln_current_cfg_t cc = cfg();
@@ -460,6 +499,9 @@ KILN_TEST(swrcur11_absent_transformer_is_distinguished_from_zero_current)
 
 /* --- SWR-CUR-12 and configuration --------------------------------------- */
 
+/*
+ * @relation(SWR-CUR-12, scope=function)
+ */
 KILN_TEST(swrcur12_disabled_monitoring_suppresses_every_measurement)
 {
     kiln_current_cfg_t cc = cfg();

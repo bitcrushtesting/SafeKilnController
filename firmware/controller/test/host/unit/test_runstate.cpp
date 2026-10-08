@@ -28,6 +28,9 @@ static kiln_log_sample_t tail(kiln_state_t state, float sp, float pv)
 
 /* --- SWR-RUN-08 --------------------------------------------------------- */
 
+/*
+ * @relation(SWR-RUN-08, scope=function)
+ */
 KILN_TEST(swrrun08_defaults_to_abort)
 {
     /* Resuming a firing is a decision an operator opts into. */
@@ -45,6 +48,9 @@ KILN_TEST(swrrun08_defaults_to_abort)
     CHECK(d.reason && d.reason[0]);
 }
 
+/*
+ * @relation(SWR-RUN-08, scope=function)
+ */
 KILN_TEST(swrrun08_resumes_when_the_outage_was_short_and_the_kiln_is_in_band)
 {
     const kiln_recovery_cfg_t c = cfg(KILN_RECOVERY_RESUME);
@@ -59,6 +65,9 @@ KILN_TEST(swrrun08_resumes_when_the_outage_was_short_and_the_kiln_is_in_band)
     CHECK_EQ_UINT(d.t_rel_ms, 3600000u);
 }
 
+/*
+ * @relation(SWR-RUN-08, scope=function)
+ */
 KILN_TEST(swrrun08_refuses_an_outage_longer_than_the_limit)
 {
     const kiln_recovery_cfg_t c = cfg(KILN_RECOVERY_RESUME);
@@ -71,6 +80,9 @@ KILN_TEST(swrrun08_refuses_an_outage_longer_than_the_limit)
     CHECK_EQ_INT(d.fault, KILN_FAULT_RECOVERY_REFUSED);
 }
 
+/*
+ * @relation(SWR-RUN-08, scope=function)
+ */
 KILN_TEST(swrrun08_refuses_a_kiln_that_has_cooled_out_of_band)
 {
     const kiln_recovery_cfg_t c = cfg(KILN_RECOVERY_RESUME);
@@ -84,6 +96,9 @@ KILN_TEST(swrrun08_refuses_a_kiln_that_has_cooled_out_of_band)
     CHECK_EQ_INT(d.fault, KILN_FAULT_RECOVERY_REFUSED);
 }
 
+/*
+ * @relation(SWR-RUN-08, scope=function)
+ */
 KILN_TEST(swrrun08_an_unknown_outage_is_not_a_short_one)
 {
     const kiln_recovery_cfg_t c = cfg(KILN_RECOVERY_RESUME);
@@ -102,6 +117,9 @@ KILN_TEST(swrrun08_an_unknown_outage_is_not_a_short_one)
     CHECK_EQ_INT(d.action, KILN_RECOVER_REFUSED);
 }
 
+/*
+ * @relation(SWR-SAF-14, scope=function)
+ */
 KILN_TEST(swrsaf14_an_abnormal_reset_is_never_resumed)
 {
     /* SWR-NFR-15: the firmware's own state was in question when it died, so the
@@ -129,6 +147,9 @@ KILN_TEST(swrsaf14_an_abnormal_reset_is_never_resumed)
     CHECK(!kiln_reset_was_abnormal(KILN_RESET_SOFTWARE));
 }
 
+/*
+ * @relation(SWR-RUN-08, scope=function)
+ */
 KILN_TEST(swrrun08_a_boot_with_no_interrupted_run_is_an_ordinary_boot)
 {
     const kiln_recovery_cfg_t c = cfg(KILN_RECOVERY_RESUME);
@@ -149,6 +170,9 @@ KILN_TEST(swrrun08_a_boot_with_no_interrupted_run_is_an_ordinary_boot)
     CHECK_EQ_INT(d.action, KILN_RECOVER_NO_RUN);
 }
 
+/*
+ * @relation(SWR-RUN-08, scope=function)
+ */
 KILN_TEST(swrrun08_a_paused_run_is_recoverable_too)
 {
     const kiln_recovery_cfg_t c = cfg(KILN_RECOVERY_RESUME);
@@ -168,6 +192,9 @@ KILN_TEST(a_missing_policy_aborts_rather_than_guessing)
 
 /* --- SWR-RUN-07 --------------------------------------------------------- */
 
+/*
+ * @relation(SWR-RUN-07, scope=function)
+ */
 KILN_TEST(swrrun07_a_record_starts_empty_with_its_run_id)
 {
     kiln_run_record_t r;
@@ -187,6 +214,9 @@ KILN_TEST(swrrun07_a_record_starts_empty_with_its_run_id)
 
 /* --- SWR-SAF-12's baseline -------------------------------------------------- */
 
+/*
+ * @relation(SWR-SAF-12, scope=function)
+ */
 KILN_TEST(swrsaf12_the_baseline_is_a_median_across_previous_runs)
 {
     kiln_run_record_t runs[5];
@@ -206,6 +236,9 @@ KILN_TEST(swrsaf12_the_baseline_is_a_median_across_previous_runs)
     CHECK(!bl.valid[0]);                     /* no run recorded that band */
 }
 
+/*
+ * @relation(SWR-SAF-12, scope=function)
+ */
 KILN_TEST(swrsaf12_a_band_needs_enough_runs_before_it_is_trusted)
 {
     kiln_run_record_t runs[5];
@@ -226,6 +259,9 @@ KILN_TEST(swrsaf12_a_band_needs_enough_runs_before_it_is_trusted)
     CHECK_EQ_UINT(bl.duty_s[5], 1050u);
 }
 
+/*
+ * @relation(SWR-SAF-12, scope=function)
+ */
 KILN_TEST(swrsaf12_a_faulted_run_does_not_contribute_to_the_baseline)
 {
     /* Duty-seconds accumulated while a rule was already unhappy are not a

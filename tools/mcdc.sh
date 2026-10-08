@@ -78,8 +78,9 @@ if [[ $(uname) == Darwin ]] && command -v xcrun >/dev/null 2>&1; then
 fi
 
 UNDER=(firmware/supervisor/core/src/trip.cpp firmware/supervisor/core/src/max31856.cpp
+       firmware/supervisor/core/src/selfcheck.cpp
        firmware/supervisor/protocol/src/sup_proto.cpp)
-for suite in test_trip test_proto test_max31856; do
+for suite in test_trip test_proto test_max31856 test_selfcheck; do
     "$CLANGXX" "${FLAGS[@]}" "${UNDER[@]}" \
         firmware/controller/test/host/support/kiln_check.cpp \
         "firmware/supervisor/test/host/$suite.cpp" -o "$OUT/$suite"

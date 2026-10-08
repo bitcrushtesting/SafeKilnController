@@ -27,6 +27,9 @@ sup_report_t sample()
 
 }  // namespace
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_crc16_matches_the_log_records_vector)
 {
     /* CCITT-FALSE.  The supervisor carries its own implementation so it
@@ -37,6 +40,9 @@ KILN_TEST(swa22_crc16_matches_the_log_records_vector)
     CHECK_EQ_UINT(sup_crc16(nullptr, 4u), 0xFFFFu);
 }
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_a_frame_round_trips)
 {
     const sup_report_t in = sample();
@@ -55,6 +61,9 @@ KILN_TEST(swa22_a_frame_round_trips)
     CHECK_EQ_INT(out.trip_reason, SUP_TRIP_NONE);
 }
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_the_frame_is_the_declared_length_and_starts_with_the_sof)
 {
     const sup_report_t in = sample();
@@ -66,6 +75,9 @@ KILN_TEST(swa22_the_frame_is_the_declared_length_and_starts_with_the_sof)
     CHECK_EQ_UINT(buf[1], SUP_VERSION);
 }
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_a_single_flipped_bit_anywhere_is_rejected)
 {
     const sup_report_t in = sample();
@@ -91,6 +103,9 @@ KILN_TEST(swa22_a_single_flipped_bit_anywhere_is_rejected)
     }
 }
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_resyncs_past_line_noise_and_reports_what_to_discard)
 {
     /* The receiver must recover from a partial frame or a burst of noise
@@ -109,6 +124,9 @@ KILN_TEST(swa22_resyncs_past_line_noise_and_reports_what_to_discard)
     CHECK_EQ_UINT(out.seq, 42u);
 }
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_a_partial_frame_consumes_nothing_and_keeps_the_tail)
 {
     const sup_report_t in = sample();
@@ -122,6 +140,9 @@ KILN_TEST(swa22_a_partial_frame_consumes_nothing_and_keeps_the_tail)
     CHECK_EQ_UINT(skip, 0u);
 }
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_a_buffer_of_pure_noise_is_eventually_discardable)
 {
     /* Otherwise a receiver wedges on a buffer that can never contain a frame. */
@@ -135,6 +156,9 @@ KILN_TEST(swa22_a_buffer_of_pure_noise_is_eventually_discardable)
     CHECK_EQ_UINT(skip, sizeof(noise) - (SUP_FRAME_BYTES - 1u));
 }
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_temperatures_saturate_rather_than_wrap_and_survive_a_nan)
 {
     sup_report_t r = sample();
@@ -157,6 +181,9 @@ KILN_TEST(swa22_temperatures_saturate_rather_than_wrap_and_survive_a_nan)
     CHECK_NEAR(out.chamber_c, 0.0f, 0.05);   /* a defined value, not garbage */
 }
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_a_trip_is_still_reported_so_the_other_side_can_say_why)
 {
     sup_report_t r = sample();
@@ -173,6 +200,9 @@ KILN_TEST(swa22_a_trip_is_still_reported_so_the_other_side_can_say_why)
     CHECK_EQ_INT(out.trip_reason, SUP_TRIP_OVERTEMP);
 }
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_decode_tolerates_a_caller_that_does_not_want_the_skip_count)
 {
     /* The resync path has to work for a caller passing nullptr for skip, not
@@ -186,6 +216,9 @@ KILN_TEST(swa22_decode_tolerates_a_caller_that_does_not_want_the_skip_count)
     CHECK_EQ_UINT(sup_decode(noise, sizeof(noise), &out, nullptr), 0u);
 }
 
+/*
+ * @relation(SWR-NFR-17, scope=function)
+ */
 KILN_TEST(swrnfr17_encode_and_decode_refuse_bad_arguments)
 {
     const sup_report_t r = sample();

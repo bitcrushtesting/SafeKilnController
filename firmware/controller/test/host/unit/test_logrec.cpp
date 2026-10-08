@@ -24,6 +24,9 @@ static kiln_log_sample_t sample(uint32_t t_ms, float kiln_c, float current_a)
     return s;
 }
 
+/*
+ * @relation(SWA-18, scope=function)
+ */
 KILN_TEST(swa18_the_record_is_twenty_bytes)
 {
     /* SWA-18: 20 B since SWR-CUR-09 added heater current, which gives 204 records
@@ -32,6 +35,9 @@ KILN_TEST(swa18_the_record_is_twenty_bytes)
     CHECK_EQ_UINT(KILN_LOG_RECS_PER_SECTOR, 204u);
 }
 
+/*
+ * @relation(SWR-LOG-02, scope=function)
+ */
 KILN_TEST(swrlog02_a_record_round_trips_within_its_stated_resolution)
 {
     const kiln_log_sample_t in = sample(123456u, 987.6f, 28.45f);
@@ -55,6 +61,9 @@ KILN_TEST(swrlog02_a_record_round_trips_within_its_stated_resolution)
     CHECK_EQ_UINT(out.current_flags, in.current_flags);
 }
 
+/*
+ * @relation(SWR-LOG-02, scope=function)
+ */
 KILN_TEST(swrlog02_saturates_rather_than_wrapping)
 {
     kiln_log_sample_t in = sample(0, 5000.0f, 900.0f);
@@ -75,6 +84,9 @@ KILN_TEST(swrlog02_saturates_rather_than_wrapping)
     CHECK_NEAR(out.current_a, 0.0f, 0.001f);   /* a negative current is zero */
 }
 
+/*
+ * @relation(SWR-LOG-08, scope=function)
+ */
 KILN_TEST(swrlog08_a_torn_record_is_corrupt_and_an_erased_one_is_simply_absent)
 {
     /* The distinction matters to the reader: "not found" is the end of what has
@@ -143,6 +155,9 @@ KILN_TEST(the_sector_header_round_trips_and_rejects_a_foreign_one)
 
 /* --- decimation, SWR-LOG-10 and SWR-LOG-11 ------------------------------- */
 
+/*
+ * @relation(SWR-LOG-11, scope=function)
+ */
 KILN_TEST(swrlog11_a_brief_excursion_survives_downsampling)
 {
     kiln_log_bucket_t buckets[10];
@@ -167,6 +182,9 @@ KILN_TEST(swrlog11_a_brief_excursion_survives_downsampling)
     CHECK_EQ_UINT(d.used, 10u);
 }
 
+/*
+ * @relation(SWR-LOG-10, scope=function)
+ */
 KILN_TEST(swrlog10_an_open_ended_query_returns_a_view_of_the_whole_run)
 {
     /* The old behaviour filled buckets sequentially and then dropped everything,
@@ -209,6 +227,9 @@ KILN_TEST(swrlog10_an_open_ended_query_returns_a_view_of_the_whole_run)
     CHECK_EQ_UINT(counted, pushed);
 }
 
+/*
+ * @relation(SWR-LOG-11, scope=function)
+ */
 KILN_TEST(swrlog11_extrema_survive_a_fold)
 {
     kiln_log_bucket_t buckets[8];

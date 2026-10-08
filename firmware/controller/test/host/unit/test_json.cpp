@@ -63,6 +63,9 @@ KILN_TEST(nested_objects_and_arrays_are_comma_separated_correctly)
         "{\"segments\":[{\"target_c\":100},{\"target_c\":200}],\"count\":2}");
 }
 
+/*
+ * @relation(SWR-NFR-11, scope=function)
+ */
 KILN_TEST(swrnfr11_overflow_is_sticky_and_never_writes_past_the_buffer)
 {
     /* The pattern the handlers rely on: write the whole response without
@@ -197,6 +200,9 @@ KILN_TEST(only_direct_members_are_found_so_a_nested_key_cannot_shadow_one)
     CHECK_NEAR(d, 1100.0, 0.001);
 }
 
+/*
+ * @relation(SWR-NFR-19, scope=function)
+ */
 KILN_TEST(swrnfr19_a_number_must_be_a_number_all_the_way_through)
 {
     /* Accepting the prefix of `1.2.3` is how a malformed body becomes a
@@ -212,6 +218,9 @@ KILN_TEST(swrnfr19_a_number_must_be_a_number_all_the_way_through)
     }
 }
 
+/*
+ * @relation(SWR-NFR-19, scope=function)
+ */
 KILN_TEST(swrnfr19_malformed_documents_are_rejected_not_half_parsed)
 {
     const char *bad[] = {
@@ -245,6 +254,9 @@ KILN_TEST(running_out_of_tokens_is_reported_rather_than_overrunning)
     CHECK_EQ_INT(kiln_json_parse(js, strlen(js), t, 8), -2);
 }
 
+/*
+ * @relation(SWR-NFR-19, scope=function)
+ */
 KILN_TEST(swrnfr19_a_string_that_does_not_fit_is_refused_not_truncated)
 {
     /* Half a program name is worse than a rejected request, and a silently

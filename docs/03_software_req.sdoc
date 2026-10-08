@@ -38,6 +38,9 @@ ELEMENTS:
   - TITLE: STATEMENT
     TYPE: String
     REQUIRED: True
+  - TITLE: RATIONALE
+    TYPE: String
+    REQUIRED: False
   - TITLE: PRIORITY
     TYPE: SingleChoice(M, S, C, W)
     REQUIRED: False
@@ -2214,6 +2217,21 @@ UID: SWR-SAF-31
 STATEMENT: >>>
 **Door / lid interlock.** Where a door interlock switch is fitted, the system shall de-energise heating and open the contactor **immediately**: within one safety cycle, with no confirmation delay, whenever the switch indicates the door is open, and shall latch a fault if it remains open for a configurable confirmation period (0–0.5 s, default 0.2 s) while a heating state is active. The switch shall be **normally closed**, so that an open circuit, a disconnected plug or a failed switch all read as "door open". Where no interlock is fitted the rule shall stand down and a warning shall be raised; it shall not be possible for an unread input to be interpreted as a closed door.
 <<<
+VERIFICATION: T
+
+[REQUIREMENT]
+UID: SWR-SAF-32
+STATEMENT: >>>
+**Clearing the supervisor's own trip.** The independent safety supervisor of [LINK: SWA-22] shall latch its trip and shall clear it only on a **local, deliberate human act**: a button wired to the supervisor, which shall be **edge triggered and held**. The input shall be seen released before it can clear anything, and shall then be held for a configurable-at-compile-time period (default 0.5 s), so that a button shorted to ground, or one stuck down, can never clear the latch. A failed start-up self-test shall not be clearable by this or any other means.
+
+There shall be no path to this function from the link, because the supervisor has no receiver ([LINK: SWA-22]).
+<<<
+RATIONALE: >>>
+Written because the behaviour was implemented and tested before it was specified, which `safety-supervisor.md` section 12 item 4 recorded as outstanding. Six host tests exercised it against a tasklist item rather than a requirement, and a tested behaviour with nothing behind it is the gap a certification assessment finds first.
+
+The deliberate difference from [LINK: SWR-SAF-17] is worth stating rather than leaving as an apparent contradiction: that requirement makes the **ESP32's** latched fault survive power loss, whereas the supervisor's latch does not. The supervisor comes up refusing heat regardless, because its permit is conjunctive and no conversion has yet been seen, so a latch that survived the power cycle would add nothing and would need a second clearing path to recover from.
+<<<
+PRIORITY: M
 VERIFICATION: T
 
 [[/SECTION]]

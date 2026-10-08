@@ -89,6 +89,9 @@ static count_ctx_t count_all(rig_t *r, uint32_t run_id)
 
 /* --- mount and format --------------------------------------------------- */
 
+/*
+ * @relation(SWR-LOG-05, scope=function)
+ */
 KILN_TEST(swrlog05_an_erased_partition_mounts_as_empty_and_is_usable)
 {
     rig_t r;
@@ -105,6 +108,9 @@ KILN_TEST(swrlog05_an_erased_partition_mounts_as_empty_and_is_usable)
     CHECK_EQ_UINT(count_all(&r, 0).count, 1u);
 }
 
+/*
+ * @relation(SWR-LOG-02, scope=function)
+ */
 KILN_TEST(swrlog02_records_round_trip_through_the_ring)
 {
     rig_t r;
@@ -153,6 +159,9 @@ KILN_TEST(head_discovery_resumes_where_the_previous_boot_stopped)
 
 /* --- SWR-LOG-06: wrap ---------------------------------------------------- */
 
+/*
+ * @relation(SWR-LOG-06, scope=function)
+ */
 KILN_TEST(swrlog06_the_oldest_data_is_overwritten_and_the_run_never_fails)
 {
     rig_t r;
@@ -201,6 +210,9 @@ KILN_TEST(wrap_erases_immediately_before_writing_and_never_in_advance)
 
 /* --- SWR-LOG-08: torn records -------------------------------------------- */
 
+/*
+ * @relation(SWR-LOG-08, scope=function)
+ */
 KILN_TEST(swrlog08_a_torn_record_costs_only_itself)
 {
     rig_t r;
@@ -236,6 +248,9 @@ KILN_TEST(swrlog08_a_torn_record_costs_only_itself)
     CHECK_EQ_UINT(fresh.head_slot, 20u);
 }
 
+/*
+ * @relation(SWR-LOG-08, scope=function)
+ */
 KILN_TEST(swrlog08_a_single_bit_rot_is_skipped_by_readers)
 {
     rig_t r;
@@ -278,6 +293,9 @@ KILN_TEST(iteration_can_select_a_single_run)
     CHECK_EQ_UINT(count_all(&r, 99).count, 0u);
 }
 
+/*
+ * @relation(SWA-09, scope=function)
+ */
 KILN_TEST(swa09_the_log_tail_is_the_power_loss_journal)
 {
     /* The whole of SWA-09: recovery state is read back out of the log rather than
@@ -303,6 +321,9 @@ KILN_TEST(swa09_the_log_tail_is_the_power_loss_journal)
     CHECK_ERR(kiln_logring_last_record(&r.ring, 99, rec), KILN_ERR_NOT_FOUND);
 }
 
+/*
+ * @relation(SWA-09, scope=function)
+ */
 KILN_TEST(swa09_the_tail_survives_a_power_cut_mid_run)
 {
     rig_t r;
@@ -329,6 +350,9 @@ KILN_TEST(swa09_the_tail_survives_a_power_cut_mid_run)
 
 /* --- SWR-LOG-13, SWR-LOG-14, SWR-LOG-15 ----------------------------------- */
 
+/*
+ * @relation(SWR-LOG-13, scope=function)
+ */
 KILN_TEST(swrlog13_erase_all_leaves_an_empty_store)
 {
     rig_t r;
@@ -350,6 +374,9 @@ KILN_TEST(swrlog13_erase_all_leaves_an_empty_store)
     CHECK_EQ_UINT(count_all(&r, 0).count, 1u);
 }
 
+/*
+ * @relation(SWR-LOG-14, scope=function)
+ */
 KILN_TEST(swrlog14_a_write_failure_is_counted_and_not_fatal)
 {
     rig_t r;
@@ -369,6 +396,9 @@ KILN_TEST(swrlog14_a_write_failure_is_counted_and_not_fatal)
     CHECK_OK(append(&r, 100, 100.0f));
 }
 
+/*
+ * @relation(SWR-LOG-15, scope=function)
+ */
 KILN_TEST(swrlog15_stats_report_store_health)
 {
     rig_t r;
@@ -427,6 +457,9 @@ KILN_TEST(the_ring_validates_its_arguments)
 /* The real partition: 2 MB of 4 kB sectors. */
 static uint8_t g_full_partition[2u * 1024u * 1024u];
 
+/*
+ * @relation(SWR-LOG-07, scope=function)
+ */
 KILN_TEST(swrlog07_the_real_partition_holds_more_than_150_hours)
 {
     kiln_host_flash_t flash;

@@ -64,6 +64,9 @@ static kiln_err_t get(rig_t *r, const char *path, void *out, size_t cap, size_t 
     return r->store.read(r->store.ctx, path, out, cap, n);
 }
 
+/*
+ * @relation(SWA-10, scope=function)
+ */
 KILN_TEST(swa10_an_empty_medium_mounts_with_nothing_in_it)
 {
     rig_t *r = &g_rig;
@@ -76,6 +79,9 @@ KILN_TEST(swa10_an_empty_medium_mounts_with_nothing_in_it)
     CHECK_ERR(get(r, "/p/00", buf, sizeof(buf), nullptr), KILN_ERR_NOT_FOUND);
 }
 
+/*
+ * @relation(SWA-10, scope=function)
+ */
 KILN_TEST(swa10_a_file_reads_back_and_survives_a_remount)
 {
     rig_t *r = &g_rig;
@@ -98,6 +104,9 @@ KILN_TEST(swa10_a_file_reads_back_and_survives_a_remount)
     CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs), 1u);
 }
 
+/*
+ * @relation(SWA-10, scope=function)
+ */
 KILN_TEST(swa10_rewriting_alternates_the_two_copies_of_the_region)
 {
     rig_t *r = &g_rig;
@@ -124,7 +133,10 @@ KILN_TEST(swa10_rewriting_alternates_the_two_copies_of_the_region)
     CHECK_STR_EQ(as_str(buf), "c");
 }
 
-KILN_TEST(fr_run_08_a_cut_before_the_commit_leaves_the_previous_copy)
+/*
+ * @relation(SWR-RUN-08, scope=function)
+ */
+KILN_TEST(swr_run_08_a_cut_before_the_commit_leaves_the_previous_copy)
 {
     rig_t *r = &g_rig;
     rig_init(r);
@@ -145,7 +157,10 @@ KILN_TEST(fr_run_08_a_cut_before_the_commit_leaves_the_previous_copy)
     CHECK_STR_EQ(as_str(buf), "first");
 }
 
-KILN_TEST(fr_run_08_a_cut_inside_the_commit_header_leaves_the_previous_copy)
+/*
+ * @relation(SWR-RUN-08, scope=function)
+ */
+KILN_TEST(swr_run_08_a_cut_inside_the_commit_header_leaves_the_previous_copy)
 {
     rig_t *r = &g_rig;
     rig_init(r);
@@ -166,7 +181,10 @@ KILN_TEST(fr_run_08_a_cut_inside_the_commit_header_leaves_the_previous_copy)
     CHECK_STR_EQ(as_str(buf), "keep");
 }
 
-KILN_TEST(fr_run_08_a_cut_with_only_the_crc_missing_leaves_the_previous_copy)
+/*
+ * @relation(SWR-RUN-08, scope=function)
+ */
+KILN_TEST(swr_run_08_a_cut_with_only_the_crc_missing_leaves_the_previous_copy)
 {
     rig_t *r = &g_rig;
     rig_init(r);
@@ -187,7 +205,10 @@ KILN_TEST(fr_run_08_a_cut_with_only_the_crc_missing_leaves_the_previous_copy)
     CHECK_STR_EQ(as_str(buf), "keep");
 }
 
-KILN_TEST(fr_run_08_a_cut_on_a_first_write_leaves_no_file_rather_than_half_of_one)
+/*
+ * @relation(SWR-RUN-08, scope=function)
+ */
+KILN_TEST(swr_run_08_a_cut_on_a_first_write_leaves_no_file_rather_than_half_of_one)
 {
     rig_t *r = &g_rig;
     rig_init(r);
@@ -204,7 +225,10 @@ KILN_TEST(fr_run_08_a_cut_on_a_first_write_leaves_no_file_rather_than_half_of_on
     CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs), 0u);
 }
 
-KILN_TEST(fr_prg_04_twenty_programs_and_twenty_run_records_coexist)
+/*
+ * @relation(SWR-PRG-04, scope=function)
+ */
+KILN_TEST(swr_prg_04_twenty_programs_and_twenty_run_records_coexist)
 {
     rig_t *r = &g_rig;
     rig_init(r);
@@ -229,6 +253,9 @@ KILN_TEST(fr_prg_04_twenty_programs_and_twenty_run_records_coexist)
     }
 }
 
+/*
+ * @relation(SWA-10, scope=function)
+ */
 KILN_TEST(swa10_a_full_medium_refuses_a_new_file_and_still_takes_a_rewrite)
 {
     rig_t *r = &g_rig;
@@ -245,6 +272,9 @@ KILN_TEST(swa10_a_full_medium_refuses_a_new_file_and_still_takes_a_rewrite)
     CHECK_OK(put(r, "/p/00", "y", 2));
 }
 
+/*
+ * @relation(SWA-10, scope=function)
+ */
 KILN_TEST(swa10_remove_frees_the_region_for_another_name)
 {
     rig_t *r = &g_rig;
@@ -262,6 +292,9 @@ KILN_TEST(swa10_remove_frees_the_region_for_another_name)
     CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs), 0u);
 }
 
+/*
+ * @relation(SWA-10, scope=function)
+ */
 KILN_TEST(swa10_a_payload_too_large_for_a_sector_is_refused)
 {
     rig_t *r = &g_rig;
@@ -280,6 +313,9 @@ KILN_TEST(swa10_a_payload_too_large_for_a_sector_is_refused)
     CHECK(memcmp(back, big, r->fs.payload_max) == 0);
 }
 
+/*
+ * @relation(SWA-10, scope=function)
+ */
 KILN_TEST(swa10_a_payload_corrupted_under_the_store_is_not_served)
 {
     rig_t *r = &g_rig;
@@ -299,6 +335,9 @@ KILN_TEST(swa10_a_payload_corrupted_under_the_store_is_not_served)
     CHECK_ERR(get(r, "/p/00", buf, sizeof(buf), nullptr), KILN_ERR_NOT_FOUND);
 }
 
+/*
+ * @relation(SWA-10, scope=function)
+ */
 KILN_TEST(swa10_a_short_buffer_is_refused_rather_than_truncated)
 {
     rig_t *r = &g_rig;
@@ -309,6 +348,9 @@ KILN_TEST(swa10_a_short_buffer_is_refused_rather_than_truncated)
     CHECK_ERR(get(r, "/p/00", small, sizeof(small), nullptr), KILN_ERR_RANGE);
 }
 
+/*
+ * @relation(SWA-10, scope=function)
+ */
 KILN_TEST(swa10_usage_and_list_report_what_is_stored)
 {
     rig_t *r = &g_rig;
@@ -336,6 +378,9 @@ KILN_TEST(swa10_usage_and_list_report_what_is_stored)
     CHECK_EQ_UINT(c.bytes, 4u);
 }
 
+/*
+ * @relation(SWA-10, scope=function)
+ */
 KILN_TEST(swa10_format_empties_the_store)
 {
     rig_t *r = &g_rig;
@@ -350,6 +395,9 @@ KILN_TEST(swa10_format_empties_the_store)
     CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs), 0u);
 }
 
+/*
+ * @relation(SWA-10, scope=function)
+ */
 KILN_TEST(swa10_the_store_validates_its_arguments)
 {
     rig_t *r = &g_rig;

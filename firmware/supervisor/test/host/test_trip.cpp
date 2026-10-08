@@ -31,6 +31,9 @@ void run_for(sup_t *s, const sup_input_t *in, float seconds)
 
 }  // namespace
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_comes_up_refusing_heat_before_any_conversion)
 {
     /* Absence of evidence must not be permission.  This is the defect K1
@@ -47,6 +50,9 @@ KILN_TEST(swa22_comes_up_refusing_heat_before_any_conversion)
     CHECK(!s.permit);
 }
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_permits_heat_once_a_good_reading_arrives)
 {
     sup_t s;
@@ -58,6 +64,9 @@ KILN_TEST(swa22_permits_heat_once_a_good_reading_arrives)
     CHECK_EQ_INT(s.reason, SUP_TRIP_NONE);
 }
 
+/*
+ * @relation(SWR-SAF-23, scope=function)
+ */
 KILN_TEST(swrsaf23_latches_above_the_backstop_without_waiting)
 {
     /* A backstop does not have a grace period. */
@@ -70,6 +79,9 @@ KILN_TEST(swrsaf23_latches_above_the_backstop_without_waiting)
     CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);
 }
 
+/*
+ * @relation(SWR-SAF-23, scope=function)
+ */
 KILN_TEST(swrsaf23_does_not_trip_at_the_ceiling_or_just_below_the_backstop)
 {
     /* 1300 is the configurable ceiling and must remain reachable: a backstop
@@ -87,6 +99,9 @@ KILN_TEST(swrsaf23_does_not_trip_at_the_ceiling_or_just_below_the_backstop)
     CHECK(!s.tripped);
 }
 
+/*
+ * @relation(SWR-SAF-23, scope=function)
+ */
 KILN_TEST(swrsaf23_overtemp_does_not_unlatch_when_it_cools)
 {
     sup_t s;
@@ -102,6 +117,9 @@ KILN_TEST(swrsaf23_overtemp_does_not_unlatch_when_it_cools)
     CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);
 }
 
+/*
+ * @relation(SWR-SAF-04, scope=function)
+ */
 KILN_TEST(swrsaf04_withholds_heat_at_once_on_a_fault_and_latches_after_the_grace)
 {
     sup_t s;
@@ -121,6 +139,9 @@ KILN_TEST(swrsaf04_withholds_heat_at_once_on_a_fault_and_latches_after_the_grace
     CHECK_EQ_INT(s.reason, SUP_TRIP_TC_FAULT);
 }
 
+/*
+ * @relation(SWR-SAF-04, scope=function)
+ */
 KILN_TEST(swrsaf04_a_transient_fault_shorter_than_the_grace_does_not_latch)
 {
     sup_t s;
@@ -139,6 +160,9 @@ KILN_TEST(swrsaf04_a_transient_fault_shorter_than_the_grace_does_not_latch)
     CHECK(!s.tripped);
 }
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_an_unusable_reading_latches_as_stale_not_as_a_fault)
 {
     /* Different cause, same consequence, reported separately so the other side
@@ -156,6 +180,9 @@ KILN_TEST(swa22_an_unusable_reading_latches_as_stale_not_as_a_fault)
     CHECK_EQ_INT(s.reason, SUP_TRIP_SENSOR_STALE);
 }
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_a_nan_reading_is_stale_and_never_permits)
 {
     /* The comparison against the backstop is false for a NaN whichever way it
@@ -171,6 +198,9 @@ KILN_TEST(swa22_a_nan_reading_is_stale_and_never_permits)
     CHECK(!(nan_in.chamber_c <= SUP_OVERTEMP_C));
 }
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_a_failed_selftest_never_permits_and_cannot_be_cleared)
 {
     sup_t s;
@@ -187,6 +217,9 @@ KILN_TEST(swa22_a_failed_selftest_never_permits_and_cannot_be_cleared)
     CHECK_EQ_INT(s.reason, SUP_TRIP_SELF_TEST);
 }
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_clearing_a_trip_does_not_permit_until_conditions_are_re_established)
 {
     sup_t s;
@@ -210,6 +243,9 @@ KILN_TEST(swa22_clearing_a_trip_does_not_permit_until_conditions_are_re_establis
     CHECK(s.permit);
 }
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_flags_describe_what_the_supervisor_is_doing)
 {
     sup_t s;
@@ -223,6 +259,9 @@ KILN_TEST(swa22_flags_describe_what_the_supervisor_is_doing)
     CHECK((f & SUP_FLAG_TRIPPED) == 0u);
 }
 
+/*
+ * @relation(SWR-NFR-17, scope=function)
+ */
 KILN_TEST(swrnfr17_null_and_negative_time_are_refused_not_faulted)
 {
     sup_t s;
@@ -248,7 +287,10 @@ KILN_TEST(swrnfr17_null_and_negative_time_are_refused_not_faulted)
 
 /* --- the clear button (R4) ---------------------------------------------- */
 
-KILN_TEST(r4_a_held_button_clears_the_latch_once_the_hold_elapses)
+/*
+ * @relation(SWR-SAF-32, scope=function)
+ */
+KILN_TEST(swrsaf32_a_held_button_clears_the_latch_once_the_hold_elapses)
 {
     sup_t s;
     sup_init(&s, true);
@@ -270,7 +312,10 @@ KILN_TEST(r4_a_held_button_clears_the_latch_once_the_hold_elapses)
     CHECK_EQ_INT(s.reason, SUP_TRIP_NONE);
 }
 
-KILN_TEST(r4_a_tap_shorter_than_the_hold_does_not_clear)
+/*
+ * @relation(SWR-SAF-32, scope=function)
+ */
+KILN_TEST(swrsaf32_a_tap_shorter_than_the_hold_does_not_clear)
 {
     sup_t s;
     sup_init(&s, true);
@@ -286,7 +331,10 @@ KILN_TEST(r4_a_tap_shorter_than_the_hold_does_not_clear)
     CHECK(s.tripped);
 }
 
-KILN_TEST(r4_a_line_stuck_low_never_clears_the_latch)
+/*
+ * @relation(SWR-SAF-32, scope=function)
+ */
+KILN_TEST(swrsaf32_a_line_stuck_low_never_clears_the_latch)
 {
     /* The case the edge triggering exists for.  A button shorted to ground, or
      * one wedged down, must not turn the latch into a no-op: at power-on it is
@@ -306,7 +354,10 @@ KILN_TEST(r4_a_line_stuck_low_never_clears_the_latch)
     CHECK(!s.permit);
 }
 
-KILN_TEST(r4_clearing_disarms_until_the_button_is_released_again)
+/*
+ * @relation(SWR-SAF-32, scope=function)
+ */
+KILN_TEST(swrsaf32_clearing_disarms_until_the_button_is_released_again)
 {
     /* One press, one clear.  Otherwise a held button would clear each time the
      * supervisor re-latched, which is the stuck-line failure in slow motion. */
@@ -336,7 +387,10 @@ KILN_TEST(r4_clearing_disarms_until_the_button_is_released_again)
     CHECK(!s.tripped);
 }
 
-KILN_TEST(r4_the_button_cannot_clear_a_failed_selftest)
+/*
+ * @relation(SWR-SAF-32, scope=function)
+ */
+KILN_TEST(swrsaf32_the_button_cannot_clear_a_failed_selftest)
 {
     sup_t s;
     sup_init(&s, false);
@@ -349,7 +403,10 @@ KILN_TEST(r4_the_button_cannot_clear_a_failed_selftest)
     CHECK(!s.permit);
 }
 
-KILN_TEST(r4_the_button_cannot_clear_a_condition_that_still_holds)
+/*
+ * @relation(SWR-SAF-32, scope=function)
+ */
+KILN_TEST(swrsaf32_the_button_cannot_clear_a_condition_that_still_holds)
 {
     /* Clearing while the kiln is still too hot re-latches on the same cycle,
      * so the button cannot be held down to keep firing. */
@@ -370,6 +427,9 @@ KILN_TEST(r4_the_button_cannot_clear_a_condition_that_still_holds)
 
 /* --- the lid is not the supervisor's concern ---------------------------- */
 
+/*
+ * @relation(SYS-HW-21, scope=function)
+ */
 KILN_TEST(syshw21_the_supervisor_has_no_lid_input_so_loading_cold_cannot_trip_it)
 {
     /* The lid breaks the coil in hardware and SWR-SAF-31's latch is the ESP32's,
@@ -388,6 +448,9 @@ KILN_TEST(syshw21_the_supervisor_has_no_lid_input_so_loading_cold_cannot_trip_it
 
 /* --- bringing the front end up ----------------------------------------- */
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_a_front_end_still_starting_up_withholds_heat_without_latching)
 {
     /* Boot: no conversion has arrived yet.  The supervisor must not permit,
@@ -412,6 +475,9 @@ KILN_TEST(swa22_a_front_end_still_starting_up_withholds_heat_without_latching)
     CHECK(s.seen_valid);
 }
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_a_reading_that_was_working_and_stopped_does_latch)
 {
     /* The other half: once a reading has been seen, losing it is a fault to
@@ -433,6 +499,9 @@ KILN_TEST(swa22_a_reading_that_was_working_and_stopped_does_latch)
     CHECK_EQ_INT(s.reason, SUP_TRIP_SENSOR_STALE);
 }
 
+/*
+ * @relation(SWA-22, scope=function)
+ */
 KILN_TEST(swa22_a_reported_fault_latches_even_before_a_first_reading)
 {
     /* A front end actively reporting a fault is not "still starting up": it is

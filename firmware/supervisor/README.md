@@ -137,8 +137,8 @@ it is anybody's recollection.
 
 ## What is done, and what is not
 
-**Done and tested:** the trip logic (14 tests), the wire format (10 tests) and
-the MAX31856 register decode (9 tests). Between them that is the entire safety
+**Done and tested:** the trip logic, the wire format, the MAX31856 register
+decode and the self-checks: 50 host tests over four suites. Between them that is the entire safety
 function, the entire interface and the arithmetic that turns six register bytes
 into a temperature, and none of it needs hardware to exercise. MC/DC is measured
 over all three and is at 100 % against an 80 % floor (`tools/mcdc.sh`).
@@ -158,6 +158,57 @@ marked `(confirm)` where they are assumed. What is unverified is now the
 *transport* rather than the logic: the SPI configuration, the chip-select
 timing, the SysTick period and the USART bring-up. Each is a small separate
 function so it can be brought up and checked one at a time on a bench.
+
+### Self-diagnostics
+
+Three measures, added because an assessment against EN IEC 60730-1 Annex H or
+EN ISO 13849-1 asks for them and a single-channel supervisor can only claim
+diagnostic coverage for what it actually observes.
+
+**Clock integrity** (`sup_clock_ok`). The clock switch status must agree with the
+selection, HSI must be ready, and the PLL must be off. Every check is phrased as
+an invariant that holds whatever the `SWS` encoding turns out to be, because this
+part's SVD carries no enumerated values for it and its `RCC_CR` reset value
+disagrees with the reference manual. Guessing a bit pattern in a safety check is
+not worth the brevity.
+
+**Program memory integrity** (`sup_flash_ok`). CRC-32 over the whole image from
+the vector table to `_sup_crc_region_end`, compared against a digest stamped into
+`.sup_crc` after linking by `tools/sup-crc.py`. The digest sits immediately after
+the region because a digest cannot cover itself, and the tool checks that
+invariant rather than trusting the linker script. An **unstamped** image fails:
+`SUP_CRC_UNPROGRAMMED` is a failure, not "no expectation", because an image that
+reached a board without being stamped is exactly the one whose integrity is
+unknown. The stamp is a build step so it cannot be forgotten.
+
+**A windowed watchdog**, which is the clock cross-check and is easy to mistake
+for an ordinary watchdog. The IWDG counts from the LSI, an oscillator the system
+clock cannot influence. Feeding late resets, as before. Feeding **early**, while
+the counter is still above `IWDG_WINDOW`, now also resets, so the 100 ms cycle is
+measured against an independent oscillator from both sides. That makes three
+previously silent failures loud:
+
+| failure | before | now |
+|---|---|---|
+| system clock running fast | undetected | early feed resets |
+| LSI stopped | **watchdog never fires** | counter never leaves the reload, first feed resets |
+| system clock slow, or loop hung | timeout | timeout, unchanged |
+
+The LSI one matters most: a dead LSI meant a watchdog that could never fire, so
+the protection the design leans on would have been absent with no indication.
+
+What it does **not** catch is small drift, and the limit is the LSI's own
+tolerance rather than a design choice. At 32 kHz ±10 % a 100 ms cycle is 45 to 55
+ticks, putting the counter at 120 to 130 when the feed arrives, so the window has
+to sit above that or a healthy board resets itself. 140 leaves ten ticks for loop
+jitter and detects a system clock roughly 1.3× fast or worse. That is
+gross-failure detection. A 2 % drift is not caught and does not need to be: it
+does not threaten the safety function, whereas a nuisance reset of the supervisor
+would be worse than the fault.
+
+Every feed in the firmware sits immediately after `wait_for_cycle_end()`, which
+is the one place a full cycle is known to have elapsed. With a window, that is no
+longer a style preference.
 
 The start-up self-test is real rather than a stub returning "not configured". It
 writes MASK, CR1 and CR0, reads CR1 back to tell a configured part from a dead

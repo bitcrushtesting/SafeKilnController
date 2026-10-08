@@ -18,6 +18,9 @@ static kiln_program_t valid_program(void)
     return p;
 }
 
+/*
+ * @relation(SWR-PRG-05, scope=function)
+ */
 KILN_TEST(swrprg05_accepts_a_valid_program)
 {
     const kiln_program_t p = valid_program();
@@ -26,6 +29,9 @@ KILN_TEST(swrprg05_accepts_a_valid_program)
     CHECK_EQ_UINT(v.segment, KILN_SEG_NONE);
 }
 
+/*
+ * @relation(SWR-PRG-05, scope=function)
+ */
 KILN_TEST(swrprg05_rejects_every_out_of_range_field_and_names_the_segment)
 {
     kiln_program_t p = valid_program();
@@ -74,6 +80,9 @@ KILN_TEST(a_null_program_is_not_an_empty_one)
     CHECK_STR_EQ(kiln_profile_validation_str(KILN_PROG_ERR_NULL), "no program supplied");
 }
 
+/*
+ * @relation(SWR-NFR-19, scope=function)
+ */
 KILN_TEST(swrnfr19_an_unterminated_string_is_rejected)
 {
     /* name and description are fixed arrays that arrive from the network and
@@ -96,6 +105,9 @@ KILN_TEST(swrnfr19_an_unterminated_string_is_rejected)
     CHECK_EQ_UINT(strlen(p.description), KILN_PROGRAM_DESC_LEN - 1u);
 }
 
+/*
+ * @relation(SWR-PRG-05, scope=function)
+ */
 KILN_TEST(swrprg05_rejects_a_program_longer_than_168_hours)
 {
     kiln_program_t p = valid_program();
@@ -106,6 +118,9 @@ KILN_TEST(swrprg05_rejects_a_program_longer_than_168_hours)
     CHECK_EQ_INT(kiln_profile_validate(&p, 1280.0f).code, KILN_PROG_ERR_TOO_LONG);
 }
 
+/*
+ * @relation(SWR-PRG-06, scope=function)
+ */
 KILN_TEST(swrprg06_duration_counts_ramps_and_dwells)
 {
     kiln_program_t p;
@@ -126,6 +141,9 @@ KILN_TEST(swrprg06_duration_counts_ramps_and_dwells)
 
 /* --- SWR-PRG-09: the built-in examples ---------------------------------- */
 
+/*
+ * @relation(SWR-PRG-09, scope=function)
+ */
 KILN_TEST(swrprg09_every_built_in_example_passes_validation)
 {
     /* The examples were never run through the validator, so an edit could ship a
@@ -154,6 +172,9 @@ KILN_TEST(swrprg09_every_built_in_example_passes_validation)
     CHECK_ERR(kiln_profile_example(0, NULL), KILN_ERR_INVALID_ARG);
 }
 
+/*
+ * @relation(SWR-PRG-09, scope=function)
+ */
 KILN_TEST(swrprg09_examples_stay_valid_against_the_lowest_sensible_maximum)
 {
     /* A kiln configured for a lower maximum must still be offered examples it

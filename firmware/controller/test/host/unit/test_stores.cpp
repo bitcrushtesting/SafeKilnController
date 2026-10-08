@@ -15,6 +15,9 @@
 
 /* --- configuration (SWR-CFG-05) ------------------------------------------ */
 
+/*
+ * @relation(SWR-CFG-05, scope=function)
+ */
 KILN_TEST(swrcfg05_a_saved_configuration_comes_back)
 {
     kiln_host_kv_t kv;
@@ -44,6 +47,9 @@ KILN_TEST(swrcfg05_a_saved_configuration_comes_back)
     CHECK(kv.commits > 0u);
 }
 
+/*
+ * @relation(SWR-CFG-05, scope=function)
+ */
 KILN_TEST(swrcfg05_storage_that_will_not_answer_leaves_defaults_in_place)
 {
     kiln_host_kv_t kv;
@@ -63,6 +69,9 @@ KILN_TEST(swrcfg05_storage_that_will_not_answer_leaves_defaults_in_place)
     CHECK_NEAR(out.max_temp_c, 1280.0f, 0.01f);
 }
 
+/*
+ * @relation(SWR-CFG-05, scope=function)
+ */
 KILN_TEST(swrcfg05_a_write_failure_is_reported_rather_than_silently_lost)
 {
     kiln_host_kv_t kv;
@@ -78,6 +87,9 @@ KILN_TEST(swrcfg05_a_write_failure_is_reported_rather_than_silently_lost)
 
 /* --- the latched fault (SWR-SAF-17) ------------------------------------------ */
 
+/*
+ * @relation(SWR-SAF-17, scope=function)
+ */
 KILN_TEST(swrsaf17_a_latched_fault_survives_a_power_loss_with_its_snapshot)
 {
     kiln_host_kv_t kv;
@@ -122,6 +134,9 @@ KILN_TEST(swrsaf17_a_latched_fault_survives_a_power_loss_with_its_snapshot)
     CHECK_ERR(kiln_settings_load_fault(&port, &out), KILN_ERR_NOT_FOUND);
 }
 
+/*
+ * @relation(SWR-SAF-17, scope=function)
+ */
 KILN_TEST(swrsaf17_a_corrupt_stored_fault_is_not_believed)
 {
     kiln_host_kv_t kv;
@@ -160,6 +175,9 @@ static kiln_program_t named(const char *name, uint16_t target)
     return p;
 }
 
+/*
+ * @relation(SWR-PRG-09, scope=function)
+ */
 KILN_TEST(swrprg09_the_examples_are_seeded_once_and_are_read_only)
 {
     kiln_host_fs_t fs;
@@ -188,7 +206,7 @@ KILN_TEST(swrprg09_the_examples_are_seeded_once_and_are_read_only)
     CHECK_ERR(kiln_program_store_delete(&port, example.name), KILN_ERR_STATE);
 }
 
-KILN_TEST(frprg_programs_round_trip_and_replace_by_name)
+KILN_TEST(swrprg_programs_round_trip_and_replace_by_name)
 {
     kiln_host_fs_t fs;
     kiln_port_filestore_t port;
@@ -215,6 +233,9 @@ KILN_TEST(frprg_programs_round_trip_and_replace_by_name)
     CHECK_ERR(kiln_program_store_delete(&port, "my firing"), KILN_ERR_NOT_FOUND);
 }
 
+/*
+ * @relation(SWR-PRG-05, scope=function)
+ */
 KILN_TEST(swrprg05_an_invalid_program_never_reaches_storage)
 {
     kiln_host_fs_t fs;
@@ -231,6 +252,9 @@ KILN_TEST(swrprg05_an_invalid_program_never_reaches_storage)
     CHECK_EQ_UINT(fs.writes, 0u);
 }
 
+/*
+ * @relation(SWR-PRG-04, scope=function)
+ */
 KILN_TEST(swrprg04_the_store_holds_twenty_programs_and_then_says_no)
 {
     kiln_host_fs_t fs;
@@ -256,6 +280,9 @@ KILN_TEST(swrprg04_the_store_holds_twenty_programs_and_then_says_no)
     CHECK_OK(kiln_program_store_save(&port, &replace, 1280.0f));
 }
 
+/*
+ * @relation(SWR-NFR-19, scope=function)
+ */
 KILN_TEST(swrnfr19_a_stored_program_is_treated_as_untrusted_on_the_way_back_in)
 {
     kiln_host_fs_t fs;
@@ -318,6 +345,9 @@ static kiln_run_record_t run(uint32_t id, kiln_run_end_t reason)
     return r;
 }
 
+/*
+ * @relation(SWR-RUN-07, scope=function)
+ */
 KILN_TEST(swrrun07_a_run_record_round_trips_with_everything_the_requirement_lists)
 {
     kiln_host_fs_t fs;
@@ -348,6 +378,9 @@ KILN_TEST(swrrun07_a_run_record_round_trips_with_everything_the_requirement_list
     CHECK_NEAR(out.peak_c, 901.0f, 0.001f);
 }
 
+/*
+ * @relation(SWR-LOG-09, scope=function)
+ */
 KILN_TEST(swrlog09_twenty_runs_are_retained_and_the_oldest_is_evicted)
 {
     kiln_host_fs_t fs;
@@ -373,6 +406,9 @@ KILN_TEST(swrlog09_twenty_runs_are_retained_and_the_oldest_is_evicted)
     CHECK_OK(kiln_run_index_find(&port, KILN_RUN_SLOTS + 1u, &out));
 }
 
+/*
+ * @relation(SWR-LOG-09, scope=function)
+ */
 KILN_TEST(swrlog09_a_run_whose_samples_are_gone_is_marked_truncated)
 {
     /* Otherwise a chart with no data in it is indistinguishable from a run that
@@ -424,6 +460,9 @@ KILN_TEST(run_numbering_continues_across_a_reboot)
     CHECK_EQ_UINT(kiln_run_index_next_run_id(&port), 6u);
 }
 
+/*
+ * @relation(SWR-SAF-12, scope=function)
+ */
 KILN_TEST(swrsaf12_the_baseline_comes_from_the_stored_run_history)
 {
     kiln_host_fs_t fs;

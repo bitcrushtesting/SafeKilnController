@@ -40,6 +40,9 @@ static kiln_safety_input_t base(void)
 
 /* --- tier one: immediate, unconditional ------------------------------- */
 
+/*
+ * @relation(SWR-SAF-31, scope=function)
+ */
 KILN_TEST(swrsaf31_open_withholds_heat_on_the_very_first_sample)
 {
     kiln_safety_t s;
@@ -54,6 +57,9 @@ KILN_TEST(swrsaf31_open_withholds_heat_on_the_very_first_sample)
     CHECK_MSG(!v.heat_permitted, "heat must be withheld on the first open sample");
 }
 
+/*
+ * @relation(SWR-SAF-31, scope=function)
+ */
 KILN_TEST(swrsaf31_open_drops_the_contactor_not_merely_the_duty)
 {
     kiln_safety_t s;
@@ -69,6 +75,9 @@ KILN_TEST(swrsaf31_open_drops_the_contactor_not_merely_the_duty)
 
 /* --- tier two: the latch ---------------------------------------------- */
 
+/*
+ * @relation(SWR-SAF-31, scope=function)
+ */
 KILN_TEST(swrsaf31_latches_once_the_door_has_been_open_for_the_confirm_window)
 {
     kiln_safety_t s;
@@ -83,6 +92,9 @@ KILN_TEST(swrsaf31_latches_once_the_door_has_been_open_for_the_confirm_window)
     CHECK_EQ_INT(kiln_safety_eval(&s, &in, 0.1f).fault, KILN_FAULT_DOOR_OPEN);
 }
 
+/*
+ * @relation(SWR-SAF-31, scope=function)
+ */
 KILN_TEST(swrsaf31_a_single_glitched_sample_does_not_stop_a_healthy_firing)
 {
     /* HZ-10: a rule that stops a healthy firing is worse than no rule, because
@@ -103,6 +115,9 @@ KILN_TEST(swrsaf31_a_single_glitched_sample_does_not_stop_a_healthy_firing)
     }
 }
 
+/*
+ * @relation(SWR-SAF-31, scope=function)
+ */
 KILN_TEST(swrsaf31_the_confirm_timer_resets_when_the_door_shuts)
 {
     kiln_safety_t s;
@@ -119,6 +134,9 @@ KILN_TEST(swrsaf31_the_confirm_timer_resets_when_the_door_shuts)
               "the window must start again, not resume where it left off");
 }
 
+/*
+ * @relation(SWR-SAF-31, scope=function)
+ */
 KILN_TEST(swrsaf31_open_while_idle_inhibits_but_does_not_latch)
 {
     /* Opening the door of an idle kiln is what loading one looks like. */
@@ -139,6 +157,9 @@ KILN_TEST(swrsaf31_open_while_idle_inhibits_but_does_not_latch)
 
 /* --- not fitted -------------------------------------------------------- */
 
+/*
+ * @relation(SWR-SAF-31, scope=function)
+ */
 KILN_TEST(swrsaf31_no_interlock_fitted_stands_the_rule_down_and_warns)
 {
     kiln_safety_t s;
@@ -156,6 +177,9 @@ KILN_TEST(swrsaf31_no_interlock_fitted_stands_the_rule_down_and_warns)
               "warning 113 must say the interlock is missing");
 }
 
+/*
+ * @relation(SWR-SAF-31, scope=function)
+ */
 KILN_TEST(swrsaf31_a_fitted_and_shut_door_raises_no_warning)
 {
     kiln_safety_t s;
@@ -169,6 +193,9 @@ KILN_TEST(swrsaf31_a_fitted_and_shut_door_raises_no_warning)
 
 /* --- SWR-SAF-18: clearing --------------------------------------------------- */
 
+/*
+ * @relation(SWR-SAF-31, scope=function)
+ */
 KILN_TEST(swrsaf31_cannot_be_cleared_while_the_door_is_still_open)
 {
     const kiln_safety_cfg_t c = cfg();
@@ -178,6 +205,9 @@ KILN_TEST(swrsaf31_cannot_be_cleared_while_the_door_is_still_open)
               "SWR-SAF-18: refuse while the triggering condition still holds");
 }
 
+/*
+ * @relation(SWR-SAF-31, scope=function)
+ */
 KILN_TEST(swrsaf31_clearable_once_the_door_is_shut)
 {
     const kiln_safety_cfg_t c = cfg();
@@ -188,6 +218,9 @@ KILN_TEST(swrsaf31_clearable_once_the_door_is_shut)
 
 /* --- ordering ----------------------------------------------------------- */
 
+/*
+ * @relation(SWR-SAF-31, scope=function)
+ */
 KILN_TEST(swrsaf31_is_decided_before_the_deadline_rules)
 {
     /* A door switch is a direct physical signal; it does not depend on the loop
@@ -207,6 +240,9 @@ KILN_TEST(swrsaf31_is_decided_before_the_deadline_rules)
     CHECK(!v.heat_permitted);
 }
 
+/*
+ * @relation(SWR-SAF-31, scope=function)
+ */
 KILN_TEST(swrsaf31_fault_has_a_label_a_cause_and_a_requirement)
 {
     /* SWR-SAF-19: every fault is presentable and documented. */
