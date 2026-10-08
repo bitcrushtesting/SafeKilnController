@@ -440,9 +440,9 @@ question is whether it is worth its cost.
   how protections get disabled. Consider a fitted-by-default `0R` in `Q5`'s
   drain so the enclosure branch can be depopulated without cutting a track.
 
-  Decide this together with section 1 of
-  [`docs/bom-optimisation.md`](docs/bom-optimisation.md), which reaches the same
-  question from the parts end: if this branch is depopulatable then the
+  Decide this together with the parts analysis that used to live in
+  `docs/bom-optimisation.md` (removed from the repository; see its history),
+  which reached the same question from the parts end: if this branch is depopulatable then the
   MAX31856 on the enclosure channel has nothing left to justify it, since it is
   bought for its `FAULT` pin rather than for measuring 40 to 90 degC. That
   document's preferred option removes the channel entirely, using the chamber

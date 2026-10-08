@@ -231,8 +231,9 @@ controller input and in series with the coil, and the series contact is the one
 element in the whole design that depends on no firmware at all. It costs
 nothing and it is kept.
 
-This also changes the conclusion of
-[`bom-optimisation.md` §1](bom-optimisation.md): see section 9.
+This also changed the conclusion of the parts analysis that used to live in
+`bom-optimisation.md` §1, which has since been removed from the repository: see
+section 9.
 
 ## 8. The thermocouple type problem
 
@@ -331,8 +332,8 @@ to make the CT optional should be sent here first.
 
 ### The option that was declined, and has now been taken
 
-For the record, since this is the analysis the reversal overturned. The enclosure channel `TC2` is, on
-the analysis in [`bom-optimisation.md` §1](bom-optimisation.md), a MAX31856
+For the record, since this is the analysis the reversal overturned. The enclosure channel `TC2` was, on
+the parts analysis that used to live in `bom-optimisation.md` §1, a MAX31856
 bought for a `FAULT` pin it no longer needs. Repurposed as a second chamber
 couple read only by the supervisor, the two MCUs could have been made to
 disagree, and a disagreement beyond a band is a detection neither can make
