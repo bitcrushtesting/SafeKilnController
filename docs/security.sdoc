@@ -1,0 +1,1254 @@
+[DOCUMENT]
+TITLE: Safe Kiln Controller, Security Concept
+UID: SAFEKILN-SECURITY
+VERSION: 0.1 (draft)
+DATE: 2026-10-08
+OPTIONS:
+  MARKUP: Markdown
+  VIEW_STYLE: Table
+  NODE_IN_TOC: True
+METADATA:
+  SPDX-FileCopyrightText: 2026 Bitcrush Testing
+  SPDX-License-Identifier: GPL-3.0-or-later
+  Status: For review
+  Project: Safe Kiln Controller, PID kiln controller
+
+[GRAMMAR]
+ELEMENTS:
+- TAG: TEXT
+  FIELDS:
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+- TAG: SECTION
+  PROPERTIES:
+    IS_COMPOSITE: True
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: False
+  - TITLE: TITLE
+    TYPE: String
+    REQUIRED: True
+- TAG: ASSET
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: WHY_IT_MATTERS
+    TYPE: String
+    REQUIRED: False
+- TAG: ADVERSARY
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: CAPABILITY
+    TYPE: String
+    REQUIRED: False
+  - TITLE: REALISTIC
+    TYPE: String
+    REQUIRED: False
+- TAG: THREAT
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: VIA
+    TYPE: String
+    REQUIRED: False
+  - TITLE: CONSEQUENCE
+    TYPE: String
+    REQUIRED: False
+  - TITLE: SAFETY_RELEVANT
+    TYPE: SingleChoice(Yes, Indirect, No, Closed)
+    REQUIRED: True
+  - TITLE: STATUS
+    TYPE: SingleChoice(Active, Withdrawn, Superseded, Reversed, Resolved)
+    REQUIRED: True
+  - TITLE: COMMENT
+    TYPE: String
+    REQUIRED: False
+  RELATIONS:
+  - TYPE: Parent
+    ROLE: Threatens
+    REVERSE_ROLE: Threatened by
+  - TYPE: Parent
+    ROLE: Exploited by
+    REVERSE_ROLE: Exploits
+  - TYPE: Parent
+    ROLE: Reaches
+    REVERSE_ROLE: Reached by
+  - TYPE: Child
+    ROLE: Closed by
+    REVERSE_ROLE: Closes
+- TAG: SECURITY_GOAL
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: IMPLEMENTATION
+    TYPE: SingleChoice(Built, Partial, Spec, Absent, NotNeeded)
+    REQUIRED: True
+  - TITLE: STATUS
+    TYPE: SingleChoice(Active, Withdrawn, Superseded, Reversed, Resolved)
+    REQUIRED: True
+  - TITLE: COMMENT
+    TYPE: String
+    REQUIRED: False
+  RELATIONS:
+  - TYPE: Parent
+    ROLE: Addresses
+    REVERSE_ROLE: Addressed by
+  - TYPE: Child
+    ROLE: Realised by
+    REVERSE_ROLE: Realises
+- TAG: OPEN_QUESTION
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATUS
+    TYPE: SingleChoice(Active, Withdrawn, Superseded, Reversed, Resolved)
+    REQUIRED: True
+  - TITLE: COMMENT
+    TYPE: String
+    REQUIRED: False
+  RELATIONS:
+  - TYPE: Parent
+    ROLE: Would settle
+    REVERSE_ROLE: Settled by
+- TAG: SECURITY_RESIDUAL_RISK
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: WHY_IT_STANDS
+    TYPE: String
+    REQUIRED: False
+  - TITLE: CARRIED_BY
+    TYPE: String
+    REQUIRED: False
+  - TITLE: MITIGATION
+    TYPE: String
+    REQUIRED: False
+  - TITLE: STATUS
+    TYPE: SingleChoice(Active, Withdrawn, Superseded, Reversed, Resolved)
+    REQUIRED: True
+  RELATIONS:
+  - TYPE: Parent
+    ROLE: Remains under
+    REVERSE_ROLE: Leaves residual risk
+  - TYPE: Parent
+    ROLE: Remains against
+    REVERSE_ROLE: Leaves residual risk
+
+[TEXT]
+STATEMENT: >>>
+The assets worth attacking, who would attack them, how, the goals that answer
+each threat, and the risk that remains.
+
+These were five markdown tables in [`security.md`](security.md), promoted here
+for the reason the architecture decisions and the hazards went to
+[`architecture.sdoc`](architecture.sdoc) and [`safety.sdoc`](safety.sdoc): they
+are the part of the concept that has identity. Forty-eight stable IDs with a
+chain between them that was previously kept by hand in an appendix.
+
+The chain is now relations the build checks:
+
+- `Threatens` from each threat to the asset it is aimed at, and `Exploited by`
+  to the adversary who can mount it,
+- `Reaches` from a threat to the **safety hazard** it arrives at, which is the
+  claim this document exists to make and the one that was hardest to see:
+  [`HZ-12`](safety.sdoc) is a node now, so "a security compromise of this device
+  is a safety event" is a link rather than a sentence,
+- `Addresses` from each security goal to the threats it answers, and
+  `Realised by` to the requirements behind it,
+- `Remains under` from each residual risk to the goal that leaves it.
+
+Two fields carry what the markdown carried as typography, and both are worth
+more as fields.
+
+**STATUS** replaces strikethrough. Four threats, two goals and one residual risk
+were closed or dissolved by the read-only decision of 2026-10-06, and in the
+markdown that was a `~~struck-through heading~~` plus a sentence. It is now
+`Resolved` or `Withdrawn`, which can be filtered, counted and reported on. A
+closed threat is kept rather than deleted: the reasoning for why it is closed is
+the most useful thing about it, and a reader who finds the ID in an old commit
+should land on an explanation.
+
+**IMPLEMENTATION** replaces the `[built]` / `[partial]` / `[spec]` / `[absent]`
+marks on the goals. `security.md` says the preponderance of `[spec]` is the
+single most important fact in it; a typed field makes that countable instead of
+a thing a reader has to notice.
+
+Everything else stays in [`security.md`](security.md): the scope, the trust
+boundary diagram, section 7 on security as a safety concern, what the
+implementation already gets right, the obligations, the verification status and
+the open questions. The trust boundaries `B-1` to `B-6` stay there too, and that
+is a decision rather than an omission: they are the legend of the diagram
+immediately above them, they carry no chain through them, and splitting a legend
+from its picture helps nobody.
+
+A reconciliation, stated because it changed what some relations say. The
+appendix tables at the end of `security.md` were not updated by the 2026-10-06
+read-only change, while sections 5, 6 and 9 were, so the two disagreed. Where
+they disagree the body is taken as authoritative. The consequence is visible
+and deliberate: with `SEC-01` and `SEC-04` withdrawn, the threats the stale
+appendix routed through them ([LINK: TH-08] and [LINK: TH-11]) now have no
+security goal at all, and so does [LINK: TH-13], which never had one. That is a
+real gap, and naming it is better than inheriting a mapping to a goal that no
+longer exists.
+<<<
+
+[[SECTION]]
+UID: SECURITY-1
+TITLE: 1. Assets
+
+[TEXT]
+STATEMENT: >>>
+What is worth attacking, in the order an attacker would care about.
+<<<
+
+[ASSET]
+UID: A-1
+STATEMENT: >>>
+**Control of the heater.**
+<<<
+WHY_IT_MATTERS: >>>
+The kiln is a multi-kilowatt mains heater reaching 1350 °C. This is the asset; everything else is a means to it.
+<<<
+
+[ASSET]
+UID: A-2
+STATEMENT: >>>
+**The safety configuration.**
+<<<
+WHY_IT_MATTERS: >>>
+Maximum chamber temperature, runaway thresholds, current limits. Loosening these does not start a fire by itself, but it removes the layer that would stop one.
+<<<
+
+[ASSET]
+UID: A-3
+STATEMENT: >>>
+**The latched-fault state.**
+<<<
+WHY_IT_MATTERS: >>>
+A latched fault is the mechanism that keeps a failed kiln off ([LINK: SR-17]). Clearing one remotely re-arms a kiln that something has already gone wrong with.
+<<<
+
+[ASSET]
+UID: A-4
+STATEMENT: >>>
+**WiFi credentials.**
+<<<
+WHY_IT_MATTERS: >>>
+`net.wifi_pass` is the user's network password, stored on the device. Its loss is a breach of their network, not merely of this device.
+<<<
+
+[ASSET]
+UID: A-5
+STATEMENT: >>>
+**The web password.**
+<<<
+WHY_IT_MATTERS: >>>
+`security.web_password`, guarding [LINK: A-1] to [LINK: A-3]. Removed from the configuration schema on 2026-10-06; the asset is kept because the threats against it are part of why it is gone.
+<<<
+
+[ASSET]
+UID: A-6
+STATEMENT: >>>
+**The firmware image.**
+<<<
+WHY_IT_MATTERS: >>>
+Write access to it is total and persistent control of [LINK: A-1].
+<<<
+
+[ASSET]
+UID: A-7
+STATEMENT: >>>
+**Firing programs and run history.**
+<<<
+WHY_IT_MATTERS: >>>
+Commercially meaningful to a production potter; the lowest-value asset here, and the only one whose loss is purely a privacy matter.
+<<<
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SECURITY-2
+TITLE: 2. Adversaries
+
+[ADVERSARY]
+UID: ADV-1
+STATEMENT: >>>
+**Another device on the LAN**: a compromised IoT gadget, a guest laptop, malware on a household machine.
+<<<
+CAPABILITY: >>>
+Full IP access to the device; no credentials.
+<<<
+REALISTIC: >>>
+**Yes.** This is the normal case and the one [LINK: ASM-05] quietly assumes away.
+<<<
+
+[ADVERSARY]
+UID: ADV-2
+STATEMENT: >>>
+**A malicious web page** the operator visits while on the same LAN.
+<<<
+CAPABILITY: >>>
+Can make cross-origin requests from the operator's browser; can attempt DNS rebinding to defeat the same-origin policy.
+<<<
+REALISTIC: >>>
+**Yes**, and it needs no LAN foothold at all.
+<<<
+
+[ADVERSARY]
+UID: ADV-3
+STATEMENT: >>>
+**Someone with brief physical access**: a shared studio, a classroom, a workshop.
+<<<
+CAPABILITY: >>>
+UART, JTAG, flash readout, reflash.
+<<<
+REALISTIC: >>>
+**Yes**, given where kilns live.
+<<<
+
+[ADVERSARY]
+UID: ADV-4
+STATEMENT: >>>
+**A later owner** of a second-hand or disposed device.
+<<<
+CAPABILITY: >>>
+Everything in flash.
+<<<
+REALISTIC: >>>
+**Yes**, and nobody thinks about it.
+<<<
+
+[ADVERSARY]
+UID: ADV-5
+STATEMENT: >>>
+**An attacker from the internet.**
+<<<
+CAPABILITY: >>>
+Only if the user port-forwards or the router is compromised.
+<<<
+REALISTIC: >>>
+Only through a user error that the documentation must argue against.
+<<<
+
+[ADVERSARY]
+UID: ADV-6
+STATEMENT: >>>
+**A supply-chain attacker** on a dependency.
+<<<
+CAPABILITY: >>>
+Code execution in the image.
+<<<
+REALISTIC: >>>
+Low: no package manager at build time, assets vendored ([LINK: CON-04]), dependencies are ESP-IDF itself.
+<<<
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SECURITY-3
+TITLE: 3. Threats
+
+[TEXT]
+STATEMENT: >>>
+Rated by consequence, not likelihood. A `Reaches` relation to a hazard means the
+threat arrives at [`safety.sdoc`](safety.sdoc)'s analysis and therefore at
+everything behind it; `SAFETY_RELEVANT` says so in a field as well, because the
+distinction between "yes", "indirectly" and "closed" is the one a reader scans
+for.
+<<<
+
+[THREAT]
+UID: TH-01
+STATEMENT: >>>
+**Unauthenticated command execution.**
+<<<
+CONSEQUENCE: >>>
+Would have been direct control of the heater.
+<<<
+SAFETY_RELEVANT: Closed
+STATUS: Resolved
+COMMENT: >>>
+**Closed by [LINK: FR-WEB-26].** No network route can start a firing, abort one or command manual duty; the handlers are deleted, not disabled.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: A-1
+  ROLE: Threatens
+- TYPE: Parent
+  VALUE: HZ-12
+  ROLE: Reaches
+- TYPE: Child
+  VALUE: FR-WEB-26
+  ROLE: Closed by
+
+[THREAT]
+UID: TH-02
+STATEMENT: >>>
+**Loosening the safety configuration.**
+<<<
+CONSEQUENCE: >>>
+Would have removed the layer that stops a runaway rather than starting one.
+<<<
+SAFETY_RELEVANT: Closed
+STATUS: Resolved
+COMMENT: >>>
+**Closed by [LINK: FR-WEB-26].** `/api/config` is read-only; the maximum temperature and every safety threshold are writable only at the kiln. [LINK: SR-22] and [LINK: SR-23] bounded the damage even before that, which is the point section 7 of [`security.md`](security.md) makes about bounds doing security work.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: A-2
+  ROLE: Threatens
+- TYPE: Parent
+  VALUE: HZ-02
+  ROLE: Reaches
+- TYPE: Parent
+  VALUE: HZ-10
+  ROLE: Reaches
+- TYPE: Child
+  VALUE: FR-WEB-26
+  ROLE: Closed by
+
+[THREAT]
+UID: TH-03
+STATEMENT: >>>
+**Clearing a latched fault remotely.**
+<<<
+CONSEQUENCE: >>>
+Would have re-armed a kiln that something had already gone wrong with.
+<<<
+SAFETY_RELEVANT: Closed
+STATUS: Resolved
+COMMENT: >>>
+**Closed by [LINK: FR-WEB-26].** Acknowledgement happens in front of the kiln. The fault stays readable, which is what the banner needs. [LINK: SR-18] blunted it regardless: a fault cannot be cleared while its condition is still observably true, so an attacker could clear a stale fault but not a live one.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: A-3
+  ROLE: Threatens
+- TYPE: Parent
+  VALUE: HZ-08
+  ROLE: Reaches
+- TYPE: Child
+  VALUE: FR-WEB-26
+  ROLE: Closed by
+
+[THREAT]
+UID: TH-04
+STATEMENT: >>>
+**Hostile firmware upload.**
+<<<
+CONSEQUENCE: >>>
+Would have been total and persistent control of the heater.
+<<<
+SAFETY_RELEVANT: Closed
+STATUS: Resolved
+COMMENT: >>>
+**Closed by [LINK: FR-UPD-01].** No image is accepted over the network. Note the cost: the device now has **no field update path at all** ([LINK: OQ-08]), so a security fix needs a physical visit. Carried as [LINK: SRR-11], which blocks release.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: A-6
+  ROLE: Threatens
+- TYPE: Parent
+  VALUE: HZ-01
+  ROLE: Reaches
+- TYPE: Child
+  VALUE: FR-UPD-01
+  ROLE: Closed by
+
+[THREAT]
+UID: TH-05
+STATEMENT: >>>
+**Cross-site request forgery and DNS rebinding.**
+<<<
+VIA: >>>
+[LINK: ADV-2]; the operator's own browser is the confused deputy.
+<<<
+CONSEQUENCE: >>>
+Reduced by [LINK: TH-01] to [LINK: TH-04] being closed: the worst a forged request can now do is **edit a stored firing program**, which takes effect only if an operator starts it at the kiln.
+<<<
+SAFETY_RELEVANT: Indirect
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: A-7
+  ROLE: Threatens
+- TYPE: Parent
+  VALUE: ADV-2
+  ROLE: Exploited by
+- TYPE: Parent
+  VALUE: HZ-12
+  ROLE: Reaches
+
+[THREAT]
+UID: TH-06
+STATEMENT: >>>
+**Credential disclosure from flash.**
+<<<
+VIA: >>>
+[LINK: ADV-3], [LINK: ADV-4], plaintext NVS, no flash encryption.
+<<<
+CONSEQUENCE: >>>
+[LINK: A-4], the user's WiFi password, and [LINK: A-5].
+<<<
+SAFETY_RELEVANT: No
+STATUS: Active
+COMMENT: >>>
+Not a safety event, but it breaches the user's network rather than only this device.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: A-4
+  ROLE: Threatens
+- TYPE: Parent
+  VALUE: A-5
+  ROLE: Threatens
+- TYPE: Parent
+  VALUE: ADV-3
+  ROLE: Exploited by
+- TYPE: Parent
+  VALUE: ADV-4
+  ROLE: Exploited by
+
+[THREAT]
+UID: TH-07
+STATEMENT: >>>
+**Credential disclosure on the wire.**
+<<<
+VIA: >>>
+No TLS; the password crosses the LAN in cleartext on every authenticated request.
+<<<
+CONSEQUENCE: >>>
+[LINK: A-5], observable by [LINK: ADV-1].
+<<<
+SAFETY_RELEVANT: No
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: A-5
+  ROLE: Threatens
+- TYPE: Parent
+  VALUE: ADV-1
+  ROLE: Exploited by
+
+[THREAT]
+UID: TH-08
+STATEMENT: >>>
+**Password brute force.**
+<<<
+VIA: >>>
+Repeated requests against the auth check.
+<<<
+CONSEQUENCE: >>>
+[LINK: A-5].
+<<<
+SAFETY_RELEVANT: No
+STATUS: Active
+COMMENT: >>>
+**Has no security goal.** It was answered by `SEC-04`, which was withdrawn on 2026-10-06 along with the password itself. Arguably it is moot rather than open, since there is nothing left to guess, but it is left Active and unanswered rather than quietly closed: if authentication ever returns, this threat returns with it, and it should be visible when that happens.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: A-5
+  ROLE: Threatens
+
+[THREAT]
+UID: TH-09
+STATEMENT: >>>
+**Denial of service**: socket exhaustion, oversized bodies, slow clients.
+<<<
+VIA: >>>
+Boundaries `B-2` and `B-4`; see section 3 of [`security.md`](security.md).
+<<<
+CONSEQUENCE: >>>
+Loss of the web interface. Crucially **not** loss of control: the safety supervisor is a separate task on the other core ([LINK: AD-15]), and [LINK: NFR-02] bounds non-safety interference at 50 ms.
+<<<
+SAFETY_RELEVANT: No
+STATUS: Active
+COMMENT: >>>
+Deliberately carries no `Threatens` relation. The interface is not one of the assets, and the asset an attacker would want, [LINK: A-1], is exactly the one this threat cannot reach.
+<<<
+
+[THREAT]
+UID: TH-10
+STATEMENT: >>>
+**Information disclosure through unauthenticated reads.**
+<<<
+VIA: >>>
+Every `GET` is unauthenticated by design.
+<<<
+CONSEQUENCE: >>>
+Telemetry, logs, programs, run history, network status ([LINK: A-7]).
+<<<
+SAFETY_RELEVANT: No
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: A-7
+  ROLE: Threatens
+- TYPE: Parent
+  VALUE: ADV-1
+  ROLE: Exploited by
+
+[THREAT]
+UID: TH-11
+STATEMENT: >>>
+**Open provisioning access point.**
+<<<
+VIA: >>>
+[LINK: FR-NET-02] AP fallback; if `net.ap_pass` is empty the AP is open.
+<<<
+CONSEQUENCE: >>>
+Anyone in radio range reaches the provisioning page and can supply their own credentials.
+<<<
+SAFETY_RELEVANT: Yes
+STATUS: Active
+COMMENT: >>>
+**Has no security goal.** The stale appendix routed it through `SEC-01`, which is withdrawn. This is the most security-sensitive surface the device has and the one most likely to be reachable without credentials, and it is currently answered by nothing but [LINK: OQ-S4]. Carried as [LINK: SRR-08].
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: A-4
+  ROLE: Threatens
+- TYPE: Parent
+  VALUE: HZ-12
+  ROLE: Reaches
+
+[THREAT]
+UID: TH-12
+STATEMENT: >>>
+**Physical console access.**
+<<<
+VIA: >>>
+UART console.
+<<<
+CONSEQUENCE: >>>
+The simulator build exposes fault injection and direct commands.
+<<<
+SAFETY_RELEVANT: Yes
+STATUS: Active
+COMMENT: >>>
+On a simulator build only: the console is compile-gated behind `CONFIG_KILN_PLANT_SIM` and is not in a production image. [LINK: NFR-24] is the requirement behind that.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: A-1
+  ROLE: Threatens
+- TYPE: Parent
+  VALUE: ADV-3
+  ROLE: Exploited by
+- TYPE: Parent
+  VALUE: HZ-12
+  ROLE: Reaches
+
+[THREAT]
+UID: TH-13
+STATEMENT: >>>
+**mDNS and network reconnaissance.**
+<<<
+VIA: >>>
+`kiln.local` advertised on the LAN ([LINK: FR-NET-05]).
+<<<
+CONSEQUENCE: >>>
+Makes the device trivially discoverable; a precondition for the rest rather than a threat alone.
+<<<
+SAFETY_RELEVANT: No
+STATUS: Active
+COMMENT: >>>
+**Has no security goal, and never had one.** Discoverability is accepted: the device is meant to be found by its operator, and `FR-NET-05` asks for exactly that. Recorded so the acceptance is explicit rather than an omission.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: ADV-1
+  ROLE: Exploited by
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SECURITY-4
+TITLE: 4. Security goals
+
+[TEXT]
+STATEMENT: >>>
+`IMPLEMENTATION` is what is actually true today, and the marks are not
+decoration: most of this is **not built yet**.
+
+- **Built**, implemented and covered by an automated test.
+- **Partial**, implemented in the host-testable core, but the piece that would
+  enforce it on a device does not exist.
+- **Spec**, required or designed, no implementation at all.
+- **Absent**, not required, not designed, not present. A gap, named as one.
+- **NotNeeded**, the threat it would answer cannot occur.
+
+At the time of writing there is **no HTTP transport on the target**. The REST API
+is complete and host-tested, but the `esp_http_server` adapter that would
+terminate TCP, parse headers, check a password and apply rate limiting is not
+started. Nearly every network control here is therefore `Spec`, and that is the
+single most important fact in this document.
+<<<
+
+[SECURITY_GOAL]
+UID: SEC-00
+STATEMENT: >>>
+**No network request shall change any device state at all.**
+<<<
+IMPLEMENTATION: Built
+STATUS: Active
+COMMENT: >>>
+Tested: every request other than `GET` returns `403 read_only`, program authoring included since 2026-10-06, and the handlers are **deleted from the image** rather than gated by a flag. This is the strongest control in this document, and the only one that does not depend on the unwritten HTTP transport, because it is enforced in the API layer that *is* written.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: TH-01
+  ROLE: Addresses
+- TYPE: Parent
+  VALUE: TH-02
+  ROLE: Addresses
+- TYPE: Parent
+  VALUE: TH-03
+  ROLE: Addresses
+- TYPE: Parent
+  VALUE: TH-04
+  ROLE: Addresses
+- TYPE: Parent
+  VALUE: TH-05
+  ROLE: Addresses
+- TYPE: Child
+  VALUE: FR-WEB-26
+  ROLE: Realised by
+
+[SECURITY_GOAL]
+UID: SEC-01
+STATEMENT: >>>
+Only an authenticated client may change state.
+<<<
+IMPLEMENTATION: Partial
+STATUS: Withdrawn
+COMMENT: >>>
+**Dissolved 2026-10-06**: no client may change state, authenticated or not, so there is nothing left for authentication to gate. Kept rather than deleted because the route-selection half is still in the code and still worth not losing: `kiln_api_needs_auth` returns true for every non-`GET` method, so a route added later is protected *by default* rather than by somebody remembering to list it. Superseded in substance by [LINK: SEC-00].
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: TH-01
+  ROLE: Addresses
+- TYPE: Parent
+  VALUE: TH-02
+  ROLE: Addresses
+- TYPE: Parent
+  VALUE: TH-03
+  ROLE: Addresses
+
+[SECURITY_GOAL]
+UID: SEC-02
+STATEMENT: >>>
+Credentials are never disclosed through the API.
+<<<
+IMPLEMENTATION: Built
+STATUS: Active
+COMMENT: >>>
+Tested: `net.wifi_pass`, `net.ap_pass` and `security.web_password` carry `KILN_CFG_F_SECRET`, and the config endpoint returns only whether a secret *is set*, never its value. There is no mode in which it returns one, and the endpoint is generated from the same table that declares the flag, so a new secret field is redacted by construction rather than by a second edit.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: TH-06
+  ROLE: Addresses
+- TYPE: Child
+  VALUE: FR-CFG-07
+  ROLE: Realised by
+
+[SECURITY_GOAL]
+UID: SEC-03
+STATEMENT: >>>
+Every byte from the network is treated as hostile.
+<<<
+IMPLEMENTATION: Built
+STATUS: Active
+COMMENT: >>>
+A declared maximum body per handler (2048 B), a bounded token budget (192), a bounded point budget (2000), caller-owned buffers, no allocation proportional to input, and responses streamed in bounded chunks rather than accumulated. Exercised by a fuzz suite and by ASan/UBSan in CI. The firmware contains zero `malloc`/`free`, so an attacker cannot exhaust a heap that does not exist.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: TH-09
+  ROLE: Addresses
+- TYPE: Child
+  VALUE: NFR-19
+  ROLE: Realised by
+
+[SECURITY_GOAL]
+UID: SEC-04
+STATEMENT: >>>
+Authentication resists guessing and timing analysis.
+<<<
+IMPLEMENTATION: Spec
+STATUS: Withdrawn
+COMMENT: >>>
+**Dissolved 2026-10-06** with the password itself: there is nothing left to authenticate. This also closed [LINK: SRR-02], which asked whether the password was stored as a salted hash or in plaintext. It leaves [LINK: TH-08] with no goal, which is recorded there rather than hidden here.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: TH-08
+  ROLE: Addresses
+
+[SECURITY_GOAL]
+UID: SEC-05
+STATEMENT: >>>
+Only a valid image for this target can be installed, and never mid-firing.
+<<<
+IMPLEMENTATION: Spec
+STATUS: Active
+COMMENT: >>>
+Note what is *not* required anywhere: a **signature**. See [LINK: SRR-04]. With [LINK: TH-04] closed by removing the network update path entirely, this goal currently has no path to exercise, which is why it remains `Spec` rather than becoming moot: whatever replaces OTA under [LINK: OQ-08] will need it.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: TH-04
+  ROLE: Addresses
+- TYPE: Child
+  VALUE: FR-UPD-02
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: FR-UPD-03
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: FR-UPD-04
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: FR-UPD-08
+  ROLE: Realised by
+
+[SECURITY_GOAL]
+UID: SEC-06
+STATEMENT: >>>
+The device reveals and transmits nothing to third parties.
+<<<
+IMPLEMENTATION: Built
+STATUS: Active
+COMMENT: >>>
+Structurally: there is no cloud client, no telemetry, no analytics and no outbound connection in the codebase. This is a property of what was never written, which is why it carries no threat relation: it answers no specific threat and forecloses a category.
+<<<
+RELATIONS:
+- TYPE: Child
+  VALUE: NFR-21
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: CON-03
+  ROLE: Realised by
+
+[SECURITY_GOAL]
+UID: SEC-07
+STATEMENT: >>>
+No hidden access.
+<<<
+IMPLEMENTATION: Built
+STATUS: Active
+COMMENT: >>>
+No hardcoded credentials, no undocumented ports, no default-enabled remote access. Built by inspection; [LINK: AD-16] reinforces it, because the UI uses only the public API, so there is no privileged back channel to find.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: TH-10
+  ROLE: Addresses
+- TYPE: Child
+  VALUE: NFR-22
+  ROLE: Realised by
+
+[SECURITY_GOAL]
+UID: SEC-08
+STATEMENT: >>>
+A compromised or overloaded web stack cannot affect control.
+<<<
+IMPLEMENTATION: Built
+STATUS: Active
+COMMENT: >>>
+[LINK: AD-15] pins control and safety to core 1 and networking to core 0; [LINK: AD-13] uses queues and immutable snapshots with no mutex on the control path; [LINK: NFR-02] bounds interference at 50 ms; [LINK: AD-04] keeps heat authority in the safety supervisor alone. This is the strongest security property the design has, and it came from the safety work.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: TH-09
+  ROLE: Addresses
+- TYPE: Child
+  VALUE: NFR-02
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: AD-13
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: AD-15
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: AD-04
+  ROLE: Realised by
+
+[SECURITY_GOAL]
+UID: SEC-09
+STATEMENT: >>>
+Secrets at rest are protected from physical access.
+<<<
+IMPLEMENTATION: Absent
+STATUS: Active
+COMMENT: >>>
+No flash encryption, no secure boot, neither appears in `sdkconfig.defaults`. Carried as [LINK: SRR-05], and open as [LINK: OQ-S3].
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: TH-06
+  ROLE: Addresses
+- TYPE: Parent
+  VALUE: TH-12
+  ROLE: Addresses
+
+[SECURITY_GOAL]
+UID: SEC-10
+STATEMENT: >>>
+Browser-originated requests cannot be forged.
+<<<
+IMPLEMENTATION: NotNeeded
+STATUS: Active
+COMMENT: >>>
+CSRF matters because a forged request can act; with the interface read-only a forged request can only read, and the reads are public anyway ([LINK: SRR-07]). This is the one gap the read-only decision closed without any code. It is `NotNeeded` rather than `Absent` on that basis, and it reverts to `Absent` the moment any write route returns: [LINK: SRR-06] keeps that visible.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: TH-05
+  ROLE: Addresses
+
+[SECURITY_GOAL]
+UID: SEC-11
+STATEMENT: >>>
+Traffic is confidential and integrity-protected in transit.
+<<<
+IMPLEMENTATION: Absent
+STATUS: Active
+COMMENT: >>>
+Absent **by decision, not oversight**: see [LINK: SRR-03] for the trade. [LINK: NFR-20]'s "trusted LAN only" is what stands in its place.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: TH-07
+  ROLE: Addresses
+- TYPE: Child
+  VALUE: NFR-20
+  ROLE: Realised by
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SECURITY-5
+TITLE: 5. Security residual risk
+
+[TEXT]
+STATEMENT: >>>
+What stands after the goals above, stated without softening. Each names who
+carries it. There is no `SRR-10`: the numbering has a gap and keeping it is
+cheaper than renumbering IDs that are cited from other documents.
+<<<
+
+[SECURITY_RESIDUAL_RISK]
+UID: SRR-01
+STATEMENT: >>>
+**There is no authentication on a device, because there is no HTTP server on a device.** Every network control is a specification.
+<<<
+WHY_IT_STANDS: >>>
+Milestone M6 is not implemented.
+<<<
+CARRIED_BY: >>>
+The project.
+<<<
+MITIGATION: >>>
+None. It is not a *live* exposure, since an unimplemented server accepts no connections, but it must not be read as "the controls exist". **Nothing in this document may be cited as evidence of a deployed control.**
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: SEC-05
+  ROLE: Remains under
+
+[SECURITY_RESIDUAL_RISK]
+UID: SRR-02
+STATEMENT: >>>
+The design and the data model disagree about the password.
+<<<
+WHY_IT_STANDS: >>>
+It does not. **Closed 2026-10-06**: `security.web_password` is removed from the configuration schema. There is no password, no hash, and nothing to disagree about.
+<<<
+CARRIED_BY: >>>
+Nobody.
+<<<
+STATUS: Resolved
+RELATIONS:
+- TYPE: Parent
+  VALUE: SEC-04
+  ROLE: Remains under
+
+[SECURITY_RESIDUAL_RISK]
+UID: SRR-03
+STATEMENT: >>>
+**No TLS.** Every request crosses the LAN in cleartext, readable by [LINK: ADV-1].
+<<<
+WHY_IT_STANDS: >>>
+A self-signed certificate on a `.local` name trains users to click through browser warnings, costs flash and RAM against a 2 MB OTA slot, and still cannot be verified. The honest trade was plaintext on a network already assumed trusted.
+<<<
+CARRIED_BY: >>>
+The owner of the network ([LINK: ASM-05]).
+<<<
+MITIGATION: >>>
+[LINK: NFR-20]'s "trusted LAN only", stated in the README, in [`safety.md`](safety.md) and here. It is a real limitation, not a solved problem.
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: SEC-11
+  ROLE: Remains under
+
+[SECURITY_RESIDUAL_RISK]
+UID: SRR-04
+STATEMENT: >>>
+**Firmware images are validated but not authenticated.** [LINK: FR-UPD-03] requires checking an image is *valid for this target*; no requirement anywhere asks for a **signature**, and secure boot is not enabled.
+<<<
+WHY_IT_STANDS: >>>
+Signing was never specified.
+<<<
+CARRIED_BY: >>>
+The project.
+<<<
+MITIGATION: >>>
+Only [LINK: FR-UPD-08]'s authentication stands between an attacker and [LINK: TH-04], and that is specification only. With secure boot absent, physical reflash ([LINK: ADV-3]) bypasses it entirely. Open as [LINK: OQ-S2].
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: SEC-05
+  ROLE: Remains under
+
+[SECURITY_RESIDUAL_RISK]
+UID: SRR-05
+STATEMENT: >>>
+**Secrets are plaintext in flash.** No flash encryption. Anyone with the board reads the user's WiFi password.
+<<<
+WHY_IT_STANDS: >>>
+Not specified; flash encryption also complicates development and field recovery.
+<<<
+CARRIED_BY: >>>
+The owner, and anyone who disposes of a device.
+<<<
+MITIGATION: >>>
+None. [LINK: ADV-4] is the under-considered case: a device sold on or thrown out carries the credentials with it. Open as [LINK: OQ-S3].
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: SEC-09
+  ROLE: Remains under
+
+[SECURITY_RESIDUAL_RISK]
+UID: SRR-06
+STATEMENT: >>>
+**No CSRF defence.** A page the operator visits can issue cross-origin requests to `kiln.local`, and DNS rebinding defeats the same-origin policy.
+<<<
+WHY_IT_STANDS: >>>
+Not specified or designed. Currently harmless only because the interface is read-only, which is a property of [LINK: SEC-00] rather than of any CSRF work.
+<<<
+CARRIED_BY: >>>
+The project.
+<<<
+MITIGATION: >>>
+None. Cheap to fix, since validating `Origin` and `Host` costs almost nothing, and it should land *with* the transport rather than after it.
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: SEC-10
+  ROLE: Remains under
+
+[SECURITY_RESIDUAL_RISK]
+UID: SRR-07
+STATEMENT: >>>
+**All reads are unauthenticated**, and reads are now all there is.
+<<<
+WHY_IT_STANDS: >>>
+The interface is read-only by decision.
+<<<
+CARRIED_BY: >>>
+The design, deliberately.
+<<<
+MITIGATION: >>>
+Defensible: the dashboard is meant to be glanceable and the data is low-value ([LINK: A-7]). But it is a decision, and it means the device is not private. Open as [LINK: OQ-S5].
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: SEC-07
+  ROLE: Remains under
+
+[SECURITY_RESIDUAL_RISK]
+UID: SRR-08
+STATEMENT: >>>
+**The AP fallback may be open.** [LINK: FR-NET-02] starts an access point with a provisioning page; nothing requires `net.ap_pass` to be non-empty.
+<<<
+WHY_IT_STANDS: >>>
+No minimum-passphrase rule exists.
+<<<
+CARRIED_BY: >>>
+The installer.
+<<<
+MITIGATION: >>>
+None. The provisioning page is the most security-sensitive surface the device has, and it is the one most likely to be reachable without credentials. Open as [LINK: OQ-S4].
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: TH-11
+  ROLE: Remains against
+
+[SECURITY_RESIDUAL_RISK]
+UID: SRR-09
+STATEMENT: >>>
+**[LINK: ASM-05] is the assumption everything rests on, and it is usually false.** Home and studio LANs routinely carry compromised IoT devices and guest traffic.
+<<<
+WHY_IT_STANDS: >>>
+A single-purpose controller cannot police its own network.
+<<<
+CARRIED_BY: >>>
+The owner.
+<<<
+MITIGATION: >>>
+A VLAN or a dedicated network segment is the real answer; the documentation should say so rather than only saying "trusted".
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: SEC-11
+  ROLE: Remains under
+
+[SECURITY_RESIDUAL_RISK]
+UID: SRR-11
+STATEMENT: >>>
+**No field update path.** Removing OTA closed [LINK: TH-04] completely and left the device with no way to receive a fix, including a security fix, without physical access.
+<<<
+WHY_IT_STANDS: >>>
+[LINK: FR-UPD-01] was inverted deliberately; the replacement is [LINK: OQ-08] and is not yet specified.
+<<<
+CARRIED_BY: >>>
+The project. **This blocks release**, not merely an open question.
+<<<
+MITIGATION: >>>
+None. A vulnerability found after shipping currently requires visiting every device.
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: TH-04
+  ROLE: Remains against
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SECURITY-6
+TITLE: 6. Open questions
+
+[TEXT]
+STATEMENT: >>>
+Each names the residual risk it would settle, so a question cannot drift away
+from the risk that motivated it. Two were answered by the read-only decision of
+2026-10-06 and are kept as `Resolved` rather than deleted, because the answer is
+the useful part.
+<<<
+
+[OPEN_QUESTION]
+UID: OQ-S1
+STATEMENT: >>>
+Salted hash or plaintext for the web password?
+<<<
+STATUS: Resolved
+COMMENT: >>>
+**Answered 2026-10-06 by removing the question.** The interface is read-only, so there is no password. Closed [LINK: SRR-02] with it.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SRR-02
+  ROLE: Would settle
+
+[OPEN_QUESTION]
+UID: OQ-S2
+STATEMENT: >>>
+Should firmware images be **signed** ([LINK: FR-UPD-03] requires validity, not authenticity), and should secure boot be enabled?
+<<<
+STATUS: Active
+COMMENT: >>>
+Both have real field-recovery costs for an open-source device users are expected to build themselves. Bound up with [LINK: OQ-08], since whatever replaces the removed update path has to answer this at the same time.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SRR-04
+  ROLE: Would settle
+
+[OPEN_QUESTION]
+UID: OQ-S3
+STATEMENT: >>>
+Should flash encryption be enabled by default?
+<<<
+STATUS: Active
+COMMENT: >>>
+It complicates self-builders and field debugging, and it is the only answer to [LINK: SRR-05].
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SRR-05
+  ROLE: Would settle
+
+[OPEN_QUESTION]
+UID: OQ-S4
+STATEMENT: >>>
+Should `net.ap_pass` have an enforced minimum, or should the access point refuse to start open?
+<<<
+STATUS: Active
+COMMENT: >>>
+[LINK: TH-11] currently has no security goal at all, so this question is the only thing standing against it.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SRR-08
+  ROLE: Would settle
+
+[OPEN_QUESTION]
+UID: OQ-S5
+STATEMENT: >>>
+Should read endpoints require authentication when a password is set?
+<<<
+STATUS: Resolved
+COMMENT: >>>
+**Moot 2026-10-06**: there is no password to set. The question of whether the dashboard should be private *at all* is not moot and remains as [LINK: SRR-07].
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: SRR-07
+  ROLE: Would settle
+
+[[/SECTION]]

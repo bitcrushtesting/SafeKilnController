@@ -357,7 +357,7 @@ A firing started, altered or a fault acknowledged by someone not at the kiln. **
 <<<
 SEVERITY: Moderate
 COMMENT: >>>
-Severe before [LINK: FR-WEB-26] removed every heating route, Moderate after. Analysed in full in [`security.md`](security.md).
+Severe before [LINK: FR-WEB-26] removed every heating route, Moderate after. Analysed in full in [`security.sdoc`](security.sdoc), whose threats relate to this hazard directly, with the reasoning in [`security.md`](security.md).
 <<<
 
 [TEXT]

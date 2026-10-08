@@ -84,11 +84,11 @@ ELEMENTS:
     REQUIRED: False
 
 [[SECTION]]
-UID: SEC-1
+UID: SECT-1
 TITLE: 1. Introduction
 
 [[SECTION]]
-UID: SEC-1-1
+UID: SECT-1-1
 TITLE: 1.1 Purpose
 
 [TEXT]
@@ -102,7 +102,7 @@ from this document is [`architecture.md`](architecture.md).
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-1-2
+UID: SECT-1-2
 TITLE: 1.2 Scope
 
 [TEXT]
@@ -130,13 +130,13 @@ In scope:
 - Safety supervision: thermal runaway, sensor failure, relay failure,
   over-temperature.
 
-Out of scope: see §12 ([LINK: SEC-12]).
+Out of scope: see §12 ([LINK: SECT-12]).
 <<<
 
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-1-3
+UID: SECT-1-3
 TITLE: 1.3 Definitions and abbreviations
 
 [TEXT]
@@ -171,7 +171,7 @@ STATEMENT: >>>
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-1-4
+UID: SECT-1-4
 TITLE: 1.4 Requirement conventions
 
 [TEXT]
@@ -215,7 +215,7 @@ Identifier prefixes:
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-1-5
+UID: SECT-1-5
 TITLE: 1.5 References
 
 [TEXT]
@@ -234,7 +234,7 @@ STATEMENT: >>>
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-1-6
+UID: SECT-1-6
 TITLE: 1.6 Relationship to PIDKiln
 
 [TEXT]
@@ -254,10 +254,10 @@ divergences drive many requirements below:
 | Framework | Arduino-ESP32 | ESP-IDF v5.x ([LINK: CON-01]) | Explicit requirement; better test tooling, partition/OTA control, watchdogs |
 | MCU | ESP32-WROVER | ESP32-S3 ([LINK: HR-01]) | Explicit requirement |
 | TC front-end | MAX31855 (K only, ≤1350 °C) | MAX31856 (K/N/S/R/B/E/J/T, richer fault detection) | Diagnosability, [LINK: SR-04] |
-| PID gains | Manually tuned, documented by experiment | Automatic tuning on-device (FR-TUN ([LINK: SEC-3-3])) | Explicit requirement |
+| PID gains | Manually tuned, documented by experiment | Automatic tuning on-device (FR-TUN ([LINK: SECT-3-3])) | Explicit requirement |
 | Storage | SPIFFS on internal flash, microSD board recommended | Dedicated raw partitions, fixed slots for programs and run records and a circular ring for the log, no SD card and no filesystem ([LINK: CON-03]) | Explicit requirement |
-| Heater current | Optional 30 A/1 V power meter, not used for protection | **Mandatory** current transformer driving relay fail-on / fail-off detection and weld discrimination (FR-CUR ([LINK: SEC-3-12]), [LINK: SR-25]–[LINK: SR-30]) | Explicit requirement; resolves [LINK: OQ-02] |
-| Architecture | Arduino sketch, hardware access throughout | Layered, HAL-isolated, host-testable core (TR ([LINK: SEC-7])) | Explicit requirement: design for testability |
+| Heater current | Optional 30 A/1 V power meter, not used for protection | **Mandatory** current transformer driving relay fail-on / fail-off detection and weld discrimination (FR-CUR ([LINK: SECT-3-12]), [LINK: SR-25]–[LINK: SR-30]) | Explicit requirement; resolves [LINK: OQ-02] |
+| Architecture | Arduino sketch, hardware access throughout | Layered, HAL-isolated, host-testable core (TR ([LINK: SECT-7])) | Explicit requirement: design for testability |
 
 No PIDKiln source code is copied. Safe Kiln Controller is licensed GPL-3.0-or-later, the
 same licence as PIDKiln, so derivation remains possible in either direction.
@@ -268,11 +268,11 @@ same licence as PIDKiln, so derivation remains possible in either direction.
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-2
+UID: SECT-2
 TITLE: 2. System overview
 
 [[SECTION]]
-UID: SEC-2-1
+UID: SECT-2-1
 TITLE: 2.1 Context
 
 [TEXT]
@@ -314,7 +314,7 @@ flowchart LR
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-2-2
+UID: SECT-2-2
 TITLE: 2.2 Operating modes
 
 [TEXT]
@@ -352,7 +352,7 @@ stateDiagram-v2
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-2-3
+UID: SECT-2-3
 TITLE: 2.3 Primary use cases
 
 [TEXT]
@@ -379,11 +379,11 @@ STATEMENT: >>>
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-3
+UID: SECT-3
 TITLE: 3. Functional requirements
 
 [[SECTION]]
-UID: SEC-3-1
+UID: SECT-3-1
 TITLE: 3.1 Temperature acquisition (FR-ACQ)
 
 [REQUIREMENT]
@@ -489,7 +489,7 @@ VERIFICATION: T
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-3-2
+UID: SECT-3-2
 TITLE: 3.2 Control loop (FR-CTL)
 
 [REQUIREMENT]
@@ -623,7 +623,7 @@ VERIFICATION: T
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-3-3
+UID: SECT-3-3
 TITLE: 3.3 Automatic PID tuning (FR-TUN)
 
 [REQUIREMENT]
@@ -677,7 +677,7 @@ VERIFICATION: T
 [REQUIREMENT]
 UID: FR-TUN-07
 STATEMENT: >>>
-The system shall abort tuning and enter Fault if any safety requirement in §5 ([LINK: SEC-5]) trips, if no valid oscillation is identified within a configurable timeout (10–480 min, default 120 min), or if the operator cancels.
+The system shall abort tuning and enter Fault if any safety requirement in §5 ([LINK: SECT-5]) trips, if no valid oscillation is identified within a configurable timeout (10–480 min, default 120 min), or if the operator cancels.
 <<<
 PRIORITY: M
 VERIFICATION: T
@@ -733,7 +733,7 @@ VERIFICATION: T
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-3-4
+UID: SECT-3-4
 TITLE: 3.4 Firing programs (FR-PRG)
 
 [REQUIREMENT]
@@ -827,13 +827,13 @@ VERIFICATION: T
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-3-5
+UID: SECT-3-5
 TITLE: 3.5 Run control (FR-RUN)
 
 [REQUIREMENT]
 UID: FR-RUN-01
 STATEMENT: >>>
-The system shall implement the state machine of §2.2 ([LINK: SEC-2-2]), and every state transition shall be logged with a timestamp and cause.
+The system shall implement the state machine of §2.2 ([LINK: SECT-2-2]), and every state transition shall be logged with a timestamp and cause.
 <<<
 PRIORITY: M
 VERIFICATION: T
@@ -913,7 +913,7 @@ VERIFICATION: T
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-3-6
+UID: SECT-3-6
 TITLE: 3.6 Local display and input (FR-HMI)
 
 [REQUIREMENT]
@@ -1039,7 +1039,7 @@ VERIFICATION: T
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-3-7
+UID: SECT-3-7
 TITLE: 3.7 Web interface (FR-WEB)
 
 [REQUIREMENT]
@@ -1263,7 +1263,7 @@ VERIFICATION: D
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-3-8
+UID: SECT-3-8
 TITLE: 3.8 Data logging (FR-LOG)
 
 [REQUIREMENT]
@@ -1389,7 +1389,7 @@ VERIFICATION: T
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-3-9
+UID: SECT-3-9
 TITLE: 3.9 Configuration (FR-CFG)
 
 [REQUIREMENT]
@@ -1459,7 +1459,7 @@ VERIFICATION: T
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-3-10
+UID: SECT-3-10
 TITLE: 3.10 Connectivity and time (FR-NET)
 
 [REQUIREMENT]
@@ -1545,7 +1545,7 @@ VERIFICATION: T
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-3-11
+UID: SECT-3-11
 TITLE: 3.11 Firmware update (FR-UPD)
 
 [REQUIREMENT]
@@ -1615,7 +1615,7 @@ VERIFICATION: T
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-3-12
+UID: SECT-3-12
 TITLE: 3.12 Heater current measurement (FR-CUR)
 
 [TEXT]
@@ -1742,7 +1742,7 @@ VERIFICATION: T
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-3-13
+UID: SECT-3-13
 TITLE: 3.13 Device identity (FR-PROD)
 
 [TEXT]
@@ -1806,7 +1806,7 @@ VERIFICATION: T, D
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-4
+UID: SECT-4
 TITLE: 4. Non-functional requirements
 
 [REQUIREMENT]
@@ -1844,7 +1844,7 @@ VERIFICATION: T
 [REQUIREMENT]
 UID: NFR-05
 STATEMENT: >>>
-The system shall control temperature to within **±5 °C** of setpoint during a dwell, on a kiln whose PID has been tuned by the procedure of FR-TUN ([LINK: SEC-3-3]).
+The system shall control temperature to within **±5 °C** of setpoint during a dwell, on a kiln whose PID has been tuned by the procedure of FR-TUN ([LINK: SECT-3-3]).
 <<<
 PRIORITY: M
 VERIFICATION: T
@@ -2028,7 +2028,7 @@ VERIFICATION: T
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-5
+UID: SECT-5
 TITLE: 5. Safety requirements
 
 [TEXT]
@@ -2041,7 +2041,7 @@ STATEMENT: >>>
 <<<
 
 [[SECTION]]
-UID: SEC-5-1
+UID: SECT-5-1
 TITLE: 5.1 Safety principles
 
 [REQUIREMENT]
@@ -2068,7 +2068,7 @@ VERIFICATION: I
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-5-2
+UID: SECT-5-2
 TITLE: 5.2 Detection requirements
 
 [TEXT]
@@ -2219,7 +2219,7 @@ VERIFICATION: T
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-5-3
+UID: SECT-5-3
 TITLE: 5.3 Reaction and recovery requirements
 
 [REQUIREMENT]
@@ -2292,7 +2292,7 @@ VERIFICATION: I
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-6
+UID: SECT-6
 TITLE: 6. Hardware interface requirements
 
 [TEXT]
@@ -2488,7 +2488,7 @@ VERIFICATION: I
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-7
+UID: SECT-7
 TITLE: 7. Testability requirements
 
 [TEXT]
@@ -2499,7 +2499,7 @@ STATEMENT: >>>
 <<<
 
 [[SECTION]]
-UID: SEC-7-1
+UID: SECT-7-1
 TITLE: 7.1 Design for test
 
 [REQUIREMENT]
@@ -2569,7 +2569,7 @@ VERIFICATION: I
 [REQUIREMENT]
 UID: TR-09
 STATEMENT: >>>
-Every fault condition of §5.2 ([LINK: SEC-5-2]) shall be reachable in a test through a documented stimulus, without physical hardware.
+Every fault condition of §5.2 ([LINK: SECT-5-2]) shall be reachable in a test through a documented stimulus, without physical hardware.
 <<<
 PRIORITY: M
 VERIFICATION: T
@@ -2585,7 +2585,7 @@ VERIFICATION: A
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-7-2
+UID: SECT-7-2
 TITLE: 7.2 Test infrastructure
 
 [REQUIREMENT]
@@ -2615,7 +2615,7 @@ VERIFICATION: D
 [REQUIREMENT]
 UID: TR-14
 STATEMENT: >>>
-The project shall provide closed-loop integration tests that run the real control, setpoint, safety and autotune code against the simulator, verifying the performance requirements [LINK: NFR-05] to [LINK: NFR-08] and the safety reactions of §5 ([LINK: SEC-5]).
+The project shall provide closed-loop integration tests that run the real control, setpoint, safety and autotune code against the simulator, verifying the performance requirements [LINK: NFR-05] to [LINK: NFR-08] and the safety reactions of §5 ([LINK: SECT-5]).
 <<<
 PRIORITY: M
 VERIFICATION: T
@@ -2679,7 +2679,7 @@ VERIFICATION: T
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-7-3
+UID: SECT-7-3
 TITLE: 7.3 Process
 
 [REQUIREMENT]
@@ -2693,7 +2693,7 @@ VERIFICATION: A
 [REQUIREMENT]
 UID: TR-23
 STATEMENT: >>>
-Every requirement in §5 ([LINK: SEC-5]) shall be covered by at least one **automated** test; inspection alone shall not be sufficient.
+Every requirement in §5 ([LINK: SECT-5]) shall be covered by at least one **automated** test; inspection alone shall not be sufficient.
 <<<
 PRIORITY: M
 VERIFICATION: A
@@ -2755,7 +2755,7 @@ VERIFICATION: T
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-8
+UID: SECT-8
 TITLE: 8. Constraints
 
 [CONSTRAINT]
@@ -2803,7 +2803,7 @@ Total bill of materials for the controller electronics should remain comparable 
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-9
+UID: SECT-9
 TITLE: 9. Assumptions
 
 [ASSUMPTION]
@@ -2863,13 +2863,13 @@ The heater load is resistive and switched as a single group, so the current in t
 [ASSUMPTION]
 UID: ASM-10
 STATEMENT: >>>
-The kiln is **single phase**. Three-phase kilns are out of scope (§12 ([LINK: SEC-12]), [LINK: OQ-06]), so there is no unmonitored phase for a fault to hide on: there is one phase and one current transformer on it ([LINK: HR-11]).
+The kiln is **single phase**. Three-phase kilns are out of scope (§12 ([LINK: SECT-12]), [LINK: OQ-06]), so there is no unmonitored phase for a fault to hide on: there is one phase and one current transformer on it ([LINK: HR-11]).
 <<<
 
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-10
+UID: SECT-10
 TITLE: 10. Verification strategy summary
 
 [TEXT]
@@ -2890,7 +2890,7 @@ STATEMENT: >>>
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-11
+UID: SECT-11
 TITLE: 11. Open questions
 
 [QUESTION]
@@ -2902,14 +2902,14 @@ Should cone-based targets (Orton cone numbers with heatwork/rate correction) be 
 [QUESTION]
 UID: OQ-02
 STATEMENT: >>>
-**Resolved 2026-09-28: yes.** The current transformer is mandatory ([LINK: HR-11]) and drives FR-CUR ([LINK: SEC-3-12]) and [LINK: SR-25]–[LINK: SR-30]. The thermal detections are retained as an independent backstop.
+**Resolved 2026-09-28: yes.** The current transformer is mandatory ([LINK: HR-11]) and drives FR-CUR ([LINK: SECT-3-12]) and [LINK: SR-25]–[LINK: SR-30]. The thermal detections are retained as an independent backstop.
 <<<
 STATUS: Resolved
 
 [QUESTION]
 UID: OQ-06
 STATEMENT: >>>
-**Resolved 2026-10-06: single phase only.** Three-phase kilns are out of scope (§12 ([LINK: SEC-12])). A three-phase kiln monitored on one phase is worse than one not supported at all: a fault on an unmonitored phase would be caught only by the thermal rules, slowly, and the power and energy figures would cover a third of the load while looking like a whole-kiln number. This reverses the resolution of 2026-10-05 and reinstates [LINK: ASM-10] in a narrower form.
+**Resolved 2026-10-06: single phase only.** Three-phase kilns are out of scope (§12 ([LINK: SECT-12])). A three-phase kiln monitored on one phase is worse than one not supported at all: a fault on an unmonitored phase would be caught only by the thermal rules, slowly, and the power and energy figures would cover a third of the load while looking like a whole-kiln number. This reverses the resolution of 2026-10-05 and reinstates [LINK: ASM-10] in a narrower form.
 <<<
 STATUS: Resolved
 
@@ -2952,7 +2952,7 @@ Is a 3-zone variant ([LINK: ASM-02]) a v1.1 goal? It affects whether the control
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-12
+UID: SECT-12
 TITLE: 12. Out of scope
 
 [TEXT]
@@ -2970,12 +2970,12 @@ STATEMENT: >>>
 [[/SECTION]]
 
 [[SECTION]]
-UID: SEC-APPENDIX-A-FAULT-CODE-ALLOCATION
+UID: SECT-APPENDIX-A-FAULT-CODE-ALLOCATION
 TITLE: Appendix A, Fault code allocation
 
 [TEXT]
 STATEMENT: >>>
-Codes are stable and shall not be reused. Detail in §5.2 ([LINK: SEC-5-2]).
+Codes are stable and shall not be reused. Detail in §5.2 ([LINK: SECT-5-2]).
 
 | Code | Fault | Requirement |
 |---|---|---|

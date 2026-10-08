@@ -12,7 +12,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 | **Version** | 0.1 (draft) |
 | **Date** | 2026-10-05 |
 | **Status** | For review |
-| **Derives from** | [`requirements.sdoc`](requirements.sdoc) v0.1, [`architecture.md`](architecture.md) v0.1, [`safety.md`](safety.md) v0.1 |
+| **Derives from** | [`requirements.sdoc`](requirements.sdoc) v0.1, [`architecture.md`](architecture.md) v0.1, [`safety.md`](safety.md) and [`safety.sdoc`](safety.sdoc) v0.1 |
 | **License** | GPL-3.0-or-later |
 
 ---
@@ -42,15 +42,37 @@ update path, and physical access to the board. It does not cover the security of
 the user's own network, their browser, or their WiFi infrastructure, except to
 say where Safe Kiln Controller depends on them.
 
-Identifiers introduced here extend the scheme of
+The split between this document and [`security.sdoc`](security.sdoc) follows the
+one between [`safety.md`](safety.md) and [`safety.sdoc`](safety.sdoc). The
+assets, adversaries, threats, security goals, residual risks and open questions
+are nodes in `security.sdoc`, because they have identity and a chain between
+them that is now checked when the document is built. The reasoning is here: the
+scope, the trust boundaries, section 7 on why a security compromise is a safety
+event, what the implementation already gets right, the obligations and the
+verification status.
+
+Identifiers introduced by this concept extend the scheme of
 [requirements §1.4](requirements.sdoc) and of
-[`safety.md` §1](safety.md#1-purpose-and-scope):
+[`safety.md` §1](safety.md#1-purpose-and-scope), and are defined as nodes in
+[`security.sdoc`](security.sdoc):
 
 | Prefix | Meaning |
 |---|---|
+| `A` | Asset |
+| `ADV` | Adversary |
 | `TH` | Threat |
 | `SEC` | Security goal |
 | `SRR` | Security residual risk |
+| `OQ-S` | Open question, security |
+
+The trust boundaries `B-1` to `B-6` are **not** nodes, and that is deliberate:
+they are the legend of the diagram in [§3](#3-attack-surface-and-trust-boundaries)
+and carry no chain through them, so splitting them from the picture would help
+nobody.
+
+Note for anyone reading `requirements.sdoc` alongside this: its section anchors
+used to be `SEC-n`, which collided with the security goals here once both became
+StrictDoc documents. They are `SECT-n` now. `SEC` means security goal.
 
 **Status honesty.** Every control below is marked with what is actually true
 today, and the marks are not decoration, most of this is **not built yet**:
@@ -72,17 +94,9 @@ fact in it.
 
 ## 2. Assets
 
-What is worth attacking, in the order an attacker would care about.
-
-| ID | Asset | Why it matters |
-|---|---|---|
-| **A-1** | **Control of the heater** | The kiln is a multi-kilowatt mains heater reaching 1350 °C. This is the asset; everything else is a means to it. |
-| **A-2** | **The safety configuration** | Maximum chamber temperature, runaway thresholds, current limits. Loosening these does not start a fire by itself, but it removes the layer that would stop one. |
-| **A-3** | **The latched-fault state** | A latched fault is the mechanism that keeps a failed kiln off ([`SR-17`](requirements.sdoc)). Clearing one remotely re-arms a kiln that something has already gone wrong with. |
-| **A-4** | **WiFi credentials** | `net.wifi_pass` is the user's network password, stored on the device. Its loss is a breach of their network, not merely of this device. |
-| **A-5** | **The web password** | `security.web_password`, guarding A-1 to A-3. |
-| **A-6** | **The firmware image** | Write access to it is total and persistent control of A-1. |
-| **A-7** | **Firing programs and run history** | Commercially meaningful to a production potter; the lowest-value asset here, and the only one whose loss is purely a privacy matter. |
+The seven assets live in [`security.sdoc`](security.sdoc), not here, each with
+what it is and why it matters. `A-1`, control of the heater, is the asset;
+everything else is a means to it.
 
 ## 3. Attack surface and trust boundaries
 
@@ -132,53 +146,39 @@ The trust boundaries, named:
 
 ## 4. Adversaries
 
-| ID | Adversary | Capability | Realistic? |
-|---|---|---|---|
-| **ADV-1** | **Another device on the LAN**: a compromised IoT gadget, a guest laptop, malware on a household machine | Full IP access to the device; no credentials | **Yes.** This is the normal case and the one `ASM-05` quietly assumes away. |
-| **ADV-2** | **A malicious web page** the operator visits while on the same LAN | Can make cross-origin requests from the operator's browser; can attempt DNS rebinding to defeat the same-origin policy | **Yes**, and it needs no LAN foothold at all. |
-| **ADV-3** | **Someone with brief physical access**: a shared studio, a classroom, a workshop | UART, JTAG, flash readout, reflash | **Yes**, given where kilns live. |
-| **ADV-4** | **A later owner** of a second-hand or disposed device | Everything in flash | **Yes**, and nobody thinks about it. |
-| **ADV-5** | **An attacker from the internet** | Only if the user port-forwards or the router is compromised | Only through a user error that the documentation must argue against. |
-| **ADV-6** | **A supply-chain attacker** on a dependency | Code execution in the image | Low: no package manager at build time, assets vendored (`CON-04`), dependencies are ESP-IDF itself. |
+The six adversaries live in [`security.sdoc`](security.sdoc), each with its
+capability and an honest answer to whether it is realistic. `ADV-1`, another
+device on the same LAN, is the normal case and the one `ASM-05` quietly assumes
+away.
 
 ## 5. Threats
 
-Rated by consequence, not likelihood. "Safety" in the last column means the
-threat reaches [`HZ-12`](safety.sdoc) and therefore the hazards
-behind it.
+The thirteen threats live in [`security.sdoc`](security.sdoc), rated by
+consequence rather than likelihood. Each names the asset it is aimed at, the
+adversary who can mount it, and, where it gets there, the **safety hazard** it
+reaches: that last relation is the claim this document exists to make, and it is
+now a link to a node in [`safety.sdoc`](safety.sdoc) rather than a sentence.
 
-| ID | Threat | Via | Consequence | Safety? |
-|---|---|---|---|---|
-| **TH-01** | ~~**Unauthenticated command execution**~~, **closed by `FR-WEB-26`.** No network route can start a firing, abort one or command manual duty; the handlers are deleted, not disabled. |, |, | **Closed** |
-| **TH-02** | ~~**Loosening the safety configuration**~~, **closed by `FR-WEB-26`.** `/api/config` is read-only; the maximum temperature and every safety threshold are writable only at the kiln. |, |, | **Closed** |
-| **TH-03** | ~~**Clearing a latched fault remotely**~~, **closed by `FR-WEB-26`.** Acknowledgement happens in front of the kiln. The fault stays readable, which is what the banner needs. |, |, | **Closed** |
-| **TH-04** | ~~**Hostile firmware upload**~~, **closed by `FR-UPD-01`.** No image is accepted over the network. Note the cost: the device now has **no field update path at all** (`OQ-08`), so a security fix needs a physical visit. |, |, | **Closed, at a price** |
-| **TH-05** | **Cross-site request forgery / DNS rebinding** | ADV-2, the operator's own browser is the confused deputy | Reduced with TH-01..TH-04: the worst a forged request can now do is **edit a stored firing program**, which takes effect only if an operator starts it at the kiln | Indirect |
-| **TH-06** | **Credential disclosure from flash** | ADV-3, ADV-4, plaintext NVS, no flash encryption | A-4 (the user's WiFi password) and A-5 | No, but it breaches the user's network |
-| **TH-07** | **Credential disclosure on the wire** | No TLS; the password crosses the LAN in cleartext on every authenticated request | A-5, observable by ADV-1 | No |
-| **TH-08** | **Password brute force** | Repeated requests against the auth check | A-5 | No |
-| **TH-09** | **Denial of service**: socket exhaustion, oversized bodies, slow clients | B-2, B-4 | Loss of the web interface. Crucially **not** loss of control: the safety supervisor is a separate task on the other core (`AD-15`), and `NFR-02` bounds non-safety interference at 50 ms | No |
-| **TH-10** | **Information disclosure through unauthenticated reads** | Every `GET` is unauthenticated by design | Telemetry, logs, programs, run history, network status (A-7) | No |
-| **TH-11** | **Open provisioning access point** | `FR-NET-02` AP fallback; if `net.ap_pass` is empty the AP is open | Anyone in radio range reaches the provisioning page and can supply their own credentials | **Yes** |
-| **TH-12** | **Physical console access** | UART console | The simulator build exposes fault injection and direct commands | **Yes**, on a sim build |
-| **TH-13** | **mDNS/network reconnaissance** | `kiln.local` advertised on the LAN | Makes the device trivially discoverable; a precondition for the rest rather than a threat alone | No |
+Four of them, `TH-01` to `TH-04`, are `Resolved`, closed outright by the
+read-only decision of 2026-10-06. They are kept rather than deleted, because why
+a threat is closed is the most useful thing about it.
 
 ## 6. Security goals and the controls behind them
 
-| ID | Security goal | Addresses | Controls, with honest status |
-|---|---|---|---|
-| **SEC-00** | **No network request shall change any device state at all.** | TH-01 to TH-05 | `FR-WEB-26`. **[built]** and tested: every request other than `GET` returns `403 read_only`, program authoring included since 2026-10-06, and the handlers are **deleted from the image** rather than gated by a flag. This is the strongest control in this document, and the only one that does not depend on the unwritten HTTP transport, because it is enforced in the API layer that *is* written. |
-| ~~**SEC-01**~~ | ~~Only an authenticated client may change state~~ **Dissolved 2026-10-06**: no client may change state, authenticated or not. | TH-01, TH-02, TH-03 | `FR-WEB-23`. Route selection is **[built]**: [`kiln_api_needs_auth`](../firmware/components/kiln_web/src/api.cpp) returns true for every non-`GET` method, so a route added later is protected *by default* rather than by somebody remembering to list it. Enforcement is **[spec]**: `req->authenticated` is an input the API trusts, and nothing on the target sets it. |
-| **SEC-02** | Credentials are never disclosed through the API | TH-06 | `FR-CFG-07`. **[built]** and tested: `net.wifi_pass`, `net.ap_pass` and `security.web_password` carry `KILN_CFG_F_SECRET`, and the config endpoint returns only whether a secret *is set*, never its value. There is no mode in which it returns one. |
-| **SEC-03** | Every byte from the network is treated as hostile | TH-09, and memory-safety bugs generally | `NFR-19`. **[built]**: a declared maximum body per handler (2048 B), a bounded token budget (192), a bounded point budget (2000), caller-owned buffers, no allocation proportional to input, and responses streamed in bounded chunks rather than accumulated. Exercised by a fuzz suite and by ASan/UBSan in CI. |
-| ~~**SEC-04**~~ | ~~Authentication resists guessing and timing analysis~~ **Dissolved 2026-10-06** with `FR-WEB-23`: there is no authentication, because there is nothing left to authenticate. This also closes [SRR-02](#9-residual-risk), which asked whether the password was stored as a salted hash or in plaintext. The password is gone. | none | none |
-| **SEC-05** | Only a valid image for this target can be installed, and never mid-firing | TH-04 | `FR-UPD-03` (validity), `FR-UPD-04` (refused during a run or autotune), `FR-UPD-08` (authentication required), `FR-UPD-02` (rollback if it will not confirm). All **[spec]**. Note what is *not* required anywhere: a **signature**. See [SRR-04](#9-residual-risk). |
-| **SEC-06** | The device reveals and transmits nothing to third parties |, | `NFR-21`, `CON-03`. **[built]** structurally: there is no cloud client, no telemetry, no analytics and no outbound connection in the codebase. This is a property of what was never written. |
-| **SEC-07** | No hidden access |, | `NFR-22`: no hardcoded credentials, no undocumented ports, no default-enabled remote access. **[built]** by inspection; `AD-16` reinforces it, the UI uses only the public API, so there is no privileged back channel to find. |
-| **SEC-08** | A compromised or overloaded web stack cannot affect control | TH-09 | **[built]**: `AD-15` pins control and safety to core 1 and networking to core 0; `AD-13` uses queues and immutable snapshots with no mutex on the control path; `NFR-02` bounds interference at 50 ms; `AD-04` keeps heat authority in the safety supervisor alone. This is the strongest security property the design has, and it came from the safety work. |
-| **SEC-09** | Secrets at rest are protected from physical access | TH-06 | **[absent]**. No flash encryption, no secure boot, neither appears in `sdkconfig.defaults`. |
-| **SEC-10** | Browser-originated requests cannot be forged | TH-05 | **Not needed.** CSRF matters because a forged request can act; with the interface read-only a forged request can only read, and the reads are public anyway (SRR-07). This is the one gap the read-only decision closed without any code. |
-| **SEC-11** | Traffic is confidential and integrity-protected in transit | TH-07 | **[absent]** by decision, not oversight, see [SRR-03](#9-residual-risk). |
+The twelve security goals live in [`security.sdoc`](security.sdoc), each with the
+threats it addresses, the requirements that realise it, and an
+`IMPLEMENTATION` field carrying what used to be a `[built]` / `[partial]` /
+`[spec]` / `[absent]` mark in this table.
+
+That field is the one to read first. At the time of writing it stands at **6
+built, 1 partial, 2 spec, 2 absent, 1 not needed**, and the reason is that there
+is still **no HTTP transport on the target**: the REST API is complete and
+host-tested, but the adapter that would terminate TCP, parse headers and apply
+rate limiting is not started. Nearly every network control is therefore a
+specification, and that remains the single most important fact in this document.
+
+`SEC-01` and `SEC-04` are `Withdrawn`, dissolved on 2026-10-06 along with the
+password itself.
 
 ## 7. Security as a safety concern
 
@@ -242,18 +242,15 @@ design, and because each of these is a property worth not losing.
 
 ## 9. Residual risk
 
-| ID | Residual risk | Why it stands | Carried by | Mitigation today |
-|---|---|---|---|---|
-| **SRR-01** | **There is no authentication on a device, because there is no HTTP server on a device.** Every network control is a specification. | M6 is not implemented. | The project. | None. It is not a *live* exposure, an unimplemented server accepts no connections, but it must not be read as "the controls exist". **Nothing in this document may be cited as evidence of a deployed control.** |
-| ~~**SRR-02**~~ | ~~The design and the data model disagree about the password.~~ **Closed 2026-10-06.** `security.web_password` is removed from the configuration schema. There is no password, no hash, and nothing to disagree about. |
-| **SRR-03** | **No TLS.** The web password and every command cross the LAN in cleartext, readable by ADV-1. | A self-signed certificate on a `.local` name trains users to click through browser warnings, costs flash and RAM against a 2 MB OTA slot, and still cannot be verified. The honest trade was plaintext on a network already assumed trusted. | The owner of the network (`ASM-05`). | `NFR-20`'s "trusted LAN only", stated in the README, in `safety.md` and here. It is a real limitation, not a solved problem. |
-| **SRR-04** | **Firmware images are validated but not authenticated.** `FR-UPD-03` requires checking an image is *valid for this target*; no requirement anywhere asks for a **signature**, and secure boot is not enabled. | Signing was never specified. | The project. | Only `FR-UPD-08`'s authentication stands between an attacker and TH-04, and that is `[spec]`. With secure boot absent, physical reflash (ADV-3) bypasses it entirely. |
-| **SRR-05** | **Secrets are plaintext in flash.** No flash encryption. Anyone with the board reads the user's WiFi password. | Not specified; flash encryption also complicates development and field recovery. | The owner, and anyone who disposes of a device. | None. ADV-4 is the under-considered case: a device sold on or thrown out carries the credentials with it. |
-| **SRR-06** | **No CSRF defence.** A page the operator visits can issue cross-origin requests to `kiln.local`, and DNS rebinding defeats the same-origin policy. | Not specified or designed. | The project. | None. Cheap to fix, validating `Origin`/`Host` costs almost nothing, and it should land *with* the transport rather than after it. |
-| **SRR-07** | **All reads are unauthenticated**, and reads are now all there is. | `FR-WEB-23` is withdrawn; the interface is read-only. | The design, deliberately. | Defensible: the dashboard is meant to be glanceable and the data is low-value (A-7). But it is a decision, and `security.web_password` being set does **not** make the device private. |
-| **SRR-11** | **No field update path.** Removing OTA closed TH-04 completely and left the device with no way to receive a fix, including a security fix, without physical access. | `FR-UPD-01` was inverted deliberately; the replacement is `OQ-08` and is not yet specified. | The project. **This blocks release**, not merely an open question. | None. A vulnerability found after shipping currently requires visiting every device. |
-| **SRR-08** | **The AP fallback may be open.** `FR-NET-02` starts an access point with a provisioning page; nothing requires `net.ap_pass` to be non-empty. | No minimum-passphrase rule exists. | The installer. | None. The provisioning page is the most security-sensitive surface the device has, and it is the one most likely to be reachable without credentials. |
-| **SRR-09** | **`ASM-05` is the assumption everything rests on, and it is usually false.** Home and studio LANs routinely carry compromised IoT devices and guest traffic. | A single-purpose controller cannot police its own network. | The owner. | VLAN or a dedicated network segment is the real answer; the documentation should say so rather than only saying "trusted". |
+The ten security residual risks live in [`security.sdoc`](security.sdoc), each
+with why it stands, **who carries it**, and what mitigation exists today. Two
+are worth naming here: `SRR-01`, that every network control is a specification
+and **nothing in this concept may be cited as evidence of a deployed control**;
+and `SRR-11`, that removing OTA left the device with no way to receive a
+security fix without a physical visit, which **blocks release**.
+
+There is no `SRR-10`. The numbering has a gap, and keeping it costs less than
+renumbering identifiers other documents cite.
 
 ## 10. Obligations
 
@@ -313,39 +310,16 @@ it is unbuilt.
 
 ## 12. Open questions
 
-| | Question |
-|---|---|
-| ~~**OQ-S1**~~ | ~~Salted hash or plaintext for the web password?~~ **Answered 2026-10-06 by removing the question.** The interface is read-only, so there is no password. |
-| **OQ-S2** | Should firmware images be signed (`FR-UPD-03` requires validity, not authenticity), and should secure boot be enabled? Both have real field-recovery costs for an open-source device users are expected to build themselves. |
-| **OQ-S3** | Should flash encryption be enabled by default, given it complicates self-builders and field debugging but is the only answer to SRR-05? |
-| **OQ-S4** | Should `net.ap_pass` have an enforced minimum, or should the AP refuse to start open? |
-| ~~**OQ-S5**~~ | ~~Should read endpoints require authentication when a password is set?~~ **Moot 2026-10-06**: there is no password to set. The question of whether the dashboard should be private at all remains, as [SRR-07](#9-residual-risk). |
-| Threat | Security goals | Requirements | Safety hazard |
-|---|---|---|---|
-| TH-01 Unauthenticated commands | SEC-01, SEC-08 | `FR-WEB-23`, `NFR-19` | `HZ-12` |
-| TH-02 Loosened safety config | SEC-01 | `FR-CFG-08`, `SR-22`, `SR-23` | `HZ-02`, `HZ-10` |
-| TH-03 Remote fault clear | SEC-01 | `SR-17`, `SR-18` | `HZ-08` |
-| TH-04 Hostile firmware | SEC-05 | `FR-UPD-02`–`FR-UPD-04`, `FR-UPD-08` | `HZ-01` |
-| TH-05 CSRF / DNS rebinding | SEC-10 |, (gap) | `HZ-12` |
-| TH-06 Secrets from flash | SEC-02, SEC-09 | `FR-CFG-07` |, |
-| TH-07 Secrets on the wire | SEC-11 | `NFR-20` |, |
-| TH-08 Brute force | SEC-04 | `NFR-19` |, |
-| TH-09 Denial of service | SEC-03, SEC-08 | `NFR-02`, `NFR-19`, `AD-13`, `AD-15` |, |
-| TH-10 Unauthenticated reads | SEC-07 | `FR-WEB-23` |, |
-| TH-11 Open provisioning AP | SEC-01 | `FR-NET-02` | `HZ-12` |
-| TH-12 Physical console | SEC-09 | `NFR-24` | `HZ-12` |
-| TH-13 Reconnaissance |, | `FR-NET-05` |, |
+The five open questions live in [`security.sdoc`](security.sdoc), each related to
+the residual risk it would settle, so a question cannot drift away from the risk
+that motivated it. `OQ-S1` and `OQ-S5` are `Resolved`, answered by the read-only
+decision of 2026-10-06.
 
-| Security goal | Status | Residual risk |
-|---|---|---|
-| SEC-01 Authenticated state change | [partial], routing built, enforcement absent | SRR-01 |
-| SEC-02 No credential disclosure via API | **[built]** |, |
-| SEC-03 Hostile input handling | **[built]** |, |
-| SEC-04 Resistant authentication | [spec] | SRR-01, SRR-02 |
-| SEC-05 Trustworthy updates | [spec] | SRR-04 |
-| SEC-06 No third-party transmission | **[built]** |, |
-| SEC-07 No hidden access | **[built]** | SRR-07 |
-| SEC-08 Control isolated from network | **[built]** |, |
-| SEC-09 Secrets at rest | **[absent]** | SRR-05 |
-| SEC-10 CSRF resistance | **[absent]** | SRR-06 |
-| SEC-11 Transport security | **[absent]** by decision | SRR-03 |
+The traceability tables that used to sit below them are gone. They were a threat
+to security-goal to requirement grid and a goal to residual-risk grid, both
+maintained by hand, and both had fallen out of step with the body: they still
+routed threats through `SEC-01` and `SEC-04` after those were dissolved, and
+carried no row for `SEC-00`, the strongest control in the document. Those
+mappings are relations in [`security.sdoc`](security.sdoc) now, generated in both
+directions from the relations themselves, and a goal citing a requirement that
+does not exist is an error in the `requirements` CI job rather than a stale row.

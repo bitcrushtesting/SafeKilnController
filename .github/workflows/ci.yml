@@ -350,7 +350,7 @@ jobs:
             echo '### Requirements specification'
             echo
             if [ -d build-docs/html ]; then
-              echo "StrictDoc validated \`requirements.sdoc\`, \`architecture.sdoc\` and \`safety.sdoc\`, and exported them."
+              echo "StrictDoc validated \`requirements.sdoc\`, \`architecture.sdoc\`, \`safety.sdoc\` and \`security.sdoc\`, and exported them."
               echo
               echo '```'
               printf 'requirements   %s\n' \
@@ -374,6 +374,13 @@ jobs:
                 "$(grep -c '^  ROLE: Realised by' docs/safety.sdoc)"
               printf 'residual risks %s\n' \
                 "$(grep -c '^\[RESIDUAL_RISK\]' docs/safety.sdoc)"
+              printf 'threats        %s, with %s reaching a hazard\n' \
+                "$(grep -c '^\[THREAT\]' docs/security.sdoc)" \
+                "$(grep -c '^  ROLE: Reaches' docs/security.sdoc)"
+              printf 'security goals %s\n' \
+                "$(grep -c '^\[SECURITY_GOAL\]' docs/security.sdoc)"
+              printf 'security risks %s\n' \
+                "$(grep -c '^\[SECURITY_RESIDUAL_RISK\]' docs/security.sdoc)"
               echo '```'
             else
               echo 'StrictDoc rejected the document; see the job log.'
