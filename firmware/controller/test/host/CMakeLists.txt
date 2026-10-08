@@ -25,9 +25,29 @@ if(ENABLE_COVERAGE)
     add_link_options(--coverage)
 endif()
 
+# -fno-sanitize-recover=undefined, added with the supervisor's equivalent block
+# and for the reason found there: UBSan's default is to print a runtime error
+# and continue, so the exit code stays zero and ctest reports PASSED for a test
+# that triggered real undefined behaviour.  This job was green on those terms
+# for as long as it has existed, over three real findings.  ASan aborts by
+# default; UBSan had to be told.
+#
+# `enum` is excluded from UBSan, and it is the one check that had to go.
+# Loading an out-of-range value through an enum-typed lvalue is undefined, and
+# three suites do it DELIBERATELY: test_faults casts 999 to a fault code,
+# test_safety_current casts 200, and test_suplink feeds 200 as a wire trip
+# reason, each to prove the code rejects a value that arrived from outside.
+# That is the same deliberate behaviour firmware/controller/test/.clang-tidy
+# already exempts `EnumCastOutOfRange` for, and the negative tests are the
+# point rather than a defect to fix.
+#
+# Everything else UBSan checks stays on and now aborts.
 if(ENABLE_ASAN)
-    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
-    add_link_options(-fsanitize=address,undefined)
+    add_compile_options(-fsanitize=address,undefined -fno-sanitize=enum
+                        -fno-sanitize-recover=undefined
+                        -fno-omit-frame-pointer -g)
+    add_link_options(-fsanitize=address,undefined -fno-sanitize=enum
+                     -fno-sanitize-recover=undefined)
 endif()
 
 set(KILN_FW_ROOT ${CMAKE_CURRENT_LIST_DIR}/../..)

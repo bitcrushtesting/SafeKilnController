@@ -20,26 +20,40 @@ bool any_valid(const sup_input_t *in)
     return in->chamber_valid || in->chamber2_valid;
 }
 
-float effective_c(const sup_input_t *in)
+int32_t effective_q7(const sup_input_t *in)
 {
     if (in->chamber_valid && in->chamber2_valid) {
-        /* Written so a NaN in either cannot win: the comparison is false for a
-         * NaN whichever way round it is, so the other reading is taken. */
-        return (in->chamber2_c > in->chamber_c) ? in->chamber2_c : in->chamber_c;
+        return (in->chamber2_q7 > in->chamber_q7) ? in->chamber2_q7 : in->chamber_q7;
     }
     if (in->chamber2_valid) {
-        return in->chamber2_c;
+        return in->chamber2_q7;
     }
-    return in->chamber_c;
+    return in->chamber_q7;
 }
 
-/* True only for a finite reading strictly above the backstop.  Written so a
- * NaN answers false here and is caught by the validity path instead: a
- * comparison against a NaN is false whichever way it is written, so the
- * absence of a usable reading must be its own trip and not a silent pass. */
+/* Milliseconds, saturating.  A latch timer that wrapped would walk back below
+ * its threshold and un-arm a condition that is still present, which is the one
+ * arithmetic failure in this file that would cost protection rather than cause
+ * a nuisance trip.  Saturation cannot: once a timer is at the top it stays
+ * there, and every threshold here is far below it. */
+uint32_t add_ms(uint32_t acc, uint32_t dt)
+{
+    const uint32_t sum = acc + dt;
+    return (sum < acc) ? UINT32_MAX : sum;
+}
+
+/* True only for a usable reading strictly above the backstop.
+ *
+ * The validity term is still first and still load-bearing: the absence of a
+ * reading must be its own trip, not a silent pass, and chamber_q7 is zero when
+ * nothing has been read, which would otherwise look like a comfortable 0 degC.
+ * What has gone is the reason the float version gave for the ordering, that a
+ * comparison against a NaN is false whichever way it is written.  An int32_t
+ * has no NaN, so the comparison is total and the ordering is now about the
+ * zero-initialised snapshot alone. */
 bool over_temp(const sup_input_t *in)
 {
-    return any_valid(in) && (effective_c(in) > SUP_OVERTEMP_C);
+    return any_valid(in) && (effective_q7(in) > SUP_OVERTEMP);
 }
 
 /* True when both couples are usable and differ by more than the band. False
@@ -50,11 +64,25 @@ bool disagreeing(const sup_input_t *in)
     if (!in->chamber_valid || !in->chamber2_valid) {
         return false;
     }
-    const float d = in->chamber_c - in->chamber2_c;
-    const float mag = (d < 0.0f) ? -d : d;
-    /* `>` and not `>=`, and written so a NaN answers false: a NaN reading is a
-     * validity problem, not a disagreement, and must not be reported as one. */
-    return mag > SUP_DISAGREE_C;
+    /* The magnitude of the difference, computed so that it is defined for
+     * every pair of int32_t and not only for the 19-bit values the decode can
+     * produce.
+     *
+     * Subtracting signed and negating the result would be the obvious way and
+     * is wrong twice over: the subtraction overflows for a widely separated
+     * pair, and negating INT32_MIN is undefined on its own.  Both are
+     * unreachable through sup_tc_decode, which is exactly what makes them the
+     * kind of assumption that survives until the day something else fills this
+     * struct.  Taken high minus low in uint32_t the result is exact for any
+     * pair, because a difference of two int32_t always fits in a uint32_t, and
+     * unsigned arithmetic has no overflow to be undefined about. */
+    const int32_t  a  = in->chamber_q7;
+    const int32_t  b  = in->chamber2_q7;
+    const int32_t  hi = (a > b) ? a : b;
+    const int32_t  lo = (a > b) ? b : a;
+    const uint32_t mag = (uint32_t)hi - (uint32_t)lo;
+    /* `>` and not `>=`: the band is the largest difference still accepted. */
+    return mag > (uint32_t)SUP_DISAGREE;
 }
 
 void latch(sup_t *s, sup_trip_reason_t why)
@@ -106,14 +134,15 @@ void sup_init(sup_t *s, bool selftest_ok)
     }
 }
 
-void sup_step(sup_t *s, const sup_input_t *in, float dt_s)
+void sup_step(sup_t *s, const sup_input_t *in, uint32_t dt_ms)
 {
     if ((s == nullptr) || (in == nullptr)) {
         return;
     }
-    if (!(dt_s >= 0.0f)) {      /* also false for NaN */
-        dt_s = 0.0f;
-    }
+    /* No clamp on dt_ms, and that is not an omission.  The float version
+     * rejected a negative or NaN interval here; an unsigned integer can be
+     * neither, and add_ms saturates, so there is no value of dt_ms this
+     * function has to defend against. */
 
     /* --- latching conditions -------------------------------------------- */
 
@@ -146,12 +175,12 @@ void sup_step(sup_t *s, const sup_input_t *in, float dt_s)
 
     const bool unusable = (in->fault_bits != 0u) || !any_valid(in);
     if (unusable) {
-        s->fault_s += dt_s;
+        s->fault_ms = add_ms(s->fault_ms, dt_ms);
         /* A reported fault latches whether or not a reading ever arrived: the
          * front end is telling us something is wrong.  Staleness only latches
          * once a reading has been seen, so a front end that is still bringing
          * itself up withholds heat without demanding an acknowledgement. */
-        if (s->fault_s >= SUP_FAULT_GRACE_S) {
+        if (s->fault_ms >= SUP_FAULT_GRACE_MS) {
             if (in->fault_bits != 0u) {
                 latch(s, SUP_TRIP_TC_FAULT);
             } else if (s->seen_valid) {
@@ -159,7 +188,7 @@ void sup_step(sup_t *s, const sup_input_t *in, float dt_s)
             }
         }
     } else {
-        s->fault_s = 0.0f;
+        s->fault_ms = 0u;
     }
 
     /* --- SWR-SAF-37: the two couples disagree ---------------------------
@@ -168,12 +197,12 @@ void sup_step(sup_t *s, const sup_input_t *in, float dt_s)
      * be one bad conversion away. Heat is withheld from the first cycle either
      * way, because permit is conjunctive below; the window delays the latch. */
     if (disagreeing(in)) {
-        s->disagree_s += dt_s;
-        if (s->disagree_s >= SUP_DISAGREE_S) {
+        s->disagree_ms = add_ms(s->disagree_ms, dt_ms);
+        if (s->disagree_ms >= SUP_DISAGREE_MS) {
             latch(s, SUP_TRIP_TC_DISAGREE);
         }
     } else {
-        s->disagree_s = 0.0f;
+        s->disagree_ms = 0u;
     }
 
     /* --- SWR-SAF-38: the permit was withdrawn and the coil stayed on ------
@@ -189,12 +218,12 @@ void sup_step(sup_t *s, const sup_input_t *in, float dt_s)
      * that is slow to drop gets the whole window, and one that never drops
      * latches. */
     if (!s->permit && in->permit_sense) {
-        s->permit_stuck_s += dt_s;
-        if (s->permit_stuck_s >= SUP_PERMIT_SETTLE_S) {
+        s->permit_stuck_ms = add_ms(s->permit_stuck_ms, dt_ms);
+        if (s->permit_stuck_ms >= SUP_PERMIT_SETTLE_MS) {
             latch_escalate(s, SUP_TRIP_PERMIT_STUCK);
         }
     } else {
-        s->permit_stuck_s = 0.0f;
+        s->permit_stuck_ms = 0u;
     }
 
     /* --- the clear button ------------------------------------------------
@@ -204,13 +233,13 @@ void sup_step(sup_t *s, const sup_input_t *in, float dt_s)
      * before it counts, and clearing disarms it until it is released again. */
     if (!in->clear_pressed) {
         s->clear_armed = true;
-        s->clear_s     = 0.0f;
+        s->clear_ms    = 0u;
     } else if (s->clear_armed) {
-        s->clear_s += dt_s;
-        if (s->clear_s >= SUP_CLEAR_HOLD_S) {
+        s->clear_ms = add_ms(s->clear_ms, dt_ms);
+        if (s->clear_ms >= SUP_CLEAR_HOLD_MS) {
             sup_clear(s);
             s->clear_armed = false;
-            s->clear_s     = 0.0f;
+            s->clear_ms    = 0u;
         }
     }
 
@@ -225,7 +254,7 @@ void sup_step(sup_t *s, const sup_input_t *in, float dt_s)
              && any_valid(in)
              && !disagreeing(in)
              && (in->fault_bits == 0u)
-             && (effective_c(in) <= SUP_OVERTEMP_C);
+             && (effective_q7(in) <= SUP_OVERTEMP);
 }
 
 void sup_clear(sup_t *s)
@@ -235,9 +264,9 @@ void sup_clear(sup_t *s)
     }
     s->tripped = false;
     s->reason  = SUP_TRIP_NONE;
-    s->fault_s = 0.0f;
-    s->disagree_s     = 0.0f;
-    s->permit_stuck_s = 0.0f;
+    s->fault_ms        = 0u;
+    s->disagree_ms     = 0u;
+    s->permit_stuck_ms = 0u;
     /* permit stays false until the next sup_step re-establishes every term.
      * The arming state is deliberately not touched: sup_step owns it, and a
      * caller clearing the latch directly must not re-arm the button. */

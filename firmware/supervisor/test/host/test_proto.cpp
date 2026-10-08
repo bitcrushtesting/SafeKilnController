@@ -17,8 +17,8 @@ sup_report_t sample()
     sup_report_t r = {};
     r.version     = SUP_VERSION;
     r.seq         = 42u;
-    r.chamber_c   = 1234.5f;
-    r.cj_c        = 28.3f;
+    r.chamber_dc  = 12345;      /* 1234.5 degC in tenths */
+    r.cj_dc       = 283;        /*   28.3 degC           */
     r.fault_bits  = 0u;
     r.flags = (uint8_t)(SUP_FLAG_PERMIT | SUP_FLAG_TC_VALID | SUP_FLAG_SELFTEST_OK);
     r.trip_reason = SUP_TRIP_NONE;
@@ -55,8 +55,11 @@ KILN_TEST(swa22_a_frame_round_trips)
     CHECK_EQ_UINT(skip, 0u);
     CHECK_EQ_UINT(out.version, SUP_VERSION);
     CHECK_EQ_UINT(out.seq, 42u);
-    CHECK_NEAR(out.chamber_c, 1234.5f, 0.05);
-    CHECK_NEAR(out.cj_c, 28.3f, 0.05);
+    /* Exact equality, not a tolerance: the frame carries the same integer the
+     * report held, so a round trip that loses anything is a defect rather than
+     * a rounding.  The float version could only ever check "close enough". */
+    CHECK_EQ_INT(out.chamber_dc, 12345);
+    CHECK_EQ_INT(out.cj_dc, 283);
     CHECK_EQ_UINT(out.flags, in.flags);
     CHECK_EQ_INT(out.trip_reason, SUP_TRIP_NONE);
 }
@@ -159,26 +162,54 @@ KILN_TEST(swa22_a_buffer_of_pure_noise_is_eventually_discardable)
 /*
  * @relation(SWA-22, scope=function)
  */
-KILN_TEST(swa22_temperatures_saturate_rather_than_wrap_and_survive_a_nan)
+KILN_TEST(swa22_q7_to_tenths_is_exact_rounded_and_saturating)
 {
+    /* The scaling and the saturation used to live inside sup_encode, where they
+     * could only be observed through a frame, and the input that needed
+     * defending against was a NaN.  Both moved into sup_q7_to_dc, which is a
+     * total function of an int32_t and can therefore be pinned directly.
+     *
+     * Exact cases first: 10/128 is 5/64, so any q7 that is a multiple of 64
+     * converts without rounding at all. */
+    CHECK_EQ_INT(sup_q7_to_dc(0), 0);
+    CHECK_EQ_INT(sup_q7_to_dc(sup_c_to_q7(1)), 10);
+    CHECK_EQ_INT(sup_q7_to_dc(sup_c_to_q7(1350)), 13500);
+    CHECK_EQ_INT(sup_q7_to_dc(sup_c_to_q7(-200)), -2000);
+
+    /* Rounding, symmetrically about zero.  One q7 LSB is 1/128 degC, so 12 of
+     * them is 0.09375 degC and must round to 0.1; six is 0.046875 and must
+     * round to 0.0. */
+    CHECK_EQ_INT(sup_q7_to_dc(12), 1);
+    CHECK_EQ_INT(sup_q7_to_dc(-12), -1);
+    CHECK_EQ_INT(sup_q7_to_dc(6), 0);
+    CHECK_EQ_INT(sup_q7_to_dc(-6), 0);
+    /* Exactly half a tenth, which is where truncation and rounding differ:
+     * 6.4 q7 is not representable, so the nearest half is 32 q7 = 0.25 degC,
+     * rounding away from zero to 0.3 and -0.3 rather than towards it. */
+    CHECK_EQ_INT(sup_q7_to_dc(32), 3);
+    CHECK_EQ_INT(sup_q7_to_dc(-32), -3);
+
+    /* Saturation at both ends, for values no front end can produce.  The point
+     * is that the function is defined for every int32_t, INT32_MIN included,
+     * which is the input that would break a negate-then-divide. */
+    CHECK_EQ_INT(sup_q7_to_dc(INT32_MAX), 32767);
+    CHECK_EQ_INT(sup_q7_to_dc(INT32_MIN), -32767);
+    CHECK_EQ_INT(sup_q7_to_dc(sup_c_to_q7(100000)), 32767);
+    CHECK_EQ_INT(sup_q7_to_dc(sup_c_to_q7(-100000)), -32767);
+
+    /* And the frame carries whatever it is handed, unchanged: sup_encode holds
+     * no arithmetic now, which is why the cases above are the whole of it. */
     sup_report_t r = sample();
     uint8_t buf[SUP_FRAME_BYTES];
     sup_report_t out = {};
-
-    r.chamber_c = 9999.0f;
+    r.chamber_dc = 32767;
     (void)sup_encode(&r, buf, sizeof(buf));
     (void)sup_decode(buf, sizeof(buf), &out, nullptr);
-    CHECK(out.chamber_c > 3000.0f);     /* saturated, not wrapped negative */
-
-    r.chamber_c = -9999.0f;
+    CHECK_EQ_INT(out.chamber_dc, 32767);
+    r.chamber_dc = -32767;
     (void)sup_encode(&r, buf, sizeof(buf));
     (void)sup_decode(buf, sizeof(buf), &out, nullptr);
-    CHECK(out.chamber_c < -3000.0f);
-
-    r.chamber_c = NAN;
-    CHECK_EQ_UINT(sup_encode(&r, buf, sizeof(buf)), SUP_FRAME_BYTES);
-    (void)sup_decode(buf, sizeof(buf), &out, nullptr);
-    CHECK_NEAR(out.chamber_c, 0.0f, 0.05);   /* a defined value, not garbage */
+    CHECK_EQ_INT(out.chamber_dc, -32767);
 }
 
 /*
@@ -189,7 +220,7 @@ KILN_TEST(swa22_a_trip_is_still_reported_so_the_other_side_can_say_why)
     sup_report_t r = sample();
     r.flags = (uint8_t)(SUP_FLAG_TRIPPED | SUP_FLAG_TC_VALID | SUP_FLAG_SELFTEST_OK);
     r.trip_reason = SUP_TRIP_OVERTEMP;
-    r.chamber_c   = 1361.2f;
+    r.chamber_dc  = 13612;
 
     uint8_t buf[SUP_FRAME_BYTES];
     (void)sup_encode(&r, buf, sizeof(buf));

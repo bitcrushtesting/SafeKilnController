@@ -31,12 +31,12 @@
 #include "sup_proto.h"      /* SUP_TC_FAULT_* */
 
 /* --- registers (datasheet table 2) --------------------------------------- */
-#define SUP_TC_REG_CR0      0x00u
-#define SUP_TC_REG_CR1      0x01u
-#define SUP_TC_REG_MASK     0x02u
-#define SUP_TC_REG_CJTH     0x0Au   /* the burst read starts here            */
-#define SUP_TC_REG_SR       0x0Fu   /* ... and ends here                     */
-#define SUP_TC_REG_WRITE    0x80u   /* address | 0x80 selects a write        */
+constexpr uint8_t SUP_TC_REG_CR0 = 0x00u;
+constexpr uint8_t SUP_TC_REG_CR1 = 0x01u;
+constexpr uint8_t SUP_TC_REG_MASK = 0x02u;
+constexpr uint8_t SUP_TC_REG_CJTH = 0x0Au;  /* the burst read starts here */
+constexpr uint8_t SUP_TC_REG_SR = 0x0Fu;    /* ... and ends here */
+constexpr uint8_t SUP_TC_REG_WRITE = 0x80u; /* address | 0x80 selects a write */
 
 /* CJTH, CJTL, LTCBH, LTCBM, LTCBL, SR: six registers in one transaction.
  *
@@ -44,7 +44,7 @@
  * optimisation: the temperature and the fault status must describe the same
  * conversion, and two transactions can straddle one and produce a reading the
  * fault bits disown. */
-#define SUP_TC_BURST_BYTES  6u
+constexpr unsigned SUP_TC_BURST_BYTES = 6u;
 
 /* --- the values written at init (datasheet tables 3 to 5) ---------------- */
 
@@ -53,20 +53,20 @@
  * OCFAULT is the bit that matters most here. It defaults to 00, which means
  * the part will NOT report an open couple, and an over-temperature backstop
  * whose sensor can fall off without saying so is not a backstop. */
-#define SUP_TC_CR0_CMODE_AUTO   0x80u
-#define SUP_TC_CR0_OCFAULT_1    0x10u   /* open-circuit detect, < 5 kohm      */
-#define SUP_TC_CR0_FILTER_50    0x01u   /* 0 = 60 Hz, 1 = 50 Hz (SWR-ACQ-06)   */
-#define SUP_TC_CR0_VALUE \
-    (SUP_TC_CR0_CMODE_AUTO | SUP_TC_CR0_OCFAULT_1 | SUP_TC_CR0_FILTER_50)
+constexpr uint8_t SUP_TC_CR0_CMODE_AUTO = 0x80u;
+constexpr uint8_t SUP_TC_CR0_OCFAULT_1 = 0x10u;  /* open-circuit detect, < 5 kohm */
+constexpr uint8_t SUP_TC_CR0_FILTER_50 = 0x01u;  /* 0 = 60 Hz, 1 = 50 Hz (SWR-ACQ-06) */
+constexpr uint8_t SUP_TC_CR0_VALUE =
+    (uint8_t)(SUP_TC_CR0_CMODE_AUTO | SUP_TC_CR0_OCFAULT_1 | SUP_TC_CR0_FILTER_50);
 
 /* CR1: 4-sample averaging and type K.
  *
  * Type K is fixed, not configured: SWR-ACQ-02 settles the thermocouple type, and
  * the supervisor has no receive path to be told a different one. That is the
  * same reason the link is simplex. */
-#define SUP_TC_CR1_AVG_4        0x20u
-#define SUP_TC_CR1_TYPE_K       0x03u
-#define SUP_TC_CR1_VALUE        (SUP_TC_CR1_AVG_4 | SUP_TC_CR1_TYPE_K)
+constexpr uint8_t SUP_TC_CR1_AVG_4 = 0x20u;
+constexpr uint8_t SUP_TC_CR1_TYPE_K = 0x03u;
+constexpr uint8_t SUP_TC_CR1_VALUE = (uint8_t)(SUP_TC_CR1_AVG_4 | SUP_TC_CR1_TYPE_K);
 
 /* MASK: 0x00, every fault allowed through to the ~FAULT pin.
  *
@@ -74,24 +74,29 @@
  * what makes the ~FAULT input on PA3 mean anything at all, and it is written
  * FIRST so there is no window in which the part is converting while its fault
  * output is still inert. */
-#define SUP_TC_MASK_VALUE       0x00u
+constexpr uint8_t SUP_TC_MASK_VALUE = 0x00u;
 
 /* --- status register bits (datasheet table 6) ---------------------------- */
-#define SUP_TC_SR_CJ_RANGE  0x80u
-#define SUP_TC_SR_TC_RANGE  0x40u
-#define SUP_TC_SR_CJ_HIGH   0x20u
-#define SUP_TC_SR_CJ_LOW    0x10u
-#define SUP_TC_SR_TC_HIGH   0x08u
-#define SUP_TC_SR_TC_LOW    0x04u
-#define SUP_TC_SR_OVUV      0x02u
-#define SUP_TC_SR_OPEN      0x01u
+constexpr uint8_t SUP_TC_SR_CJ_RANGE = 0x80u;
+constexpr uint8_t SUP_TC_SR_TC_RANGE = 0x40u;
+constexpr uint8_t SUP_TC_SR_CJ_HIGH = 0x20u;
+constexpr uint8_t SUP_TC_SR_CJ_LOW = 0x10u;
+constexpr uint8_t SUP_TC_SR_TC_HIGH = 0x08u;
+constexpr uint8_t SUP_TC_SR_TC_LOW = 0x04u;
+constexpr uint8_t SUP_TC_SR_OVUV = 0x02u;
+constexpr uint8_t SUP_TC_SR_OPEN = 0x01u;
 
 typedef struct {
-    float    chamber_c;     /* linearised hot junction, degC                 */
-    float    cj_c;          /* cold junction, degC                           */
+    /* q7: 1/128 degC, the part's own unit.  See SUP_Q7_PER_C in sup_proto.h for
+     * why the whole supervisor measures temperature in it, and note what it
+     * buys right here: the hot junction is a shift of the register bytes and
+     * nothing more, so there is no scaling step in which a reading can be
+     * rounded, truncated or promoted to a type this processor cannot multiply. */
+    int32_t  chamber_q7;    /* linearised hot junction, 1/128 degC           */
+    int32_t  cj_q7;         /* cold junction, 1/128 degC                     */
     uint16_t fault_bits;    /* SUP_TC_FAULT_*, 0 for none                    */
     /* A conversion completed and the part reported nothing wrong with it.
-     * False leaves chamber_c at 0, which is never read by a caller that checks
+     * False leaves chamber_q7 at 0, which is never read by a caller that checks
      * this first, and is a deliberately useless value for one that does not. */
     bool     valid;
 } sup_tc_sample_t;

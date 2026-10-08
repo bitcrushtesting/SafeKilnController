@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Bitcrush Testing
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# main.cpp is the composition root: bring-up of SPI, USART, SysTick and the
+# IWDG, then the 10 Hz loop.  It touches the same registers board/ does and
+# includes the same two vendor headers, so it needs the same five exemptions
+# and no others.
+#
+# The list is kept identical to firmware/supervisor/board/.clang-tidy ON
+# PURPOSE, and that file carries the reasoning for each entry.  Two files
+# rather than one because the alternative is a single .clang-tidy at
+# firmware/supervisor/, which would relax core/ and protocol/ as well -- and
+# those being gated by the unmodified root profile is the whole point.
+#
+# Anything else main.cpp trips is fixed in main.cpp, or suppressed on the line
+# with its reason, not here.  There are two such lines, both subtracting a pair
+# of linker symbols that bound one region.
+InheritParentConfig: true
+Checks: >
+  -performance-no-int-to-ptr,
+  -cppcoreguidelines-pro-type-cstyle-cast,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-macro-to-enum,
+  -misc-use-internal-linkage

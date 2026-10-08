@@ -53,8 +53,13 @@ kiln_err_t sl_read(void *ctx, kiln_tc_reading_t *out)
         return KILN_ERR_IO;
     }
 
-    out->temp_c = s->last.chamber_c;
-    out->cj_c   = s->last.cj_c;
+    /* Tenths of a degree on the wire and in sup_report_t, degrees in a float
+     * here.  The conversion lives on this side of the link deliberately: the
+     * supervisor is a Cortex-M0+ with no FPU, where a float is a libgcc helper
+     * call inside a safety function, and this is an ESP32 with hardware
+     * floating point and a port contract already expressed in degrees. */
+    out->temp_c = (float)s->last.chamber_dc / (float)SUP_DC_PER_C;
+    out->cj_c   = (float)s->last.cj_dc / (float)SUP_DC_PER_C;
     /* The supervisor's fault bits are KILN_TC_FAULT_* already: it reads the
      * same part and reports its status register unmodified. */
     out->fault_bits = s->last.fault_bits;

@@ -65,7 +65,13 @@ void sup_tc_decode(const uint8_t *regs, sup_tc_sample_t *out)
      * the two's-complement reinterpretation the datasheet describes. */
     const uint16_t cj_bits = (uint16_t)(((uint32_t)regs[0] << 8u) | (uint32_t)regs[1]);
     const int16_t  cj_raw  = (int16_t)cj_bits;
-    out->cj_c = (float)(cj_raw >> 2) / 64.0f;
+    /* >> 2 drops the two unused low bits and leaves 2^-6 degC per LSB; * 2
+     * carries that into the q7 the rest of the supervisor speaks, exactly,
+     * because the two units differ by a single power of two.  Written as a
+     * multiply rather than a shift so it reads as a change of unit and not as
+     * bit twiddling, and because shifting a signed value left is the operation
+     * worth not acquiring a habit of. */
+    out->cj_q7 = (int32_t)(cj_raw >> 2) * 2;
 
     /* Linearised hot junction: 19 bits, signed, 2^-7 degC per LSB, left-aligned
      * in 32 across three registers.
@@ -80,7 +86,10 @@ void sup_tc_decode(const uint8_t *regs, sup_tc_sample_t *out)
                              ((uint32_t)regs[3] << 16u) |
                              ((uint32_t)regs[4] << 8u);
     const int32_t  tc_raw  = (int32_t)tc_bits;
-    out->chamber_c = (float)(tc_raw >> 13) / 128.0f;
+    /* And then nothing: the 19-bit value is already 2^-7 degC per LSB, which is
+     * q7, so the shift back down is the entire decode.  This is the saving the
+     * unit was chosen for. */
+    out->chamber_q7 = tc_raw >> 13;
 
     out->fault_bits = sup_tc_faults(regs[5]);
 
@@ -91,7 +100,7 @@ void sup_tc_decode(const uint8_t *regs, sup_tc_sample_t *out)
      *
      * There is deliberately no range check of our own on top of the part's.
      * The MAX31856 asserts TC_RANGE outside type K's -200..1372 degC, which is
-     * above SUP_OVERTEMP_C, so a genuine runaway crosses the 1350 degC
+     * above SUP_OVERTEMP, so a genuine runaway crosses the 1350 degC
      * backstop, and latches OVERTEMP, many cycles before the part would call
      * the reading out of range. Adding a second range gate here would only
      * create a window where a real over-temperature was reported as a sensor

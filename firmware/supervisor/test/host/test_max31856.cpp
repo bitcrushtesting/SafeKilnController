@@ -19,11 +19,17 @@
 
 namespace {
 
-/* CJTH, CJTL, LTCBH, LTCBM, LTCBL, SR. */
+/* CJTH, CJTL, LTCBH, LTCBM, LTCBL, SR, and the q7 the burst must decode to.
+ *
+ * The expectations are exact integers rather than degrees within a tolerance,
+ * and that is the decode's own property showing through: the part's LSB IS the
+ * supervisor's unit, so there is no scaling step for a vector to be
+ * approximately right about.  A wrong shift is now a failed equality rather
+ * than a value that happens to sit inside 0.01 degC. */
 struct vector {
     uint8_t regs[SUP_TC_BURST_BYTES];
-    float   chamber_c;
-    float   cj_c;
+    int32_t chamber_q7;
+    int32_t cj_q7;
 };
 
 sup_tc_sample_t decode(const uint8_t (&regs)[SUP_TC_BURST_BYTES])
@@ -75,17 +81,25 @@ KILN_TEST(swracq02_cr1_readback_rejects_an_absent_part)
 KILN_TEST(swracq04_known_temperatures_decode_to_the_values_they_encode)
 {
     static const vector v[] = {
-        { { 0x19, 0x00, 0x00, 0x00, 0x00, 0x00 },    0.0f, 25.0f },
-        { { 0x2A, 0x80, 0x3E, 0x80, 0x00, 0x00 }, 1000.0f, 42.5f },
-        { { 0x1E, 0x00, 0x54, 0x58, 0x00, 0x00 }, 1349.5f, 30.0f },
-        { { 0x1E, 0x00, 0x54, 0x68, 0x00, 0x00 }, 1350.5f, 30.0f },
+        /* The q7 columns are the degrees the datasheet layout encodes, times
+         * 128: 0, 1000, 1349.5 and 1350.5 degC for the hot junction, and 25,
+         * 42.5, 30 and 30 for the cold.  Written as the arithmetic rather than
+         * as a bare number so the vector still says what it means. */
+        { { 0x19, 0x00, 0x00, 0x00, 0x00, 0x00 }, sup_c_to_q7(0),
+                                                  sup_c_to_q7(25) },
+        { { 0x2A, 0x80, 0x3E, 0x80, 0x00, 0x00 }, sup_c_to_q7(1000),
+                                                  sup_c_to_q7(42) + 64 },
+        { { 0x1E, 0x00, 0x54, 0x58, 0x00, 0x00 }, sup_c_to_q7(1349) + 64,
+                                                  sup_c_to_q7(30) },
+        { { 0x1E, 0x00, 0x54, 0x68, 0x00, 0x00 }, sup_c_to_q7(1350) + 64,
+                                                  sup_c_to_q7(30) },
     };
     for (const vector &c : v) {
         const sup_tc_sample_t s = decode(c.regs);
         CHECK(s.valid);
         CHECK_EQ_UINT(s.fault_bits, 0u);
-        CHECK_NEAR(s.chamber_c, c.chamber_c, 0.01);
-        CHECK_NEAR(s.cj_c, c.cj_c, 0.01);
+        CHECK_EQ_INT(s.chamber_q7, c.chamber_q7);
+        CHECK_EQ_INT(s.cj_q7, c.cj_q7);
     }
 }
 
@@ -95,22 +109,24 @@ KILN_TEST(swracq04_known_temperatures_decode_to_the_values_they_encode)
 KILN_TEST(swrsaf05_a_negative_reading_stays_negative)
 {
     /* The reason the shift in the decoder is signed. A logical shift would read
-     * -1 degC as +524287, which is above SUP_OVERTEMP_C, so the supervisor
+     * -1 degC as +524287, which is above SUP_OVERTEMP, so the supervisor
      * would latch an over-temperature on a cold kiln: a nuisance trip, and
      * HZ-10 is about what nuisance trips lead people to do.
      *
      * It also matters the other way: SWR-SAF-05 detects a reversed couple by the
      * reading falling, which it cannot do if negative is unrepresentable. */
     static const vector v[] = {
-        { { 0xFB, 0x00, 0xFF, 0x38, 0x00, 0x00 }, -12.5f, -5.0f },
-        { { 0x14, 0x00, 0xFF, 0xF0, 0x00, 0x00 },  -1.0f, 20.0f },
+        { { 0xFB, 0x00, 0xFF, 0x38, 0x00, 0x00 }, sup_c_to_q7(-12) - 64,
+                                                  sup_c_to_q7(-5) },
+        { { 0x14, 0x00, 0xFF, 0xF0, 0x00, 0x00 }, sup_c_to_q7(-1),
+                                                  sup_c_to_q7(20) },
     };
     for (const vector &c : v) {
         const sup_tc_sample_t s = decode(c.regs);
         CHECK(s.valid);
-        CHECK(s.chamber_c < 0.0f);
-        CHECK_NEAR(s.chamber_c, c.chamber_c, 0.01);
-        CHECK_NEAR(s.cj_c, c.cj_c, 0.01);
+        CHECK(s.chamber_q7 < 0);
+        CHECK_EQ_INT(s.chamber_q7, c.chamber_q7);
+        CHECK_EQ_INT(s.cj_q7, c.cj_q7);
     }
 }
 
@@ -189,7 +205,7 @@ KILN_TEST(swrsaf04_a_fault_bit_makes_the_reading_unusable_however_plausible_it_i
     CHECK_EQ_UINT(s.fault_bits, (unsigned)SUP_TC_FAULT_OPEN);
     /* The number is still decoded and still reported: the ESP32 shows it, and
      * suppressing it would lose the one clue about what the sensor was doing. */
-    CHECK_NEAR(s.chamber_c, 1000.0f, 0.01);
+    CHECK_EQ_INT(s.chamber_q7, sup_c_to_q7(1000));
 }
 
 /*
@@ -209,18 +225,18 @@ KILN_TEST(swa22_a_decoded_reading_drives_the_trip_logic_end_to_end)
     sup_tc_sample_t sample = decode(hot);
     sup_input_t in = {};
     in.diag_ok       = true;
-    in.chamber_c     = sample.chamber_c;
+    in.chamber_q7    = sample.chamber_q7;
     in.chamber_valid = sample.valid;
     in.fault_bits    = sample.fault_bits;
-    sup_step(&s, &in, 0.1f);
+    sup_step(&s, &in, 100u);
     CHECK(s.permit);                        /* 1349.5 is below the backstop */
     CHECK(!s.tripped);
 
     sample          = decode(over);
-    in.chamber_c    = sample.chamber_c;
+    in.chamber_q7   = sample.chamber_q7;
     in.chamber_valid = sample.valid;
     in.fault_bits   = sample.fault_bits;
-    sup_step(&s, &in, 0.1f);
+    sup_step(&s, &in, 100u);
     CHECK(!s.permit);                       /* 1350.5 is above it */
     CHECK(s.tripped);
     CHECK_EQ_INT(s.reason, SUP_TRIP_OVERTEMP);

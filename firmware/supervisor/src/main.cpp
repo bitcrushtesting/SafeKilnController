@@ -73,9 +73,15 @@ constexpr uint32_t SUP_SYSCLK_HZ = 16000000u;
 constexpr uint32_t SUP_UART_BAUD = 115200u;
 
 /* 10 Hz, matching the report rate the link is specified at and the cycle the
- * ESP32's own supervisor task runs. */
-constexpr float    CYCLE_S     = 0.1f;
+ * ESP32's own supervisor task runs.
+ *
+ * The period is handed to sup_step in milliseconds rather than seconds in a
+ * float, so the two constants below are the same number twice and a
+ * static_assert says so: a cycle whose timing and whose reported interval
+ * disagreed would make every latch timer wrong by that ratio, silently. */
 constexpr uint32_t CYCLE_HZ    = 10u;
+constexpr uint32_t CYCLE_MS    = 100u;
+static_assert(CYCLE_MS * CYCLE_HZ == 1000u, "CYCLE_MS must be the period of CYCLE_HZ");
 
 /* SysTick reload for one cycle.  The counter is a down-counter that reloads on
  * reaching zero, so the period is RVR + 1 ticks: the reload holds one less than
@@ -220,6 +226,8 @@ void board_gpio_init()
     pin_mode(PORT_B, SUP_PIN_TC2_CS, 1u, 0u);
     pin_set(PORT_B, SUP_PIN_TC2_CS, true);              /* ~CS idle high */
 
+    pin_mode(PORT_B, SUP_PIN_TC2_FAULT, 0u, 1u);        /* input, pull-up */
+
     pin_af(PORT_B, SUP_PIN_SPI2_SCK,  SUP_AF_SPI2_SCK);
     pin_af(PORT_B, SUP_PIN_SPI2_MISO, SUP_AF_SPI2_MISO);
     pin_af(PORT_B, SUP_PIN_SPI2_MOSI, SUP_AF_SPI2_MOSI);
@@ -363,7 +371,7 @@ void board_watchdog_init()
  *   A SYSTEM CLOCK RUNNING FAST. The loop comes round early, the counter has
  *   not fallen far enough, and the feed resets. Previously undetected, and it
  *   matters because every trip timer is derived from the system clock: a fast
- *   clock shortens SUP_CLEAR_HOLD_S, which is the one of them whose shortening
+ *   clock shortens SUP_CLEAR_HOLD_MS, which is the one of them whose shortening
  *   is not in the safe direction.
  *
  *   A STOPPED LSI. The counter never leaves IWDG_RELOAD, which is above the
@@ -443,6 +451,11 @@ bool ram_startup_ok()
 
 size_t stack_guard_words()
 {
+    /* The two symbols bound ONE region, placed adjacently by the linker
+     * script, so the difference is that region's size.  The analyser cannot
+     * see the linker script and so cannot know they are related, which is the
+     * limit of what it can be told here.
+     * NOLINTNEXTLINE(clang-analyzer-security.PointerSub) */
     return static_cast<size_t>(_sup_stack_guard_end - _sup_stack_guard_start);
 }
 
@@ -454,6 +467,8 @@ bool stack_ok()
 /* Program memory integrity, checked once before anything is permitted. */
 bool flash_ok()
 {
+    /* One region again, bounded by two linker symbols; see stack_guard_words.
+     * NOLINTNEXTLINE(clang-analyzer-security.PointerSub) */
     const size_t len = static_cast<size_t>(_sup_crc_region_end - _sup_crc_region_start);
     /* Read through a volatile pointer: the compiler can see the placeholder
      * initialiser and would otherwise be entitled to fold the comparison and
@@ -483,7 +498,11 @@ void wait_for_cycle_end()
     }
 }
 
-bool pin_low(unsigned pin) { return !pin_is_high(PORT_A, pin); }
+/* Takes its port rather than assuming A, now that one of the three inputs read
+ * through it is on B. A second pin_low_b() alongside it would be two copies of a
+ * one-line negation differing in one identifier, which is the shape of mistake
+ * the tc_dev comment below is about. */
+bool pin_low(const gpio_port &g, unsigned pin) { return !pin_is_high(g, pin); }
 
 /* SWR-SAF-38: the coil drive node as the supervisor sees it. */
 bool permit_sensed()
@@ -592,8 +611,8 @@ uint8_t tc_read_reg(const tc_dev &d, uint8_t reg)
 }
 
 struct tc_reading {
-    float    chamber_c;
-    float    cj_c;
+    int32_t  chamber_q7;    /* 1/128 degC, the part's unit; see sup_proto.h */
+    int32_t  cj_q7;
     uint16_t fault_bits;
     bool     valid;
 };
@@ -621,8 +640,8 @@ tc_reading tc_read(const tc_dev &d)
     sup_tc_decode(regs, &sample);       /* the decode is in sup_core, tested */
 
     tc_reading r = {};
-    r.chamber_c  = sample.chamber_c;
-    r.cj_c       = sample.cj_c;
+    r.chamber_q7 = sample.chamber_q7;
+    r.cj_q7      = sample.cj_q7;
     r.fault_bits = sample.fault_bits;
     r.valid      = sample.valid;
     return r;
@@ -635,8 +654,9 @@ tc_reading tc_read(const tc_dev &d)
  * to hold, and all three are checked rather than assumed:
  *
  *   MASK is written FIRST, because until it is cleared the part's ~FAULT output
- *   stays inert, and PA3 would read "no fault" from a part that had not yet been
- *   told to report any.
+ *   stays inert, and the fault input would read "no fault" from a part that had
+ *   not yet been told to report any. True of both front ends, which is why this
+ *   is written once and handed a descriptor.
  *
  *   CR1 is read back. An absent part, or a bus stuck at either rail, reads 0x00
  *   or 0xFF, and neither is a configured CR1. This is the check that
@@ -738,14 +758,15 @@ int main()
         sup_flow_mark(&flow, SUP_FLOW_READ);
 
         sup_input_t in = {};
-        in.chamber_c     = tc.chamber_c;
-        in.chamber_valid = tc.valid && !pin_low(SUP_PIN_TC_FAULT);
-        /* No hardware ~FAULT pin for the second front end: its status register
-         * carries the same information over SPI, and the pin on the first is a
-         * legacy of the discrete chain the supervisor replaced. One pin saved,
-         * nothing lost. */
-        in.chamber2_c     = tc2.chamber_c;
-        in.chamber2_valid = tc2.valid;
+        in.chamber_q7    = tc.chamber_q7;
+        in.chamber_valid = tc.valid && !pin_low(PORT_A, SUP_PIN_TC_FAULT);
+        /* The same two terms as the first couple, and for the same reason. The
+         * status register would carry these fault bits over SPI anyway, but it
+         * arrives over the very bus whose failure the reading needs qualifying
+         * against; the pin is an indication that does not share silicon with the
+         * data path. See the note in pins.h. */
+        in.chamber2_q7    = tc2.chamber_q7;
+        in.chamber2_valid = tc2.valid && !pin_low(PORT_B, SUP_PIN_TC2_FAULT);
         /* The union, so a fault on either front end is reported and acted on.
          * The trip logic does not need to know which one; the flags say which
          * couple is usable and that is what the ESP32 shows. */
@@ -754,14 +775,14 @@ int main()
         /* The button is a level on a pin; whether it *means* anything is
          * sup_step's decision, because it is edge triggered and held and that
          * belongs in the part that has tests. */
-        in.clear_pressed = pin_low(SUP_PIN_CLEAR);
+        in.clear_pressed = pin_low(PORT_A, SUP_PIN_CLEAR);
 
         /* SWR-SAF-36: every periodic diagnostic, in one conjunction. A false
          * here revokes the self-test inside sup_step, which withholds heat for
          * good and cannot be cleared by the button. */
         in.diag_ok = stack_ok() && ram_step() && prev_flow_ok;
 
-        sup_step(&sup, &in, CYCLE_S);
+        sup_step(&sup, &in, CYCLE_MS);
         sup_flow_mark(&flow, SUP_FLOW_STEP);
 
         /* The output is driven every cycle rather than on change, so a bit
@@ -772,8 +793,10 @@ int main()
         sup_report_t rep = {};
         rep.version     = SUP_VERSION;
         rep.seq         = seq++;
-        rep.chamber_c   = tc.chamber_c;
-        rep.cj_c        = tc.cj_c;
+        /* Scaled to tenths here, at the wire, which is the only place in the
+         * firmware where a temperature changes unit. */
+        rep.chamber_dc  = sup_q7_to_dc(tc.chamber_q7);
+        rep.cj_dc       = sup_q7_to_dc(tc.cj_q7);
         rep.fault_bits  = tc.fault_bits;
         rep.flags       = sup_flags(&sup, &in);
         rep.trip_reason = sup.reason;

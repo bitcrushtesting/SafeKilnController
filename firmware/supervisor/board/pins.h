@@ -51,6 +51,7 @@
  *   PA6    13  SPI1 MISO                       AF0
  *   PA7    14  SPI1 MOSI                       AF0
  *   PA8    18  coil permit                     output, low = coil open
+ *   PB4    28  TC2 ~FAULT                      input, pull-up
  *   PB5    29  TC2 ~CS                         output, idle high
  *   PB6    30  SPI2 MISO                       AF4   <- note the AF
  *   PB7    31  SPI2 MOSI                       AF1
@@ -61,7 +62,8 @@
  *
  * PA5/PA6/PA7 are adjacent and all AF0, which puts the first SPI bus on three
  * neighbouring pins next to its chip select on PA4.  PB6/PB7/PB8 do the same
- * for the second, next to its chip select on PB5.
+ * for the second, next to its chip select on PB5 and its fault input on PB4,
+ * so each channel is one contiguous run: PA3 to PA7, and PB4 to PB8.
  *
  * THE SPI2 ALTERNATE FUNCTIONS ARE NOT ALL THE SAME NUMBER.  MISO is AF4 while
  * SCK and MOSI are AF1, which is unlike SPI1 where all three are AF0.  Taken
@@ -76,7 +78,7 @@
  * range that property 2 below refuses to depend on.  Port B is what is left,
  * and it is adjacent and contiguous.
  *
- * Free for later: PA15, PB0 to PB4, PB9, PC6, PC14, PC15. */
+ * Free for later: PA15, PB0 to PB3, PB9, PC6, PC14, PC15. */
 
 #define SUP_PIN_CLEAR        0u   /* PA0,  pos 7   */
 #define SUP_PIN_PERMIT_SENSE 1u   /* PA1,  pos 8   */
@@ -88,7 +90,14 @@
 #define SUP_PIN_SPI_MOSI     7u   /* PA7,  pos 14  */
 #define SUP_PIN_PERMIT       8u   /* PA8,  pos 18  */
 
-/* --- port B: the second thermocouple's bus (SWR-SAF-37) ----------------- */
+/* --- port B: the second thermocouple's bus (SWR-SAF-37) -----------------
+ *
+ * PB4 is a plain GPIO on this package with no competing function, which is why
+ * the fault input went there rather than onto PC14/PC15: those are the OSC32
+ * pins, and nothing is using them only because the supervisor runs from the LSI.
+ * Putting a safety input on them would foreclose ever fitting an LSE crystal,
+ * which is the obvious upgrade for the IWDG window check's timing accuracy. */
+#define SUP_PIN_TC2_FAULT    4u   /* PB4,  pos 28  */
 #define SUP_PIN_TC2_CS       5u   /* PB5,  pos 29  */
 #define SUP_PIN_SPI2_MISO    6u   /* PB6,  pos 30  */
 #define SUP_PIN_SPI2_MOSI    7u   /* PB7,  pos 31  */
@@ -145,5 +154,74 @@
  * getting it backwards fails loudly on the first cycle rather than quietly
  * agreeing half the time. */
 #define SUP_PERMIT_SENSE_ACTIVE_HIGH 1
+
+/* --- why the second couple has a ~FAULT pin too -------------------------
+ *
+ * The status register carries the same fault bits over SPI, so this pin adds no
+ * information the cycle does not already read.  What it adds is INDEPENDENCE:
+ * the status register arrives over the same bus as the data it qualifies, so a
+ * bus failure makes the fault bits unreadable at exactly the moment they matter.
+ * The all-0xFF/all-0x00 burst check does catch a dead bus and reports it as a
+ * comms fault, so the condition is not missed, but it is caught by one channel
+ * inferring that another has gone quiet rather than by an independent
+ * indication.
+ *
+ * Having gone to the trouble of two front ends on two buses for SWR-SAF-37,
+ * leaving the fault indication dependent on one of those buses would be
+ * inconsistent.  The pin costs one GPIO, adjacent to the bus it belongs to.
+ *
+ * Both parts need MASK = 0x00 before the pin means anything, and both get it:
+ * tc_init writes it first, for whichever front end it is handed. */
+
+/* --- the pin map, checked at compile time --------------------------------
+ *
+ * Added when port B reached five pins, because a collision there is otherwise
+ * silent: two names for the same bit compile, link and run, and the symptom is
+ * one peripheral configuring another's pin somewhere in the middle of
+ * board_gpio_init. Nothing downstream complains.
+ *
+ * Sum-equals-OR is the whole trick. Both fold the same (1u << pin) terms, but
+ * addition carries where a bitwise OR absorbs, so the two agree if and only if
+ * no bit appears twice. No <bit>, no popcount, no constexpr function: it holds
+ * in a freestanding build. */
+#define SUP_BIT(p) (1u << (p))
+
+/* Written out rather than folded by a variadic macro: the preprocessor does not
+ * rescan a list-valued macro into separate arguments, so the clever version
+ * does not compile, and the version that does would need an apply-indirection
+ * layer to read correctly. Thirteen terms twice is worth not having that. */
+#define SUP_PORTA_SUM                                                        \
+    (SUP_BIT(SUP_PIN_CLEAR)      + SUP_BIT(SUP_PIN_PERMIT_SENSE) +           \
+     SUP_BIT(SUP_PIN_UART_TX)    + SUP_BIT(SUP_PIN_TC_FAULT)     +           \
+     SUP_BIT(SUP_PIN_TC_CS)      + SUP_BIT(SUP_PIN_SPI_SCK)      +           \
+     SUP_BIT(SUP_PIN_SPI_MISO)   + SUP_BIT(SUP_PIN_SPI_MOSI)     +           \
+     SUP_BIT(SUP_PIN_PERMIT))
+
+#define SUP_PORTA_OR                                                         \
+    (SUP_BIT(SUP_PIN_CLEAR)      | SUP_BIT(SUP_PIN_PERMIT_SENSE) |           \
+     SUP_BIT(SUP_PIN_UART_TX)    | SUP_BIT(SUP_PIN_TC_FAULT)     |           \
+     SUP_BIT(SUP_PIN_TC_CS)      | SUP_BIT(SUP_PIN_SPI_SCK)      |           \
+     SUP_BIT(SUP_PIN_SPI_MISO)   | SUP_BIT(SUP_PIN_SPI_MOSI)     |           \
+     SUP_BIT(SUP_PIN_PERMIT))
+
+#define SUP_PORTB_SUM                                                        \
+    (SUP_BIT(SUP_PIN_TC2_FAULT)  + SUP_BIT(SUP_PIN_TC2_CS)       +           \
+     SUP_BIT(SUP_PIN_SPI2_MISO)  + SUP_BIT(SUP_PIN_SPI2_MOSI)    +           \
+     SUP_BIT(SUP_PIN_SPI2_SCK))
+
+#define SUP_PORTB_OR                                                         \
+    (SUP_BIT(SUP_PIN_TC2_FAULT)  | SUP_BIT(SUP_PIN_TC2_CS)       |           \
+     SUP_BIT(SUP_PIN_SPI2_MISO)  | SUP_BIT(SUP_PIN_SPI2_MOSI)    |           \
+     SUP_BIT(SUP_PIN_SPI2_SCK))
+
+#ifdef __cplusplus
+static_assert(SUP_PORTA_SUM == SUP_PORTA_OR, "two port A pins share a bit");
+static_assert(SUP_PORTB_SUM == SUP_PORTB_OR, "two port B pins share a bit");
+
+/* Property 2 of the header comment, as a check rather than a paragraph: nothing
+ * may land on PA9..PA12, whose bonding and SYSCFG remap this map refuses to
+ * depend on. PA13/PA14 are SWD and the same mask covers them. */
+static_assert((SUP_PORTA_OR & 0x7E00u) == 0u, "a port A pin landed on PA9..PA14");
+#endif
 
 #endif /* SUP_PINS_H */
