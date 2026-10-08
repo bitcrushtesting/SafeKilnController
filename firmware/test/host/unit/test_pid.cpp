@@ -71,7 +71,8 @@ KILN_TEST(frctl16_duty_ceiling_is_honoured_and_has_one_range)
     /* pid.h documents 100..1000, and both the initialiser and the setter now
      * accept exactly that -- a gain set loaded from NVS cannot carry a ceiling
      * the setter would have refused. */
-    const kiln_pid_cfg_t c = { .kp = 100.0f, .duty_max_permille = 50 };
+    const kiln_pid_cfg_t c = { .kp = 100.0f, .ki = 0.0f, .kd = 0.0f,
+                               .duty_max_permille = 50 };
     kiln_pid_t p;
     kiln_pid_init(&p, &c);
     CHECK_EQ_UINT(p.cfg.duty_max_permille, KILN_PID_DUTY_MAX_MIN);
@@ -83,7 +84,8 @@ KILN_TEST(frctl16_duty_ceiling_is_honoured_and_has_one_range)
     CHECK_EQ_UINT(kiln_pid_update(&p, 1000.0f, 0.0f, 1.0f), 600u);
 
     /* Zero still means "default". */
-    const kiln_pid_cfg_t z = { .kp = 1.0f, .duty_max_permille = 0 };
+    const kiln_pid_cfg_t z = { .kp = 1.0f, .ki = 0.0f, .kd = 0.0f,
+                               .duty_max_permille = 0 };
     kiln_pid_init(&p, &z);
     CHECK_EQ_UINT(p.cfg.duty_max_permille, KILN_DUTY_MAX);
 }

@@ -91,6 +91,7 @@ KILN_TEST(sr17_a_latched_fault_survives_a_power_loss_with_its_snapshot)
     const kiln_latched_fault_t in = {
         .fault         = KILN_FAULT_CONTACTOR_WELDED,
         .state         = KILN_STATE_FAULT,
+        .flags         = 0,
         .run_id        = 42,
         .t_rel_ms      = 3600000u,
         .wall_utc_s    = 1767225600ull,

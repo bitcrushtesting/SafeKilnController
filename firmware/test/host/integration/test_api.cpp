@@ -1182,9 +1182,13 @@ KILN_TEST(frweb23_state_changing_endpoints_require_authentication)
 
     /* And the rule is by method, so a route added later is protected by default
      * rather than by someone remembering to list it. */
-    const kiln_api_req_t nw = {.method = KILN_HTTP_POST, .path = "/api/something/new"};
+    const kiln_api_req_t nw = {.method = KILN_HTTP_POST, .path = "/api/something/new",
+                               .query = nullptr, .body = nullptr, .body_len = 0,
+                               .authenticated = false};
     CHECK(kiln_api_needs_auth(&nw));
-    const kiln_api_req_t rd = {.method = KILN_HTTP_GET, .path = "/api/anything"};
+    const kiln_api_req_t rd = {.method = KILN_HTTP_GET, .path = "/api/anything",
+                               .query = nullptr, .body = nullptr, .body_len = 0,
+                               .authenticated = false};
     CHECK(!kiln_api_needs_auth(&rd));
 }
 
@@ -1238,7 +1242,8 @@ KILN_TEST(a_response_that_does_not_fit_says_so_rather_than_truncating)
 
     char tiny[48];
     const kiln_api_req_t req = {
-        .method = KILN_HTTP_GET, .path = "/api/config", .authenticated = true};
+        .method = KILN_HTTP_GET, .path = "/api/config", .query = nullptr,
+        .body = nullptr, .body_len = 0, .authenticated = true};
     kiln_api_resp_t resp = {};
     resp.body     = tiny;
     resp.body_cap = sizeof(tiny);
@@ -1301,12 +1306,15 @@ KILN_TEST(the_api_validates_its_own_arguments)
     resp.body     = r.body;
     resp.body_cap = sizeof(r.body);
     const kiln_api_req_t req = {
-        .method = KILN_HTTP_GET, .path = "/api/status", .authenticated = true};
+        .method = KILN_HTTP_GET, .path = "/api/status", .query = nullptr,
+        .body = nullptr, .body_len = 0, .authenticated = true};
 
     CHECK_ERR(kiln_api_handle(NULL, &req, &resp), KILN_ERR_INVALID_ARG);
     CHECK_ERR(kiln_api_handle(&r.api, NULL, &resp), KILN_ERR_INVALID_ARG);
     CHECK_ERR(kiln_api_handle(&r.api, &req, NULL), KILN_ERR_INVALID_ARG);
 
-    const kiln_api_req_t nopath = {.method = KILN_HTTP_GET, .authenticated = true};
+    const kiln_api_req_t nopath = {.method = KILN_HTTP_GET, .path = nullptr,
+                                   .query = nullptr, .body = nullptr,
+                                   .body_len = 0, .authenticated = true};
     CHECK_ERR(kiln_api_handle(&r.api, &nopath, &resp), KILN_ERR_INVALID_ARG);
 }
