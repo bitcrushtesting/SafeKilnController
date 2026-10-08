@@ -170,7 +170,7 @@ jobs:
         with:
           esp_idf_version: ${{ env.IDF_VERSION }}
           target: esp32s3
-          path: firmware
+          path: firmware/controller
           command: |
             export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.qemu"
             idf.py build
@@ -422,7 +422,7 @@ jobs:
         with:
           esp_idf_version: ${{ env.IDF_VERSION }}
           target: esp32s3
-          path: firmware
+          path: firmware/controller
           command: |
             export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.qemu"
             idf.py build
@@ -476,7 +476,7 @@ jobs:
         with:
           esp_idf_version: ${{ env.IDF_VERSION }}
           target: esp32s3
-          path: firmware
+          path: firmware/controller
           command: |
             export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.qemu"
             python "$IDF_PATH/tools/idf_tools.py" install qemu-xtensa

@@ -3,8 +3,12 @@
 #
 # The supervisor's target build: STM32G031K8, arm-none-eabi, no vendor HAL.
 #
-#   cmake -B build-sup-target -S supervisor \
-#         -DCMAKE_TOOLCHAIN_FILE=firmware/supervisor/arm-none-eabi.cmake
+#   cmake -B build-sup-target -S firmware/supervisor \
+#         -DCMAKE_TOOLCHAIN_FILE=$PWD/firmware/supervisor/arm-none-eabi.cmake
+#
+# $PWD and not a relative path: CMake resolves CMAKE_TOOLCHAIN_FILE against the
+# BUILD directory rather than the source one, so a relative path fails to find
+# the file with a message that does not say why.
 #   cmake --build build-sup-target
 #
 # The host tests are a separate project under test/host and need no ARM
