@@ -10,7 +10,10 @@
 cmake_minimum_required(VERSION 3.16)
 project(kiln_supervisor_tests CXX)
 
-set(CMAKE_CXX_STANDARD 20)
+# C++17 to match firmware/supervisor/CMakeLists.txt: the suites compile the same
+# core sources, and a test build at a different standard tests a different
+# translation of the code than the one that ships.
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_options(-Wall -Wextra -Werror -Wshadow)
 
