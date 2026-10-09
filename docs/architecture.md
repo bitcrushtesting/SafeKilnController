@@ -805,13 +805,30 @@ stale and reconnects with backoff rather than showing old data as current
 
 ### 12.4 Asset budget
 
-| Asset | Budget (gzipped) |
-|---|---|
-| `index.html` | 4 kB |
-| `app.css` | 6 kB |
-| `app.js` (views, SSE, API client) | 24 kB |
-| `chart.js` | 10 kB |
-| Font | 0, system font stack only |
+| Asset | Budget (gzipped) | Measured 2026-10-09 |
+|---|---|---|
+| `index.html` | 4 kB | 2.2 kB |
+| `app.css` | 6 kB | 3.6 kB |
+| `app.js` (views, SSE, API client) | 24 kB | 8.6 kB |
+| `chart.js` | 10 kB | 4.2 kB |
+| Font | 0, system font stack only | 0 |
+| **Total** | **44 kB** | **18.6 kB** |
+
+Measured for the first time when the assets were embedded, and they pass with
+room. The four are gzipped at build time by `kiln_web`'s CMakeLists and linked
+in as binary data, so the hardware image carries them at 908 kB, 56 % of the
+OTA slot still free.
+
+They are served **still compressed**, with `Content-Encoding: gzip`: every
+browser that can run this interface can inflate it, and inflating on the device
+would cost a window buffer per request on the processor that is also running a
+kiln.
+
+The simulated image is **unchanged at 246 kB**, and that is the linker rather
+than a special case. `CONFIG_KILN_PLANT_SIM` compiles out the call that starts
+the server, nothing then references the asset table, and `--gc-sections` drops
+the blobs with it. The configuration that cannot serve the interface does not
+carry it.
 | **Total** | **≤ 48 kB** embedded in the image (`SWA-11`) |
 
 ## 13. Cross-cutting concerns

@@ -61,7 +61,8 @@ all green plain and under AddressSanitizer and UBSan. `clang-tidy` is clean on
 host and target with no suppressions baseline, MC/DC over the supervisor's trip
 logic is 100 % against an 80 % floor, the `esp32s3` image builds with zero
 warnings at 246 kB (88 % of the OTA slot free), and QEMU boots that image and
-fires it.
+fires it. The hardware configuration, which that one compiles out, builds at
+908 kB with the browser interface gzipped into it and 56 % of the slot free.
 
 The controller is C++20; the supervisor is C++17, which is the standard
 MISRA C++:2023 is written against. What is done, what is not, and what blocks
