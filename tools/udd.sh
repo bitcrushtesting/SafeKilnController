@@ -40,13 +40,22 @@ if ! command -v doxygen >/dev/null 2>&1; then
     exit 1
 fi
 
-# Graphviz is optional.  With it the document carries call and include graphs;
-# without it the document is the same minus the pictures, and nobody has to
-# install a package to read their own unit design.
-dot_flag="NO"
-if command -v dot >/dev/null 2>&1; then
-    dot_flag="YES"
+# Graphviz is REQUIRED, and it used to be optional. The unit design now carries
+# \dot blocks of its own: the trip logic's state machine and the cycle's
+# program-sequence graph, which are the two pictures an assessment of a safety
+# function actually asks for. Without dot those are not missing decoration,
+# they are missing content, and doxygen says so loudly enough to fail the
+# build. Better to say it here, in one sentence, than as a documentation
+# warning somebody has to interpret.
+if ! command -v dot >/dev/null 2>&1; then
+    echo "graphviz is not installed, and the unit design needs it: the state" >&2
+    echo "machine and the program-sequence diagram are \dot blocks in the" >&2
+    echo "headers." >&2
+    echo "  macOS:  brew install graphviz" >&2
+    echo "  Debian: apt-get install graphviz" >&2
+    exit 1
 fi
+dot_flag="YES"
 
 cd "$sup"
 rm -rf "$out"
