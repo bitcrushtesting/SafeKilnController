@@ -102,6 +102,11 @@ typedef struct {
      * between "no networks here" and "ask again in a moment", which is the
      * whole of what an operator needs during the two seconds a scan takes. */
     bool            net_scanning;
+    /* SWR-NET-12: the radio's reason for the last disconnect or refused join,
+     * straight from kiln_net_status_t.  With the display the only way
+     * credentials reach the device, "it did not work" is not a useful answer,
+     * and a reason code is something an operator can read out over a phone. */
+    uint8_t         net_last_reason;
     uint8_t         net_count;
     char            net_list_ssid[KILN_HMI_MAX_NETWORKS][KILN_HMI_SSID_LEN];
     int8_t          net_list_rssi[KILN_HMI_MAX_NETWORKS];

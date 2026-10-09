@@ -40,6 +40,20 @@ typedef struct {
     uint32_t         disconnect_count;
     uint32_t         uptime_s;
     bool             time_synced;
+    /* SWR-NET-12.  The radio's own reason for the last disconnect or refused
+     * join -- IEEE 802.11 reason codes as the driver reports them, plus the
+     * vendor range above 200 that carries "no AP found" and "handshake
+     * timeout", which are the two an operator at the display will actually
+     * meet.  Zero means none has been recorded, which is also what a device
+     * that has never tried to associate says.
+     *
+     * Carried because the display had nothing to show when a join failed: it
+     * returned to the network screen saying "not connected", leaving the
+     * operator to guess between a typed passphrase that was wrong, an SSID
+     * that is out of range, and a radio that never came up.  With the setup at
+     * the display the only route in (there is no access point), guessing is the
+     * whole cost of getting it wrong. */
+    uint8_t          last_reason;
 } kiln_net_status_t;
 
 /* The most networks a scan will report.  Sixteen rather than "all of them":

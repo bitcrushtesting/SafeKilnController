@@ -10,6 +10,7 @@
 
 #include "kiln_core/faults.h"
 #include "kiln_hmi/hmi.h"
+#include "kiln_hmi/strings.h"
 
 /* --- small helpers ------------------------------------------------------ */
 
@@ -65,6 +66,14 @@ void fmt_hms(char *buf, size_t n, uint32_t s)
     const uint32_t m = (s % 3600u) / 60u;
     if (h > 0u) { (void)snprintf(buf, n, "%uh%02u", (unsigned)h, (unsigned)m); }
     else        { (void)snprintf(buf, n, "%um%02u", (unsigned)m, (unsigned)(s % 60u)); }
+}
+
+/* The one place the language is read, so a draw site is a lookup rather than a
+ * conditional.  SWR-NFR-23 is a presentation concern: nothing downstream of
+ * here knows what language the panel is in. */
+const char *S(const kiln_hmi_view_t *v, kiln_hmi_str_id_t id)
+{
+    return kiln_hmi_str(id, v->language);
 }
 
 const char *state_text(const kiln_hmi_view_t *v)
@@ -123,9 +132,9 @@ void draw_main(kiln_hmi_t *h, const kiln_hmi_view_t *v)
     /* Duty, and the two states worth seeing at a glance. */
     (void)snprintf(buf, sizeof(buf), "%u%%", (unsigned)(v->snap.duty_permille / 10u));
     kiln_fb_text(&h->fb, 0, 40, buf, 1, true);
-    if (v->snap.heat_authorised) { kiln_fb_text(&h->fb, 30, 40, "HEAT", 1, true); }
-    if (v->snap.holdback_active) { kiln_fb_text(&h->fb, 62, 40, "HOLD", 1, true); }
-    if (v->awaiting_ack)         { kiln_fb_text(&h->fb, 94, 40, "ACK?", 1, true); }
+    if (v->snap.heat_authorised) { kiln_fb_text(&h->fb, 30, 40, S(v, KILN_HMI_STR_HEAT), 1, true); }
+    if (v->snap.holdback_active) { kiln_fb_text(&h->fb, 62, 40, S(v, KILN_HMI_STR_HOLD), 1, true); }
+    if (v->awaiting_ack)         { kiln_fb_text(&h->fb, 94, 40, S(v, KILN_HMI_STR_ACK), 1, true); }
 
     /* SWR-HMI-04's progress indication: segment position through the program. */
     uint8_t pct = 0;
@@ -158,9 +167,10 @@ void draw_fault(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 
     char buf[40];
     if (sup_blame) {
-        (void)snprintf(buf, sizeof(buf), "SUPERVISOR");
+        (void)snprintf(buf, sizeof(buf), "%s", S(v, KILN_HMI_STR_SUPERVISOR));
     } else {
-        (void)snprintf(buf, sizeof(buf), "FAULT %u", (unsigned)v->fault);
+        (void)snprintf(buf, sizeof(buf), "%s %u", S(v, KILN_HMI_STR_FAULT),
+                       (unsigned)v->fault);
     }
     kiln_fb_text(&h->fb, 2, 2, buf, 1, false);
     kiln_fb_text_right(&h->fb, KILN_DISPLAY_W - 2, 2,
@@ -200,12 +210,14 @@ const char *menu_label(uint8_t i, const kiln_hmi_view_t *v)
     const bool running = (v->snap.state == (uint8_t)KILN_STATE_RUNNING);
     const bool paused  = (v->snap.state == (uint8_t)KILN_STATE_PAUSED);
     switch (i) {
-    case 0: return "Start program";
-    case 1: return running ? "Pause" : (paused ? "Resume" : "Pause/Resume");
-    case 2: return "Abort";
-    case 3: return "Network";
-    case 4: return "Diagnostics";
-    case 5: return "Info";
+    case 0: return S(v, KILN_HMI_STR_START_PROGRAM);
+    case 1: return running ? S(v, KILN_HMI_STR_PAUSE)
+                           : (paused ? S(v, KILN_HMI_STR_RESUME)
+                                     : S(v, KILN_HMI_STR_PAUSE_RESUME));
+    case 2: return S(v, KILN_HMI_STR_ABORT);
+    case 3: return S(v, KILN_HMI_STR_NETWORK);
+    case 4: return S(v, KILN_HMI_STR_DIAGNOSTICS);
+    case 5: return S(v, KILN_HMI_STR_INFO);
     default: return "";
     }
 }
@@ -250,7 +262,9 @@ const char *program_label(uint8_t i, const kiln_hmi_view_t *v)
 void draw_confirm(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 {
     /* SWR-HMI-11: starting and aborting both require this step. */
-    const char *what = (h->pending == KILN_HMI_ACT_START) ? "Start firing?" : "Abort firing?";
+    const char *what = (h->pending == KILN_HMI_ACT_START)
+                     ? S(v, KILN_HMI_STR_START_FIRING_Q)
+                     : S(v, KILN_HMI_STR_ABORT_FIRING_Q);
     kiln_fb_text(&h->fb, 0, 4, what, 1, true);
 
     if (h->pending == KILN_HMI_ACT_START && h->pending_program < v->program_count) {
@@ -258,29 +272,58 @@ void draw_confirm(kiln_hmi_t *h, const kiln_hmi_view_t *v)
     }
 
     if (h->confirm_yes) {
-        kiln_fb_text_inv(&h->fb, 14, 40, "YES", 1);
-        kiln_fb_text(&h->fb, 80, 40, "NO", 1, true);
+        kiln_fb_text_inv(&h->fb, 14, 40, S(v, KILN_HMI_STR_YES), 1);
+        kiln_fb_text(&h->fb, 80, 40, S(v, KILN_HMI_STR_NO), 1, true);
     } else {
-        kiln_fb_text(&h->fb, 14, 40, "YES", 1, true);
-        kiln_fb_text_inv(&h->fb, 80, 40, "NO", 1);
+        kiln_fb_text(&h->fb, 14, 40, S(v, KILN_HMI_STR_YES), 1, true);
+        kiln_fb_text_inv(&h->fb, 80, 40, S(v, KILN_HMI_STR_NO), 1);
     }
-    kiln_fb_text(&h->fb, 0, 54, "turn to choose, press", 1, true);
+    kiln_fb_text(&h->fb, 0, 54, S(v, KILN_HMI_STR_TURN_THEN_PRESS), 1, true);
 }
 
 void draw_network(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 {
     /* SWR-HMI-07: where the web interface is, which is the question an operator
      * standing at the kiln actually has. */
-    kiln_fb_text(&h->fb, 0, 0, "NETWORK", 1, true);
+    kiln_fb_text(&h->fb, 0, 0, S(v, KILN_HMI_STR_NETWORK), 1, true);
     kiln_fb_hline(&h->fb, 0, 9, KILN_DISPLAY_W, true);
-    kiln_fb_text(&h->fb, 0, 13, v->net_up ? "connected" : "not connected", 1, true);
+
+    /* SWR-NET-12: what became of the last attempt.
+     *
+     * "not connected" on its own is the answer an operator cannot act on, and
+     * with the display the only route in -- there is no access point -- acting
+     * on it is the whole job.  So a join in progress says so, and a join that
+     * the radio refused says so with the radio's reason code: 15 is a failed
+     * four-way handshake, which is a wrong passphrase in almost every case,
+     * 201 is "no AP of that name answered", and 2 and 4 are the AP dropping
+     * the association.  The number is there to be read out over a phone to
+     * somebody who can look it up, which beats a sentence that guesses. */
+    const char *first = v->net_up ? S(v, KILN_HMI_STR_CONNECTED)
+                                  : S(v, KILN_HMI_STR_NOT_CONNECTED);
+    kiln_fb_text(&h->fb, 0, 13, first, 1, true);
     kiln_fb_text(&h->fb, 0, 23, v->net_up ? v->net_ssid : "", 1, true);
-    kiln_fb_text(&h->fb, 0, 33, v->hostname, 1, true);
+
+    if (!v->net_up && v->net_last_reason != 0u) {
+        char why[32];
+        (void)snprintf(why, sizeof(why), "%s (%u)", S(v, KILN_HMI_STR_JOIN_FAILED),
+                       (unsigned)v->net_last_reason);
+        kiln_fb_text(&h->fb, 0, 33, why, 1, true);
+    }
+    else if (!v->net_up) {
+        /* No reason recorded: either nothing has been attempted yet, or an
+         * attempt is in flight.  Both are "ask again in a moment" rather than
+         * a failure, and saying so is what stops an operator abandoning a join
+         * that was going to work. */
+        kiln_fb_text(&h->fb, 0, 33, S(v, KILN_HMI_STR_JOINING), 1, true);
+    }
+    else {
+        kiln_fb_text(&h->fb, 0, 33, v->hostname, 1, true);
+    }
     kiln_fb_text(&h->fb, 0, 43, v->ip, 1, true);
     /* SWR-NET-11: this is the only route into WiFi setup, and it says so.  The
      * device raises no access point, so if this screen cannot be reached the
      * network cannot be configured at all. */
-    kiln_fb_text(&h->fb, 0, 54, "press: set up wifi", 1, true);
+    kiln_fb_text(&h->fb, 0, 54, S(v, KILN_HMI_STR_PRESS_SETUP_WIFI), 1, true);
 }
 
 /* SWR-NET-11.  Four rows at a time, strongest first, with a bar for signal and
@@ -289,13 +332,14 @@ void draw_network(kiln_hmi_t *h, const kiln_hmi_view_t *v)
  * the operator can see that it was cut. */
 void draw_networks(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 {
-    kiln_fb_text(&h->fb, 0, 0, "WIFI NETWORKS", 1, true);
+    kiln_fb_text(&h->fb, 0, 0, S(v, KILN_HMI_STR_NETWORKS), 1, true);
     kiln_fb_hline(&h->fb, 0, 9, KILN_DISPLAY_W, true);
 
     if (v->net_count == 0u) {
         kiln_fb_text(&h->fb, 0, 24,
-                     v->net_scanning ? "scanning..." : "none found", 1, true);
-        kiln_fb_text(&h->fb, 0, 54, "hold: back", 1, true);
+                     v->net_scanning ? S(v, KILN_HMI_STR_SCANNING)
+                                     : S(v, KILN_HMI_STR_NONE_FOUND), 1, true);
+        kiln_fb_text(&h->fb, 0, 54, S(v, KILN_HMI_STR_HOLD_BACK), 1, true);
         return;
     }
 
@@ -327,8 +371,9 @@ void draw_networks(kiln_hmi_t *h, const kiln_hmi_view_t *v)
      * drawn on: the compiler is right that %u of an unsigned is ten digits,
      * and a truncated footer is a worse answer than a wide buffer. */
     char foot[40];
-    (void)snprintf(foot, sizeof(foot), "%u of %u   * needs key",
-                   (unsigned)(h->net_sel + 1u), (unsigned)v->net_count);
+    (void)snprintf(foot, sizeof(foot), "%u %s %u  %s",
+                   (unsigned)(h->net_sel + 1u), S(v, KILN_HMI_STR_OF),
+                   (unsigned)v->net_count, S(v, KILN_HMI_STR_NEEDS_KEY));
     kiln_fb_text(&h->fb, 0, 54, foot, 1, true);
 }
 
@@ -339,7 +384,7 @@ void draw_networks(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 void draw_passphrase(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 {
     (void)v;
-    kiln_fb_text(&h->fb, 0, 0, "PASSPHRASE", 1, true);
+    kiln_fb_text(&h->fb, 0, 0, S(v, KILN_HMI_STR_PASSPHRASE), 1, true);
     kiln_fb_hline(&h->fb, 0, 9, KILN_DISPLAY_W, true);
 
     /* The tail, because that is where the cursor is: 20 characters fit and a
@@ -352,43 +397,48 @@ void draw_passphrase(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 
     char pick[24];
     if (h->charset_sel == K_SEL_DEL) {
-        (void)snprintf(pick, sizeof(pick), "[ delete ]");
+        (void)snprintf(pick, sizeof(pick), "%s", S(v, KILN_HMI_STR_DELETE));
     } else if (h->charset_sel == K_SEL_OK) {
         /* The length rule is shown where it is enforced, so "nothing happened
          * when I pressed" never has to be guessed at. */
         (void)snprintf(pick, sizeof(pick), "%s",
-                       (h->pass_len >= 8u) ? "[ connect ]" : "[ 8 or more ]");
+                       (h->pass_len >= 8u) ? S(v, KILN_HMI_STR_CONNECT)
+                                           : S(v, KILN_HMI_STR_EIGHT_OR_MORE));
     } else {
         (void)snprintf(pick, sizeof(pick), "   %c", k_charset[h->charset_sel]);
     }
     kiln_fb_text(&h->fb, 0, 30, pick, 1, true);
 
     char foot[40];
-    (void)snprintf(foot, sizeof(foot), "%u chars   hold: cancel",
-                   (unsigned)h->pass_len);
+    (void)snprintf(foot, sizeof(foot), "%u %s  %s", (unsigned)h->pass_len,
+                   S(v, KILN_HMI_STR_CHARS), S(v, KILN_HMI_STR_HOLD_CANCEL));
     kiln_fb_text(&h->fb, 0, 54, foot, 1, true);
 }
 
 void draw_diag(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 {
     char buf[32], t[12];
-    kiln_fb_text(&h->fb, 0, 0, "DIAGNOSTICS", 1, true);
+    kiln_fb_text(&h->fb, 0, 0, S(v, KILN_HMI_STR_DIAGNOSTICS), 1, true);
     kiln_fb_hline(&h->fb, 0, 9, KILN_DISPLAY_W, true);
 
     fmt_temp(t, sizeof(t), v, v->snap.case_c, v->snap.case_valid);
-    (void)snprintf(buf, sizeof(buf), "case  %s%s", t, unit_str(v));
+    (void)snprintf(buf, sizeof(buf), "%-5s %s%s", S(v, KILN_HMI_STR_CASE), t,
+                   unit_str(v));
     kiln_fb_text(&h->fb, 0, 13, buf, 1, true);
 
-    (void)snprintf(buf, sizeof(buf), "amps  %.1f", (double)v->snap.current_a);
+    (void)snprintf(buf, sizeof(buf), "%-5s %.1f", S(v, KILN_HMI_STR_AMPS),
+                   (double)v->snap.current_a);
     kiln_fb_text(&h->fb, 0, 23, buf, 1, true);
 
     /* SWR-CUR-07, in the units a kiln owner thinks in. */
-    (void)snprintf(buf, sizeof(buf), "power %.2fkW", v->power_w / 1000.0);
+    (void)snprintf(buf, sizeof(buf), "%-5s %.2fkW", S(v, KILN_HMI_STR_POWER),
+                   v->power_w / 1000.0);
     kiln_fb_text(&h->fb, 0, 33, buf, 1, true);
-    (void)snprintf(buf, sizeof(buf), "used  %.2fkWh", v->energy_wh / 1000.0);
+    (void)snprintf(buf, sizeof(buf), "%-5s %.2fkWh", S(v, KILN_HMI_STR_USED),
+                   v->energy_wh / 1000.0);
     kiln_fb_text(&h->fb, 0, 43, buf, 1, true);
 
-    (void)snprintf(buf, sizeof(buf), "duty  %u%%",
+    (void)snprintf(buf, sizeof(buf), "%-5s %u%%", S(v, KILN_HMI_STR_DUTY),
                    (unsigned)(v->snap.duty_permille / 10u));
     kiln_fb_text(&h->fb, 0, 53, buf, 1, true);
 }
@@ -396,12 +446,12 @@ void draw_diag(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 void draw_info(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 {
     char buf[40], up[12];
-    kiln_fb_text(&h->fb, 0, 0, "INFO", 1, true);
+    kiln_fb_text(&h->fb, 0, 0, S(v, KILN_HMI_STR_INFO), 1, true);
     kiln_fb_hline(&h->fb, 0, 9, KILN_DISPLAY_W, true);
     kiln_fb_text(&h->fb, 0, 13, v->version, 1, true);
 
     fmt_hms(up, sizeof(up), v->uptime_s);
-    (void)snprintf(buf, sizeof(buf), "up %s", up);
+    (void)snprintf(buf, sizeof(buf), "%s %s", S(v, KILN_HMI_STR_UPTIME), up);
     kiln_fb_text(&h->fb, 0, 23, buf, 1, true);
 
     (void)snprintf(buf, sizeof(buf), "P%.1f I%.3f", (double)v->kp, (double)v->ki);
@@ -411,7 +461,9 @@ void draw_info(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 
     /* SWR-TUN-11: factory gains are not gains for *this* kiln, and the screen
      * that shows them is the right place to say so. */
-    kiln_fb_text(&h->fb, 0, 53, v->gains_tuned ? "tuned" : "UNTUNED defaults", 1, true);
+    kiln_fb_text(&h->fb, 0, 53,
+                 v->gains_tuned ? S(v, KILN_HMI_STR_TUNED)
+                                : S(v, KILN_HMI_STR_UNTUNED), 1, true);
 }
 
 } // namespace
@@ -652,15 +704,21 @@ kiln_hmi_action_t kiln_hmi_update(kiln_hmi_t *h, const kiln_hmi_view_t *view,
     switch (h->screen) {
     case KILN_HMI_SCREEN_FAULT:    draw_fault(h, view);   break;
     case KILN_HMI_SCREEN_MENU:
-        draw_list(h, "MENU", MENU_ITEMS, h->menu_sel, 0, menu_label, view);
+        draw_list(h, kiln_hmi_str(KILN_HMI_STR_MENU, view->language),
+                      MENU_ITEMS, h->menu_sel, 0, menu_label, view);
         break;
     case KILN_HMI_SCREEN_PROGRAMS:
         if (view->program_count == 0u) {
-            kiln_fb_text(&h->fb, 0, 0, "PROGRAMS", 1, true);
+            kiln_fb_text(&h->fb, 0, 0,
+                         kiln_hmi_str(KILN_HMI_STR_PROGRAMS, view->language),
+                         1, true);
             kiln_fb_hline(&h->fb, 0, 9, KILN_DISPLAY_W, true);
-            kiln_fb_text(&h->fb, 0, 20, "none stored", 1, true);
+            kiln_fb_text(&h->fb, 0, 20,
+                         kiln_hmi_str(KILN_HMI_STR_NONE_STORED, view->language),
+                         1, true);
         } else {
-            draw_list(h, "PROGRAMS", view->program_count, h->prog_sel, h->prog_top,
+            draw_list(h, kiln_hmi_str(KILN_HMI_STR_PROGRAMS, view->language),
+                          view->program_count, h->prog_sel, h->prog_top,
                       program_label, view);
         }
         break;

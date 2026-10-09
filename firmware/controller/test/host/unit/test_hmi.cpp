@@ -18,6 +18,7 @@
 #include "kiln_check.h"
 #include "kiln_core/faults.h"
 #include "kiln_hmi/hmi.h"
+#include "kiln_hmi/strings.h"
 
 static kiln_hmi_view_t base_view(void)
 {
@@ -744,4 +745,222 @@ KILN_TEST(swrnet11_the_list_scrolls_and_keeps_the_selection_visible)
                   (unsigned)h.net_top);
         (void)feed(&h, &v, KILN_INPUT_CW);
     }
+}
+
+/* ===========================================================================
+ * THE DISPLAY'S OWN WORDS  (SWR-NFR-23, tasklist O4 and J2)
+ * ===========================================================================
+ * kiln_core/faults has always carried faults and warnings in both languages,
+ * so a device set to German announced its faults in German inside an English
+ * frame: every screen title, the whole menu, both answers to a confirmation
+ * and every footer were string literals at their draw sites.
+ *
+ * The table these check is the one a reviewer reads (J4 is still open: no
+ * native speaker has been through it). What is asserted here is what a
+ * reviewer cannot see by reading -- that nothing is missing, that nothing
+ * overruns the panel, and that nothing contains a character the font cannot
+ * draw.
+ */
+
+/*
+ * @relation(SWR-NFR-23, scope=function)
+ */
+KILN_TEST(swrnfr23_every_string_exists_in_both_languages)
+{
+    for (unsigned id = 0; id < (unsigned)KILN_HMI_STR_COUNT; id++) {
+        for (unsigned lang = 0; lang < (unsigned)KILN_LANG_COUNT; lang++) {
+            const char *s = kiln_hmi_str((kiln_hmi_str_id_t)id, (kiln_lang_t)lang);
+            CHECK_MSG(s != nullptr && s[0] != '\0',
+                      "string %u is missing in language %u", id, lang);
+        }
+    }
+}
+
+/*
+ * @relation(SWR-NFR-23, scope=function)
+ */
+KILN_TEST(swrnfr23_the_german_uses_only_glyphs_the_font_has)
+{
+    /* draw.cpp's 5x7 font is the 95 printable ASCII glyphs and nothing else:
+     * no umlauts, no sharp s. So the German is transliterated -- AE OE UE SS,
+     * as kiln_core/faults has always done -- and a single umlaut typed into
+     * the table would reach the panel as a blank nobody sees until the device
+     * is in a workshop. */
+    for (unsigned id = 0; id < (unsigned)KILN_HMI_STR_COUNT; id++) {
+        for (unsigned lang = 0; lang < (unsigned)KILN_LANG_COUNT; lang++) {
+            const char *s = kiln_hmi_str((kiln_hmi_str_id_t)id, (kiln_lang_t)lang);
+            for (const char *p = s; *p != '\0'; p++) {
+                const unsigned char c = (unsigned char)*p;
+                CHECK_MSG(c >= 0x20u && c <= 0x7Eu,
+                          "string %u language %u has byte 0x%02X, which the font "
+                          "cannot draw", id, lang, (unsigned)c);
+            }
+        }
+    }
+}
+
+/*
+ * @relation(SWR-NFR-23, scope=function)
+ */
+KILN_TEST(swrnfr23_no_label_overruns_the_panel)
+{
+    /* 21 characters at scale 1, and the framebuffer clips silently past that.
+     * German runs about 15 per cent longer than English, so this is the bound
+     * the translation has to be written against rather than something to
+     * discover on hardware. */
+    for (unsigned id = 0; id < (unsigned)KILN_HMI_STR_COUNT; id++) {
+        for (unsigned lang = 0; lang < (unsigned)KILN_LANG_COUNT; lang++) {
+            const char *s = kiln_hmi_str((kiln_hmi_str_id_t)id, (kiln_lang_t)lang);
+            CHECK_MSG(strlen(s) <= KILN_HMI_COLS,
+                      "string %u language %u is %u characters, over the %u the "
+                      "panel has", id, lang, (unsigned)strlen(s),
+                      (unsigned)KILN_HMI_COLS);
+        }
+    }
+}
+
+/*
+ * @relation(SWR-NFR-23, scope=function)
+ */
+KILN_TEST(swrnfr23_an_unknown_language_falls_back_rather_than_blanking)
+{
+    /* types.h promises that a language the build does not carry shows English
+     * rather than an empty screen. A blank menu on a kiln is worse than an
+     * English one. */
+    const char *en = kiln_hmi_str(KILN_HMI_STR_ABORT, KILN_LANG_EN);
+    CHECK_STR_EQ(kiln_hmi_str(KILN_HMI_STR_ABORT, (kiln_lang_t)47), en);
+
+    /* An identifier out of range is a programming error rather than a
+     * configuration one, and answers with nothing: a wrong label on a kiln is
+     * worse than a gap, which at least looks like what it is. */
+    CHECK_STR_EQ(kiln_hmi_str((kiln_hmi_str_id_t)KILN_HMI_STR_COUNT, KILN_LANG_EN), "");
+}
+
+/*
+ * @relation(SWR-NFR-23, scope=function)
+ */
+KILN_TEST(swrnfr23_the_screens_themselves_change_language)
+{
+    /* The table existing is not the point; the screens using it is. Each of
+     * these is a screen that carried English literals until the table landed,
+     * and the pixel count moving is what proves the draw site was changed. */
+    kiln_hmi_t h; kiln_hmi_init(&h, 0);
+    kiln_hmi_view_t v = base_view();
+
+    /* The menu, which is the first screen an operator meets. */
+    v.language = KILN_LANG_EN;
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+    CHECK_EQ_INT(h.screen, KILN_HMI_SCREEN_MENU);
+    const int menu_en = ink(&h, 0, 0, 128, 64);
+    v.language = KILN_LANG_DE;
+    (void)feed(&h, &v, KILN_INPUT_NONE);
+    CHECK_MSG(ink(&h, 0, 0, 128, 64) != menu_en, "the menu did not change");
+
+    /* The confirmation, where the two answers are the whole screen. */
+    v.language = KILN_LANG_EN;
+    (void)feed(&h, &v, KILN_INPUT_NONE);
+    (void)feed(&h, &v, KILN_INPUT_PRESS);           /* Start program  */
+    (void)feed(&h, &v, KILN_INPUT_PRESS);           /* pick the first */
+    CHECK_EQ_INT(h.screen, KILN_HMI_SCREEN_CONFIRM);
+    const int confirm_en = ink(&h, 0, 0, 128, 64);
+    v.language = KILN_LANG_DE;
+    (void)feed(&h, &v, KILN_INPUT_NONE);
+    CHECK_MSG(ink(&h, 0, 0, 128, 64) != confirm_en,
+              "the confirmation did not change");
+}
+
+/*
+ * @relation(SWR-NET-12, scope=function)
+ */
+KILN_TEST(swrnet12_a_failed_join_says_so_with_the_radios_reason)
+{
+    /* Until now the display returned to the network screen saying "not
+     * connected", leaving the operator to guess between a mistyped
+     * passphrase, an SSID out of range and a radio that never came up. With
+     * the display the only route in -- there is no access point -- guessing is
+     * the entire cost of getting it wrong. */
+    kiln_hmi_t h; kiln_hmi_init(&h, 0);
+    kiln_hmi_view_t v = base_view();
+    v.net_up = false;
+
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+    for (int i = 0; i < 3; i++) { (void)feed(&h, &v, KILN_INPUT_CW); }
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+    CHECK_EQ_INT(h.screen, KILN_HMI_SCREEN_NETWORK);
+
+    /* Nothing attempted yet: the third row says an attempt is in flight
+     * rather than that it failed. */
+    v.net_last_reason = 0;
+    (void)feed(&h, &v, KILN_INPUT_NONE);
+    const int joining = ink(&h, 0, 32, 128, 10);
+    CHECK(joining > 0);
+
+    /* Reason 15 is a failed four-way handshake, which is a wrong passphrase in
+     * almost every case. The row has to change, and visibly. */
+    v.net_last_reason = 15;
+    (void)feed(&h, &v, KILN_INPUT_NONE);
+    const int failed = ink(&h, 0, 32, 128, 10);
+    CHECK_MSG(failed != joining,
+              "the network screen shows the same thing whether a join is in "
+              "progress or has failed");
+
+    /* The code itself is on the screen: it is there to be read out to somebody
+     * who can look it up, so a different code must render differently. */
+    v.net_last_reason = 201;        /* no AP of that name answered */
+    (void)feed(&h, &v, KILN_INPUT_NONE);
+    CHECK_MSG(ink(&h, 0, 32, 128, 10) != failed,
+              "the reason code is not rendered, only the fact of the failure");
+
+    /* And once it is up, the row goes back to being the hostname. */
+    v.net_up = true;
+    (void)feed(&h, &v, KILN_INPUT_NONE);
+    CHECK(ink(&h, 0, 32, 128, 10) > 0);
+}
+
+/*
+ * @relation(SWR-NET-12, scope=function)
+ */
+KILN_TEST(swrnet12_the_knob_stays_where_the_last_character_left_it)
+{
+    /* A rotary encoder is a poor keyboard and 95 characters is a long way
+     * round, so the one cheap improvement is not sending the knob back to 'a'
+     * after every press: passphrases repeat characters and cluster inside a
+     * region of the set, so resuming where the last press landed is usually
+     * several turns saved and never more.
+     *
+     * This is a property of the entry screen that nothing asserted, and it is
+     * the sort of thing a later edit silently reverses by adding one
+     * "sensible" reset.
+     */
+    kiln_hmi_t h; kiln_hmi_init(&h, 0);
+    kiln_hmi_view_t v = base_view();
+    v.net_count = 1;
+    v.net_list_secured[0] = true;
+    (void)snprintf(v.net_list_ssid[0], KILN_HMI_SSID_LEN, "workshop");
+
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+    for (int i = 0; i < 3; i++) { (void)feed(&h, &v, KILN_INPUT_CW); }
+    (void)feed(&h, &v, KILN_INPUT_PRESS);          /* network screen   */
+    (void)feed(&h, &v, KILN_INPUT_PRESS);          /* the scan list    */
+    CHECK_EQ_INT(h.screen, KILN_HMI_SCREEN_NETWORKS);
+    (void)feed(&h, &v, KILN_INPUT_PRESS);          /* secured, so type */
+    CHECK_EQ_INT(h.screen, KILN_HMI_SCREEN_PASSPHRASE);
+
+    /* Entry starts at the first character, which is right for the first one. */
+    CHECK_EQ_UINT(h.charset_sel, 0u);
+
+    for (int i = 0; i < 7; i++) { (void)feed(&h, &v, KILN_INPUT_CW); }
+    const uint8_t landed = h.charset_sel;
+    CHECK(landed == 7u);
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+    CHECK_EQ_UINT(h.pass_len, 1u);
+    CHECK_MSG(h.charset_sel == landed,
+              "the knob went back to the start after a press, which costs the "
+              "operator the whole way round again for a repeated character");
+
+    /* And again, so the second press is not a special case either. */
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+    CHECK_EQ_UINT(h.pass_len, 2u);
+    CHECK_EQ_UINT(h.charset_sel, landed);
+    CHECK_EQ_INT(h.pass[0], h.pass[1]);       /* the same character twice */
 }
