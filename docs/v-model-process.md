@@ -37,7 +37,7 @@ User Requirements  ────────────────────�
 | 2 | System Requirements   | `02_system_req.sdoc`   | `SYS-`     | `UR-`            | System Tests      |
 | 3 | Software Requirements | `03_software_req.sdoc` | `SWR-`     | `SYS-`           | Integration Tests |
 | 4 | Software Architecture | `04_software_arch.sdoc`| `SWA-`     | `SWR-`           | Software Tests    |
-| 5 | Unit Design           | `05_unit_design.sdoc`  | `SWD-`     | `SWA-`           | Unit Tests        |
+| 5 | Unit Design           | Doxygen in the source  | see §4.5   | `SWA-`           | Unit Tests        |
 | 6 | Implementation        | `src/`                 | –          | `SWD-`           | –                 |
 
 | #  | Test level        | Document                    | UID prefix | Verifies |
@@ -134,7 +134,7 @@ in section 8.
 - **Exit criteria:** every `SWR-` is allocated to at least one component;
   every interface is specified on both sides.
 
-### 4.5 Unit Design (`SWD-`)
+### 4.5 Unit Design
 
 - **Purpose:** specify each unit in enough detail to implement and test it.
 - **Input:** software architecture.
@@ -142,6 +142,34 @@ in section 8.
   state machines, error behaviour.
 - **Exit criteria:** every `SWA-` component is broken down into units; every
   unit design element is testable in isolation.
+
+**This level is generated from the source and has no `.sdoc` of its own**, and
+the departure from the pattern is deliberate. Every other level describes
+something that does not exist yet; this one describes code that does. A
+separate document saying what a function's parameters, ranges and error
+behaviour are is a second description of the same thing, and when the two
+disagree it is found by whoever is auditing rather than by whoever is editing.
+
+So the unit design lives in Doxygen comments beside each unit, and
+[`tools/udd.sh`](../tools/udd.sh) produces the document. Three consequences
+worth stating:
+
+- **There are no `SWD-` identifiers.** A unit's identity is its name, which the
+  compiler already enforces and nothing can silently rename. What rule 6 of
+  section 8 asks of a `SWD-`, that it trace up and down, is carried by
+  `\implements`, `\derivedfrom` and `\verifiedby`, each of which becomes a
+  cross-referenced index page in the generated document.
+- **The gate is doxygen's warnings**, with `WARN_AS_ERROR`, so an undocumented
+  parameter fails CI rather than producing a document with a hole in it.
+- **Coverage is counted separately**, by `tools/udd-coverage.py`, because
+  doxygen is silent about a file carrying no comment blocks at all: a clean run
+  proves the comments that exist are well formed and nothing about the ones
+  that do not.
+
+The fields each unit carries, and why those: `firmware/supervisor/Doxyfile`
+states the five questions an assessment under EN ISO 13849-1:2023 cl. 4.6 or
+EN IEC 60730-1 Annex H actually asks of a safety function, and each alias
+exists to answer one of them in a fixed place.
 
 ## 5. Implementation
 
@@ -347,7 +375,7 @@ and its realisation is visible rather than assumed away.
 | 2 System requirements | [`02_system_req.sdoc`](02_system_req.sdoc) | `SYS-HW-`, `SYS-SAF-`, `SYS-ASM-` | written |
 | 3 Software requirements | [`03_software_req.sdoc`](03_software_req.sdoc) | `SWR-` + area | written |
 | 4 Software architecture | [`04_software_arch.sdoc`](04_software_arch.sdoc) | `SWA-` | written |
-| 5 Unit design | `05_unit_design.sdoc` | `SWD-` | **not written** |
+| 5 Unit design | Doxygen comments in the source, built by [`tools/udd.sh`](../tools/udd.sh) | not `SWD-`, see below | **Partial, and generated rather than written.** `firmware/supervisor/core/include/sup/trip.h`, the whole trip logic, is complete: 10 of the supervisor's 76 public functions and constants. Three headers remain (tasklist R13). The controller has none. |
 | 7 Unit tests | `07_unit_tests.sdoc` | `UT-` | **not written** |
 | 8 Software tests | `08_software_tests.sdoc` | `SWT-` | **not written** |
 | 9 Integration tests | `09_integration_tests.sdoc` | `IT-` | **not written** |

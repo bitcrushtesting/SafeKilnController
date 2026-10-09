@@ -467,6 +467,45 @@ jobs:
             build-docs/json
           if-no-files-found: error
 
+  # --- V-model level 5: the unit design, generated from the source -------
+  #
+  # The document is the gate and the gate is doxygen's warnings: an undocumented
+  # parameter or a reference to something that does not exist fails this job.
+  # The coverage number is printed because a clean doxygen run proves only that
+  # the comments which exist are well formed, and says nothing about the ones
+  # that do not (tools/udd-coverage.py has the argument).
+  udd:
+    name: Unit design document (supervisor)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install doxygen
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq doxygen graphviz
+
+      - name: Generate, with documentation warnings as errors
+        run: tools/udd.sh | tee udd.log
+
+      - name: Summarise what the document covers
+        if: always()
+        run: |
+          {
+            echo '### Unit design document'
+            echo
+            echo 'V-model level 5, generated from the supervisor headers.'
+            echo '```'
+            sed -n '/Unit design coverage/,/Tasklist/p' udd.log || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-design-document
+          path: |
+            firmware/supervisor/build-udd/html/
+            firmware/supervisor/build-udd/doxygen-warnings.txt
+
   # --- architecture 14.6: the target build ------------------------------
   firmware:
     name: Firmware build (esp32s3)

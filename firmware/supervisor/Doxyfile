@@ -1,0 +1,172 @@
+# SPDX-FileCopyrightText: 2026 Bitcrush Testing
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The supervisor's Unit Design Document, generated from the source.
+#
+#   tools/udd.sh                      build it into build-udd/
+#   doxygen firmware/supervisor/Doxyfile
+#
+# ===========================================================================
+# WHY THE UDD IS GENERATED AND NOT WRITTEN
+# ===========================================================================
+# Level 5 of the V-model (docs/v-model-process.md) wants, per unit: its
+# functions, its parameters and their value ranges, its algorithms, its state
+# machines and its error behaviour, each traceable up to the architecture and
+# down to a test.  A separate document saying all that about code is a document
+# that disagrees with the code, and the disagreement is discovered by whoever
+# is auditing rather than by whoever is editing.
+#
+# So the unit design lives in the headers, beside the thing it describes, and
+# this produces the document from it.  The traceability is the same mechanism:
+# \implements and \verifiedby below become cross-referenced index pages, so
+# "which unit realises SWR-SAF-37" and "what covers sup_step" are answerable
+# from the generated document rather than from a maintained table.
+#
+# ---------------------------------------------------------------------------
+# WHAT AN ASSESSOR IS LOOKING FOR, AND WHICH ALIAS CARRIES IT
+# ---------------------------------------------------------------------------
+# EN ISO 13849-1:2023 cl. 4.6 and EN IEC 60730-1 Annex H do not prescribe a
+# document format.  What a notified body reads a unit design for is narrower
+# than "documentation" and is always the same five questions:
+#
+#   What is this for, and what requirement makes it exist?   \implements
+#   What may I pass it, and what will it give me back?       \param, \retval,
+#                                                            \range
+#   What does it do when the input is wrong?                 \errorbehaviour
+#   Why is it like this rather than the obvious way?         \rationale
+#   How do I know it works?                                  \verifiedby
+#
+# The aliases exist so those five are answered in a fixed place per unit rather
+# than being somewhere in a paragraph, and so that a missing one is visible.
+# \rationale is the one people leave out and the one an assessor asks about
+# first on a safety function: a decision with no recorded reason has to be
+# re-derived by the person reviewing it.
+
+DOXYFILE_ENCODING      = UTF-8
+PROJECT_NAME           = "Safe Kiln Controller: Supervisor Unit Design"
+PROJECT_BRIEF          = "Level 5 of the V-model, generated from the source (SWA-22)"
+OUTPUT_DIRECTORY       = build-udd
+CREATE_SUBDIRS         = NO
+OUTPUT_LANGUAGE        = English
+
+# The supervisor is C++ written in a C shape: no templates, no classes, no
+# namespaces outside the board layer.  This output mode suits it and keeps the
+# document readable by somebody who does not write C++ for a living, which an
+# assessor may not.
+OPTIMIZE_OUTPUT_FOR_C  = YES
+
+FULL_PATH_NAMES        = YES
+STRIP_FROM_PATH        = ../..
+JAVADOC_AUTOBRIEF      = YES
+TAB_SIZE               = 4
+MARKDOWN_SUPPORT       = YES
+AUTOLINK_SUPPORT       = YES
+
+# --- the fields a unit design has to carry -------------------------------
+#
+# Each \xrefitem builds its own index page, which is what turns these from
+# comments into traceability: "Requirements implemented" lists every unit
+# against the SWR- it realises, and the reverse direction is one click.
+ALIASES += "implements=\xrefitem implements \"Implements\" \"Requirements implemented\" "
+ALIASES += "derivedfrom=\xrefitem derivedfrom \"Derived from\" \"Architecture traceability\" "
+ALIASES += "verifiedby=\xrefitem verifiedby \"Verified by\" \"Unit verification\" "
+ALIASES += "errorbehaviour=\par Error behaviour:^^"
+ALIASES += "rationale=\par Design rationale:^^"
+ALIASES += "rangeof=\par Permitted range:^^"
+ALIASES += "statemachine=\par State machine:^^"
+ALIASES += "sideeffects=\par Side effects:^^"
+ALIASES += "reentrancy=\par Reentrancy:^^"
+ALIASES += "resources=\par Resource use:^^"
+ALIASES += "safetyclass=\xrefitem safetyclass \"Safety class\" \"Safety classification\" "
+
+# --- what goes in ---------------------------------------------------------
+#
+# core/ and protocol/ are the safety function and are documented to the letter.
+# board/ and src/ are the silicon and the composition root; they are in the
+# document because a unit design that stops at the platform boundary does not
+# describe the unit that ships.
+INPUT                  = core/include \
+                         core/src \
+                         protocol/include \
+                         src \
+                         board \
+                         doc
+FILE_PATTERNS          = *.h *.cpp *.dox
+RECURSIVE              = YES
+EXCLUDE                = test
+EXCLUDE_PATTERNS       = */build/* */stm32g031.h
+USE_MDFILE_AS_MAINPAGE =
+
+# stm32g031.h is excluded deliberately: it is 4 000 generated register
+# definitions from ST's CMSIS-SVD, it is not anybody's unit design, and
+# including it would bury the four files that are.
+
+# --- extraction -----------------------------------------------------------
+#
+# EXTRACT_ALL stays NO.  With it on, every undocumented function appears in the
+# document with an empty description and the UDD looks complete while saying
+# nothing; with it off, an undocumented unit is absent and the warning below
+# says so.  That is the difference between a document and a gate.
+EXTRACT_ALL            = NO
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+EXTRACT_LOCAL_CLASSES  = YES
+HIDE_UNDOC_MEMBERS     = YES
+HIDE_UNDOC_CLASSES     = YES
+INTERNAL_DOCS          = NO
+SHOW_INCLUDE_FILES     = YES
+SHOW_USED_FILES        = YES
+SORT_MEMBER_DOCS       = NO
+SORT_BRIEF_DOCS        = NO
+
+# Source browsing is on: an assessor reading a unit design wants the code one
+# click away, and a generated document that hides it invites the question of
+# whether the two agree.
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+STRIP_CODE_COMMENTS    = NO
+REFERENCED_BY_RELATION = YES
+REFERENCES_RELATION    = YES
+VERBATIM_HEADERS       = YES
+
+# --- warnings are the gate ------------------------------------------------
+QUIET                  = YES
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_IF_INCOMPLETE_DOC = YES
+WARN_NO_PARAMDOC       = YES
+WARN_AS_ERROR          = FAIL_ON_WARNINGS
+WARN_FORMAT            = "$file:$line: $text"
+WARN_LOGFILE           = build-udd/doxygen-warnings.txt
+
+# --- output ---------------------------------------------------------------
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+HTML_COLORSTYLE        = LIGHT
+GENERATE_TREEVIEW      = YES
+DISABLE_INDEX          = NO
+FULL_SIDEBAR           = NO
+SEARCHENGINE           = YES
+
+# LaTeX is off by default because it needs a TeX installation that nothing else
+# in this project needs.  Turn it on when a PDF has to be handed over: the
+# document is the same either way, which is the point of generating it.
+GENERATE_LATEX         = NO
+GENERATE_XML           = YES
+XML_OUTPUT             = xml
+
+# XML is on so the document is machine-readable as well as human-readable: a
+# traceability check that wants to ask "is every SWR-SAF- realised by a unit"
+# reads the XML rather than scraping HTML.
+
+# --- diagrams -------------------------------------------------------------
+#
+# Graphviz is optional and HAVE_DOT is set by tools/udd.sh when dot is present,
+# so the document builds the same with or without it and nobody has to install
+# a package to read their own code.
+HAVE_DOT               = NO
+CALL_GRAPH             = NO
+CALLER_GRAPH           = NO
+INCLUDE_GRAPH          = NO
+INCLUDED_BY_GRAPH      = NO

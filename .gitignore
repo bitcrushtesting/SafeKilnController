@@ -53,6 +53,11 @@ secure_boot_digest.bin
 # firmware compiles in (SWR-UPD-11); `*.pem` above keeps the private half out.
 dist/
 
+# The generated Unit Design Document (tools/udd.sh). It is generated from the
+# headers on demand and published as a CI artifact; a copy in git would be the
+# second description of the code that generating it exists to avoid.
+firmware/supervisor/build-udd/
+
 # Python bytecode from the tools/ scripts.
 __pycache__/
 *.pyc
