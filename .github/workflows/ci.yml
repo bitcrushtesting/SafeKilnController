@@ -567,6 +567,39 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # The HARDWARE configuration, which until now nothing built. Every job
+      # above uses sdkconfig.qemu, which sets CONFIG_KILN_PLANT_SIM and
+      # compiles out the WiFi, the HTTP server and the whole hardware path in
+      # main.cpp. So the configuration that will actually ship was guarded by
+      # no build at all, and when it was first tried it did not compile: two
+      # -Wformat-truncation errors in code no CI job had ever seen.
+      #
+      # It is a build and not a test: nothing here can run it. What it buys is
+      # that the half of the firmware aimed at real hardware cannot rot
+      # unnoticed between now and the first board.
+      - name: Build the hardware configuration
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: ${{ env.IDF_VERSION }}
+          target: esp32s3
+          path: firmware/controller
+          command: |
+            idf.py -B build-hw -D SDKCONFIG=build-hw/sdkconfig -D SDKCONFIG_DEFAULTS="sdkconfig.defaults" build
+            idf.py -B build-hw size > build-hw/size.txt
+
+      - name: Summarise the hardware image size
+        if: always()
+        run: |
+          {
+            echo '### Hardware image size'
+            echo
+            echo 'The configuration with WiFi, the HTTP server and the hardware'
+            echo 'adapters, which the simulated build compiles out.'
+            echo '```'
+            head -20 firmware/controller/build-hw/size.txt || echo 'build failed'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/upload-artifact@v4
         with:
           name: firmware-esp32s3-simulated

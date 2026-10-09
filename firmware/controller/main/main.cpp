@@ -525,7 +525,13 @@ void hmi_build_view(kiln_hmi_view_t *v)
     if (s_system.fw_info != NULL) {
         (void)s_system.fw_info(s_system.ctx, &fw);
     }
-    (void)snprintf(v->version, sizeof(v->version), "%s", fw.version);
+    /* An explicit bound rather than letting snprintf cut: kiln_fw_info_t
+     * carries 32 characters and the view has 24, so a long version string
+     * loses its build metadata here. Stating the width says that is the
+     * design; "%s" into a shorter buffer reads as an accident, and GCC says
+     * so (-Wformat-truncation). */
+    (void)snprintf(v->version, sizeof(v->version), "%.*s",
+                   (int)(sizeof(v->version) - 1u), fw.version);
     v->uptime_s = (uint32_t)(esp_timer_get_time() / 1000000);
 
     /* SWR-HMI-07: where the web interface is, which is the question an operator
@@ -557,7 +563,12 @@ void hmi_build_view(kiln_hmi_view_t *v)
     }
     v->net_count = s_scan_count;
     for (uint8_t i = 0; i < s_scan_count && i < KILN_HMI_MAX_NETWORKS; i++) {
-        (void)snprintf(v->net_list_ssid[i], KILN_HMI_SSID_LEN, "%s", s_scan[i].ssid);
+        /* Bounded explicitly for the same reason, and here the compiler is
+         * making a sharper point: it cannot prove the driver NUL-terminated
+         * the SSID inside its own field, so without a width the copy could
+         * run on into the rest of the record. */
+        (void)snprintf(v->net_list_ssid[i], KILN_HMI_SSID_LEN, "%.*s",
+                       (int)(KILN_HMI_SSID_LEN - 1u), s_scan[i].ssid);
         v->net_list_rssi[i]    = s_scan[i].rssi;
         v->net_list_secured[i] = s_scan[i].secured;
     }
