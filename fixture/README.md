@@ -30,7 +30,7 @@ change is only the change.
 
 ```sh
 pip install pinside                       # or run from a checkout, see its README
-pinside check    hardware/kilncontrol.kicad_pcb --baseline fixture/pinside-baseline.json
+pinside check    hardware/safekiln.kicad_pcb --baseline fixture/pinside-baseline.json
 pinside project  fixture/kilncontrol-fixture.json --out fixture/board
 pinside generate fixture/kilncontrol-fixture.json --out fixture/firmware
 bash fixture/firmware/test/run.sh         # 128 host checks, no hardware needed

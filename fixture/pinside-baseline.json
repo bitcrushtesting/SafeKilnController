@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "board": "hardware/kilncontrol.kicad_pcb",
+  "board": "hardware/safekiln.kicad_pcb",
   "accepted": [
     {
       "code": "PS022",

@@ -14,7 +14,7 @@
     "mirror": "x"
   },
   "dut": {
-    "board": "/Users/bernhardtrinnes/Developer/Bitcrush/kilncontrol/hardware/kilncontrol.kicad_pcb",
+    "board": "/Users/bernhardtrinnes/Developer/Bitcrush/kilncontrol/hardware/safekiln.kicad_pcb",
     "logic_voltage": 3.3,
     "require_all_test_points": true
   },
