@@ -15,6 +15,7 @@
 #include "kiln_app/app.h"
 #include "kiln_core/faults.h"
 #include "kiln_core/profile.h"
+#include "kiln_core/suplink.h"
 #include "kiln_sim/sim.h"
 
 /* --- the harness -------------------------------------------------------- */
@@ -880,4 +881,202 @@ KILN_TEST(a_multi_segment_firing_completes_without_a_spurious_fault)
     CHECK_EQ_INT(r.app.state, KILN_STATE_COMPLETE);
     CHECK(r.app.record.peak_c > 750.0f);
     CHECK(kiln_current_energy_wh(&r.app.cur) > 0.0);
+}
+
+/* ===========================================================================
+ * THE SUPERVISOR LINK, END TO END  (SWA-22, tasklist R8)
+ * ===========================================================================
+ * The pieces were each tested and the chain was not. test_suplink proves that
+ * a quiet link and a stale sequence number both become KILN_TC_FAULT_COMMS;
+ * test_safety_thermal proves that bit becomes KILN_FAULT_TC_COMMS; other tests
+ * prove a latched fault withholds heat. What R8 actually asks for is the
+ * property those three add up to, and an assembly of proven parts is not a
+ * proven assembly: the chamber temperature enters this firmware at exactly one
+ * place, over a wire, and if silence on that wire does not stop the heater then
+ * nothing else in the safety argument matters.
+ *
+ * So these two run the real app with the real link bound as the chamber port,
+ * the way main.cpp binds it on the board, and watch the heater.
+ */
+
+namespace {
+
+/* The chamber port, as the product has it: a decoder fed bytes from a UART. */
+typedef struct {
+    kiln_suplink_t   link;
+    kiln_port_tc_t   tc;
+} suplink_rig_t;
+
+sup_report_t sup_rep(uint8_t seq, float c)
+{
+    sup_report_t r = {};
+    r.version     = SUP_VERSION;
+    r.seq         = seq;
+    r.chamber_dc  = (int16_t)lroundf(c * (float)SUP_DC_PER_C);
+    r.cj_dc       = (int16_t)(25 * SUP_DC_PER_C);
+    r.fault_bits  = 0u;
+    r.flags = (uint8_t)(SUP_FLAG_PERMIT | SUP_FLAG_TC_VALID | SUP_FLAG_SELFTEST_OK);
+    r.trip_reason = SUP_TRIP_NONE;
+    return r;
+}
+
+void sup_send(kiln_suplink_t *s, const sup_report_t &r)
+{
+    uint8_t f[SUP_FRAME_BYTES];
+    (void)sup_encode(&r, f, sizeof(f));
+    kiln_suplink_feed(s, f, sizeof(f));
+}
+
+/* One acquisition period's worth of link service, which on the board is the
+ * UART draining into the decoder and kiln_suplink_tick ageing it. */
+void sup_service(suplink_rig_t *sl, rig_t *r, uint8_t seq, bool speak)
+{
+    if (speak) {
+        sup_send(&sl->link, sup_rep(seq, (float)kiln_sim_temperature(&r->sim)));
+    }
+    kiln_suplink_tick(&sl->link, (float)ACQUIRE_DT);
+}
+
+} // namespace
+
+/*
+ * @relation(SWA-22, scope=function)
+ */
+KILN_TEST(swa22_silence_on_the_link_takes_the_heat_away)
+{
+    static rig_t r;
+    static suplink_rig_t sl;
+    rig_init(&r, 20.0f);
+
+    memset(&sl, 0, sizeof(sl));
+    kiln_suplink_init(&sl.link);
+    kiln_suplink_bind(&sl.link, &sl.tc);
+
+    /* Rebind the chamber port to the link, which is what the board does: the
+     * simulated plant still provides the physics, and the temperature reaches
+     * the core only by way of a frame. */
+    kiln_app_ports_t ports = {};
+    ports.tc       = &sl.tc;
+    ports.case_tc  = &r.ports.case_tc;
+    ports.heat     = &r.ports.heat;
+    ports.current  = &r.ports.current;
+    ports.counters = &r.ports.counters;
+    kiln_config_t cfg;
+    kiln_config_defaults(&cfg);
+    cfg.kp = 6.0f; cfg.ki = 0.02f; cfg.kd = 30.0f;
+    cfg.filter_tau_s = 1.0f;
+    cfg.holdback_band_c = 0.0f;
+    CHECK_OK(kiln_app_init(&r.app, &ports, &cfg));
+
+    kiln_program_t prog;
+    CHECK_OK(kiln_profile_example(0, &prog));
+
+    /* Let acquisition answer first, which over this port means letting a few
+     * frames arrive: a start is refused while the chamber has no reading, and
+     * on this device a reading is a frame. */
+    uint8_t seq = 1;
+    for (int i = 0; i < 200; i++) {
+        rig_step(&r);
+        if ((i % 25) == 0) { sup_service(&sl, &r, seq++, true); }
+    }
+    CHECK_OK(kiln_app_start(&r.app, &prog));
+
+    /* A talking link: the kiln heats. Asserted, because a test where the heat
+     * never came on would pass the interesting half for the wrong reason. */
+    for (int i = 0; i < 400; i++) {
+        rig_step(&r);
+        if ((i % 25) == 0) { sup_service(&sl, &r, seq++, true); }
+    }
+    CHECK_MSG(r.app.heat_authorised, "the kiln never started heating");
+    CHECK_EQ_INT(r.app.fault, KILN_FAULT_NONE);
+
+    /* Now the supervisor stops talking: the board is pulled, the wire breaks,
+     * the other processor hangs. Nothing announces it. */
+    bool heat_seen = false;
+    kiln_fault_t fault = KILN_FAULT_NONE;
+    for (int i = 0; i < 4000; i++) {
+        rig_step(&r);
+        if ((i % 25) == 0) { sup_service(&sl, &r, seq++, false); }
+        if (r.app.fault != KILN_FAULT_NONE) { fault = r.app.fault; break; }
+        if (r.app.heat_authorised) { heat_seen = true; }
+    }
+
+    /* SWR-SAF-04's grace, then a comms fault: not a temperature of zero, not
+     * the last reading held for ever. */
+    CHECK_EQ_INT(fault, KILN_FAULT_TC_COMMS);
+    CHECK(heat_seen);                       /* it was heating before */
+    CHECK(!r.app.heat_authorised);          /* and is not now */
+
+    /* And the contactor is open, which is the part the kiln cares about. */
+    rig_run(&r, 1.0);
+    CHECK(!kiln_sim_contactor(&r.sim));
+}
+
+/*
+ * @relation(SWA-22, scope=function)
+ */
+KILN_TEST(swa22_a_supervisor_repeating_itself_takes_the_heat_away_too)
+{
+    /* The failure that looks like health: frames keep arriving, the CRC is
+     * good, the temperature is plausible, and the sequence number never
+     * advances -- a supervisor stuck in a loop, or a transmit buffer being
+     * replayed. A link check that only counted bytes would see a healthy
+     * channel and let the kiln run on a reading from minutes ago.
+     */
+    static rig_t r;
+    static suplink_rig_t sl;
+    rig_init(&r, 20.0f);
+
+    memset(&sl, 0, sizeof(sl));
+    kiln_suplink_init(&sl.link);
+    kiln_suplink_bind(&sl.link, &sl.tc);
+
+    kiln_app_ports_t ports = {};
+    ports.tc       = &sl.tc;
+    ports.case_tc  = &r.ports.case_tc;
+    ports.heat     = &r.ports.heat;
+    ports.current  = &r.ports.current;
+    ports.counters = &r.ports.counters;
+    kiln_config_t cfg;
+    kiln_config_defaults(&cfg);
+    cfg.kp = 6.0f; cfg.ki = 0.02f; cfg.kd = 30.0f;
+    cfg.filter_tau_s = 1.0f;
+    cfg.holdback_band_c = 0.0f;
+    CHECK_OK(kiln_app_init(&r.app, &ports, &cfg));
+
+    kiln_program_t prog;
+    CHECK_OK(kiln_profile_example(0, &prog));
+    uint8_t seq = 1;
+    for (int i = 0; i < 200; i++) {
+        rig_step(&r);
+        if ((i % 25) == 0) { sup_service(&sl, &r, seq++, true); }
+    }
+    CHECK_OK(kiln_app_start(&r.app, &prog));
+    for (int i = 0; i < 400; i++) {
+        rig_step(&r);
+        if ((i % 25) == 0) { sup_service(&sl, &r, seq++, true); }
+    }
+    CHECK(r.app.heat_authorised);
+
+    /* Frames keep coming, all of them seq 9, all of them well formed. */
+    const uint8_t stuck = 9;
+    kiln_fault_t fault = KILN_FAULT_NONE;
+    const uint32_t frames_before = sl.link.frames;
+    for (int i = 0; i < 4000; i++) {
+        rig_step(&r);
+        if ((i % 25) == 0) {
+            sup_send(&sl.link, sup_rep(stuck, 600.0f));
+            kiln_suplink_tick(&sl.link, (float)ACQUIRE_DT);
+        }
+        if (r.app.fault != KILN_FAULT_NONE) { fault = r.app.fault; break; }
+    }
+
+    CHECK_EQ_INT(fault, KILN_FAULT_TC_COMMS);
+    CHECK(!r.app.heat_authorised);
+    /* Frames really were arriving throughout: this is not the silence test
+     * wearing a different hat. */
+    CHECK(sl.link.frames > frames_before + 10u);
+
+    rig_run(&r, 1.0);
+    CHECK(!kiln_sim_contactor(&r.sim));
 }
