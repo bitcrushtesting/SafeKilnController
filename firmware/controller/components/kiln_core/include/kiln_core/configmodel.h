@@ -21,7 +21,12 @@
 #include "kiln/err.h"
 #include "kiln/types.h"
 
-constexpr uint16_t KILN_CFG_SCHEMA_VERSION = 1;
+/* 2: `sense.tc_type` removed (SWR-ACQ-02, tasklist R9).  A removal in the
+ * middle of the struct shifts every field after it, so a version 1 blob cannot
+ * be read as a version 2 one; kiln_config_decode carries the splice that
+ * migrates it, and SWR-CFG-05's "older: migrate" is met rather than answered
+ * with defaults. */
+constexpr uint16_t KILN_CFG_SCHEMA_VERSION = 2;
 
 constexpr size_t KILN_CFG_STR_LEN     = 33;  /* WiFi SSID is 32 + NUL */
 constexpr size_t KILN_CFG_PASS_LEN    = 65;
@@ -108,7 +113,14 @@ typedef struct {
     float    dwell_tol_c;
 
     /* sensing */
-    uint8_t  tc_type;                    /* kiln_tc_type_t */
+    /* There is no chamber tc_type, and that is SWR-ACQ-02: the chamber front
+     * end belongs to the independent supervisor, which linearises for type K
+     * and whose backstop means nothing if this side can change that.  Removed
+     * from the schema at version 2 rather than left as an item nothing could
+     * act on -- a setting that is offered and ignored is worse than one that
+     * is absent, because an operator can set it and believe it.  The
+     * enclosure channel's type stays configurable; that channel is not in the
+     * supervisor's remit. */
     uint8_t  case_tc_type;
     uint16_t line_filter_hz;
     float    filter_tau_s;
