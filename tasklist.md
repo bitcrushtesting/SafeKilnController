@@ -651,14 +651,32 @@ weakness first, the deadline second, the sentence third, the engineering last.
   IP until mDNS is vendored deliberately. The address is on the HMI network screen, which is
   where an operator would look anyway.
 
-- [ ] **O2. The image grew by 540 kB.** WiFi takes it from 292 kB to 831 kB,
-  which is 60.4 % of the OTA slot still free, so `SWR-NFR-13` holds comfortably.
-  Worth watching once the web assets are embedded (`C9`): that budget is
-  architecture 12.4's and it has not been measured against a real asset build.
+- [ ] **O2. The hardware image is 888 kB, 57 % of the slot free.** Measured
+  2026-10-09, replacing numbers that predated several releases of ESP-IDF. The
+  simulated build that CI publishes is **246 kB** and contains no WiFi and no
+  HTTP server at all, which is worth keeping straight when reading a size
+  report: `CONFIG_KILN_PLANT_SIM` compiles both out.
 
-- [ ] **O3. Untested against a radio.** Same class as `L2`: it compiles and
-  passes analysis. Nobody has watched it associate, recover from a dropped
-  connection, or sync time.
+  `SWR-NFR-13` holds with room. The web assets measure **18 kB gzipped** in
+  total against architecture 12.4's 44 kB budget (`index.html` 2.2, `app.css`
+  3.6, `app.js` 8.6, `chart.js` 4.2), so embedding them takes the hardware
+  image to about 906 kB and 55 % free. That budget had never been measured;
+  it has now, and it passes.
+
+- [ ] **O3. Untested against a radio, and until today it did not even
+  compile.** The claim here used to be "it compiles and passes analysis", and
+  that was false in a way nothing could have caught: every CI job builds
+  `sdkconfig.qemu`, which sets `CONFIG_KILN_PLANT_SIM` and compiles the WiFi,
+  the HTTP server and the hardware path out of `main.cpp`. The configuration
+  that ships was guarded by no build at all.
+
+  Built for the first time on 2026-10-09 and it failed on two
+  `-Wformat-truncation` errors, one of them older than the WiFi work. Both are
+  fixed and CI now builds the hardware configuration on every push, so this
+  cannot recur.
+
+  What remains is what the heading says. Nobody has watched it associate,
+  recover from a dropped connection, or sync time.
 
   The WiFi setup of `O4` is in the same position and matters more, because it
   is now the **only** way credentials reach the device: a scan that returns
