@@ -16,6 +16,17 @@
  * same on every Cortex-M0+ implementation, which is why they can be written
  * down here without a vendor file to derive them from.
  */
+/**
+ * @file cortex_m0plus.h
+ * @brief Cortex-M0+ core registers used by the supervisor.
+ *
+ * @derivedfrom SWA-22.
+ *
+ * Core peripherals rather than STM32 ones: SysTick and the registers the
+ * start-up path touches. Separate from `stm32g031.h` because that file is
+ * generated from ST's CMSIS-SVD and this is the ARM core underneath it.
+ */
+
 #ifndef SUP_CORTEX_M0PLUS_H
 #define SUP_CORTEX_M0PLUS_H
 

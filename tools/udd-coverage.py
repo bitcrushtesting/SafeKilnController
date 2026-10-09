@@ -67,16 +67,53 @@ def declared(sup_dir):
     return per_file
 
 
+def missing_file_blocks(sup_dir):
+    """Input files with no \\file block, which doxygen cannot warn about.
+
+    This is the hole the doxygen settings cannot close, and it is a quiet one:
+    for a C or C++ global function to appear in the document at all, the FILE
+    has to carry a \\file block. Without one, doxygen skips the whole file,
+    members included, and says nothing. Two of this component's four headers
+    were in that state while the build was green.
+    """
+    sup = pathlib.Path(sup_dir)
+
+    # HEADERS only, and the distinction is the point. A unit design specifies
+    # units by their interface: what may be called, what may be passed, what
+    # comes back, what happens when it is wrong. The .cpp files are in the
+    # doxygen INPUT so an assessor can read the implementation one click from
+    # the specification, not so their file-static helpers acquire entries of
+    # their own; those are implementation (V-model level 6) and their contract
+    # is the header's.
+    roots = ["core/include", "protocol/include", "board"]
+    skip = {"stm32g031.h"}          # generated from ST's SVD; excluded in the Doxyfile
+    out = []
+    for root in roots:
+        base = sup / root
+        if not base.is_dir():
+            continue
+        for f in sorted(base.rglob("*.h")):
+            if f.name in skip:
+                continue
+            text = f.read_text()
+            if "\\file" not in text and "@file" not in text:
+                out.append(f.relative_to(sup))
+    return out
+
+
 def main(argv):
+    strict = "--require-complete" in argv
+    argv = [a for a in argv if a != "--require-complete"]
     if len(argv) != 3:
-        print("usage: udd-coverage.py <supervisor dir> <doxygen output dir>",
-              file=sys.stderr)
+        print("usage: udd-coverage.py [--require-complete] "
+              "<supervisor dir> <doxygen output dir>", file=sys.stderr)
         return 2
 
     have = documented_names(argv[2])
     per_file = declared(argv[1])
     public = set().union(*per_file.values()) if per_file else set()
     missing = sorted(public - have)
+    no_file_block = missing_file_blocks(argv[1])
 
     print()
     print(f"Unit design coverage: {len(public) - len(missing)} of {len(public)} "
@@ -85,11 +122,22 @@ def main(argv):
         gap = sorted(names - have)
         state = "complete" if not gap else f"{len(names) - len(gap)} of {len(names)}"
         print(f"  {str(h):<34} {state}")
+
     if missing:
         print()
-        print("  Not in the document yet: " + ", ".join(missing[:12])
+        print("  Not in the document: " + ", ".join(missing[:12])
               + (" ..." if len(missing) > 12 else ""))
-        print("  Tasklist R13.")
+    if no_file_block:
+        print()
+        print("  No \\file block, so doxygen cannot see these files at all:")
+        for f in no_file_block:
+            print(f"    {f}")
+
+    if strict and (missing or no_file_block):
+        print()
+        print("error: --require-complete, and the unit design has gaps above",
+              file=sys.stderr)
+        return 1
     return 0
 
 

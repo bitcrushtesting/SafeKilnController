@@ -101,18 +101,71 @@ USE_MDFILE_AS_MAINPAGE =
 # definitions from ST's CMSIS-SVD, it is not anybody's unit design, and
 # including it would bury the four files that are.
 
-# --- extraction -----------------------------------------------------------
+# --- the one exemption, at the hardware boundary --------------------------
 #
-# EXTRACT_ALL stays NO.  With it on, every undocumented function appears in the
-# document with an empty description and the UDD looks complete while saying
-# nothing; with it off, an undocumented unit is absent and the warning below
-# says so.  That is the difference between a document and a gate.
+# Register addresses and pin numbers, 44 of them across board/pins.h and
+# board/cortex_m0plus.h. The files stay IN the document, with their \file
+# blocks, the pin table and the compile-time proofs that no two pins share a
+# bit; what is exempted is an individual entry per register address.
+#
+# The reason is the one the board layer's .clang-tidy already gives for its own
+# exemptions: a finding inherent to the hardware boundary is exempted THERE and
+# nowhere else. The provenance of these numbers is what an assessor needs and
+# it is stated once, in the file blocks: the pinout and alternate functions
+# from STM32CubeMX's MCU database, the register bits from the CMSIS-SVD,
+# neither from anybody's recollection. Forty-four entries saying "SYST_RVR is
+# the SysTick reload register" would add no fact that the name does not.
+#
+# core/ and protocol/, which are the safety function, carry NO exemption of any
+# kind and are complete at 76 of 76.
+# The permit polarities and SUP_BIT are NOT in this list and are documented
+# individually: a polarity is the difference between permitting heat and
+# refusing it, and SUP_BIT is what the compile-time pin-map proofs are built
+# from. The exemption covers addresses and numbers, not meaning.
+# SUP_RCC_APBENR* and SUP_RCC_IOPENR* rather than SUP_RCC_*: the wider pattern
+# reached into core/ and silently removed selfcheck.h's five clock-integrity
+# constants, which are part of the safety function and are documented. Nothing
+# warned, because excluding a symbol is not the same as it being undocumented;
+# the coverage count caught it, which is the second time that number has earned
+# its place.
+EXCLUDE_SYMBOLS        = SYST_* SUP_PIN_* SUP_PORT* SUP_SYSCLK_HZ \
+                         SUP_AF_* SUP_RCC_APBENR* SUP_RCC_IOPENR* \
+                         SUP_PERMIT_GPIO_*
+
+# --- extraction: the half of the gate doxygen can enforce ------------------
+#
+# These four values are the only combination that makes an undocumented
+# function fail the build, which was established by experiment rather than by
+# reading, because the interaction is not obvious and two of the four
+# combinations are silent:
+#
+#   EXTRACT_ALL   HIDE_UNDOC_MEMBERS   undocumented function
+#   NO            YES                  SILENT, the member is simply dropped
+#   NO            NO                   WARNS           <-- what is set here
+#   YES           YES                  silent: doxygen disables the warning
+#   YES           NO                   silent, same reason
+#
+# EXTRACT_ALL = YES is the trap: it looks like "document everything" and it
+# switches WARN_IF_UNDOCUMENTED off, so the document fills with empty entries
+# and the build stays green. For a safety target that is the worst of the four.
+#
+# HIDE_UNDOC_MEMBERS = NO is what makes the difference, and it has a visible
+# cost: an undocumented member appears in the document as a bare declaration.
+# That is the right cost. A gap you can see in the output is a gap somebody
+# fixes; a member silently dropped is a unit design that looks finished.
+#
+# WHAT NEITHER SETTING CAN CATCH, and the reason tools/udd-coverage.py exists:
+# a file with no \file block at all is invisible to doxygen entirely, members
+# and all, with no warning of any kind. Two of this component's four headers
+# were in exactly that state while the build was green. Checking that every
+# input file carries a \file block is not something doxygen will do, so the
+# script does it.
 EXTRACT_ALL            = NO
 EXTRACT_PRIVATE        = NO
 EXTRACT_STATIC         = YES
 EXTRACT_LOCAL_CLASSES  = YES
-HIDE_UNDOC_MEMBERS     = YES
-HIDE_UNDOC_CLASSES     = YES
+HIDE_UNDOC_MEMBERS     = NO
+HIDE_UNDOC_CLASSES     = NO
 INTERNAL_DOCS          = NO
 SHOW_INCLUDE_FILES     = YES
 SHOW_USED_FILES        = YES
@@ -132,6 +185,17 @@ VERBATIM_HEADERS       = YES
 # --- warnings are the gate ------------------------------------------------
 QUIET                  = YES
 WARNINGS               = YES
+# Every one of these is on, and each catches a different way a unit design can
+# be incomplete:
+#
+#   WARN_IF_UNDOCUMENTED   a function, struct or constant with nothing said
+#   WARN_IF_DOC_ERROR      a comment that does not mean what it looks like
+#   WARN_IF_INCOMPLETE_DOC a documented function missing some of its parameters
+#   WARN_NO_PARAMDOC       ... or missing all of them
+#
+# FAIL_ON_WARNINGS rather than YES: it finishes the run and reports everything,
+# then fails. YES stops at the first, which turns documenting a component into
+# as many build cycles as it has gaps.
 WARN_IF_UNDOCUMENTED   = YES
 WARN_IF_DOC_ERROR      = YES
 WARN_IF_INCOMPLETE_DOC = YES
