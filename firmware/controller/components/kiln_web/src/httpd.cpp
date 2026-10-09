@@ -23,6 +23,20 @@
  * Neither is load-bearing alone and both are cheap.
  *
  * ---------------------------------------------------------------------------
+ * The interface itself (SWA-11, SWR-WEB-02)
+ * ---------------------------------------------------------------------------
+ * The four browser assets are gzipped into the image by this component's
+ * CMakeLists and served from flash, which is what SWR-WEB-02 means by every
+ * asset coming from the device: no CDN, no external font, nothing that
+ * reaches off the box, and the interface works on a network with no route to
+ * anywhere.
+ *
+ * They are served **still compressed**, with Content-Encoding: gzip. Every
+ * browser that can run this interface can inflate it, and doing it on the
+ * device would cost a window buffer per request on the processor that is also
+ * running a kiln.
+ *
+ * ---------------------------------------------------------------------------
  * SWR-NFR-02: this must not delay a control cycle
  * ---------------------------------------------------------------------------
  * The server runs on core 0 with the rest of the UI (SWA-15), at a priority
@@ -53,6 +67,67 @@ typedef struct {
 static httpd_ctx_t s_http;
 
 /* --- helpers ------------------------------------------------------------ */
+
+/* --- the embedded interface --------------------------------------------
+ *
+ * The symbol names are the ones the build generates for an embedded binary:
+ * _binary_<file with dots as underscores>_gz_start and _end.  Declared here
+ * rather than generated into a header because there are four of them and a
+ * generator for four lines would be the more complicated answer.
+ */
+#define KILN_ASSET(sym)                                     \
+    extern const uint8_t sym##_start[] asm("_" #sym "_start"); \
+    extern const uint8_t sym##_end[]   asm("_" #sym "_end")
+
+KILN_ASSET(binary_index_html_gz);
+KILN_ASSET(binary_app_css_gz);
+KILN_ASSET(binary_app_js_gz);
+KILN_ASSET(binary_chart_js_gz);
+
+typedef struct {
+    const char    *path;
+    const char    *type;
+    const uint8_t *start;
+    const uint8_t *end;
+} asset_t;
+
+static const asset_t k_assets[] = {
+    /* "/" first: it is the one every browser asks for. */
+    { "/",          "text/html",       binary_index_html_gz_start, binary_index_html_gz_end },
+    { "/index.html","text/html",       binary_index_html_gz_start, binary_index_html_gz_end },
+    { "/app.css",   "text/css",        binary_app_css_gz_start,    binary_app_css_gz_end },
+    { "/app.js",    "text/javascript", binary_app_js_gz_start,     binary_app_js_gz_end },
+    { "/chart.js",  "text/javascript", binary_chart_js_gz_start,   binary_chart_js_gz_end },
+};
+
+/* The asset for this exact path, or NULL.
+ *
+ * An exact match and no path walking of any kind: there is no filesystem
+ * behind this and no directory to escape from, so ".." is not special, it
+ * simply matches nothing. */
+static const asset_t *find_asset(const char *path)
+{
+    for (size_t i = 0; i < sizeof(k_assets) / sizeof(k_assets[0]); i++) {
+        if (strcmp(path, k_assets[i].path) == 0) {
+            return &k_assets[i];
+        }
+    }
+    return NULL;
+}
+
+static esp_err_t send_asset(httpd_req_t *req, const asset_t *a)
+{
+    const size_t len = (size_t)(a->end - a->start);
+    (void)httpd_resp_set_type(req, a->type);
+    (void)httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    /* The assets change only when the firmware does, and a firmware update
+     * changes every one of them at once, so a browser holding a stale pair of
+     * app.js and index.html is the failure to avoid. no-cache means
+     * revalidate, not "do not store": the 304 costs nothing on a LAN and the
+     * pair can never be mismatched. */
+    (void)httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    return httpd_resp_send(req, (const char *)a->start, (ssize_t)len);
+}
 
 static const char *status_line(int code)
 {
@@ -122,6 +197,16 @@ static esp_err_t handle_any(httpd_req_t *req)
     }
     memcpy(uri, req->uri, uri_len + 1u);
     const char *query = split_query(uri);
+
+    /* The interface before the API, and only on an exact match: every path
+     * that is not one of the four assets falls through to the route table,
+     * which answers the API routes and produces the 404 for anything else. */
+    if (strncmp(uri, "/api/", 5) != 0) {
+        const asset_t *a = find_asset(uri);
+        if (a != NULL) {
+            return send_asset(req, a);
+        }
+    }
 
     kiln_api_req_t ar = {};
     ar.method = to_kiln_method((int)req->method);
@@ -222,6 +307,12 @@ kiln_err_t kiln_httpd_start(kiln_api_ctx_t *api)
 
     ESP_LOGI(TAG, "listening on port %u, GET only (SWR-WEB-26)",
              (unsigned)cfg.server_port);
+    ESP_LOGI(TAG, "interface: %u bytes gzipped across %u assets",
+             (unsigned)((binary_index_html_gz_end - binary_index_html_gz_start) +
+                        (binary_app_css_gz_end    - binary_app_css_gz_start) +
+                        (binary_app_js_gz_end     - binary_app_js_gz_start) +
+                        (binary_chart_js_gz_end   - binary_chart_js_gz_start)),
+             (unsigned)(sizeof(k_assets) / sizeof(k_assets[0])));
     return KILN_OK;
 }
 

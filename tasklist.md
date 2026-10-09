@@ -35,7 +35,7 @@ reused: gaps in the numbering are items that have been closed.
 | | | Open |
 |---|---|---|
 | [A](#a-schematic-and-pcb) | Schematic and PCB | 22 |
-| [C](#c-build-test-and-ci-infrastructure) | Build, test and CI | 8 |
+| [C](#c-build-test-and-ci-infrastructure) | Build, test and CI | 7 |
 | [D](#d-documentation-and-open-questions) | Documentation and open questions | 2 |
 | [F](#f-static-analysis) | Static analysis | 2 |
 | [G](#g-door-interlock-sr-31) | Door interlock | 3 |
@@ -47,7 +47,7 @@ reused: gaps in the numbering are items that have been closed.
 | [M](#m-kiln_hmi-the-local-interface) | `kiln_hmi` | 3 |
 | [N](#n-security-obligations-and-the-cyber-resilience-act) | Security obligations and the CRA | 5 |
 | [O](#o-wifi-fr-net) | WiFi | 4 |
-| [P](#p-http-transport-and-the-api) | HTTP transport and the API | 4 |
+| [P](#p-http-transport-and-the-api) | HTTP transport and the API | 3 |
 | [Q](#q-the-file-store-ad-21) | The file store | 5 |
 | [R](#r-the-independent-safety-supervisor-ad-22) | Independent safety supervisor | 6 |
 
@@ -235,11 +235,6 @@ reused: gaps in the numbering are items that have been closed.
 
 - [ ] **C7. `tools/logdump`.** Decode a log partition dump to CSV, also the
   cross-check for the `logrec` codec.
-
-- [ ] **C9. Vendor the web assets into the firmware.** `web/` is no longer empty:
-  it carries the UI, read-only and translated. What is missing is the build step
-  that gzips it into `kiln_web/assets` so `SWA-11` holds and the assets ship
-  inside the image, within the budget of architecture §12.4.
 
 - [ ] **C11. `main.cpp` and `httpd.cpp` are analysed by nothing.** Found while
   starting section P. `tools/tidy.sh` drives from the host compile database,
@@ -713,12 +708,6 @@ weakness first, the deadline second, the sentence third, the engineering last.
 ---
 
 ## P. HTTP transport and the API
-
-- [ ] **P1. The UI is not served.** The transport answers `/api/*` and nothing
-  else: `C9`'s asset embedding is not done, so there is no `index.html` in the
-  image and a browser at the device's address gets a 404. The API is usable
-  with `curl` today. `SWA-11` wants the assets gzipped into the image, which
-  also needs the budget of architecture 12.4 measured for the first time.
 
 - [ ] **P2. Server-Sent Events are not implemented.** `SWR-WEB-05` wants live
   values pushed at least once a second, and `kiln_api_telemetry_event()` is
