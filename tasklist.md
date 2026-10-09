@@ -297,27 +297,36 @@ reused: gaps in the numbering are items that have been closed.
   autotune is enforced; 100 % of safety decision branches (`SWR-TST-19`) is not.
   Branch coverage was around 83 % when last measured.
 
-- [ ] **C14. The QEMU smoke test gets a log with no device output in it.** The
-  job has never passed. Its log ends at QEMU's own launch banner and carries
-  nothing from the target, so all six assertions fail for one reason and none
-  of those reasons is the firmware.
+- [ ] **C14. The QEMU smoke test has no QEMU.** Diagnosed 2026-10-09, not yet
+  fixed. The job has never passed, and the reason was never the firmware:
 
-  **Not reproducible off CI.** The same commands on a developer machine with
-  ESP-IDF v6.0.1 and the QEMU that `idf_tools` installs produce 20 kB of ROM
-  output and telemetry, with every assertion's pattern present, and they still
-  do when the run is killed with `SIGKILL` and when stdin is `/dev/null`. So
-  neither output buffering nor the missing tty explains it, and both of those
-  were the obvious suspects.
+      --- qemu: NOT ON PATH ---
+      qemu-system-xtensa: command not found
+      --- idf.py qemu exited 127 after 71 bytes ---
 
-  The job now prints which `qemu-system-xtensa` it found, what version it
-  reports, the exit status of `idf.py qemu` (previously swallowed by `|| true`)
-  and the byte count of the log. The next red run should say which of "QEMU
-  exited at once" and "QEMU ran for three minutes in silence" is happening,
-  which is the fork this has been stuck on.
+  `|| true` had been swallowing exit 127 since the job was written, so a
+  missing emulator looked like an empty log. Three plausible explanations were
+  eliminated by experiment first, and all three were irrelevant: the same
+  commands on a developer machine produce 20 kB of ROM output and telemetry,
+  and still do under `SIGKILL` and with stdin closed, so neither buffering nor
+  the missing tty was ever involved.
 
-  Worth considering if that does not settle it: run `qemu-system-xtensa`
-  directly rather than through `idf.py qemu`, so the invocation is the job's
-  own and its stderr is not somebody else's wrapper.
+  `idf_tools.py install qemu-xtensa` installs it and `export.sh` does not put
+  it on PATH in that image. The step now searches `IDF_TOOLS_PATH` for the
+  binary and fails loudly when there is none, and on the run after that change
+  it still reported NOT ON PATH, so the search is looking in the wrong place or
+  the install puts it somewhere else again. What to try next, in order:
+
+  1. `python "$IDF_PATH/tools/idf_tools.py" export --format key-value` and
+     `eval` it, which is the documented way and does not guess at a layout.
+  2. Print `IDF_TOOLS_PATH` and `find / -name qemu-system-xtensa` once, to see
+     where the install actually put it.
+  3. Invoke `qemu-system-xtensa` directly rather than through `idf.py qemu`, so
+     the command line is the job's own and its stderr is not somebody else's
+     wrapper.
+
+  The lesson is worth more than the fix: the step was diagnosed by making it
+  say what it was doing, after guessing better had failed twice.
 
 ---
 
