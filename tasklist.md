@@ -646,17 +646,20 @@ weakness first, the deadline second, the sentence third, the engineering last.
 
 ## O. WiFi, FR-NET
 
-- [ ] **O2. The hardware image is 940 kB, 54 % of the slot free.** Measured
-  2026-10-09, replacing numbers that predated several releases of ESP-IDF. The
+- [x] **O2. The hardware image is 945 kB, 54 % of the slot free.** A record
+  rather than a task, re-measured 2026-10-10 after mDNS, the embedded assets,
+  the event stream and the German strings all landed: 0xec520 bytes against a
+  2 MB slot. The
   simulated build that CI publishes is **246 kB** and contains no WiFi and no
   HTTP server at all, which is worth keeping straight when reading a size
   report: `CONFIG_KILN_PLANT_SIM` compiles both out.
 
   `SWR-NFR-13` holds with room. The web assets measure **18 kB gzipped** in
   total against architecture 12.4's 44 kB budget (`index.html` 2.2, `app.css`
-  3.6, `app.js` 8.6, `chart.js` 4.2). With them embedded and mDNS linked in,
-  the hardware image measures **940 kB, 54 % of the slot free**. That budget
-  had never been measured; it has now, and it passes.
+  3.6, `app.js` 8.6, `chart.js` 4.2). That budget had never been measured; it
+  has now, and it passes. Of the growth since 888 kB, mDNS is 32 kB and the
+  assets 18 kB; the rest is the event stream, the string table and the
+  supervisor link.
 
 - [ ] **O3. Untested against a radio, and until today it did not even
   compile.** The claim here used to be "it compiles and passes analysis", and
@@ -681,8 +684,9 @@ weakness first, the deadline second, the sentence third, the engineering last.
   containing symbols, power-cycle and confirm it comes back, then join a
   different network to confirm it replaces rather than accumulates.
 
-- [ ] **O4. The provisioning AP is gone; WiFi is set up at the display.**
-  Done in firmware and unproven on hardware. `SWR-NET-02` and `SWR-NET-05` are
+- [x] **O4. The provisioning AP is gone; WiFi is set up at the display.**
+  Done in firmware and unproven on hardware, which is `O3`'s session rather
+  than a task of its own. `SWR-NET-02` and `SWR-NET-05` are
   withdrawn, `SWR-NET-11` and `SWR-NET-12` replace them, `net.ap_ssid` and
   `net.ap_pass` leave the schema, and `TH-11`, `SRR-08` and `OQ-S4` close with
   them: the surface is deleted rather than regulated.
@@ -879,9 +883,12 @@ weakness first, the deadline second, the sentence third, the engineering last.
 
 ## R. The independent safety supervisor, SWA-22
 
-Designed in [`docs/safety-supervisor.md`](docs/safety-supervisor.md). Nothing
-below can start until `R1` to `R4` are answered, because each of them changes
-either the supervisor's pin count or a requirement.
+Designed in [`docs/safety-supervisor.md`](docs/safety-supervisor.md). That
+intro said nothing below could start until `R1` to `R4` were answered, because
+each of them changed the supervisor's pin count or a requirement. They are
+answered, and the firmware, the requirement deltas and the link tests are done:
+what is left in this section is **hardware**, which is `R6` the schematic and
+`R11` the button on the panel.
 
 - [x] **R9. `sense.tc_type` is retired. Done 2026-10-10.** The chamber front
   end belongs to the supervisor, which linearises for type K, so an item that
@@ -996,19 +1003,6 @@ either the supervisor's pin count or a requirement.
   flashable on its own. And on the ESP32 side the link lands on
   `KILN_PIN_EXP_IO2` or `KILN_PIN_EXP_IO42`, one pin, receive only; `UART0` is
   the console and must not be used.
-
-- [ ] **R7. Remove what the supervisor supersedes.** `Q5`, `Q6` and `R28` to
-  `R31` of section K, and `SYS-HW-24` rewritten rather than deleted, because the
-  property it reached for is now delivered differently. Keep the lid's series
-  contact (`SYS-HW-21`): it depends on no firmware at all and costs nothing. `K1`
-  is answered by this change and `K2` dissolves, the enclosure channel not
-  being in the supervisor's remit.
-
-  The lid is likewise not in it. Its switch breaks the coil in hardware, which
-  is already safe without firmware, and `SWR-SAF-31`'s latch is gated on a heating
-  state only the ESP32 knows; a supervisor latching on it regardless would trip
-  on every cold load. So `SWR-SAF-31` and `SYS-HW-21` are unchanged, the lid sense stays
-  on the ESP32, and `Q5`'s branch is the only one section K loses.
 
 - [x] **R8. The supervisor's firmware and its test strategy. Done 2026-10-10.**
   The firmware is 3 488 bytes of program memory across four source files, which
