@@ -24,7 +24,7 @@ reused: gaps in the numbering are items that have been closed.
 
 | | |
 |---|---|
-| **Firmware logic** | Complete and tested. C++20, 398 host tests green plain and under ASan/UBSan, `clang-tidy` clean on host, target and webhost with no suppressions baseline, `esp32s3` builds with zero warnings at 246 kB (88 % of the OTA slot free). QEMU boots the image and fires it **on a developer machine**; the CI job that asserts the same thing gets a log with no device output in it and has never passed (`C14`). |
+| **Firmware logic** | Complete and tested. C++20, 398 host tests green plain and under ASan/UBSan, `clang-tidy` clean on host, target and webhost with no suppressions baseline, `esp32s3` builds with zero warnings at 246 kB (88 % of the OTA slot free). QEMU boots the image and fires it, on a developer machine and in CI: `tools/qemu-smoke.sh` runs it for 180 s and asserts seven things, ending with the simulated kiln passing 100 degC without latching a fault. |
 | **Firmware on hardware** | 15 of 16 ports are wired on the target. Only `update` has nothing behind it (`H2`). **None of it has been run against real hardware** (`L2`, `O3`, `P4`, `M3`). |
 | **Schematic** | ERC clean apart from one known `SDO` false positive (`A11`). Carries the lid interlock and the thermocouple-fault interlock. Does not carry the phase strap (`HR-22`) or the second and third CT inputs (`HR-23`). |
 | **PCB** | Updated from the schematic and placement started. **Not routed at all** (`A23`, `K4`). |
@@ -35,7 +35,7 @@ reused: gaps in the numbering are items that have been closed.
 | | | Open |
 |---|---|---|
 | [A](#a-schematic-and-pcb) | Schematic and PCB | 22 |
-| [C](#c-build-test-and-ci-infrastructure) | Build, test and CI | 9 |
+| [C](#c-build-test-and-ci-infrastructure) | Build, test and CI | 8 |
 | [D](#d-documentation-and-open-questions) | Documentation and open questions | 2 |
 | [F](#f-static-analysis) | Static analysis | 2 |
 | [G](#g-door-interlock-sr-31) | Door interlock | 3 |
@@ -296,37 +296,6 @@ reused: gaps in the numbering are items that have been closed.
 - [ ] **C10. Coverage gate.** 90 % lines on control, safety, setpoint, program and
   autotune is enforced; 100 % of safety decision branches (`SWR-TST-19`) is not.
   Branch coverage was around 83 % when last measured.
-
-- [ ] **C14. The QEMU smoke test has no QEMU.** Diagnosed 2026-10-09, not yet
-  fixed. The job has never passed, and the reason was never the firmware:
-
-      --- qemu: NOT ON PATH ---
-      qemu-system-xtensa: command not found
-      --- idf.py qemu exited 127 after 71 bytes ---
-
-  `|| true` had been swallowing exit 127 since the job was written, so a
-  missing emulator looked like an empty log. Three plausible explanations were
-  eliminated by experiment first, and all three were irrelevant: the same
-  commands on a developer machine produce 20 kB of ROM output and telemetry,
-  and still do under `SIGKILL` and with stdin closed, so neither buffering nor
-  the missing tty was ever involved.
-
-  `idf_tools.py install qemu-xtensa` installs it and `export.sh` does not put
-  it on PATH in that image. The step now searches `IDF_TOOLS_PATH` for the
-  binary and fails loudly when there is none, and on the run after that change
-  it still reported NOT ON PATH, so the search is looking in the wrong place or
-  the install puts it somewhere else again. What to try next, in order:
-
-  1. `python "$IDF_PATH/tools/idf_tools.py" export --format key-value` and
-     `eval` it, which is the documented way and does not guess at a layout.
-  2. Print `IDF_TOOLS_PATH` and `find / -name qemu-system-xtensa` once, to see
-     where the install actually put it.
-  3. Invoke `qemu-system-xtensa` directly rather than through `idf.py qemu`, so
-     the command line is the job's own and its stderr is not somebody else's
-     wrapper.
-
-  The lesson is worth more than the fix: the step was diagnosed by making it
-  say what it was doing, after guessing better had failed twice.
 
 ---
 

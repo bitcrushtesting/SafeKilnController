@@ -1,0 +1,1085 @@
+Adding "qemu"'s dependency "all" to list of commands with default set of options.
+Executing action: all (aliases: build)
+Running ninja in directory /Users/bernhardtrinnes/Developer/Bitcrush/kilncontrol/firmware/controller/build
+Executing "ninja all"...
+[1/4] cd /Users/bernhardtrinnes/Developer/Bitcrush/kilncontrol/firmware/controller/build && /Users/bernhardtrinnes/.espressif/tools/python/v6.0.1/venv/bin/python /Users/bernhardtrinnes/.espressif/v6.0.1/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 partition --type app /Users/bernhardtrinnes/Developer/Bitcrush/kilncontrol/firmware/controller/build/partition_table/partition-table.bin /Users/bernhardtrinnes/Developer/Bitcrush/kilncontrol/firmware/controller/build/safekiln.bin
+safekiln.bin binary size 0x3d8d0 bytes. Smallest app partition is 0x200000 bytes. 0x1c2730 bytes (88%) free.
+[2/4] Performing build step for 'bootloader'
+[1/1] cd /Users/bernhardtrinnes/Developer/Bitcrush/kilncontrol/firmware/controller/build/bootloader && /Users/bernhardtrinnes/.espressif/tools/python/v6.0.1/venv/bin/python /Users/bernhardtrinnes/.espressif/v6.0.1/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x0 /Users/bernhardtrinnes/Developer/Bitcrush/kilncontrol/firmware/controller/build/bootloader/bootloader.bin
+Bootloader binary size 0x5290 bytes. 0x2d70 bytes (35%) free.
+[3/4] No install step for 'bootloader'
+[4/4] Completed 'bootloader'
+[0;33mGenerating flash image: /Users/bernhardtrinnes/Developer/Bitcrush/kilncontrol/firmware/controller/build/qemu_flash.bin[0m
+esptool --chip=esp32s3 merge-bin --output=/Users/bernhardtrinnes/Developer/Bitcrush/kilncontrol/firmware/controller/build/qemu_flash.bin --pad-to-size=8MB --flash-mode dio --flash-freq 80m --flash-size 8MB 0x0 bootloader/bootloader.bin 0x8000 partition_table/partition-table.bin 0xf000 ota_data_initial.bin 0x20000 safekiln.bin
+esptool v5.3.dev2
+SHA digest in image updated.
+Wrote 0x800000 bytes to file '/Users/bernhardtrinnes/Developer/Bitcrush/kilncontrol/firmware/controller/build/qemu_flash.bin', ready to flash to offset 0x0.
+[0;33mUsing existing efuse image: /Users/bernhardtrinnes/Developer/Bitcrush/kilncontrol/firmware/controller/build/qemu_efuse.bin[0m
+[0;33mRunning qemu (fg): qemu-system-xtensa -M esp32s3 -m 32M -drive file=/Users/bernhardtrinnes/Developer/Bitcrush/kilncontrol/firmware/controller/build/qemu_flash.bin,if=mtd,format=raw -drive file=/Users/bernhardtrinnes/Developer/Bitcrush/kilncontrol/firmware/controller/build/qemu_efuse.bin,if=none,format=raw,id=efuse -global driver=nvram.esp32s3.efuse,property=drive,value=efuse -global driver=timer.esp32s3.timg,property=wdt_disable,value=true -nic user,model=open_eth -nographic -serial mon:stdio[0m
+Adding SPI flash device
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x1 (POWERON),boot:0x4 (SPI_FLASH_BOOT)
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x14f0
+load:0x403c8700,len:0xda0
+load:0x403cb700,len:0x2fa0
+entry 0x403c8908
+I (12) boot: ESP-IDF v6.0.1 2nd stage bootloader
+I (13) boot: compile time Oct  9 2026 13:58:13
+I (13) boot: Multicore bootloader
+I (15) boot: chip revision: v0.3
+I (15) boot: efuse block revision: v0.0
+I (15) boot.esp32s3: Boot SPI Speed : 80MHz
+I (15) boot.esp32s3: SPI Mode       : SLOW READ
+I (15) boot.esp32s3: SPI Flash Size : 8MB
+I (16) boot: Enabling RNG early entropy source...
+I (19) boot: Partition Table:
+I (19) boot: ## Label            Usage          Type ST Offset   Length
+I (19) boot:  0 nvs              WiFi data        01 02 00009000 00006000
+I (19) boot:  1 otadata          OTA data         01 00 0000f000 00002000
+I (19) boot:  2 phy_init         RF data          01 01 00011000 00001000
+I (19) boot:  3 ota_0            OTA app          00 10 00020000 00200000
+I (20) boot:  4 ota_1            OTA app          00 11 00220000 00200000
+I (20) boot:  5 kilnfs           unknown          40 01 00420000 00080000
+I (20) boot:  6 kilnlog          unknown          40 00 004a0000 00200000
+I (20) boot:  7 prod             WiFi data        01 02 006a0000 00004000
+I (20) boot: End of partition table
+I (21) boot: No factory image, trying OTA 0
+I (21) esp_image: segment 0: paddr=00020020 vaddr=3c020020 size=10434h ( 66612) map
+I (25) esp_image: segment 1: paddr=0003045c vaddr=3fc8fd00 size=03058h ( 12376) load
+I (27) esp_image: segment 2: paddr=000334bc vaddr=40374000 size=0bcb8h ( 48312) load
+I (29) esp_image: segment 3: paddr=0003f17c vaddr=50000000 size=00024h (    36) load
+I (30) esp_image: segment 4: paddr=0003f1a8 vaddr=00000000 size=00e70h (  3696) 
+I (30) esp_image: segment 5: paddr=00040020 vaddr=42000020 size=1d888h (120968) map
+I (37) boot: Loaded app from partition at offset 0x20000
+I (38) boot: Set actual ota_seq=1 in otadata[0]
+I (38) boot: Disabling RNG early entropy source...
+W (93) rtcinit: o_code calibration fail
+
+I (49) cpu_start: Multicore app
+I (58) cpu_start: GPIO 44 and 43 are used as console UART I/O pins
+I (59) cpu_start: Pro cpu start user code
+I (59) cpu_start: cpu freq: 160000000 Hz
+I (59) app_init: Application information:
+I (59) app_init: Project name:     safekiln
+I (59) app_init: App version:      0.0.0+c767f2e.dirty
+I (59) app_init: Compile time:     Oct  9 2026 13:58:11
+I (59) app_init: ELF file SHA256:  356e279a2...
+I (59) app_init: ESP-IDF:          v6.0.1
+I (59) efuse_init: Min chip rev:     v0.0
+I (59) efuse_init: Max chip rev:     v0.99 
+I (59) efuse_init: Chip rev:         v0.3
+I (59) heap_init: Initializing. RAM available for dynamic allocation:
+I (60) heap_init: At 3FC9BA80 len 0004DC90 (311 KiB): RAM
+I (60) heap_init: At 3FCE9710 len 00005724 (21 KiB): RAM
+I (60) heap_init: At 3FCF0000 len 00008000 (32 KiB): DRAM
+I (60) heap_init: At 600FE000 len 00001FE8 (7 KiB): RTCRAM
+I (61) spi_flash: detected chip: gd
+I (61) spi_flash: flash io: dio
+I (62) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (62) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (63) main_task: Started on CPU0
+I (66) main_task: Calling app_main()
+W (76) hal_prod: `prod` present but not programmed (ESP_ERR_NVS_NOT_FOUND)
+I (76) kiln: Safe Kiln Controller 0.0.0+c767f2e.dirty (rev c767f2e.dirty, Oct  9 2026 13:58:11, IDF v6.0.1) on esp32s3
+W (76) kiln: unit has no production data; see tools/prod-data.py
+I (77) kiln: reset cause 1
+I (83) hal_flash: partition 'kilnlog': 2097152 bytes at 0x4a0000, 4096 byte sectors
+I (124) kiln: log: 0 records stored of 104448 (290 h at 10 s), 512 sectors
+I (124) hal_flash: partition 'kilnfs': 524288 bytes at 0x420000, 4096 byte sectors
+I (135) kiln: file store: 0 of 64 regions used
+W (135) kiln: SIMULATED PLANT: no hardware output is driven. time acceleration 60x
+
+  s  start the example program      a  abort
+  p  pause                          r  resume
+  c  clear the latched fault        m  manual 50% duty
+  i  idle
+  Fault injection (toggle):
+   d  door switch open (SWR-SAF-31)     D  no interlock fitted (warn 113)
+   1  relay fail-on (SWR-SAF-25/SWR-SAF-27)   2  relay fail-off (SWR-SAF-26)
+   3  welded contactor (SWR-SAF-27)      4  partial element loss (SWR-SAF-28)
+   5  over-current (SWR-SAF-29)          6  CT disconnected (SWR-CUR-11)
+   7  SSR shorted (SWR-SAF-08/SWR-SAF-25)     8  thermocouple open (SWR-SAF-04)
+   9  thermocouple stuck (SWR-SAF-06)    0  lid open (SWR-SAF-07)
+   x  clear all injections          h  this help
+
+E (241) uart: uart_read_bytes(1731): uart driver error
+E (491) uart: uart_read_bytes(1731): uart driver error
+E (742) uart: uart_read_bytes(1731): uart driver error
+E (992) uart: uart_read_bytes(1731): uart driver error
+[IDLE  ]    19.9 degC  sp     0.0  rate    +2.9 degC/h  duty    0  I  0.12 A L~    ref  0.00  seg 1/0
+    log: 0 records, 0 sectors erased, 0 dropped, 0 errors
+E (1241) uart: uart_read_bytes(1731): uart driver error
+I (1251) kiln: started "Glaze cone 6": 5 segments, peak 1222 degC
+I (1253) main_task: Returned from app_main()
+E (1492) uart: uart_read_bytes(1731): uart driver error
+E (1742) uart: uart_read_bytes(1731): uart driver error
+E (1992) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    20.0 degC  sp    19.7  rate    -2.1 degC/h  duty    0  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 1 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (2241) uart: uart_read_bytes(1731): uart driver error
+E (2492) uart: uart_read_bytes(1731): uart driver error
+E (2741) uart: uart_read_bytes(1731): uart driver error
+E (2993) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    20.1 degC  sp    21.3  rate    +9.6 degC/h  duty   21  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 4 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (3241) uart: uart_read_bytes(1731): uart driver error
+E (3492) uart: uart_read_bytes(1731): uart driver error
+E (3743) uart: uart_read_bytes(1731): uart driver error
+E (3991) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    20.5 degC  sp    23.0  rate    +5.8 degC/h  duty   54  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 5 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (4241) uart: uart_read_bytes(1731): uart driver error
+E (4491) uart: uart_read_bytes(1731): uart driver error
+E (4741) uart: uart_read_bytes(1731): uart driver error
+E (4993) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    21.0 degC  sp    24.7  rate   +35.6 degC/h  duty   79  I  0.11 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 6 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (5242) uart: uart_read_bytes(1731): uart driver error
+E (5492) uart: uart_read_bytes(1731): uart driver error
+E (5741) uart: uart_read_bytes(1731): uart driver error
+E (5991) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    23.5 degC  sp    26.3  rate   +88.7 degC/h  duty   98  I  0.11 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 7 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (6241) uart: uart_read_bytes(1731): uart driver error
+E (6491) uart: uart_read_bytes(1731): uart driver error
+E (6741) uart: uart_read_bytes(1731): uart driver error
+E (6992) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    26.6 degC  sp    28.0  rate  +167.4 degC/h  duty   74  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 8 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (7241) uart: uart_read_bytes(1731): uart driver error
+E (7491) uart: uart_read_bytes(1731): uart driver error
+E (7741) uart: uart_read_bytes(1731): uart driver error
+E (7992) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    29.6 degC  sp    29.7  rate  +185.0 degC/h  duty   58  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 9 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (8242) uart: uart_read_bytes(1731): uart driver error
+E (8492) uart: uart_read_bytes(1731): uart driver error
+E (8743) uart: uart_read_bytes(1731): uart driver error
+E (8991) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    32.3 degC  sp    31.3  rate  +169.4 degC/h  duty   41  I  0.11 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 10 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (9241) uart: uart_read_bytes(1731): uart driver error
+E (9492) uart: uart_read_bytes(1731): uart driver error
+E (9741) uart: uart_read_bytes(1731): uart driver error
+E (9993) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    33.7 degC  sp    33.0  rate  +135.0 degC/h  duty   38  I  0.12 A L     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 11 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (10242) uart: uart_read_bytes(1731): uart driver error
+E (10492) uart: uart_read_bytes(1731): uart driver error
+E (10741) uart: uart_read_bytes(1731): uart driver error
+E (10992) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    34.6 degC  sp    34.7  rate   +63.7 degC/h  duty   66  I  0.11 A L     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 12 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (11242) uart: uart_read_bytes(1731): uart driver error
+E (11492) uart: uart_read_bytes(1731): uart driver error
+E (11742) uart: uart_read_bytes(1731): uart driver error
+E (11991) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    36.0 degC  sp    36.3  rate   +71.6 degC/h  duty   82  I  0.12 A L     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 13 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (12241) uart: uart_read_bytes(1731): uart driver error
+E (12492) uart: uart_read_bytes(1731): uart driver error
+E (12742) uart: uart_read_bytes(1731): uart driver error
+E (12992) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    38.1 degC  sp    38.0  rate  +105.1 degC/h  duty   74  I  0.12 A L     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 14 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (13243) uart: uart_read_bytes(1731): uart driver error
+E (13491) uart: uart_read_bytes(1731): uart driver error
+E (13742) uart: uart_read_bytes(1731): uart driver error
+E (13992) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    41.1 degC  sp    39.7  rate  +146.5 degC/h  duty   75  I  0.11 A L     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 15 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (14242) uart: uart_read_bytes(1731): uart driver error
+E (14491) uart: uart_read_bytes(1731): uart driver error
+E (14741) uart: uart_read_bytes(1731): uart driver error
+E (14993) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    43.3 degC  sp    41.3  rate  +152.6 degC/h  duty   49  I  0.12 A L     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 16 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (15242) uart: uart_read_bytes(1731): uart driver error
+E (15493) uart: uart_read_bytes(1731): uart driver error
+E (15742) uart: uart_read_bytes(1731): uart driver error
+E (15993) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    45.1 degC  sp    43.0  rate  +130.0 degC/h  duty   32  I  0.13 A L     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 17 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (16242) uart: uart_read_bytes(1731): uart driver error
+E (16492) uart: uart_read_bytes(1731): uart driver error
+E (16742) uart: uart_read_bytes(1731): uart driver error
+E (16993) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    46.4 degC  sp    44.7  rate   +84.3 degC/h  duty   49  I  0.11 A L     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 18 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (17241) uart: uart_read_bytes(1731): uart driver error
+E (17492) uart: uart_read_bytes(1731): uart driver error
+E (17742) uart: uart_read_bytes(1731): uart driver error
+E (17991) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    46.8 degC  sp    46.3  rate   +45.1 degC/h  duty   75  I  0.12 A L     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 19 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (18242) uart: uart_read_bytes(1731): uart driver error
+E (18491) uart: uart_read_bytes(1731): uart driver error
+E (18741) uart: uart_read_bytes(1731): uart driver error
+E (18992) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    47.8 degC  sp    48.0  rate   +55.3 degC/h  duty   83  I  0.12 A L     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 20 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (19241) uart: uart_read_bytes(1731): uart driver error
+E (19491) uart: uart_read_bytes(1731): uart driver error
+E (19741) uart: uart_read_bytes(1731): uart driver error
+E (19993) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    50.1 degC  sp    49.7  rate   +97.5 degC/h  duty   87  I  0.12 A L     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 21 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (20242) uart: uart_read_bytes(1731): uart driver error
+E (20493) uart: uart_read_bytes(1731): uart driver error
+E (20741) uart: uart_read_bytes(1731): uart driver error
+E (20991) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    52.8 degC  sp    51.3  rate  +142.7 degC/h  duty   66  I  0.12 A L     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 22 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (21241) uart: uart_read_bytes(1731): uart driver error
+E (21491) uart: uart_read_bytes(1731): uart driver error
+E (21741) uart: uart_read_bytes(1731): uart driver error
+E (21991) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    55.2 degC  sp    53.0  rate  +156.7 degC/h  duty   47  I  0.11 A L     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 23 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (22241) uart: uart_read_bytes(1731): uart driver error
+E (22492) uart: uart_read_bytes(1731): uart driver error
+E (22742) uart: uart_read_bytes(1731): uart driver error
+E (22993) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    56.3 degC  sp    54.7  rate  +106.5 degC/h  duty   40  I  0.12 A L     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 24 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (23241) uart: uart_read_bytes(1731): uart driver error
+E (23492) uart: uart_read_bytes(1731): uart driver error
+E (23742) uart: uart_read_bytes(1731): uart driver error
+E (23991) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    57.2 degC  sp    56.3  rate   +54.0 degC/h  duty   61  I  0.12 A L     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 25 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (24241) uart: uart_read_bytes(1731): uart driver error
+E (24491) uart: uart_read_bytes(1731): uart driver error
+E (24741) uart: uart_read_bytes(1731): uart driver error
+E (24993) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    57.6 degC  sp    58.0  rate   +47.6 degC/h  duty   94  I  0.11 A L     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 26 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (25241) uart: uart_read_bytes(1731): uart driver error
+E (25492) uart: uart_read_bytes(1731): uart driver error
+E (25741) uart: uart_read_bytes(1731): uart driver error
+E (25992) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    59.5 degC  sp    59.7  rate   +56.5 degC/h  duty  104  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 27 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (26241) uart: uart_read_bytes(1731): uart driver error
+E (26492) uart: uart_read_bytes(1731): uart driver error
+E (26741) uart: uart_read_bytes(1731): uart driver error
+E (26991) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    61.8 degC  sp    61.3  rate  +126.7 degC/h  duty   97  I  0.12 A L     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 28 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (27241) uart: uart_read_bytes(1731): uart driver error
+E (27492) uart: uart_read_bytes(1731): uart driver error
+E (27741) uart: uart_read_bytes(1731): uart driver error
+E (27992) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    65.0 degC  sp    63.0  rate  +170.0 degC/h  duty   50  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+E (28241) uart: uart_read_bytes(1731): uart driver error
+    log: 29 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (28492) uart: uart_read_bytes(1731): uart driver error
+E (28742) uart: uart_read_bytes(1731): uart driver error
+E (28992) uart: uart_read_bytes(1731): uart driver error
+E (29241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    67.1 degC  sp    66.3  rate  +143.4 degC/h  duty   60  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 30 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (29491) uart: uart_read_bytes(1731): uart driver error
+E (29742) uart: uart_read_bytes(1731): uart driver error
+E (29992) uart: uart_read_bytes(1731): uart driver error
+E (30241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    67.7 degC  sp    68.0  rate   +44.6 degC/h  duty   88  I  0.11 A L     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 31 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (30492) uart: uart_read_bytes(1731): uart driver error
+E (30743) uart: uart_read_bytes(1731): uart driver error
+E (30993) uart: uart_read_bytes(1731): uart driver error
+E (31241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    68.4 degC  sp    69.7  rate   +39.2 degC/h  duty  108  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 32 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (31491) uart: uart_read_bytes(1731): uart driver error
+E (31742) uart: uart_read_bytes(1731): uart driver error
+E (31992) uart: uart_read_bytes(1731): uart driver error
+E (32242) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    70.0 degC  sp    71.3  rate   +68.1 degC/h  duty  100  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 33 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (32492) uart: uart_read_bytes(1731): uart driver error
+E (32741) uart: uart_read_bytes(1731): uart driver error
+E (32991) uart: uart_read_bytes(1731): uart driver error
+E (33241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    72.3 degC  sp    73.0  rate  +123.9 degC/h  duty   81  I  0.11 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 34 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (33493) uart: uart_read_bytes(1731): uart driver error
+E (33741) uart: uart_read_bytes(1731): uart driver error
+E (33992) uart: uart_read_bytes(1731): uart driver error
+E (34241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    74.7 degC  sp    74.7  rate  +147.9 degC/h  duty   70  I  0.12 A L     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 36 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (34491) uart: uart_read_bytes(1731): uart driver error
+E (34741) uart: uart_read_bytes(1731): uart driver error
+E (34991) uart: uart_read_bytes(1731): uart driver error
+E (35241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    76.6 degC  sp    76.3  rate  +140.6 degC/h  duty   72  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 37 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (35493) uart: uart_read_bytes(1731): uart driver error
+E (35742) uart: uart_read_bytes(1731): uart driver error
+E (35992) uart: uart_read_bytes(1731): uart driver error
+E (36241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    78.0 degC  sp    78.0  rate  +101.3 degC/h  duty   85  I 29.40 A C     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 38 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (36491) uart: uart_read_bytes(1731): uart driver error
+E (36741) uart: uart_read_bytes(1731): uart driver error
+E (36993) uart: uart_read_bytes(1731): uart driver error
+E (37241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    79.3 degC  sp    79.7  rate   +77.4 degC/h  duty   92  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 38 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (37492) uart: uart_read_bytes(1731): uart driver error
+E (37742) uart: uart_read_bytes(1731): uart driver error
+E (37992) uart: uart_read_bytes(1731): uart driver error
+E (38242) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    80.7 degC  sp    81.3  rate   +66.2 degC/h  duty   98  I 29.37 A C     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 39 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (38492) uart: uart_read_bytes(1731): uart driver error
+E (38741) uart: uart_read_bytes(1731): uart driver error
+E (38992) uart: uart_read_bytes(1731): uart driver error
+E (39241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    82.6 degC  sp    83.0  rate   +99.0 degC/h  duty   89  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 40 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (39492) uart: uart_read_bytes(1731): uart driver error
+E (39741) uart: uart_read_bytes(1731): uart driver error
+E (39992) uart: uart_read_bytes(1731): uart driver error
+E (40243) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    84.5 degC  sp    84.7  rate  +109.9 degC/h  duty   84  I 29.34 A C     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 41 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (40492) uart: uart_read_bytes(1731): uart driver error
+E (40742) uart: uart_read_bytes(1731): uart driver error
+E (40993) uart: uart_read_bytes(1731): uart driver error
+E (41241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    86.6 degC  sp    86.3  rate  +122.4 degC/h  duty   76  I  0.11 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 42 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (41493) uart: uart_read_bytes(1731): uart driver error
+E (41741) uart: uart_read_bytes(1731): uart driver error
+E (41992) uart: uart_read_bytes(1731): uart driver error
+E (42241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    88.1 degC  sp    88.0  rate  +108.3 degC/h  duty   85  I 29.29 A C     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 44 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (42492) uart: uart_read_bytes(1731): uart driver error
+E (42741) uart: uart_read_bytes(1731): uart driver error
+E (42991) uart: uart_read_bytes(1731): uart driver error
+E (43242) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    89.1 degC  sp    89.7  rate   +87.3 degC/h  duty  105  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 45 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (43491) uart: uart_read_bytes(1731): uart driver error
+E (43741) uart: uart_read_bytes(1731): uart driver error
+E (43991) uart: uart_read_bytes(1731): uart driver error
+E (44242) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    90.7 degC  sp    91.3  rate   +62.7 degC/h  duty  100  I 29.28 A C     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 46 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (44491) uart: uart_read_bytes(1731): uart driver error
+E (44741) uart: uart_read_bytes(1731): uart driver error
+E (44991) uart: uart_read_bytes(1731): uart driver error
+E (45241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    92.3 degC  sp    93.0  rate   +92.7 degC/h  duty  103  I  0.11 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 47 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (45491) uart: uart_read_bytes(1731): uart driver error
+E (45742) uart: uart_read_bytes(1731): uart driver error
+E (45991) uart: uart_read_bytes(1731): uart driver error
+E (46241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    94.3 degC  sp    94.7  rate  +111.1 degC/h  duty   94  I 29.23 A C     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 48 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (46492) uart: uart_read_bytes(1731): uart driver error
+E (46741) uart: uart_read_bytes(1731): uart driver error
+E (46991) uart: uart_read_bytes(1731): uart driver error
+E (47241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    96.2 degC  sp    96.3  rate  +110.3 degC/h  duty   93  I  0.11 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 49 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (47492) uart: uart_read_bytes(1731): uart driver error
+E (47741) uart: uart_read_bytes(1731): uart driver error
+E (47992) uart: uart_read_bytes(1731): uart driver error
+E (48241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    98.2 degC  sp    98.0  rate  +127.6 degC/h  duty   85  I 29.20 A C     ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 50 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (48493) uart: uart_read_bytes(1731): uart driver error
+E (48741) uart: uart_read_bytes(1731): uart driver error
+E (48992) uart: uart_read_bytes(1731): uart driver error
+E (49243) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]    99.8 degC  sp    99.7  rate  +100.2 degC/h  duty   93  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 50 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (49491) uart: uart_read_bytes(1731): uart driver error
+E (49742) uart: uart_read_bytes(1731): uart driver error
+E (49993) uart: uart_read_bytes(1731): uart driver error
+E (50241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   101.2 degC  sp   101.3  rate   +76.1 degC/h  duty   99  I 29.18 A C~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 52 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (50492) uart: uart_read_bytes(1731): uart driver error
+E (50742) uart: uart_read_bytes(1731): uart driver error
+E (50992) uart: uart_read_bytes(1731): uart driver error
+E (51241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   102.5 degC  sp   103.0  rate   +78.0 degC/h  duty  107  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 53 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (51491) uart: uart_read_bytes(1731): uart driver error
+E (51742) uart: uart_read_bytes(1731): uart driver error
+E (51992) uart: uart_read_bytes(1731): uart driver error
+E (52241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   103.6 degC  sp   104.7  rate   +85.9 degC/h  duty  122  I 29.16 A C~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 54 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (52493) uart: uart_read_bytes(1731): uart driver error
+E (52742) uart: uart_read_bytes(1731): uart driver error
+E (52992) uart: uart_read_bytes(1731): uart driver error
+E (53241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   105.3 degC  sp   106.3  rate   +92.0 degC/h  duty  116  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 55 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (53491) uart: uart_read_bytes(1731): uart driver error
+E (53742) uart: uart_read_bytes(1731): uart driver error
+E (53991) uart: uart_read_bytes(1731): uart driver error
+E (54241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   107.3 degC  sp   108.0  rate  +117.9 degC/h  duty  110  I 29.09 A C~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 56 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (54493) uart: uart_read_bytes(1731): uart driver error
+E (54742) uart: uart_read_bytes(1731): uart driver error
+E (54992) uart: uart_read_bytes(1731): uart driver error
+E (55242) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   109.9 degC  sp   109.7  rate  +128.6 degC/h  duty   88  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 57 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (55493) uart: uart_read_bytes(1731): uart driver error
+E (55741) uart: uart_read_bytes(1731): uart driver error
+E (55991) uart: uart_read_bytes(1731): uart driver error
+E (56243) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   111.8 degC  sp   111.3  rate  +133.9 degC/h  duty   90  I 29.04 A C~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 58 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (56493) uart: uart_read_bytes(1731): uart driver error
+E (56742) uart: uart_read_bytes(1731): uart driver error
+E (56993) uart: uart_read_bytes(1731): uart driver error
+E (57241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   113.0 degC  sp   113.0  rate  +101.9 degC/h  duty  111  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 59 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (57493) uart: uart_read_bytes(1731): uart driver error
+E (57742) uart: uart_read_bytes(1731): uart driver error
+E (57991) uart: uart_read_bytes(1731): uart driver error
+E (58241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   114.6 degC  sp   114.7  rate   +75.7 degC/h  duty  104  I 29.03 A C~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 60 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (58491) uart: uart_read_bytes(1731): uart driver error
+E (58741) uart: uart_read_bytes(1731): uart driver error
+E (58991) uart: uart_read_bytes(1731): uart driver error
+E (59243) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   115.6 degC  sp   116.3  rate   +61.2 degC/h  duty  127  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 61 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (59493) uart: uart_read_bytes(1731): uart driver error
+E (59741) uart: uart_read_bytes(1731): uart driver error
+E (59991) uart: uart_read_bytes(1731): uart driver error
+E (60241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   117.0 degC  sp   118.0  rate   +99.1 degC/h  duty  128  I 29.01 A C~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 62 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (60491) uart: uart_read_bytes(1731): uart driver error
+E (60741) uart: uart_read_bytes(1731): uart driver error
+E (60992) uart: uart_read_bytes(1731): uart driver error
+E (61241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   119.4 degC  sp   119.7  rate  +105.8 degC/h  duty  102  I  0.11 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 63 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (61492) uart: uart_read_bytes(1731): uart driver error
+E (61742) uart: uart_read_bytes(1731): uart driver error
+E (61991) uart: uart_read_bytes(1731): uart driver error
+E (62241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   121.0 degC  sp   121.3  rate  +122.0 degC/h  duty  116  I 28.97 A C~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 64 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (62492) uart: uart_read_bytes(1731): uart driver error
+E (62741) uart: uart_read_bytes(1731): uart driver error
+E (62992) uart: uart_read_bytes(1731): uart driver error
+E (63242) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   123.4 degC  sp   123.0  rate  +130.5 degC/h  duty   94  I  0.11 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 65 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (63492) uart: uart_read_bytes(1731): uart driver error
+E (63741) uart: uart_read_bytes(1731): uart driver error
+E (63993) uart: uart_read_bytes(1731): uart driver error
+E (64241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   124.7 degC  sp   124.7  rate   +80.5 degC/h  duty  112  I 28.94 A C~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 66 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (64493) uart: uart_read_bytes(1731): uart driver error
+E (64742) uart: uart_read_bytes(1731): uart driver error
+E (64991) uart: uart_read_bytes(1731): uart driver error
+E (65241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   125.9 degC  sp   126.3  rate   +94.7 degC/h  duty  124  I  0.13 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 67 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (65493) uart: uart_read_bytes(1731): uart driver error
+E (65742) uart: uart_read_bytes(1731): uart driver error
+E (65992) uart: uart_read_bytes(1731): uart driver error
+E (66241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   127.1 degC  sp   128.0  rate   +79.3 degC/h  duty  135  I 28.93 A C~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 68 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (66493) uart: uart_read_bytes(1731): uart driver error
+E (66741) uart: uart_read_bytes(1731): uart driver error
+E (66991) uart: uart_read_bytes(1731): uart driver error
+E (67241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   129.0 degC  sp   129.7  rate   +84.8 degC/h  duty  123  I  0.13 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 69 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (67491) uart: uart_read_bytes(1731): uart driver error
+E (67742) uart: uart_read_bytes(1731): uart driver error
+E (67993) uart: uart_read_bytes(1731): uart driver error
+E (68242) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   130.9 degC  sp   131.3  rate  +114.6 degC/h  duty  120  I 28.87 A C~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 70 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (68493) uart: uart_read_bytes(1731): uart driver error
+E (68741) uart: uart_read_bytes(1731): uart driver error
+E (68992) uart: uart_read_bytes(1731): uart driver error
+E (69242) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   133.0 degC  sp   133.0  rate  +130.5 degC/h  duty  112  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 71 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (69492) uart: uart_read_bytes(1731): uart driver error
+E (69741) uart: uart_read_bytes(1731): uart driver error
+E (69991) uart: uart_read_bytes(1731): uart driver error
+E (70241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   134.9 degC  sp   134.7  rate  +111.4 degC/h  duty  111  I 28.85 A C~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 72 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (70491) uart: uart_read_bytes(1731): uart driver error
+E (70742) uart: uart_read_bytes(1731): uart driver error
+E (70991) uart: uart_read_bytes(1731): uart driver error
+E (71241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   135.9 degC  sp   136.3  rate   +87.3 degC/h  duty  134  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 73 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (71492) uart: uart_read_bytes(1731): uart driver error
+E (71741) uart: uart_read_bytes(1731): uart driver error
+E (71992) uart: uart_read_bytes(1731): uart driver error
+E (72242) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   137.6 degC  sp   138.0  rate   +75.8 degC/h  duty  127  I 28.82 A C~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 74 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (72491) uart: uart_read_bytes(1731): uart driver error
+E (72742) uart: uart_read_bytes(1731): uart driver error
+E (72992) uart: uart_read_bytes(1731): uart driver error
+E (73242) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   139.4 degC  sp   139.7  rate   +86.2 degC/h  duty  125  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 75 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (73492) uart: uart_read_bytes(1731): uart driver error
+E (73741) uart: uart_read_bytes(1731): uart driver error
+E (73992) uart: uart_read_bytes(1731): uart driver error
+E (74242) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   141.1 degC  sp   141.3  rate  +117.4 degC/h  duty  124  I 28.79 A C~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 76 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (74491) uart: uart_read_bytes(1731): uart driver error
+E (74741) uart: uart_read_bytes(1731): uart driver error
+E (74992) uart: uart_read_bytes(1731): uart driver error
+E (75242) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   142.4 degC  sp   143.0  rate  +101.0 degC/h  duty  139  I  0.11 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 77 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (75491) uart: uart_read_bytes(1731): uart driver error
+E (75742) uart: uart_read_bytes(1731): uart driver error
+E (75992) uart: uart_read_bytes(1731): uart driver error
+E (76242) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   144.0 degC  sp   144.7  rate   +99.4 degC/h  duty  139  I 28.75 A C~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 78 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (76493) uart: uart_read_bytes(1731): uart driver error
+E (76741) uart: uart_read_bytes(1731): uart driver error
+E (76991) uart: uart_read_bytes(1731): uart driver error
+E (77241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   146.0 degC  sp   146.3  rate  +105.4 degC/h  duty  129  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 79 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (77493) uart: uart_read_bytes(1731): uart driver error
+E (77741) uart: uart_read_bytes(1731): uart driver error
+E (77991) uart: uart_read_bytes(1731): uart driver error
+E (78241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   148.3 degC  sp   148.0  rate  +117.6 degC/h  duty  111  I 28.72 A C~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 80 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (78493) uart: uart_read_bytes(1731): uart driver error
+E (78741) uart: uart_read_bytes(1731): uart driver error
+E (78991) uart: uart_read_bytes(1731): uart driver error
+E (79241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   149.5 degC  sp   149.7  rate  +106.2 degC/h  duty  137  I  0.12 A L~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 81 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (79491) uart: uart_read_bytes(1731): uart driver error
+E (79742) uart: uart_read_bytes(1731): uart driver error
+E (79992) uart: uart_read_bytes(1731): uart driver error
+E (80241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   151.4 degC  sp   150.0  rate  +103.2 degC/h  duty   98  I 28.70 A C~    ref  0.00  seg 1/5  HEAT  [contactor closed]
+    log: 82 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (80492) uart: uart_read_bytes(1731): uart driver error
+E (80741) uart: uart_read_bytes(1731): uart driver error
+E (80992) uart: uart_read_bytes(1731): uart driver error
+E (81242) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   152.6 degC  sp   150.0  rate   +71.5 degC/h  duty   80  I  0.11 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 83 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (81492) uart: uart_read_bytes(1731): uart driver error
+E (81742) uart: uart_read_bytes(1731): uart driver error
+E (81992) uart: uart_read_bytes(1731): uart driver error
+E (82241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   153.3 degC  sp   153.0  rate   +75.0 degC/h  duty  123  I 28.66 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 84 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (82491) uart: uart_read_bytes(1731): uart driver error
+E (82742) uart: uart_read_bytes(1731): uart driver error
+E (82992) uart: uart_read_bytes(1731): uart driver error
+E (83242) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   154.0 degC  sp   156.0  rate   +46.4 degC/h  duty  165  I  0.12 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 85 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (83491) uart: uart_read_bytes(1731): uart driver error
+E (83741) uart: uart_read_bytes(1731): uart driver error
+E (83992) uart: uart_read_bytes(1731): uart driver error
+E (84241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   154.3 degC  sp   159.0  rate    +3.5 degC/h  duty  225  I 28.67 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 86 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (84493) uart: uart_read_bytes(1731): uart driver error
+E (84742) uart: uart_read_bytes(1731): uart driver error
+E (84992) uart: uart_read_bytes(1731): uart driver error
+E (85241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   156.0 degC  sp   162.0  rate   +59.6 degC/h  duty  248  I  0.11 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 87 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (85493) uart: uart_read_bytes(1731): uart driver error
+E (85741) uart: uart_read_bytes(1731): uart driver error
+E (85991) uart: uart_read_bytes(1731): uart driver error
+E (86241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   159.6 degC  sp   165.0  rate  +174.6 degC/h  duty  230  I 28.59 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 88 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (86492) uart: uart_read_bytes(1731): uart driver error
+E (86741) uart: uart_read_bytes(1731): uart driver error
+E (86991) uart: uart_read_bytes(1731): uart driver error
+E (87242) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   164.9 degC  sp   168.0  rate  +275.6 degC/h  duty  181  I  0.11 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 89 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (87492) uart: uart_read_bytes(1731): uart driver error
+E (87741) uart: uart_read_bytes(1731): uart driver error
+E (87992) uart: uart_read_bytes(1731): uart driver error
+E (88241) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   170.2 degC  sp   171.0  rate  +330.7 degC/h  duty  147  I 28.50 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+E (88491) uart: uart_read_bytes(1731): uart driver error
+    log: 90 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (88741) uart: uart_read_bytes(1731): uart driver error
+E (88992) uart: uart_read_bytes(1731): uart driver error
+E (89242) uart: uart_read_bytes(1731): uart driver error
+E (89491) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   174.8 degC  sp   174.0  rate  +249.5 degC/h  duty  160  I  0.12 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 91 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (89741) uart: uart_read_bytes(1731): uart driver error
+E (89991) uart: uart_read_bytes(1731): uart driver error
+E (90242) uart: uart_read_bytes(1731): uart driver error
+E (90491) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   176.8 degC  sp   177.0  rate  +146.1 degC/h  duty  193  I 28.45 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 92 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (90741) uart: uart_read_bytes(1731): uart driver error
+E (90993) uart: uart_read_bytes(1731): uart driver error
+E (91241) uart: uart_read_bytes(1731): uart driver error
+E (91491) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   178.7 degC  sp   180.0  rate  +114.0 degC/h  duty  219  I  0.12 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 93 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (91741) uart: uart_read_bytes(1731): uart driver error
+E (91992) uart: uart_read_bytes(1731): uart driver error
+E (92241) uart: uart_read_bytes(1731): uart driver error
+E (92492) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   181.8 degC  sp   183.0  rate  +137.4 degC/h  duty  219  I 28.40 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 94 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (92742) uart: uart_read_bytes(1731): uart driver error
+E (92992) uart: uart_read_bytes(1731): uart driver error
+E (93242) uart: uart_read_bytes(1731): uart driver error
+E (93492) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   185.6 degC  sp   186.0  rate  +213.9 degC/h  duty  205  I  0.12 A L     ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 95 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (93742) uart: uart_read_bytes(1731): uart driver error
+E (93991) uart: uart_read_bytes(1731): uart driver error
+E (94241) uart: uart_read_bytes(1731): uart driver error
+E (94492) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   189.6 degC  sp   189.0  rate  +227.0 degC/h  duty  191  I 28.33 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 96 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (94741) uart: uart_read_bytes(1731): uart driver error
+E (94992) uart: uart_read_bytes(1731): uart driver error
+E (95242) uart: uart_read_bytes(1731): uart driver error
+E (95491) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   193.1 degC  sp   192.0  rate  +235.0 degC/h  duty  171  I  0.12 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 97 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (95741) uart: uart_read_bytes(1731): uart driver error
+E (95992) uart: uart_read_bytes(1731): uart driver error
+E (96241) uart: uart_read_bytes(1731): uart driver error
+E (96492) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   196.4 degC  sp   195.0  rate  +197.2 degC/h  duty  171  I 28.24 A C     ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 98 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (96742) uart: uart_read_bytes(1731): uart driver error
+E (96992) uart: uart_read_bytes(1731): uart driver error
+E (97241) uart: uart_read_bytes(1731): uart driver error
+E (97491) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   198.5 degC  sp   198.0  rate  +156.3 degC/h  duty  197  I  0.11 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 99 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (97742) uart: uart_read_bytes(1731): uart driver error
+E (97992) uart: uart_read_bytes(1731): uart driver error
+E (98241) uart: uart_read_bytes(1731): uart driver error
+E (98492) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   200.0 degC  sp   201.0  rate  +123.5 degC/h  duty  224  I 28.23 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 100 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (98743) uart: uart_read_bytes(1731): uart driver error
+E (98993) uart: uart_read_bytes(1731): uart driver error
+E (99242) uart: uart_read_bytes(1731): uart driver error
+E (99492) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   202.8 degC  sp   204.0  rate  +121.6 degC/h  duty  240  I  0.12 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 101 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (99742) uart: uart_read_bytes(1731): uart driver error
+E (99992) uart: uart_read_bytes(1731): uart driver error
+E (100242) uart: uart_read_bytes(1731): uart driver error
+E (100491) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   206.3 degC  sp   207.0  rate  +196.2 degC/h  duty  218  I 28.15 A C     ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 102 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (100742) uart: uart_read_bytes(1731): uart driver error
+E (100992) uart: uart_read_bytes(1731): uart driver error
+E (101242) uart: uart_read_bytes(1731): uart driver error
+E (101491) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   210.5 degC  sp   210.0  rate  +235.5 degC/h  duty  198  I  0.12 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 103 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (101742) uart: uart_read_bytes(1731): uart driver error
+E (101991) uart: uart_read_bytes(1731): uart driver error
+E (102241) uart: uart_read_bytes(1731): uart driver error
+E (102491) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   214.3 degC  sp   213.0  rate  +235.8 degC/h  duty  189  I 28.10 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 104 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (102742) uart: uart_read_bytes(1731): uart driver error
+E (102992) uart: uart_read_bytes(1731): uart driver error
+E (103241) uart: uart_read_bytes(1731): uart driver error
+E (103492) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   216.5 degC  sp   216.0  rate  +186.0 degC/h  duty  207  I  0.13 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 105 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (103742) uart: uart_read_bytes(1731): uart driver error
+E (103992) uart: uart_read_bytes(1731): uart driver error
+E (104241) uart: uart_read_bytes(1731): uart driver error
+E (104492) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   219.0 degC  sp   219.0  rate  +155.1 degC/h  duty  212  I 28.04 A C     ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 106 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (104741) uart: uart_read_bytes(1731): uart driver error
+E (104993) uart: uart_read_bytes(1731): uart driver error
+E (105241) uart: uart_read_bytes(1731): uart driver error
+E (105492) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   221.9 degC  sp   222.0  rate  +147.8 degC/h  duty  227  I  0.12 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 107 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (105741) uart: uart_read_bytes(1731): uart driver error
+E (105991) uart: uart_read_bytes(1731): uart driver error
+E (106242) uart: uart_read_bytes(1731): uart driver error
+E (106491) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   224.6 degC  sp   225.0  rate  +161.6 degC/h  duty  241  I 27.99 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 108 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (106743) uart: uart_read_bytes(1731): uart driver error
+E (106992) uart: uart_read_bytes(1731): uart driver error
+E (107241) uart: uart_read_bytes(1731): uart driver error
+E (107492) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   227.6 degC  sp   228.0  rate  +177.4 degC/h  duty  232  I  0.12 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 109 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (107742) uart: uart_read_bytes(1731): uart driver error
+E (107991) uart: uart_read_bytes(1731): uart driver error
+E (108241) uart: uart_read_bytes(1731): uart driver error
+E (108492) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   231.3 degC  sp   231.0  rate  +208.7 degC/h  duty  217  I 27.93 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 110 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (108741) uart: uart_read_bytes(1731): uart driver error
+E (108991) uart: uart_read_bytes(1731): uart driver error
+E (109241) uart: uart_read_bytes(1731): uart driver error
+E (109493) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   234.4 degC  sp   234.0  rate  +207.8 degC/h  duty  217  I  0.11 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 111 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (109741) uart: uart_read_bytes(1731): uart driver error
+E (109992) uart: uart_read_bytes(1731): uart driver error
+E (110241) uart: uart_read_bytes(1731): uart driver error
+E (110492) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   237.5 degC  sp   237.0  rate  +206.0 degC/h  duty  211  I 27.87 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 112 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (110741) uart: uart_read_bytes(1731): uart driver error
+E (110991) uart: uart_read_bytes(1731): uart driver error
+E (111241) uart: uart_read_bytes(1731): uart driver error
+E (111492) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   240.0 degC  sp   240.0  rate  +147.1 degC/h  duty  242  I  0.12 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 113 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (111741) uart: uart_read_bytes(1731): uart driver error
+E (111992) uart: uart_read_bytes(1731): uart driver error
+E (112241) uart: uart_read_bytes(1731): uart driver error
+E (112492) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   242.5 degC  sp   243.0  rate  +150.5 degC/h  duty  251  I 27.83 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 114 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (112741) uart: uart_read_bytes(1731): uart driver error
+E (112991) uart: uart_read_bytes(1731): uart driver error
+E (113241) uart: uart_read_bytes(1731): uart driver error
+E (113491) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   246.0 degC  sp   246.0  rate  +182.4 degC/h  duty  235  I  0.12 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 115 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (113741) uart: uart_read_bytes(1731): uart driver error
+E (113993) uart: uart_read_bytes(1731): uart driver error
+E (114243) uart: uart_read_bytes(1731): uart driver error
+E (114492) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   249.5 degC  sp   249.0  rate  +209.1 degC/h  duty  226  I 27.77 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 116 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (114741) uart: uart_read_bytes(1731): uart driver error
+E (114993) uart: uart_read_bytes(1731): uart driver error
+E (115242) uart: uart_read_bytes(1731): uart driver error
+E (115491) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   252.9 degC  sp   252.0  rate  +206.2 degC/h  duty  238  I  0.12 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 117 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (115742) uart: uart_read_bytes(1731): uart driver error
+E (115991) uart: uart_read_bytes(1731): uart driver error
+E (116241) uart: uart_read_bytes(1731): uart driver error
+E (116491) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   255.2 degC  sp   255.0  rate  +163.2 degC/h  duty  242  I 27.70 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 118 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (116741) uart: uart_read_bytes(1731): uart driver error
+E (116991) uart: uart_read_bytes(1731): uart driver error
+E (117241) uart: uart_read_bytes(1731): uart driver error
+E (117491) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   258.4 degC  sp   258.0  rate  +164.0 degC/h  duty  250  I  0.12 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 119 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (117741) uart: uart_read_bytes(1731): uart driver error
+E (117993) uart: uart_read_bytes(1731): uart driver error
+E (118241) uart: uart_read_bytes(1731): uart driver error
+E (118491) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   261.1 degC  sp   261.0  rate  +182.9 degC/h  duty  241  I 27.66 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 120 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (118741) uart: uart_read_bytes(1731): uart driver error
+E (118991) uart: uart_read_bytes(1731): uart driver error
+E (119242) uart: uart_read_bytes(1731): uart driver error
+E (119492) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   264.5 degC  sp   264.0  rate  +180.7 degC/h  duty  236  I  0.13 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 121 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (119741) uart: uart_read_bytes(1731): uart driver error
+E (119992) uart: uart_read_bytes(1731): uart driver error
+E (120241) uart: uart_read_bytes(1731): uart driver error
+E (120492) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   267.7 degC  sp   267.0  rate  +178.8 degC/h  duty  255  I 27.60 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 122 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (120742) uart: uart_read_bytes(1731): uart driver error
+E (120992) uart: uart_read_bytes(1731): uart driver error
+E (121241) uart: uart_read_bytes(1731): uart driver error
+E (121492) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   270.0 degC  sp   270.0  rate  +178.4 degC/h  duty  241  I  0.11 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 123 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (121741) uart: uart_read_bytes(1731): uart driver error
+E (121991) uart: uart_read_bytes(1731): uart driver error
+E (122242) uart: uart_read_bytes(1731): uart driver error
+E (122491) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   273.5 degC  sp   273.0  rate  +172.1 degC/h  duty  245  I 27.56 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 124 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (122741) uart: uart_read_bytes(1731): uart driver error
+E (122991) uart: uart_read_bytes(1731): uart driver error
+E (123242) uart: uart_read_bytes(1731): uart driver error
+E (123492) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   276.4 degC  sp   276.0  rate  +182.8 degC/h  duty  258  I  0.11 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 125 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (123741) uart: uart_read_bytes(1731): uart driver error
+E (123991) uart: uart_read_bytes(1731): uart driver error
+E (124241) uart: uart_read_bytes(1731): uart driver error
+E (124493) uart: uart_read_bytes(1731): uart driver error
+E (124741) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   278.8 degC  sp   279.0  rate  +159.3 degC/h  duty  258  I 27.49 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 126 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (124991) uart: uart_read_bytes(1731): uart driver error
+E (125242) uart: uart_read_bytes(1731): uart driver error
+E (125492) uart: uart_read_bytes(1731): uart driver error
+E (125741) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   282.4 degC  sp   282.0  rate  +168.1 degC/h  duty  273  I  0.12 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 127 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (125993) uart: uart_read_bytes(1731): uart driver error
+E (126242) uart: uart_read_bytes(1731): uart driver error
+E (126491) uart: uart_read_bytes(1731): uart driver error
+E (126742) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   285.5 degC  sp   285.0  rate  +186.2 degC/h  duty  265  I 27.45 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 128 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (126991) uart: uart_read_bytes(1731): uart driver error
+E (127241) uart: uart_read_bytes(1731): uart driver error
+E (127492) uart: uart_read_bytes(1731): uart driver error
+E (127741) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   289.0 degC  sp   288.0  rate  +192.6 degC/h  duty  260  I  0.13 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 129 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (127991) uart: uart_read_bytes(1731): uart driver error
+E (128242) uart: uart_read_bytes(1731): uart driver error
+E (128493) uart: uart_read_bytes(1731): uart driver error
+E (128742) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   292.3 degC  sp   291.0  rate  +210.6 degC/h  duty  254  I 27.40 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 130 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (128992) uart: uart_read_bytes(1731): uart driver error
+E (129241) uart: uart_read_bytes(1731): uart driver error
+E (129492) uart: uart_read_bytes(1731): uart driver error
+E (129742) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   294.8 degC  sp   294.0  rate  +175.2 degC/h  duty  273  I  0.11 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 131 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (129991) uart: uart_read_bytes(1731): uart driver error
+E (130241) uart: uart_read_bytes(1731): uart driver error
+E (130492) uart: uart_read_bytes(1731): uart driver error
+E (130742) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   297.7 degC  sp   297.0  rate  +167.7 degC/h  duty  255  I 27.34 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 132 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (130991) uart: uart_read_bytes(1731): uart driver error
+E (131241) uart: uart_read_bytes(1731): uart driver error
+E (131492) uart: uart_read_bytes(1731): uart driver error
+E (131742) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   301.1 degC  sp   300.0  rate  +180.4 degC/h  duty  271  I  0.12 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 133 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (131991) uart: uart_read_bytes(1731): uart driver error
+E (132243) uart: uart_read_bytes(1731): uart driver error
+E (132493) uart: uart_read_bytes(1731): uart driver error
+E (132741) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   303.8 degC  sp   303.0  rate  +178.8 degC/h  duty  278  I 27.30 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 134 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (132991) uart: uart_read_bytes(1731): uart driver error
+E (133241) uart: uart_read_bytes(1731): uart driver error
+E (133492) uart: uart_read_bytes(1731): uart driver error
+E (133742) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   306.4 degC  sp   306.0  rate  +163.1 degC/h  duty  281  I  0.12 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 135 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (133993) uart: uart_read_bytes(1731): uart driver error
+E (134241) uart: uart_read_bytes(1731): uart driver error
+E (134492) uart: uart_read_bytes(1731): uart driver error
+E (134741) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   309.5 degC  sp   309.0  rate  +169.7 degC/h  duty  276  I 27.24 A C~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 136 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (134991) uart: uart_read_bytes(1731): uart driver error
+E (135241) uart: uart_read_bytes(1731): uart driver error
+E (135491) uart: uart_read_bytes(1731): uart driver error
+E (135741) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   312.8 degC  sp   312.0  rate  +193.0 degC/h  duty  288  I  0.12 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 137 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (135993) uart: uart_read_bytes(1731): uart driver error
+E (136241) uart: uart_read_bytes(1731): uart driver error
+E (136492) uart: uart_read_bytes(1731): uart driver error
+E (136741) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   316.2 degC  sp   315.0  rate  +187.9 degC/h  duty  273  I 27.18 A C     ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 138 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (136992) uart: uart_read_bytes(1731): uart driver error
+E (137241) uart: uart_read_bytes(1731): uart driver error
+E (137491) uart: uart_read_bytes(1731): uart driver error
+E (137741) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   319.3 degC  sp   318.0  rate  +193.8 degC/h  duty  276  I  0.12 A L~    ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 139 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (137993) uart: uart_read_bytes(1731): uart driver error
+E (138241) uart: uart_read_bytes(1731): uart driver error
+E (138492) uart: uart_read_bytes(1731): uart driver error
+E (138741) uart: uart_read_bytes(1731): uart driver error
+[RUN   ]   321.9 degC  sp   321.0  rate  +167.3 degC/h  duty  287  I 27.15 A C     ref  0.00  seg 2/5  HEAT  [contactor closed]
+    log: 140 records, 1 sectors erased, 0 dropped, 0 errors
+    warning 105 NO TIME: Clock not synchronised; log timestamps are relative only.
+E (138992) uart: uart_read_bytes(1731): uart driver error
+E (139241) uart: uart_read_bytes(1731): uart driver error
+E (139493) uart: uart_read_bytes(1731): uart driver error
+E (139741) uart: uart_read_bytes(1731): uart driver error
+qemu-system-xtensa: terminating on signal 2 from pid 60022 (<unknown process>)
+
+Aborted!
+Executing action: qemu
