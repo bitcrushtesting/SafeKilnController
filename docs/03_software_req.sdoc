@@ -1657,6 +1657,10 @@ What the entry has to provide, each because its absence makes a network unjoinab
 - **An open network shall not ask for a passphrase at all.**
 
 The credentials shall be **persisted before the join is attempted**, so that a device which joins successfully and then loses power comes back to the same network rather than to a display nobody is standing at.
+
+**Added 2026-10-09.** The display shall also show **the outcome of the last attempt**, distinguishing a join in progress from one the radio refused, and shall show the refusal's reason code. "Not connected" is not an answer an operator can act on, and since this screen is the only route in, acting on it is the whole job: a mistyped passphrase, an SSID out of range and a radio that never came up are three different remedies and were previously one message. The reason code is shown as the number the driver reports, to be read out to somebody who can look it up, rather than translated into a sentence that guesses which of them it was.
+
+A knob is a poor keyboard, so entry shall **resume at the character the previous press selected** rather than returning to the start of the set.
 <<<
 PRIORITY: M
 VERIFICATION: T
@@ -2188,6 +2192,13 @@ VERIFICATION: I
 UID: SWR-NFR-23
 STATEMENT: >>>
 Operator-facing text shall be held in a **single resource location**, indexed by language, with no text embedded at its point of use. **English and German** shall both be provided, selected by the `hmi.language` configuration item and offered on the local display and in the web interface. A language with no entry for a string shall fall back to English rather than showing nothing. Diagnostic output, the event log and requirement identifiers shall remain English regardless of the setting, so that a fault quoted in a report reads the same whoever filed it.
+
+**Clarified 2026-10-09, after "no text embedded at its point of use" was found to be half true.** Faults and warnings were in a table from the start; the display's own frame -- screen titles, the menu, the two answers to a confirmation, the footers that say what the knob does -- was string literals at their draw sites, so a device set to German announced its faults in German inside an English frame. There are now two tables, `kiln_core/faults` for what has gone wrong and `kiln_hmi/strings` for the display's own words, and no operator-facing literal remains at a draw site.
+
+Two constraints on the German, both from the panel rather than from the language, and both asserted rather than reviewed:
+
+- **The 5x7 font carries the 95 printable ASCII glyphs and nothing else**, so German text is transliterated (AE, OE, UE, SS). A byte outside 0x20 to 0x7E reaches the panel as a blank, which nobody would see until the device was in a workshop.
+- **21 characters is the display's width** at scale 1, past which the framebuffer clips silently. German runs about 15 per cent longer than English, so this is the bound the translation is written against rather than something to discover on hardware.
 <<<
 PRIORITY: M
 VERIFICATION: T

@@ -9,6 +9,7 @@
 set(KILN_HMI_SRCS
     src/draw.cpp
     src/hmi.cpp
+    src/strings.cpp
 )
 
 if(ESP_PLATFORM)

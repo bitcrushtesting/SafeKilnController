@@ -442,15 +442,21 @@ question is whether it is worth its cost.
 
 ## J. German translation, SWR-NFR-23
 
-- [ ] **J1. The OLED font and encoding are unverified.** The labels avoid
-  umlauts for that reason, but nobody has yet confirmed what the SSD1306 font
-  in `kiln_hmi` will carry. If it does handle Latin-1 or a UTF-8 subset, the
-  labels can use proper German and the test's 16-character bound should be
-  re-checked against the real glyph widths rather than character count.
+- [x] **J1. The font carries ASCII and nothing else. Answered 2026-10-09.**
+  Not a hardware question after all: `draw.cpp` defines the 95 printable ASCII
+  glyphs, so there are no umlauts and no sharp s to draw with, at any encoding.
+  Every German string in the firmware is therefore transliterated (AE OE UE
+  SS), and a test over `kiln_hmi/strings` rejects any byte outside 0x20 to 0x7E
+  so that one umlaut typed into the table cannot reach a workshop as a blank.
+  The bound that matters is 21 characters, the panel's width at scale 1, and it
+  is asserted on every string rather than on a sample.
 
-- [ ] **J2. The long causes are not shown on the display yet.** `kiln_hmi` does
-  not exist, so only the web renders them. When the fault screen lands it will
-  need to wrap German text, which runs roughly 15 per cent longer than English.
+- [x] **J2. The display renders the long causes. Done.** `kiln_hmi` exists and
+  the fault screen word-wraps the cause from `kiln_core/faults` in the
+  configured language, at 21 columns, wrapping on spaces rather than cutting
+  words -- these sentences are the operator's instructions, and a word split
+  across two lines in a hurry reads as a different word. German's extra 15 per
+  cent is absorbed by the wrap rather than by a shorter translation.
 
 - [ ] **J3. Config item names and units are still English.** `/api/config`
   returns keys like `safety.max_temp_c` with English descriptions. The keys
@@ -683,17 +689,36 @@ weakness first, the deadline second, the sentence third, the engineering last.
   through the composition root, persisting credentials before attempting the
   radio.
 
-  What is left:
+  What was left on 2026-10-09 is now done, except the hardware session:
 
-  - **The German strings** (`J`). The new screens are English-only, which
-    `SWR-NFR-23` does not allow.
-  - **A rotary encoder is a poor keyboard**, and 95 characters is a long way
-    round. If hardware testing finds this painful, the cheapest improvement is
-    to start the knob on the character the previous press landed on rather than
-    at `a`, which costs one byte of state.
-  - **Nothing shows the join failing.** The display returns to the network
-    screen and the operator infers it from "not connected". A result line,
-    including the radio's reason code, belongs on that screen.
+  - **The display speaks German.** Every screen title, the whole menu, both
+    answers to a confirmation and every footer were English literals at their
+    draw sites, so a device set to German announced its faults in German inside
+    an English frame. They are now one table in `kiln_hmi/strings`, 46 strings
+    in two languages, with the transliteration `kiln_core/faults` has always
+    used because the 5x7 font carries the 95 printable ASCII glyphs and nothing
+    else. That answers `J1` from the code rather than from a hardware session.
+    Six tests: nothing missing, nothing over the panel's 21 columns, no byte
+    the font cannot draw, an unknown language falls back to English, and the
+    menu and the confirmation actually change when the language does. `J4`
+    still stands: no native speaker has read it.
+
+  - **The knob resumes where the last character left it**, and always did; what
+    was missing was a test saying so, which is now there. A passphrase repeats
+    characters and clusters inside a region of the set, so not sending the knob
+    back to `a` is usually several turns saved and never more, and it is the
+    sort of property one "sensible" reset silently reverses.
+
+  - **A failed join says so, with the radio's reason code.** `last_reason` was
+    recorded in the adapter and reported to nobody. The network screen now
+    distinguishes a join in flight from one the radio refused, and prints the
+    code: 15 is a failed four-way handshake, which is a wrong passphrase in
+    almost every case, and 201 is "no AP of that name answered". The number is
+    there to be read out over a phone to somebody who can look it up, which
+    beats a sentence that guesses. With the display the only route in, guessing
+    was the entire cost of getting it wrong.
+
+  What remains is the hardware session of `O3`, and nothing else.
 
 ---
 

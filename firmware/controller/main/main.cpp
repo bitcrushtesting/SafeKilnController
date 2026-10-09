@@ -546,6 +546,8 @@ void hmi_build_view(kiln_hmi_view_t *v)
         (void)snprintf(v->hostname, sizeof(v->hostname), "%s", ns.hostname);
         (void)snprintf(v->ip, sizeof(v->ip), "%s",
                        (ns.ip[0] != '\0') ? ns.ip : "no address");
+        /* SWR-NET-12: why the last attempt did not take, if it did not. */
+        v->net_last_reason = ns.last_reason;
     } else {
         v->net_up = false;
         (void)snprintf(v->hostname, sizeof(v->hostname), "%s", "wifi down");

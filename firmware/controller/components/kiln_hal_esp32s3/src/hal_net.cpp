@@ -184,6 +184,11 @@ kiln_err_t net_connect(void *ctx, const char *ssid, const char *pass)
     s_net.sta_configured = true;
     s_net.retry_ms       = RETRY_MIN_MS;
     s_net.state          = KILN_NET_CONNECTING;
+    /* A fresh attempt, so the previous attempt's reason stops being reported:
+     * the display distinguishes "joining" from "it failed, and here is why" by
+     * exactly this field, and a stale code would show the new attempt as
+     * already failed. */
+    s_net.last_reason    = 0u;
     (void)copy_checked(s_net.ssid, sizeof(s_net.ssid), ssid, "ssid");
     ESP_LOGI(TAG, "joining '%s' as asked at the display", ssid);
     return (esp_wifi_connect() == ESP_OK) ? KILN_OK : KILN_ERR_IO;
@@ -286,6 +291,7 @@ kiln_err_t net_status(void *ctx, kiln_net_status_t *out)
     (void)snprintf(out->hostname, sizeof(out->hostname), "%s", n->hostname);
     out->disconnect_count = n->disconnects;
     out->time_synced      = n->time_synced;
+    out->last_reason      = n->last_reason;
     out->uptime_s = (n->state == KILN_NET_STA_CONNECTED && n->up_since_us > 0)
                       ? (uint32_t)((esp_timer_get_time() - n->up_since_us) / 1000000)
                       : 0u;
