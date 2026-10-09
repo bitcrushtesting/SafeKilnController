@@ -12,7 +12,6 @@
 
 #include <string.h>
 #include "kiln_check.h"
-#include "kiln_app/program_store.h"
 #include "kiln_app/run_index.h"
 #include "kiln_core/fileslots.h"
 #include "kiln_core/profile.h"
@@ -56,72 +55,15 @@ static kiln_program_t named(const char *name, uint16_t top_c)
     return p;
 }
 
-/*
- * @relation(SWA-10, scope=function)
+/* The three tests that stood here saved programs to this flash, reloaded them
+ * byte for byte after a reboot, and filled twenty slots before refusing the
+ * twenty-first.  They went with the program store: the profiles are compiled
+ * into the image now, so a program cannot be lost by a medium it was never on.
+ *
+ * What the partition still holds is run records, and every property they
+ * relied on -- atomicity across a power cut, the ring, the identifier
+ * sequence, surviving a reboot -- is exercised below over the same flash fake.
  */
-KILN_TEST(swa10_the_seeded_examples_survive_a_reboot_on_flash)
-{
-    rig_t *r = &g_rig;
-    power_up_fresh(r);
-
-    /* This is the call that produced nothing on a real board before the store
-     * existed, which is why the display offered an empty list (M1). */
-    CHECK_OK(kiln_program_store_seed(&r->store));
-    const uint8_t seeded = kiln_program_store_count(&r->store);
-    CHECK(seeded > 0u);
-
-    boot(r);    /* reboot */
-    CHECK_EQ_UINT(kiln_program_store_count(&r->store), seeded);
-
-    /* Seeding is idempotent (SWR-PRG-09), including across the reboot. */
-    CHECK_OK(kiln_program_store_seed(&r->store));
-    CHECK_EQ_UINT(kiln_program_store_count(&r->store), seeded);
-}
-
-/*
- * @relation(SWR-PRG-04, scope=function)
- */
-KILN_TEST(swr_prg_04_a_saved_program_reloads_byte_for_byte_after_a_reboot)
-{
-    rig_t *r = &g_rig;
-    power_up_fresh(r);
-
-    const kiln_program_t p = named("bisque", 1000);
-    CHECK_OK(kiln_program_store_save(&r->store, &p, 1300.0f));
-
-    boot(r);
-
-    kiln_program_t back = {};
-    CHECK_OK(kiln_program_store_load(&r->store, "bisque", &back));
-    CHECK_STR_EQ(back.name, "bisque");
-    CHECK(memcmp(&back, &p, sizeof(p)) == 0);
-}
-
-/*
- * @relation(SWR-PRG-04, scope=function)
- */
-KILN_TEST(swr_prg_04_the_store_fills_to_its_slot_count_and_then_refuses)
-{
-    rig_t *r = &g_rig;
-    power_up_fresh(r);
-
-    char name[KILN_PROGRAM_NAME_LEN];
-    unsigned saved = 0;
-    for (unsigned i = 0; i < KILN_PROGRAM_SLOTS + 4u; i++) {
-        (void)snprintf(name, sizeof(name), "p%02u", i);
-        const kiln_program_t p = named(name, 900);
-        if (kiln_program_store_save(&r->store, &p, 1300.0f) == KILN_OK) {
-            saved++;
-        }
-    }
-    /* The slot count is the limit, not the region count: 64 regions are there
-     * to be shared with the run records. */
-    CHECK_EQ_UINT(saved, KILN_PROGRAM_SLOTS);
-    CHECK_EQ_UINT(kiln_program_store_count(&r->store), KILN_PROGRAM_SLOTS);
-
-    boot(r);
-    CHECK_EQ_UINT(kiln_program_store_count(&r->store), KILN_PROGRAM_SLOTS);
-}
 
 /*
  * @relation(SWR-LOG-09, scope=function)
@@ -153,19 +95,20 @@ KILN_TEST(swr_log_09_run_records_ring_and_survive_a_reboot_on_flash)
 }
 
 /*
- * @relation(SWR-PRG-04, scope=function)
+ * @relation(SWR-LOG-09, scope=function)
  */
-KILN_TEST(swr_prg_04_twenty_programs_and_twenty_runs_share_the_partition)
+KILN_TEST(swr_log_09_the_run_records_are_now_the_only_thing_on_the_partition)
 {
+    /* This test used to fill twenty program slots and twenty run slots and
+     * check that 40 of 64 regions were in use with headroom to spare.  With
+     * the programs in the image, the partition holds twenty regions of the
+     * sixty-four: it is now oversized by a factor of three rather than by half,
+     * which is recorded rather than acted on, because a 512 kB partition that
+     * is a third used costs nothing and shrinking it is a flash layout change
+     * that breaks every device already flashed. */
     rig_t *r = &g_rig;
     power_up_fresh(r);
 
-    char name[KILN_PROGRAM_NAME_LEN];
-    for (unsigned i = 0; i < KILN_PROGRAM_SLOTS; i++) {
-        (void)snprintf(name, sizeof(name), "p%02u", i);
-        const kiln_program_t p = named(name, 900);
-        CHECK_OK(kiln_program_store_save(&r->store, &p, 1300.0f));
-    }
     for (unsigned i = 1; i <= KILN_RUN_SLOTS; i++) {
         kiln_run_record_t rec = {};
         rec.run_id  = i;
@@ -173,43 +116,46 @@ KILN_TEST(swr_prg_04_twenty_programs_and_twenty_runs_share_the_partition)
         CHECK_OK(kiln_run_index_append(&r->store, &rec));
     }
 
-    CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs),
-                  KILN_PROGRAM_SLOTS + KILN_RUN_SLOTS);
-
-    /* 40 of 64, so the partition is sized with headroom and not to the inch. */
-    CHECK(kiln_fileslots_used_regions(&r->fs) < TEST_REGIONS);
+    CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs), KILN_RUN_SLOTS);
+    CHECK(kiln_fileslots_used_regions(&r->fs) * 3u <= TEST_REGIONS);
 
     boot(r);
-    CHECK_EQ_UINT(kiln_program_store_count(&r->store), KILN_PROGRAM_SLOTS);
     CHECK_EQ_UINT(kiln_run_index_count(&r->store), KILN_RUN_SLOTS);
 }
 
 /*
  * @relation(SWR-RUN-08, scope=function)
  */
-KILN_TEST(swr_run_08_a_power_cut_while_saving_a_program_keeps_the_old_one)
+KILN_TEST(swr_run_08_a_power_cut_while_rewriting_a_run_keeps_the_old_one)
 {
+    /* The same property the program save used to prove, over the file that is
+     * still written at run time: a rewrite of an existing name that loses
+     * power inside the payload leaves the previous content, not half of each.
+     *
+     * run_index rewrites a slot when it marks a run truncated, so this is not
+     * a hypothetical path. */
     rig_t *r = &g_rig;
     power_up_fresh(r);
 
-    const kiln_program_t first = named("glaze", 1200);
-    CHECK_OK(kiln_program_store_save(&r->store, &first, 1300.0f));
+    kiln_run_record_t first = {};
+    first.run_id     = 7;
+    first.duration_s = 3600;
+    first.program    = named("glaze", 1200);
+    CHECK_OK(kiln_run_index_append(&r->store, &first));
 
-    /* Overwrite the same name, and lose power inside the payload. */
-    const kiln_program_t second = named("glaze", 1250);
+    kiln_run_record_t edited = first;
+    edited.duration_s = 9999;
     r->flash.cut_power_at_write = r->flash.writes + 2u;
     r->flash.cut_bytes          = 16u;
-    (void)kiln_program_store_save(&r->store, &second, 1300.0f);
+    (void)kiln_run_index_append(&r->store, &edited);
 
     kiln_host_flash_power_on(&r->flash);
     boot(r);
 
-    /* Neither the old program nor the slot is gone, and the half-written one is
-     * nowhere: a kiln that loses power mid-save still has its firing program. */
-    kiln_program_t back = {};
-    CHECK_OK(kiln_program_store_load(&r->store, "glaze", &back));
-    CHECK_EQ_UINT(back.segments[0].target_c, 1200u);
-    CHECK_EQ_UINT(kiln_program_store_count(&r->store), 1u);
+    kiln_run_record_t back = {};
+    CHECK_OK(kiln_run_index_find(&r->store, 7u, &back));
+    CHECK_EQ_UINT(back.duration_s, 3600u);
+    CHECK_EQ_UINT(kiln_run_index_count(&r->store), 1u);
 }
 
 /*
@@ -245,25 +191,25 @@ KILN_TEST(swr_run_08_a_power_cut_while_appending_a_run_keeps_the_earlier_runs)
     CHECK_EQ_UINT(kiln_run_index_next_run_id(&r->store), 4u);
 }
 
-KILN_TEST(fr_cfg_12_a_format_clears_programs_and_runs_together)
+KILN_TEST(fr_cfg_12_a_format_clears_the_run_history)
 {
     rig_t *r = &g_rig;
     power_up_fresh(r);
 
-    CHECK_OK(kiln_program_store_seed(&r->store));
     kiln_run_record_t rec = {};
     rec.run_id  = 1;
     rec.program = named("x", 900);
     CHECK_OK(kiln_run_index_append(&r->store, &rec));
 
     CHECK_OK(kiln_fileslots_format(&r->fs));
-    CHECK_EQ_UINT(kiln_program_store_count(&r->store), 0u);
     CHECK_EQ_UINT(kiln_run_index_count(&r->store), 0u);
 
     boot(r);
-    CHECK_EQ_UINT(kiln_program_store_count(&r->store), 0u);
+    CHECK_EQ_UINT(kiln_run_index_count(&r->store), 0u);
 
-    /* And seeding brings the examples back, so a reset is recoverable. */
-    CHECK_OK(kiln_program_store_seed(&r->store));
-    CHECK(kiln_program_store_count(&r->store) > 0u);
+    /* A factory reset no longer costs the operator their programs, which is
+     * the other half of compiling them in: the only thing on this partition is
+     * history, and losing history is what a factory reset is for.  The next
+     * run also starts from 1 again, since the sequence is read from here. */
+    CHECK_EQ_UINT(kiln_run_index_next_run_id(&r->store), 1u);
 }

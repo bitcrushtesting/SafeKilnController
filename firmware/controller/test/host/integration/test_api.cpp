@@ -13,7 +13,6 @@
 #include <stdio.h>
 #include <string.h>
 #include "kiln_check.h"
-#include "kiln_app/program_store.h"
 #include "kiln_app/run_index.h"
 #include "kiln_core/logring.h"
 #include "kiln_core/profile.h"
@@ -124,8 +123,10 @@ static void rig_run(rig_t *r, double seconds)
  */
 static void local_start(rig_t *r, uint8_t program_id)
 {
+    /* From the image, which is where the programs are and where the local HMI
+     * reads them from too. */
     kiln_program_t prog;
-    CHECK_OK(kiln_program_store_get_slot(&r->fs_port, program_id, &prog));
+    CHECK_OK(kiln_profile_example(program_id, &prog));
     CHECK_OK(kiln_app_start(&r->app, &prog));
 }
 

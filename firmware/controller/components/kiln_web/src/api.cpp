@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <iterator>
-#include "kiln_app/program_store.h"
 #include "kiln_app/run_index.h"
 #include "kiln_core/faults.h"
 #include "kiln_core/profile.h"
@@ -687,22 +686,25 @@ kiln_err_t handle_tune(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
 
 /* --- /api/runs, /api/current, /api/storage, /api/net ------------------- */
 
-/* SWR-PRG-07: the stored programs, read only. */
+/* SWR-PRG-09: the programs, read only and compiled in.
+ *
+ * No storage check any more, and that is the point of the change: these came
+ * from the file store, which meant a device whose flash would not mount served
+ * 503 for the list of programs it was carrying in its own image.  The
+ * programs are now exactly as available as the firmware is. */
 kiln_err_t handle_program_list(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
 {
-    if (ctx->filestore == nullptr) {
-        kiln_api_error(resp, 503, "no_storage", "program storage is unavailable");
-        return KILN_ERR_IO;
-    }
     kiln_json_t j;
     resp_begin(resp, &j);
     kiln_json_obj_open(&j);
     kiln_json_key(&j, "programs");
     kiln_json_arr_open(&j);
-    const uint8_t n = kiln_program_store_count(ctx->filestore);
+    /* SWR-PRG-09, and now the whole of it: the programs are compiled into the
+     * image, so this enumerates the firmware rather than the medium. */
+    const uint8_t n = kiln_profile_example_count();
     for (uint8_t i = 0; i < n; i++) {
         kiln_program_t prog;
-        if (kiln_program_store_get_slot(ctx->filestore, i, &prog) != KILN_OK) {
+        if (kiln_profile_example(i, &prog) != KILN_OK) {
             continue;
         }
         write_program(&j, &prog, i, ctx->app->cfg.max_temp_c);
@@ -712,19 +714,15 @@ kiln_err_t handle_program_list(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
     return resp_end(resp, &j);
 }
 
-/* One stored program by slot.  A missing slot is 404 and not an empty list:
- * a client asking for a program that is not there has made a different
- * mistake from one asking what programs exist. */
+/* One program by id.  An id past the end is 404 and not an empty list: a
+ * client asking for a program that is not there has made a different mistake
+ * from one asking what programs exist. */
 kiln_err_t handle_program_one(kiln_api_ctx_t *ctx, uint8_t id,
                                      kiln_api_resp_t *resp)
 {
-    if (ctx->filestore == nullptr) {
-        kiln_api_error(resp, 503, "no_storage", "program storage is unavailable");
-        return KILN_ERR_IO;
-    }
     kiln_program_t prog;
-    if (kiln_program_store_get_slot(ctx->filestore, id, &prog) != KILN_OK) {
-        kiln_api_error(resp, 404, "not_found", "no program in that slot");
+    if (kiln_profile_example(id, &prog) != KILN_OK) {
+        kiln_api_error(resp, 404, "not_found", "no program with that id");
         return KILN_ERR_NOT_FOUND;
     }
     kiln_json_t j;
@@ -895,13 +893,19 @@ kiln_err_t handle_storage(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
             kiln_json_kv_uint(&j, "total_bytes", total);
             kiln_json_kv_uint(&j, "used_bytes", used);
         }
-        kiln_json_kv_uint(&j, "programs", kiln_program_store_count(ctx->filestore));
         kiln_json_kv_uint(&j, "runs", kiln_run_index_count(ctx->filestore));
     }
     else {
         kiln_json_kv_bool(&j, "available", false);
     }
     kiln_json_obj_close(&j);
+
+    /* Outside "files", because the programs are no longer files: they are in
+     * the image, and reporting them as occupants of the medium said the
+     * opposite of what is true.  Kept in this response because "how many
+     * programs does this device have" is a storage-shaped question even when
+     * the answer no longer involves storage. */
+    kiln_json_kv_uint(&j, "programs", kiln_profile_example_count());
 
     kiln_json_obj_close(&j);
     return resp_end(resp, &j);

@@ -15,9 +15,8 @@
 #include "kiln_check.h"
 #include "kiln_core/fileslots.h"
 #include "kiln_hal_host/hal_host.h"
-/* For the two blob sizes the real callers store, in the mount-cost tests at the
+/* For the blob size the one real caller stores, in the mount-cost tests at the
  * end of this file: a cost measured against made-up payloads measures nothing. */
-#include "kiln_app/program_store.h"
 #include "kiln_app/run_index.h"
 
 constexpr size_t SECTOR_BYTES = 4096u;
@@ -724,11 +723,13 @@ KILN_TEST(swa21_a_full_mount_costs_what_the_model_says)
  */
 KILN_TEST(swa21_the_mount_this_product_actually_pays_for)
 {
-    /* What the two real callers store: 20 programs and 20 run records, at the
-     * sizes their own serialisers produce. The worst case above is what the
-     * partition permits; this is what the firmware puts in it, and the
-     * difference is a factor of nine. */
-    constexpr size_t PROG_BLOB = 8u + sizeof(kiln_program_t) + 2u;
+    /* What the one real caller stores: 20 run records at the size run_index's
+     * own serialiser produces. The worst case above is what the partition
+     * permits; this is what the firmware puts in it.
+     *
+     * It used to be 20 programs as well, which is why the medium here is half
+     * what it was: the programs are compiled into the image and the partition
+     * holds history and nothing else. */
     constexpr size_t RUN_BLOB  = 8u + sizeof(kiln_run_record_t) + 2u;
 
     cost_rig_t *r = &g_cost;
@@ -742,9 +743,6 @@ KILN_TEST(swa21_the_mount_this_product_actually_pays_for)
     memset(blob, 0x5A, sizeof(blob));
     for (size_t i = 0; i < 20u; i++) {
         char path[16];
-        (void)snprintf(path, sizeof(path), "/p/%02zu", i);
-        CHECK_OK(r->store.write_atomic(r->store.ctx, path, blob, PROG_BLOB));
-        CHECK_OK(r->store.write_atomic(r->store.ctx, path, blob, PROG_BLOB));
         (void)snprintf(path, sizeof(path), "/r/%02zu", i);
         CHECK_OK(r->store.write_atomic(r->store.ctx, path, blob, RUN_BLOB));
         CHECK_OK(r->store.write_atomic(r->store.ctx, path, blob, RUN_BLOB));
@@ -754,22 +752,23 @@ KILN_TEST(swa21_the_mount_this_product_actually_pays_for)
     r->flash.bytes_read = 0;
     CHECK_OK(kiln_fileslots_mount(&r->fs, &r->port));
 
-    uint32_t pr = 0, pb = 0, rr = 0, rb = 0;
-    copy_cost(PROG_BLOB, &pr, &pb);
+    uint32_t rr = 0, rb = 0;
     copy_cost(RUN_BLOB, &rr, &rb);
 
-    /* 40 regions hold a file; the other 24 cost one failed header read each. */
-    const uint32_t want_reads = 2u * 20u * (pr + rr) + (uint32_t)(COST_REGIONS - 40u) * 2u;
-    const uint32_t want_bytes = 2u * 20u * (pb + rb)
-                              + (uint32_t)(COST_REGIONS - 40u) * 2u * KILN_FILESLOT_HDR;
+    /* 20 regions hold a file; the other 44 cost one failed header read each. */
+    const uint32_t want_reads = 2u * 20u * rr + (uint32_t)(COST_REGIONS - 20u) * 2u;
+    const uint32_t want_bytes = 2u * 20u * rb
+                              + (uint32_t)(COST_REGIONS - 20u) * 2u * KILN_FILESLOT_HDR;
     CHECK_EQ_UINT(r->flash.reads, want_reads);
     CHECK_EQ_UINT(r->flash.bytes_read, want_bytes);
-    printf("    mount: %u reads, %u bytes (program blob %zu, run blob %zu)\n",
-           r->flash.reads, r->flash.bytes_read, PROG_BLOB, RUN_BLOB);
+    printf("    mount: %u reads, %u bytes (run blob %zu)\n",
+           r->flash.reads, r->flash.bytes_read, RUN_BLOB);
 
-    /* Measured: 768 reads and 47 808 bytes, against 8 192 and 524 288 for a
-     * medium full of maximum-size files. A ninth of the worst case, and the
-     * reason the worst case is a bound rather than a budget. */
-    CHECK_EQ_UINT(r->flash.reads, 768u);
-    CHECK_EQ_UINT(r->flash.bytes_read, 47808u);
+    /* Measured, against 8 192 reads and 524 288 bytes for a medium full of
+     * maximum-size files: a small fraction of the worst case, which is the
+     * reason the worst case is a bound rather than a budget. The exact numbers
+     * are asserted so that making mount lazy, or putting something else on
+     * this partition, shows up here rather than on a board. */
+    CHECK_EQ_UINT(r->flash.reads, 488u);
+    CHECK_EQ_UINT(r->flash.bytes_read, 31888u);
 }
