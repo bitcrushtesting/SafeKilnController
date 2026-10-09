@@ -203,12 +203,18 @@ bool sup_flash_ok(const void *data, size_t len, uint32_t expected);
  * @implements SWR-SAF-33
  */
 constexpr unsigned SUP_RAM_PATTERN_COUNT = 5u;
-/* A declaration, not a definition: the array is defined in selfcheck.cpp with
- * its initialiser, so there is no initialisation of any kind in this header to
- * be ordered against anything.  The check reports the extern declaration
- * regardless.
+/**
+ * @brief The patterns, in order.
+ *
+ * @rationale
+ * A declaration, not a definition: the array is defined in `selfcheck.cpp`
+ * with its initialiser, so there is no initialisation of any kind in this
+ * header to be ordered against anything. clang-tidy reports the extern
+ * declaration regardless, which is what the suppression below is for, and it
+ * has to sit on the line immediately before the declaration.
+ *
+ * @implements SWR-SAF-33
  * NOLINTNEXTLINE(bugprone-dynamic-static-initializers) */
-/** @brief The patterns, in order. Defined in `selfcheck.cpp`. */
 extern const uint32_t SUP_RAM_PATTERNS[SUP_RAM_PATTERN_COUNT];
 
 /**
