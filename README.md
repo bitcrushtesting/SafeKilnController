@@ -18,11 +18,11 @@ An open-source PID controller for electric ceramic and glass kilns, built on the
 **ESP32-S3** with **ESP-IDF**.
 
 - **Simple local display**: a 128×64 OLED showing current and target temperature at a glance, plus state, segment progress and rate of rise.
-- **Web interface**: served by the device itself. Live dashboard, charts of the logged data, power and energy, and a firing-curve editor. **Observation only**: nothing reachable over the network can start a firing, heat the kiln or change its configuration. Those live on the device.
+- **Web interface**: served by the device itself. Live dashboard, charts of the logged data, power and energy, and the firing programs as stored. **Observation only**: nothing reachable over the network can start a firing, heat the kiln, change its configuration or author a program. Every one of those is done at the kiln.
 - **PID with automatic tuning**: relay (Åström–Hägglund) autotune on the real kiln; no manual gain hunting.
 - **Safety first**: thermal runaway, thermocouple failure, shorted-SSR, over-temperature and door-interlock detection, with a safety supervisor that has sole authority over a heat-enable line that decays unless actively refreshed.
 - **Current monitoring**: a current transformer turns relay and element failures from slow thermal inferences into fast electrical facts, with the thermal rules retained as an independent backstop.
-- **Self-contained**: no SD card, no external database, no cloud, no filesystem. Logs live in a circular partition on internal flash and programs in a fixed-slot one, each built so a power cut cannot tear a record; web assets are embedded in the firmware.
+- **Self-contained**: no SD card, no external database, no account, no filesystem. Logs live in a circular partition on internal flash and programs in a fixed-slot one, each built so a power cut cannot tear a record; web assets are embedded in the firmware. The device makes **one** outbound connection, a daily check for a firmware update that carries nothing about the device and can be turned off at the display.
 - **Designed for testability**: all decision logic is hardware-free C++ that runs on a development host against a simulated kiln.
 
 ![The web dashboard during a bisque firing, showing 813.6 °C tracking an 812.5 °C setpoint at 152 °C/h in segment 3 of 5, with the logged curve and the preheat dwell visible](docs/images/web-dashboard.png)
@@ -49,27 +49,23 @@ from the browser, so the harness starts one of the built-in examples
 
 ## Status
 
-**In development.** The firmware is C++20. The control, safety, storage and web
-logic is implemented and tested, and the hardware adapters are written but have
-not yet been run against a board. The browser UI is not served yet, its assets
-are not embedded in the image, and the **field update path is specified but not
-built** (see below).
+**In development, and not ready to fire a kiln.** The control, safety, storage,
+web and interface logic is written and tested. The hardware adapters are
+written and **have never been run against a board**. Two things block a
+release: the field update path is specified and unbuilt, and local control,
+which is now the only control, has never been operated by a person.
 
-398 host tests pass plain and under AddressSanitizer/UBSan, `clang-tidy` is
-clean on host and target, the `esp32s3` image builds with zero warnings at
-246 kB (88 % of the OTA slot free), and QEMU boots that image and fires it.
+433 host tests on the controller and 81 on the independent safety supervisor,
+all green plain and under AddressSanitizer and UBSan. `clang-tidy` is clean on
+host and target with no suppressions baseline, MC/DC over the supervisor's trip
+logic is 100 % against an 80 % floor, the `esp32s3` image builds with zero
+warnings at 246 kB (88 % of the OTA slot free), and QEMU boots that image and
+fires it.
 
-| Area | State |
-|---|---|
-| `kiln_core`: PID, setpoint generator, program model, safety supervisor (including the current-based relay rules), autotune, heater-current measurement, configuration model, run state, log codec, log ring, file store | Implemented, host-tested |
-| `kiln_ports`: the interface headers everything hardware goes through | Complete for the above |
-| `kiln_sim`: plant simulator with heater current and electrical fault injection | Implemented |
-| `kiln_app`: task orchestration, mode state machine, heat authority, logging, persistence, power-loss recovery | Implemented, host-tested |
-| `kiln_hal_esp32s3`: log partition, file store, NVS, clock, reset cause, watchdog | Implemented, builds for esp32s3 |
-| `kiln_hal_esp32s3`: MAX31856, SSD1306, encoder, SSR outputs, CT front end, WiFi | Implemented, **not yet run against hardware** |
-| `kiln_web`: REST API, JSON, log streaming, read-only enforcement | Implemented, host-tested; HTTP transport on target, **browser assets not yet embedded** |
-| `kiln_hmi`: the local display and encoder | Implemented and host-tested, **not yet run against hardware**; the only way to start a firing |
-| Firmware update | **Specified, not built.** The device pulls a signed manifest from `update.bitcrushtesting.com`, the local display announces it, and the operator confirms there; the web interface stays read-only and gains no inbound route (SWR-UPD-09 to SWR-UPD-16, `docs/security.md` §6.2) |
+The controller is C++20; the supervisor is C++17, which is the standard
+MISRA C++:2023 is written against. What is done, what is not, and what blocks
+a release is [`tasklist.md`](tasklist.md), which is kept current and is the
+only place that count lives.
 
 You can watch a complete firing, and break it in a dozen ways, without any
 hardware at all, see [`docs/simulation.md`](docs/simulation.md):
@@ -85,10 +81,13 @@ cmake -B build-host -S firmware/controller/test/host && cmake --build build-host
 ctest --test-dir build-host
 ```
 
-CI runs the layering and licence checks, the host suites plain and under
-AddressSanitizer/UBSan, a coverage gate, the `esp32s3` build with a size report,
-and a QEMU job that boots the real image and watches it fire. Tagging `v*`
-builds a release.
+CI runs eleven jobs: the layering and licence checks, both host suites plain
+and under AddressSanitizer and UBSan, a coverage gate, `clang-tidy` on host and
+on target, StrictDoc over the requirements, the `esp32s3` build with a size
+report and a generated bill of materials, the supervisor suites with MC/DC, the
+unit design document with documentation warnings as errors, and a QEMU job that
+boots the real image and asserts that the simulated kiln passes 100 degC
+without latching a fault. Tagging `v*` builds a release.
 
 ## Putting a unit into production
 
@@ -193,10 +192,14 @@ document cites it throughout.
 ## Repository layout
 
 ```
-docs/       requirements and architecture
-firmware/controller/   ESP-IDF application (not yet implemented)
-hardware/   schematic, PCB, pin map
-housing/    enclosure
+docs/                  requirements, architecture, safety and security
+firmware/controller/   the ESP-IDF application
+firmware/supervisor/   the independent safety supervisor, STM32G031
+web/                   the browser interface, served by the device
+tools/                 release, provisioning, analysis and document generation
+fixture/               the bed-of-nails test fixture
+hardware/              schematic, PCB, pin map
+housing/               enclosure
 ```
 
 ## Scope
@@ -212,13 +215,13 @@ three-phase kiln, so it is out of scope rather than partially supported.
 | Part | Choice |
 |---|---|
 | MCU | ESP32-S3, ≥ 8 MB flash, no PSRAM required |
-| Temperature | 2 × MAX31856 (chamber + enclosure), type-K by default |
+| Temperature | MAX31856 front ends, type-K. The controller reads chamber and enclosure; the **supervisor reads its own chamber couples on its own SPI buses**, so neither processor depends on the other for a temperature |
 | Display | 128×64 monochrome OLED, I²C |
 | Input | Rotary encoder with push button |
 | Output | Zero-cross SSR in series with a safety contactor |
 | Supply | **Single phase only.** One current transformer on the heater conductor |
 | Door interlock | Optional normally-closed switch, stops the heater immediately when the door opens |
-| Connectivity | WiFi station with access-point fallback, `kiln.local` via mDNS |
+| Connectivity | WiFi station only. **No access point:** the network is selected and its passphrase typed at the display, so setting it up needs somebody at the kiln. mDNS (`kiln.local`) is specified and not implemented, so the device is reached by IP, which the display shows |
 
 Details and rationale are in
 [requirements §6](docs/03_software_req.sdoc).
