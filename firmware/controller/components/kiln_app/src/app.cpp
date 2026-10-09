@@ -3,7 +3,6 @@
 
 #include <string.h>
 #include "kiln_app/app.h"
-#include "kiln_app/program_store.h"
 #include "kiln_app/run_index.h"
 #include "kiln_app/settings.h"
 
@@ -856,10 +855,10 @@ kiln_err_t kiln_app_boot(kiln_app_t *app, kiln_reset_cause_t cause, float outage
         }
     }
 
-    /* SWR-PRG-09: the examples, idempotently. */
+    /* The file store now holds run records and nothing else: SWR-PRG-09's
+     * examples are compiled into the image and read from there, so there is
+     * nothing to seed and no copy of them on the medium to go stale. */
     if (app->ports.filestore != nullptr) {
-        (void)kiln_program_store_seed(app->ports.filestore);
-
         /* Run numbering continues across a reboot rather than restarting and
          * colliding with records already on disk. */
         app->next_run_id = kiln_run_index_next_run_id(app->ports.filestore);

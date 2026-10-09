@@ -787,7 +787,19 @@ VERIFICATION: T
 [REQUIREMENT]
 UID: SWR-PRG-04
 STATEMENT: >>>
-The system shall store at least **20** programs in non-volatile storage, persisting across power loss and firmware update.
+**Withdrawn 2026-10-10.** This required at least 20 programs in non-volatile storage, persisting across power loss and firmware update.
+
+It was the last requirement standing on the authoring path that [LINK: SWR-PRG-07], [LINK: SWR-PRG-08] and [LINK: SWR-PRG-10] were withdrawn with. With nothing on the device able to create or edit a program, the storage held a copy of the three examples that arrive in the image ([LINK: SWR-PRG-09]) and nothing else: persistence of something already persistent, in a medium that wears out, behind a seeding path that could fail on a first boot and a store that could fail to mount.
+
+So the programs are read from the firmware. What that *removes* is worth stating, because this is a deletion that makes the device better rather than smaller:
+
+- A device whose flash will not mount now still has its programs. It used to serve `503` for the list of programs it was carrying in its own image.
+- A factory reset ([LINK: SWR-CFG-09]) no longer costs the operator their programs. The partition holds run history, and losing history is what a factory reset is for.
+- The first boot has nothing to get wrong. Seeding was idempotent and tested, and it was still a write to flash on every power-on of a brand-new device.
+
+"Persisting across a firmware update" is now trivially true in the only sense left: the programs are part of what the update installs. A user who wants a different curve edits `kiln_core/profile` and builds, which is the cost [LINK: SWR-PRG-09] states plainly.
+
+The 20-slot figure is gone with the requirement. `kiln_core/fileslots` still carries 64 regions and the run index still uses 20 of them ([LINK: SWR-LOG-09]), so the partition is now a third used rather than two thirds. That is recorded in architecture 10.6 and deliberately not acted on: shrinking the partition is a flash-layout change that breaks every device already flashed, to recover space nothing needs.
 <<<
 PRIORITY: M
 VERIFICATION: T
@@ -796,6 +808,8 @@ VERIFICATION: T
 UID: SWR-PRG-05
 STATEMENT: >>>
 The system shall validate a program on start, rejecting it with a specific reason if: no segments; any target above the configured maximum temperature; any field out of range; total predicted duration above 168 h.
+
+**Still required after [LINK: SWR-PRG-04]'s withdrawal, and the reason is the configured maximum.** The programs are compiled in and therefore trusted as *data*, but `safety.max_temp_c` is set by the operator and can be lowered below a program's peak; validation on start is what refuses that firing rather than running it into a ceiling. A test asserts that every compiled-in example validates against the default maximum, because an example that cannot start is one an operator discovers by selecting it.
 <<<
 PRIORITY: M
 VERIFICATION: T

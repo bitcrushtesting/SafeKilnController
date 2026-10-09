@@ -3,7 +3,6 @@
 
 set(KILN_APP_SRCS
     src/app.cpp
-    src/program_store.cpp
     src/run_index.cpp
     src/settings.cpp
 )

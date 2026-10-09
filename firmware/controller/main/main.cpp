@@ -456,12 +456,23 @@ void hmi_apply(const kiln_hmi_action_t *a)
             kiln_hal_heat_rearm();      /* SWR-SAF-18: let the output arm again */
         }
         break;
-    case KILN_HMI_ACT_START:
-        /* No program store on hardware yet (tasklist E7), so there is nothing
-         * to start.  The HMI already refuses to offer an empty list; this is
-         * the belt to that braces. */
-        e = KILN_ERR_NOT_FOUND;
+    case KILN_HMI_ACT_START: {
+        /* SWR-HMI-10 and SWR-PRG-09.  This used to return NOT_FOUND with a
+         * note that there was no program store on hardware, which made the
+         * menu's first entry dead on the device that ships: an operator could
+         * select a program and press, and nothing happened.
+         *
+         * With the profiles compiled into the image there is nothing to look
+         * up and nothing that can fail to mount, so the local input can start
+         * a firing on its own, which is what SWR-HMI-10 asked for and what a
+         * kiln with no network needs. */
+        kiln_program_t prog;
+        e = kiln_profile_example(a->program_index, &prog);
+        if (e == KILN_OK) {
+            e = kiln_app_start(&s_app, &prog);
+        }
         break;
+    }
 
     case KILN_HMI_ACT_WIFI_SCAN:
         /* SWR-NET-11.  The results arrive asynchronously; the view builder
@@ -552,6 +563,23 @@ void hmi_build_view(kiln_hmi_view_t *v)
         v->net_up = false;
         (void)snprintf(v->hostname, sizeof(v->hostname), "%s", "wifi down");
         (void)snprintf(v->ip, sizeof(v->ip), "%s", "-");
+    }
+
+    /* SWR-HMI-10: the programs the menu offers.  Read from the image, which is
+     * also why there are any: the list was never filled on hardware, so the
+     * programs screen said "none stored" on a device carrying three firing
+     * profiles in its own flash. */
+    const uint8_t progs = kiln_profile_example_count();
+    v->program_count = (progs < KILN_HMI_MAX_PROGRAMS) ? progs
+                                                       : (uint8_t)KILN_HMI_MAX_PROGRAMS;
+    for (uint8_t i = 0; i < v->program_count; i++) {
+        kiln_program_t prog;
+        if (kiln_profile_example(i, &prog) != KILN_OK) {
+            v->program_name[i][0] = '\0';
+            continue;
+        }
+        (void)snprintf(v->program_name[i], KILN_HMI_NAME_LEN, "%.*s",
+                       (int)(KILN_HMI_NAME_LEN - 1u), prog.name);
     }
 
     /* SWR-NET-11: collect the scan once, when the radio says it has finished. */

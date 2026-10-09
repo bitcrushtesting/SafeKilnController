@@ -759,31 +759,40 @@ weakness first, the deadline second, the sentence third, the engineering last.
   stream now declares neither length nor chunking and ends with the
   connection, which is what an event stream is.
 
-- [ ] **P3. The program store has no writer, and 17 of its 20 slots have no
-  purpose.** Answered rather than open: `OQ-09` is resolved, the profiles are
-  compiled into the firmware and nothing edits them, so `SWR-PRG-07`,
-  `SWR-PRG-08` and `SWR-PRG-10` are withdrawn. What is left is the machinery
-  those requirements justified.
+- [x] **P3. The program store is gone. Done 2026-10-10.** The decision was
+  pre-compiled profiles with nothing editing them, which left `SWR-PRG-04`
+  asking for 20 program slots in non-volatile storage to hold a copy of the
+  three programs that arrive in the image. It is withdrawn, the store is
+  deleted, and the profiles are read from `kiln_profile_example` by the API,
+  the HMI and the development harness alike.
 
-  `kiln_program_store_save` and `kiln_program_store_delete` are now called by
-  **nothing but their own tests**. `SWR-PRG-04` asks for 20 program slots in
-  non-volatile storage persisting across a firmware update, and the three
-  programs that exist arrive with the firmware, so the persistence is storing
-  a copy of something the image already contains.
+  It is a deletion that makes the device better rather than smaller:
 
-  Two ways to finish it, and this is a decision rather than a task:
+  - **The local start path worked for the first time.** `KILN_HMI_ACT_START`
+    returned `KILN_ERR_NOT_FOUND` on hardware with a note that there was no
+    program store, and the view builder never filled the program list, so a
+    device carrying three firing profiles in its own flash showed "none
+    stored" and its menu's first entry did nothing. Both are now wired to the
+    compiled-in profiles, which is `SWR-HMI-10` delivered rather than written.
+  - **A device whose flash will not mount still has its programs.** The list
+    used to answer `503` for programs the firmware was carrying.
+  - **A factory reset no longer costs the operator their programs.** The
+    partition holds run history, and losing history is what a reset is for.
+  - **The first boot has nothing to get wrong.** Seeding was idempotent and
+    tested, and still a flash write on every power-on of a new device.
 
-  - **Keep the store, narrow the requirement.** Seeding stays, the slots stay,
-    `SWR-PRG-04` is reworded to say what it is now for. Cheapest, and leaves
-    tested code that nothing calls.
-  - **Read the profiles straight from `kiln_profile_example()`.** The program
-    store stops existing for programs; `kilnfs` keeps the run records, which
-    are the other half of `SWA-21`. Removes a subsystem, a partition's worth
-    of wear, the seeding path and its failure modes, and about 200 lines. It
-    also deletes tested code, which wants care rather than enthusiasm.
+  About 200 lines of implementation and nine tests went with it. The three
+  properties worth keeping were re-pointed rather than dropped: every
+  compiled-in example is a valid program with a distinct name and an index past
+  the end is refused, the atomic-replace-on-power-cut property is now driven
+  through `run_index`, which is what still writes to the store, and the
+  partition-sharing test became the measurement that 20 of 64 regions are used.
+  The mount cost of `Q2` halves with it: **488 reads and 31 888 bytes**.
 
-  The second is the one consistent with the decision. Neither should be done
-  without someone deciding which.
+  `SWR-PRG-05` stays, and the reason is `safety.max_temp_c`: the programs are
+  trusted as data, but an operator can lower the ceiling below a program's
+  peak, and validation on start is what refuses that firing rather than running
+  it into a limit.
 
 - [ ] **P4. Untested against a client.** It compiles and passes analysis. No
   request has been made of it. The host API suite covers every route's
@@ -823,8 +832,9 @@ weakness first, the deadline second, the sentence third, the engineering last.
 
 - [x] **Q2. The mount cost is measured. Done 2026-10-09.** It was described
   rather than measured, and the description was low by a third. On the medium
-  this firmware actually produces, 20 programs of 398 bytes and 20 run records
-  of 554, a mount costs **768 reads and 47 808 bytes** of CRC. A partition full
+  this firmware actually produces, a mount costs **488 reads and 31 888 bytes**
+  of CRC: 20 run records of 554 bytes, both copies valid. It was 768 reads and
+  47 808 bytes while the programs were stored too, which `P3` ended. A partition full
   of maximum-size files with both copies valid costs **8 192 reads and 524 288
   bytes**, the whole partition.
 

@@ -167,7 +167,6 @@ double is a compile-time-checked substitution.
 | `telemetry` | Maintains the current published snapshot for queries, lock-free for readers. |
 | `logger_task` | Drains the log queue to `port_logstore`; the only component that blocks on flash. |
 | `settings` | Configuration load, validate, migrate, apply, persist; marks reboot-required items. |
-| `program_store` | Program CRUD over `port_filestore`, atomic replace, seeding of read-only examples. |
 | `run_index` | Run record persistence and the 20-run retention policy. |
 
 ### 5.4 Presentation
@@ -658,8 +657,9 @@ decimated series equal the extrema of the full series.
 
 ### 10.6 The file store
 
-`kilnfs` holds programs and run records as a fixed array rather than a
-filesystem (`SWA-21`). The partition divides into equal **regions of two erase
+`kilnfs` holds run records as a fixed array rather than a filesystem
+(`SWA-21`). It held programs too until `SWR-PRG-04` was withdrawn; the store
+below is unchanged, and what changed is that only one caller writes to it. The partition divides into equal **regions of two erase
 sectors**, 64 regions in 512 kB. One file occupies one region and alternates
 between its two sectors, so the copy being replaced is never the copy being
 erased.
@@ -695,10 +695,14 @@ path returns `KILN_ERR_INVALID_ARG`. Both callers produce five-character slot
 paths, so nothing generates one today; refusing is the answer because storing a
 file under a name the caller did not ask for is worse than failing.
 
-Capacity is 40 of 64 regions for the 20 programs of `SWR-PRG-04` and the 20 run
-records of `SWR-LOG-09`. Endurance is generous for the same reason the log's is:
-a program is written when a user saves it and a run record once per firing, so a
-region sees single-digit erases per year against a 100 000 cycle rating.
+Capacity is 20 of 64 regions, for the run records of `SWR-LOG-09` and nothing
+else. It was 40, half of them programs, until `SWR-PRG-04` was withdrawn and the
+firing profiles moved into the image: the partition is now a third used rather
+than two thirds. That is recorded and deliberately not acted on, because
+shrinking it is a flash-layout change that breaks every device already flashed,
+to recover space nothing needs. Endurance is generous for the same reason the
+log's is: a run record is written once per firing, so a region sees single-digit
+erases per year against a 100 000 cycle rating.
 
 **Wear is handled at the write rather than at the read.** A NOR sector at the
 end of its life does not report an error: it takes the write, returns success,
@@ -727,8 +731,8 @@ for nothing. Retirement is in because its failure mode is losing a run record,
 which is cheap to prevent and annoying to explain.
 
 **What a mount costs**, measured in `test_fileslots` rather than estimated: the
-medium this firmware produces, 20 programs of 398 bytes and 20 run records of
-554, costs **768 reads and 47 808 bytes** of CRC. A partition full of
+medium this firmware produces, 20 run records of 554 bytes, costs **488 reads
+and 31 888 bytes** of CRC. A partition full of
 maximum-size files, both copies valid, costs **8 192 reads and 524 288 bytes**,
 which is the whole partition. Both are paid once, at start-up, and the
 expectation is tens of milliseconds rather than a budget item; if a board ever
@@ -743,9 +747,9 @@ survives a remount, a cut before the commit leaves the previous copy, a cut
 inside the commit header leaves the previous copy, a sector that lies about a
 write retires its region and the file is still readable, a region that cannot be
 erased stays retired across a reboot, and a part with nowhere left to write says
-so instead of losing the previous content. The same fake drives `program_store`
-and `run_index` over the real store in `test_stores_on_flash`, which is the
-combination that runs on the board.
+so instead of losing the previous content. The same fake drives `run_index`
+over the real store in `test_stores_on_flash`, which is the combination that
+runs on the board.
 
 ### 10.7 What the buzzer sounds like
 
@@ -803,9 +807,8 @@ set (`SWR-WEB-23`).
 | `GET` | `/api/info` | Version, git revision, build time, target, uptime, gains + provenance | `SWR-UPD-06` |
 | `GET` `PUT` | `/api/config` | Read / atomically write configuration | `SWR-CFG-03` |
 | `POST` | `/api/config/defaults` | Restore defaults | `SWR-CFG-06` |
-| `GET` `POST` | `/api/programs` | List / create | `SWR-PRG-07` |
-| `GET` `PUT` `DELETE` | `/api/programs/{id}` | Read / update / delete | `SWR-PRG-07` |
-| `POST` | `/api/programs/{id}/copy` | Duplicate | `SWR-PRG-07` |
+| `GET` | `/api/programs` | List the programs compiled into the firmware | `SWR-PRG-09` |
+| `GET` | `/api/programs/{id}` | Read one; an id past the end is `404` | `SWR-PRG-09` |
 | `GET` | `/api/programs/{id}/preview` | Predicted setpoint curve, duration, end time | `SWR-PRG-06` |
 | `POST` | `/api/run` | Start `{program_id}` | `SWR-RUN-02` |
 | `POST` | `/api/run/pause` `resume` `abort` `ack` | Run control and segment acknowledgement | `SWR-RUN-03/04`, `SWR-PRG-03` |
@@ -1035,8 +1038,8 @@ Five properties of this that are decisions rather than details:
    is enforced in `kiln_app`, where the state machine lives, not in the port.
 5. **Rollback is cancelled late** (`SWR-UPD-15`). The first boot of a new image
    stays pending-verify until the supervisor link, both thermocouples, the
-   configuration, the stored programs and the display have all proved themselves
-   in the running system. `confirm_running()` in start-up code would make
+   configuration and the display have all proved themselves in the running
+   system. `confirm_running()` in start-up code would make
    `SWR-UPD-02` decoration.
 
 #### The manifest
@@ -1264,7 +1267,7 @@ Requirement-level traceability is maintained mechanically by `tools/trace`
 | `FR-CUR` | `core/current`, `hal/adc_ct`, `current` task | Unit, integration, driver, HIL |
 | `FR-CTL` | `core/pid`, `core/setpoint`, `core/window`, `control` task, `heat_window` | Unit, integration, driver (timing) |
 | `FR-TUN` | `core/autotune` | Unit, integration across plant sets |
-| `FR-PRG` | `core/profile`, `app/program_store` | Unit, API |
+| `FR-PRG` | `core/profile` (the programs are compiled in) | Unit, API |
 | `FR-RUN` | `app/run_controller`, `core/runstate` | Unit, integration (incl. power loss) |
 | `FR-HMI` | `kiln_hmi`, `hal/ssd1306`, `hal/encoder` | Golden image, driver, demonstration |
 | `FR-WEB` | `kiln_web`, `web/` | API, browser demonstration |
@@ -1304,7 +1307,7 @@ Requirement-level traceability is maintained mechanically by `tools/trace`
 | **M3, Control** | `pid`, `window`, `setpoint`, `profile`, `control` task, heat output. | A program runs closed-loop against the simulator to `SWR-NFR-05`. |
 | **M4, Safety** | `core/safety`, safety task, charge-pump enable, latching, watchdogs. | Every rule in [§8.2](#82-rule-table) has a passing automated test; HIL confirms contactor release. |
 | **M4b, Current** | `core/current`, CT adapter, `SWR-SAF-25`–`SWR-SAF-30`, weld discrimination. | Every current rule has a passing automated test; HIL confirms `SWR-SAF-27` against an emulated welded contactor. |
-| **M5, Persist** | Log ring, run index, programs, configuration, power-loss recovery. | `FR-LOG`, `FR-CFG`, `SWR-RUN-08` pass; endurance analysis confirmed by measurement. |
+| **M5, Persist** | Log ring, run index, configuration, power-loss recovery. | `FR-LOG`, `FR-CFG`, `SWR-RUN-08` pass; endurance analysis confirmed by measurement. |
 | **M6, Web** | HTTP server, REST API, SSE, dashboard, chart, program editor, settings, OTA. | `FR-WEB`, `FR-UPD` pass; API suite green. |
 | **M7, Tune** | `autotune` and its UI. | `FR-TUN` passes across the simulator's plant parameter sweep. |
 | **M8, Commission** | Soak test, timing report, documentation, real kiln firing. | `SWR-NFR-10`, `SWR-TST-18` reports published; a real firing completed and logged. |

@@ -39,7 +39,6 @@
 #include <unistd.h>
 
 #include "kiln_app/app.h"
-#include "kiln_app/program_store.h"
 #include "kiln_app/run_index.h"
 #include "kiln_core/faults.h"
 #include "kiln_core/logring.h"
@@ -132,9 +131,12 @@ void device_init(void)
     }
     (void)kiln_app_boot(&g_app, KILN_RESET_POWER_ON, -1.0f);
 
-    /* The built-in examples of SWR-PRG-09, so the Programs view has something in
-     * it.  Idempotent by design, and the device does this on every boot too. */
-    (void)kiln_program_store_seed(&g_fs_port);
+    /* Nothing to seed: SWR-PRG-09's examples are compiled into the firmware and
+     * the Programs view enumerates them from there, which is also what the
+     * device does.
+
+     * The file store below is still bound, because the run records are real
+     * files and /api/runs reads them. */
 
     g_api.app       = &g_app;
     g_api.filestore = &g_fs_port;

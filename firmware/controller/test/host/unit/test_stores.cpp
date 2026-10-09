@@ -7,7 +7,6 @@
 
 #include <string.h>
 #include "kiln_check.h"
-#include "kiln_app/program_store.h"
 #include "kiln_app/run_index.h"
 #include "kiln_app/settings.h"
 #include "kiln_core/profile.h"
@@ -175,159 +174,69 @@ static kiln_program_t named(const char *name, uint16_t target)
     return p;
 }
 
+/* --- the programs, which are now firmware (SWR-PRG-09) ------------------
+ *
+ * Six tests used to live here, over a store that saved programs to flash,
+ * replaced them by name, refused to overwrite the read-only examples, filled
+ * twenty slots and then said no, and re-validated what it read back because a
+ * stored program is untrusted input.
+ *
+ * All of it is gone, with the store. SWR-PRG-07, SWR-PRG-08 and SWR-PRG-10 are
+ * withdrawn -- nothing authors a program on this device -- and the three
+ * profiles that exist arrive in the image, so persisting them was keeping a
+ * copy of something the firmware already contained, in a medium that can wear
+ * out, behind a seeding path that could fail.
+ *
+ * What survives is the property that actually matters, and it is now checkable
+ * without a medium at all: the programs the firmware carries are valid
+ * programs. A profile compiled in wrong is a firing that fails at the moment
+ * somebody starts it.
+ */
+
 /*
  * @relation(SWR-PRG-09, scope=function)
  */
-KILN_TEST(swrprg09_the_examples_are_seeded_once_and_are_read_only)
+KILN_TEST(swrprg09_every_compiled_in_program_is_a_valid_program)
 {
-    kiln_host_fs_t fs;
-    kiln_port_filestore_t port;
-    kiln_host_fs_init(&fs);
-    kiln_host_fs_bind(&fs, &port);
-
-    CHECK_OK(kiln_program_store_seed(&port));
     const uint8_t n = kiln_profile_example_count();
-    CHECK_EQ_UINT(kiln_program_store_count(&port), n);
+    CHECK(n > 0u);
+    CHECK(n <= KILN_MAX_PROGRAMS);
 
-    const uint32_t writes = fs.writes;
-    /* Idempotent, so it can run on every boot without rewriting flash. */
-    CHECK_OK(kiln_program_store_seed(&port));
-    CHECK_EQ_UINT(fs.writes, writes);
-    CHECK_EQ_UINT(kiln_program_store_count(&port), n);
+    for (uint8_t i = 0; i < n; i++) {
+        kiln_program_t p;
+        CHECK_OK(kiln_profile_example(i, &p));
 
-    kiln_program_t example;
-    CHECK_OK(kiln_profile_example(0, &example));
+        /* Named, terminated, and not empty: the name is what the menu and the
+         * API show, and the run record keeps a copy of it. */
+        CHECK(p.name[0] != '\0');
+        CHECK(strnlen(p.name, KILN_PROGRAM_NAME_LEN) < KILN_PROGRAM_NAME_LEN);
 
-    /* SWR-PRG-09: neither overwritable nor deletable, so the operator always has
-     * a known-good program to fall back to. */
-    kiln_program_t edited = example;
-    edited.segments[0].target_c = 500;
-    CHECK_ERR(kiln_program_store_save(&port, &edited, 1280.0f), KILN_ERR_STATE);
-    CHECK_ERR(kiln_program_store_delete(&port, example.name), KILN_ERR_STATE);
-}
-
-KILN_TEST(swrprg_programs_round_trip_and_replace_by_name)
-{
-    kiln_host_fs_t fs;
-    kiln_port_filestore_t port;
-    kiln_host_fs_init(&fs);
-    kiln_host_fs_bind(&fs, &port);
-
-    const kiln_program_t p = named("my firing", 900);
-    CHECK_OK(kiln_program_store_save(&port, &p, 1280.0f));
-
-    kiln_program_t out;
-    CHECK_OK(kiln_program_store_load(&port, "my firing", &out));
-    CHECK_STR_EQ(out.name, "my firing");
-    CHECK_EQ_UINT(out.segments[0].target_c, 900u);
-
-    /* Saving the same name replaces rather than accumulating. */
-    const kiln_program_t edited = named("my firing", 1000);
-    CHECK_OK(kiln_program_store_save(&port, &edited, 1280.0f));
-    CHECK_EQ_UINT(kiln_program_store_count(&port), 1u);
-    CHECK_OK(kiln_program_store_load(&port, "my firing", &out));
-    CHECK_EQ_UINT(out.segments[0].target_c, 1000u);
-
-    CHECK_OK(kiln_program_store_delete(&port, "my firing"));
-    CHECK_ERR(kiln_program_store_load(&port, "my firing", &out), KILN_ERR_NOT_FOUND);
-    CHECK_ERR(kiln_program_store_delete(&port, "my firing"), KILN_ERR_NOT_FOUND);
-}
-
-/*
- * @relation(SWR-PRG-05, scope=function)
- */
-KILN_TEST(swrprg05_an_invalid_program_never_reaches_storage)
-{
-    kiln_host_fs_t fs;
-    kiln_port_filestore_t port;
-    kiln_host_fs_init(&fs);
-    kiln_host_fs_bind(&fs, &port);
-
-    kiln_program_t bad = named("too hot", 1340);
-    CHECK_ERR(kiln_program_store_save(&port, &bad, 1280.0f), KILN_ERR_RANGE);
-    CHECK_EQ_UINT(kiln_program_store_count(&port), 0u);
-
-    bad = named("", 900);
-    CHECK_ERR(kiln_program_store_save(&port, &bad, 1280.0f), KILN_ERR_RANGE);
-    CHECK_EQ_UINT(fs.writes, 0u);
-}
-
-/*
- * @relation(SWR-PRG-04, scope=function)
- */
-KILN_TEST(swrprg04_the_store_holds_twenty_programs_and_then_says_no)
-{
-    kiln_host_fs_t fs;
-    kiln_port_filestore_t port;
-    kiln_host_fs_init(&fs);
-    kiln_host_fs_bind(&fs, &port);
-
-    char name[KILN_PROGRAM_NAME_LEN];
-    for (unsigned i = 0; i < KILN_PROGRAM_SLOTS; i++) {
-        (void)snprintf(name, sizeof(name), "program %u", i);
-        const kiln_program_t p = named(name, 900);
-        CHECK_OK(kiln_program_store_save(&port, &p, 1280.0f));
+        /* Validates against the default ceiling of SWR-SAF-01. An example that
+         * does not is one an operator cannot start, which they would discover
+         * by selecting it. */
+        CHECK_MSG(kiln_profile_validate(&p, 1280.0f).code == KILN_PROG_OK,
+                  "example %u (%s) does not validate", i, p.name);
+        CHECK(p.segment_count > 0u);
+        CHECK(kiln_profile_peak_c(&p) > 0.0f);
     }
-    CHECK_EQ_UINT(kiln_program_store_count(&port), KILN_PROGRAM_SLOTS);
-    CHECK_EQ_UINT(KILN_PROGRAM_SLOTS, KILN_MAX_PROGRAMS);
 
-    const kiln_program_t one_too_many = named("overflow", 900);
-    CHECK_ERR(kiln_program_store_save(&port, &one_too_many, 1280.0f), KILN_ERR_NO_SPACE);
+    /* Names are distinct, because they are what the operator picks by. */
+    for (uint8_t i = 0; i < n; i++) {
+        for (uint8_t k = (uint8_t)(i + 1u); k < n; k++) {
+            kiln_program_t a, b;
+            CHECK_OK(kiln_profile_example(i, &a));
+            CHECK_OK(kiln_profile_example(k, &b));
+            CHECK_MSG(strcmp(a.name, b.name) != 0,
+                      "examples %u and %u are both called %s", i, k, a.name);
+        }
+    }
 
-    /* But replacing an existing one still works when full, which is the case a
-     * naive "is there a free slot" check gets wrong. */
-    const kiln_program_t replace = named("program 3", 950);
-    CHECK_OK(kiln_program_store_save(&port, &replace, 1280.0f));
-}
-
-/*
- * @relation(SWR-NFR-19, scope=function)
- */
-KILN_TEST(swrnfr19_a_stored_program_is_treated_as_untrusted_on_the_way_back_in)
-{
-    kiln_host_fs_t fs;
-    kiln_port_filestore_t port;
-    kiln_host_fs_init(&fs);
-    kiln_host_fs_bind(&fs, &port);
-
-    const kiln_program_t p = named("ok", 900);
-    CHECK_OK(kiln_program_store_save(&port, &p, 1280.0f));
-
-    /* Scribble over the stored name so it has no terminator, then fix the CRC so
-     * it passes -- which is what a firmware with a different struct layout, or a
-     * sufficiently unlucky corruption, looks like. */
-    CHECK(fs.files[0].used);
-    uint8_t *blob = fs.files[0].data;
-    memset(&blob[8], 'A', KILN_PROGRAM_NAME_LEN);
-    const size_t n = fs.files[0].len;
-    const uint16_t crc = kiln_crc16(blob, n - 2);
-    blob[n - 2] = (uint8_t)crc;
-    blob[n - 1] = (uint8_t)(crc >> 8u);
-
+    /* And an index past the end is refused rather than returning whatever is
+     * next in memory: the id comes off a URL (/api/programs/{id}). */
     kiln_program_t out;
-    CHECK_OK(kiln_program_store_get_slot(&port, 0, &out));
-    /* Terminated on the way in, so nothing downstream reads off the end. */
-    CHECK_EQ_UINT(strlen(out.name), KILN_PROGRAM_NAME_LEN - 1u);
-}
-
-KILN_TEST(a_corrupt_program_file_is_skipped_not_returned)
-{
-    kiln_host_fs_t fs;
-    kiln_port_filestore_t port;
-    kiln_host_fs_init(&fs);
-    kiln_host_fs_bind(&fs, &port);
-
-    const kiln_program_t a = named("good", 900);
-    CHECK_OK(kiln_program_store_save(&port, &a, 1280.0f));
-    const kiln_program_t b = named("also good", 800);
-    CHECK_OK(kiln_program_store_save(&port, &b, 1280.0f));
-
-    fs.files[0].data[20] ^= 0xFFu;        /* corrupt the first */
-
-    CHECK_EQ_UINT(kiln_program_store_count(&port), 1u);
-    kiln_program_t out;
-    CHECK_ERR(kiln_program_store_load(&port, "good", &out), KILN_ERR_NOT_FOUND);
-    CHECK_OK(kiln_program_store_load(&port, "also good", &out));
+    CHECK_ERR(kiln_profile_example(n, &out), KILN_ERR_NOT_FOUND);
+    CHECK_ERR(kiln_profile_example(255, &out), KILN_ERR_NOT_FOUND);
+    CHECK_ERR(kiln_profile_example(0, nullptr), KILN_ERR_INVALID_ARG);
 }
 
 /* --- run records (SWR-RUN-07, SWR-LOG-09) -------------------------------- */
@@ -485,24 +394,28 @@ KILN_TEST(swrsaf12_the_baseline_comes_from_the_stored_run_history)
 
 KILN_TEST(an_atomic_replace_leaves_the_previous_content_on_a_power_cut)
 {
-    /* The property atomic-by-rename buys, and the one a plain write loses: half
-     * a program on disk is worse than the old program. */
+    /* The property atomic-by-two-copies buys, and the one a plain write loses:
+     * half a record on disk is worse than the old record.  Driven through the
+     * run index, which is what still writes to this store now that the
+     * programs are compiled into the image. */
     kiln_host_fs_t fs;
     kiln_port_filestore_t port;
     kiln_host_fs_init(&fs);
     kiln_host_fs_bind(&fs, &port);
 
-    const kiln_program_t a = named("keeper", 900);
-    CHECK_OK(kiln_program_store_save(&port, &a, 1280.0f));
+    kiln_run_record_t a = run(1, KILN_END_COMPLETE);
+    a.duration_s = 3600u;
+    CHECK_OK(kiln_run_index_append(&port, &a));
 
     fs.cut_power_at_write = fs.writes + 1u;
-    const kiln_program_t b = named("keeper", 1000);
-    CHECK_ERR(kiln_program_store_save(&port, &b, 1280.0f), KILN_ERR_IO);
+    kiln_run_record_t b = a;
+    b.duration_s = 7200u;
+    (void)kiln_run_index_append(&port, &b);
 
     fs.powered = true;
-    kiln_program_t out;
-    CHECK_OK(kiln_program_store_load(&port, "keeper", &out));
-    CHECK_EQ_UINT(out.segments[0].target_c, 900u);    /* the old one, intact */
+    kiln_run_record_t out = {};
+    CHECK_OK(kiln_run_index_find(&port, 1u, &out));
+    CHECK_EQ_UINT(out.duration_s, 3600u);    /* the old one, intact */
 }
 
 KILN_TEST(the_stores_validate_their_arguments)
@@ -512,13 +425,7 @@ KILN_TEST(the_stores_validate_their_arguments)
     kiln_host_fs_init(&fs);
     kiln_host_fs_bind(&fs, &port);
 
-    kiln_program_t p;
     kiln_run_record_t r;
-    CHECK_ERR(kiln_program_store_seed(NULL), KILN_ERR_INVALID_ARG);
-    CHECK_ERR(kiln_program_store_save(&port, NULL, 1280.0f), KILN_ERR_INVALID_ARG);
-    CHECK_ERR(kiln_program_store_load(&port, NULL, &p), KILN_ERR_INVALID_ARG);
-    CHECK_ERR(kiln_program_store_get_slot(&port, 200, &p), KILN_ERR_INVALID_ARG);
-    CHECK_EQ_UINT(kiln_program_store_count(NULL), 0u);
 
     CHECK_ERR(kiln_run_index_append(&port, NULL), KILN_ERR_INVALID_ARG);
     CHECK_ERR(kiln_run_index_get_slot(&port, 200, &r), KILN_ERR_INVALID_ARG);

@@ -13,7 +13,6 @@
 #include <string.h>
 #include "kiln_check.h"
 #include "kiln_app/app.h"
-#include "kiln_app/program_store.h"
 #include "kiln_app/run_index.h"
 #include "kiln_app/settings.h"
 #include "kiln_core/faults.h"
@@ -326,18 +325,37 @@ KILN_TEST(swrcfg05_configuration_survives_a_reboot)
 /*
  * @relation(SWR-PRG-09, scope=function)
  */
-KILN_TEST(swrprg09_the_examples_are_present_after_a_first_boot)
+KILN_TEST(swrprg09_the_examples_need_no_first_boot_at_all)
 {
+    /* This used to check that the first boot seeded the examples onto the
+     * medium.  There is no seeding: they are in the image, so they are present
+     * on a device whose flash has never been written, whose flash will not
+     * mount, and immediately rather than after whatever the boot sequence gets
+     * round to.  A first boot is no longer a thing that can go wrong here.
+     *
+     * Checked after a boot anyway, because what the test is really about is
+     * that an operator has programs to start, and the boot is how a device
+     * arrives at that state. */
     static medium_t m;
     static boot_t   b;
     medium_init(&m);
     CHECK_OK(boot(&b, &m, KILN_RESET_POWER_ON, -1.0f, 20.0f));
 
-    CHECK_EQ_UINT(kiln_program_store_count(&b.fs_port), kiln_profile_example_count());
+    const uint8_t n = kiln_profile_example_count();
+    CHECK(n > 0u);
 
-    kiln_program_t p;
-    CHECK_OK(kiln_program_store_load(&b.fs_port, "Glaze cone 6", &p));
-    CHECK(p.flags & KILN_PROG_FLAG_READONLY);
+    bool found_glaze = false;
+    for (uint8_t i = 0; i < n; i++) {
+        kiln_program_t p;
+        CHECK_OK(kiln_profile_example(i, &p));
+        CHECK(p.flags & KILN_PROG_FLAG_READONLY);
+        if (strcmp(p.name, "Glaze cone 6") == 0) { found_glaze = true; }
+    }
+    CHECK(found_glaze);
+
+    /* And the medium is untouched by any of it: a first boot no longer writes
+     * a copy of what the firmware already contains. */
+    CHECK_EQ_UINT(m.fs.writes, 0u);
 }
 
 /* --- SWR-SAF-17 across a reboot ---------------------------------------------- */
