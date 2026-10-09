@@ -25,6 +25,9 @@ permissions:
 
 env:
   IDF_VERSION: v6.0.1
+  # Pinned for the reason ci.yml pins it: StrictDoc validates the requirements
+  # and a new version can change what validates.
+  STRICTDOC_VERSION: 0.30.1
 
 jobs:
   release:
@@ -84,6 +87,26 @@ jobs:
                                         --out-dir build/sbom --format both \
                                         --strict
 
+      # The two documents ship WITH the binary, deliberately. A release is the
+      # moment somebody asks what this firmware is and what was verified about
+      # it, and an answer that lives only in a CI artifact expires in ninety
+      # days. Both are generated from the sources in this tag, so they describe
+      # the image beside them and not whatever main looked like later.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build the requirements documents (StrictDoc)
+        run: |
+          pipx install "strictdoc==${STRICTDOC_VERSION}"
+          strictdoc export . --output-dir build-docs --formats=html,json
+
+      - name: Build the unit design document (Doxygen)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq doxygen graphviz
+          tools/udd.sh
+
       - name: Assemble the artifacts
         run: |
           tag='${{ steps.version.outputs.tag }}'
@@ -110,6 +133,14 @@ jobs:
           # CI artifact that expires.
           cp firmware/controller/build/sbom/*.cdx.json         "dist/${base}.cdx.json"
           cp firmware/controller/build/sbom/*.spdx.json        "dist/${base}.spdx.json"
+
+          # The documents, zipped because a release asset is a file and both
+          # are trees of HTML. The JSON half of the StrictDoc export goes in
+          # too: it is the machine-readable form of the traceability, which is
+          # what a tool asking "is every SWR- realised" would read.
+          ( cd build-docs && zip -qr "../dist/safekiln-${tag}-requirements.zip" . )
+          ( cd firmware/supervisor/build-udd/html \
+              && zip -qr "../../../../dist/safekiln-${tag}-unit-design.zip" . )
 
           ( cd dist && sha256sum ./* > SHA256SUMS )
           ls -l dist
@@ -169,6 +200,25 @@ jobs:
             echo 'Not covered by any of it: the device drivers, and the charge-pump'
             echo 'release of `SWA-05` — the central safety property of the design, which'
             echo 'needs real hardware to verify (`SWR-TST-17`, `SYS-SAF-02`).'
+            echo
+            echo '## Documents'
+            echo
+            echo 'Both generated from the sources in this tag, so they describe'
+            echo 'the image beside them:'
+            echo
+            echo "- \`${base%-esp32s3-SIMULATED}-requirements.zip\` and the JSON"
+            echo '  beside it: the user, system, software, architecture, safety'
+            echo '  and security documents as StrictDoc renders them, with the'
+            echo '  traceability between them. `strictdoc export` fails on a'
+            echo '  reference to a requirement that does not exist, so this'
+            echo '  building at all is part of what the release asserts.'
+            echo "- \`${base%-esp32s3-SIMULATED}-unit-design.zip\`: V-model level 5"
+            echo '  for the independent safety supervisor, generated from its'
+            echo '  headers. 76 of 76 public functions and constants, each with'
+            echo '  the requirement it implements, its parameter ranges, its'
+            echo '  error behaviour, its design rationale and the test that'
+            echo '  covers it. Documentation warnings are errors, so a gap in it'
+            echo '  fails the build rather than appearing as a blank entry.'
             echo
             echo '## Bill of materials'
             echo
