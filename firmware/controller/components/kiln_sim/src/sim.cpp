@@ -706,39 +706,6 @@ kiln_err_t sfs_remove(void *ctx, const char *path)
     return KILN_OK;
 }
 
-kiln_err_t sfs_exists(void *ctx, const char *path)
-{
-    kiln_sim_fs_t *fs = static_cast<kiln_sim_fs_t *>(ctx);
-    if ((fs == nullptr) || (path == nullptr)) {
-        return KILN_ERR_INVALID_ARG;
-    }
-    return sfs_find(fs, path) >= 0 ? KILN_OK : KILN_ERR_NOT_FOUND;
-}
-
-kiln_err_t sfs_list(void *ctx, const char *dir,
-                           bool (*fn)(void *user, const char *name, size_t size),
-                           void *user)
-{
-    kiln_sim_fs_t *fs = static_cast<kiln_sim_fs_t *>(ctx);
-    if ((fs == nullptr) || (dir == nullptr) || (fn == nullptr)) {
-        return KILN_ERR_INVALID_ARG;
-    }
-
-    const size_t dlen = strlen(dir);
-    for (size_t i = 0; i < KILN_SIM_FS_FILES; i++) {
-        if (!fs->files[i].used) {
-            continue;
-        }
-        if (strncmp(fs->files[i].path, dir, dlen) != 0) {
-            continue;
-        }
-        if (!fn(user, fs->files[i].path, fs->files[i].len)) {
-            break;
-        }
-    }
-    return KILN_OK;
-}
-
 kiln_err_t sfs_usage(void *ctx, size_t *total, size_t *used)
 {
     const kiln_sim_fs_t *fs = static_cast<const kiln_sim_fs_t *>(ctx);
@@ -773,8 +740,6 @@ void kiln_sim_fs_bind(kiln_sim_fs_t *fs, kiln_port_filestore_t *out)
     out->read         = sfs_read;
     out->write_atomic = sfs_write;
     out->remove       = sfs_remove;
-    out->exists       = sfs_exists;
-    out->list         = sfs_list;
     out->usage        = sfs_usage;
 }
 

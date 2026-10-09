@@ -9,9 +9,9 @@
  * not control.  The two callers above it -- program_store and run_index -- do
  * not need one either.  Both address a fixed array of numbered slots, `/p/00`
  * to `/p/19` and `/r/00` upwards, never an arbitrary name, and between them
- * they call read, write_atomic, remove and usage.  `list` and `exists` are in
- * the port but have no caller.  A filesystem would be a general mechanism paid
- * for in failure modes and bought for a fixed-size array.
+ * they call read, write_atomic, remove and usage, which is the whole port.  A
+ * filesystem would be a general mechanism paid for in failure modes and bought
+ * for a fixed-size array.
  *
  * The medium is divided into equal regions of two erase sectors.  One file
  * lives in one region and alternates between its two sectors, so the copy being

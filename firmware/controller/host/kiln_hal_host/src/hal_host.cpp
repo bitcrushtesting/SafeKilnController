@@ -415,42 +415,6 @@ kiln_err_t fs_remove(void *ctx, const char *path)
     return KILN_OK;
 }
 
-kiln_err_t fs_exists(void *ctx, const char *path)
-{
-    kiln_host_fs_t *fs = static_cast<kiln_host_fs_t *>(ctx);
-    if ((fs == nullptr) || (path == nullptr)) {
-        return KILN_ERR_INVALID_ARG;
-    }
-    return (fs_find(fs, path) != nullptr) ? KILN_OK : KILN_ERR_NOT_FOUND;
-}
-
-kiln_err_t fs_list(void *ctx, const char *dir,
-                          bool (*fn)(void *user, const char *name, size_t size),
-                          void *user)
-{
-    kiln_host_fs_t *fs = static_cast<kiln_host_fs_t *>(ctx);
-    if ((fs == nullptr) || (dir == nullptr) || (fn == nullptr)) {
-        return KILN_ERR_INVALID_ARG;
-    }
-    if (!fs->powered) {
-        return KILN_ERR_IO;
-    }
-
-    const size_t dlen = strlen(dir);
-    for (size_t i = 0; i < KILN_HOST_FS_FILES; i++) {
-        if (!fs->files[i].used) {
-            continue;
-        }
-        if (strncmp(fs->files[i].path, dir, dlen) != 0) {
-            continue;
-        }
-        if (!fn(user, fs->files[i].path, fs->files[i].len)) {
-            break;
-        }
-    }
-    return KILN_OK;
-}
-
 kiln_err_t fs_usage(void *ctx, size_t *total, size_t *used)
 {
     const kiln_host_fs_t *fs = static_cast<const kiln_host_fs_t *>(ctx);
@@ -484,8 +448,6 @@ void kiln_host_fs_bind(kiln_host_fs_t *fs, kiln_port_filestore_t *out)
     out->read         = fs_read;
     out->write_atomic = fs_write_atomic;
     out->remove       = fs_remove;
-    out->exists       = fs_exists;
-    out->list         = fs_list;
     out->usage        = fs_usage;
 }
 

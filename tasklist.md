@@ -781,15 +781,6 @@ weakness first, the deadline second, the sentence third, the engineering last.
   the only thing mount needs eagerly is which copy of each region wins, and the
   payload CRC could move to the read.
 
-- [ ] **Q3. `exists` and `list` are implemented and have no caller, and the
-  reason they were kept has gone.** They were kept for `P3`'s local program
-  editor, and the decision there was pre-compiled profiles with nothing
-  editing them, so there is no prospective caller left. Three implementations
-  (`fileslots`, the host HAL, the simulator) and two tests exist for an
-  interface nothing above uses. Either the port contract loses both and the
-  implementations go with them, or they stay with an honest reason written down.
-  **A decision rather than a task**, and it travels with `P3`.
-
 - [x] **Q4. A name longer than 63 bytes is refused rather than truncated.
   Recorded 2026-10-09.** `KILN_PATH_MAX` is 64 including the terminator and the
   name field is exactly that, so a longer path returns `KILN_ERR_INVALID_ARG`.
