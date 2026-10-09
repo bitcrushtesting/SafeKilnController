@@ -74,7 +74,11 @@ jobs:
             idf.py build
             # One image covering bootloader, partition table and app, so flashing
             # is a single command and cannot be done half way.
-            idf.py merge-bin -o build/safekiln-merged.bin
+            #
+            # -o is relative to the BUILD directory, not to the project, so the
+            # obvious "build/safekiln-merged.bin" asks for build/build/ and the
+            # file the next step copies is not there. Verified by running it.
+            idf.py merge-bin -o safekiln-merged.bin
             idf.py size > build/size.txt
             idf.py size-components > build/size-components.txt
             # SWR-NFR-28. Inside the container, because the licences are scanned
