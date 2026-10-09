@@ -45,6 +45,11 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           prev="$(git describe --tags --abbrev=0 "${tag}^" 2>/dev/null || true)"
           echo "prev=$prev" >> "$GITHUB_OUTPUT"
+          # The tag's own commit date, as SOURCE_DATE_EPOCH for the SBOM: a
+          # release artefact kept for five years should be byte-identical when
+          # rebuilt from the same tag, and a wall-clock timestamp is the one
+          # thing that would stop it.
+          echo "epoch=$(git log -1 --format=%ct "$tag")" >> "$GITHUB_OUTPUT"
           echo "Building $tag (previous: ${prev:-none})"
 
       # The logic gate first.  A release whose safety rules are untested is not a
@@ -69,6 +74,15 @@ jobs:
             idf.py merge-bin -o build/safekiln-merged.bin
             idf.py size > build/size.txt
             idf.py size-components > build/size-components.txt
+            # SWR-NFR-28. Inside the container, because the licences are scanned
+            # from the ESP-IDF tree, and --strict because a release is exactly
+            # the case where an unresolved licence or a missing digest must stop
+            # the build rather than ship as a gap nobody reads.
+            export SOURCE_DATE_EPOCH='${{ steps.version.outputs.epoch }}'
+            python3 ../../tools/sbom.py --build-dir build \
+                                        --image build/safekiln.bin \
+                                        --out-dir build/sbom --format both \
+                                        --strict
 
       - name: Assemble the artifacts
         run: |
@@ -91,6 +105,11 @@ jobs:
           cp firmware/controller/build/size-components.txt     "dist/${base}-size-components.txt"
           # The resolved configuration, so the image can be reproduced.
           cp firmware/controller/sdkconfig                     "dist/${base}-sdkconfig"
+          # The bill of materials, in both formats (SWR-NFR-28). It is kept for
+          # the support period, which is why it is a release asset rather than a
+          # CI artifact that expires.
+          cp firmware/controller/build/sbom/*.cdx.json         "dist/${base}.cdx.json"
+          cp firmware/controller/build/sbom/*.spdx.json        "dist/${base}.spdx.json"
 
           ( cd dist && sha256sum ./* > SHA256SUMS )
           ls -l dist
@@ -150,6 +169,24 @@ jobs:
             echo 'Not covered by any of it: the device drivers, and the charge-pump'
             echo 'release of `SWA-05` — the central safety property of the design, which'
             echo 'needs real hardware to verify (`SWR-TST-17`, `SYS-SAF-02`).'
+            echo
+            echo '## Bill of materials'
+            echo
+            echo 'Published with this release in both formats, generated from the'
+            echo 'build rather than maintained by hand (`SWR-NFR-28`): every'
+            echo 'ESP-IDF component actually linked, with the licence its own'
+            echo 'sources declare, and the image digest they belong to.'
+            echo
+            echo '```'
+            python3 - <<'PY'
+import glob, json
+for f in sorted(glob.glob('dist/*.cdx.json')):
+    d = json.load(open(f))
+    c = d['metadata']['component']
+    print(f"{c['name']} {c['version']}  {len(d['components'])} components")
+    print(f"serial {d['serialNumber']}")
+PY
+            echo '```'
             echo
             echo '## Changes'
             echo
