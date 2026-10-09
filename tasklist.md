@@ -46,7 +46,7 @@ reused: gaps in the numbering are items that have been closed.
 | [L](#l-target-adapters) | Target adapters | 2 |
 | [M](#m-kiln_hmi-the-local-interface) | `kiln_hmi` | 3 |
 | [N](#n-security-obligations-and-the-cyber-resilience-act) | Security obligations and the CRA | 5 |
-| [O](#o-wifi-fr-net) | WiFi | 3 |
+| [O](#o-wifi-fr-net) | WiFi | 4 |
 | [P](#p-http-transport-and-the-api) | HTTP transport and the API | 4 |
 | [Q](#q-the-file-store-ad-21) | The file store | 5 |
 | [R](#r-the-independent-safety-supervisor-ad-22) | Independent safety supervisor | 6 |
@@ -679,8 +679,40 @@ weakness first, the deadline second, the sentence third, the engineering last.
   architecture 12.4's and it has not been measured against a real asset build.
 
 - [ ] **O3. Untested against a radio.** Same class as `L2`: it compiles and
-  passes analysis. Nobody has watched it associate, fall back to the AP,
-  recover from a dropped connection, or sync time.
+  passes analysis. Nobody has watched it associate, recover from a dropped
+  connection, or sync time.
+
+  The WiFi setup of `O4` is in the same position and matters more, because it
+  is now the **only** way credentials reach the device: a scan that returns
+  nothing on real hardware, or a join that silently fails, leaves a kiln with
+  no network and no second route to one. First hardware session should be, in
+  order: scan in a crowded band, join a WPA2 network with a passphrase
+  containing symbols, power-cycle and confirm it comes back, then join a
+  different network to confirm it replaces rather than accumulates.
+
+- [ ] **O4. The provisioning AP is gone; WiFi is set up at the display.**
+  Done in firmware and unproven on hardware. `SWR-NET-02` and `SWR-NET-05` are
+  withdrawn, `SWR-NET-11` and `SWR-NET-12` replace them, `net.ap_ssid` and
+  `net.ap_pass` leave the schema, and `TH-11`, `SRR-08` and `OQ-S4` close with
+  them: the surface is deleted rather than regulated.
+
+  What is written: the scan list and the character-by-character passphrase
+  entry in `kiln_hmi`, nine host tests over them including one that walks the
+  whole character set, `esp_wifi_scan_*` behind `port_net`, and the join wired
+  through the composition root, persisting credentials before attempting the
+  radio.
+
+  What is left:
+
+  - **The German strings** (`J`). The new screens are English-only, which
+    `SWR-NFR-23` does not allow.
+  - **A rotary encoder is a poor keyboard**, and 95 characters is a long way
+    round. If hardware testing finds this painful, the cheapest improvement is
+    to start the knob on the character the previous press landed on rather than
+    at `a`, which costs one byte of state.
+  - **Nothing shows the join failing.** The display returns to the network
+    screen and the operator infers it from "not connected". A result line,
+    including the radio's reason code, belongs on that screen.
 
 ---
 

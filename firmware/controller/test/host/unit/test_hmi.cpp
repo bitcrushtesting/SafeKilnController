@@ -509,3 +509,239 @@ KILN_TEST(swa22_a_missing_supervisor_is_shown_differently_from_one_that_tripped)
     CHECK(memcmp(kiln_hmi_frame(&fired), kiln_hmi_frame(&absent),
                  KILN_DISPLAY_BYTES) != 0);
 }
+
+/* --- WiFi setup at the display (SWR-NET-11, SWR-NET-12) ------------------ */
+
+static kiln_hmi_view_t net_view(void)
+{
+    kiln_hmi_view_t v = base_view();
+    v.net_count = 3;
+    (void)snprintf(v.net_list_ssid[0], KILN_HMI_SSID_LEN, "studio");
+    v.net_list_rssi[0]    = -42;
+    v.net_list_secured[0] = true;
+    (void)snprintf(v.net_list_ssid[1], KILN_HMI_SSID_LEN, "kiln-shed");
+    v.net_list_rssi[1]    = -67;
+    v.net_list_secured[1] = true;
+    (void)snprintf(v.net_list_ssid[2], KILN_HMI_SSID_LEN, "guest-open");
+    v.net_list_rssi[2]    = -71;
+    v.net_list_secured[2] = false;
+    return v;
+}
+
+/* Walk to the network screen through the menu, the way an operator does. */
+static void to_network(kiln_hmi_t *h, const kiln_hmi_view_t *v)
+{
+    (void)feed(h, v, KILN_INPUT_PRESS);                 /* main -> menu  */
+    for (int i = 0; i < 3; i++) { (void)feed(h, v, KILN_INPUT_CW); }
+    (void)feed(h, v, KILN_INPUT_PRESS);                 /* -> network    */
+}
+
+/*
+ * @relation(SWR-NET-11, scope=function)
+ */
+KILN_TEST(swrnet11_the_network_screen_is_the_way_into_wifi_setup)
+{
+    kiln_hmi_t h; kiln_hmi_init(&h, 0);
+    const kiln_hmi_view_t v = net_view();
+    to_network(&h, &v);
+    CHECK(h.screen == KILN_HMI_SCREEN_NETWORK);
+
+    /* Pressing asks for a scan and moves to the list.  Without this there is
+     * no route to WiFi setup at all, the access point having been removed. */
+    const kiln_hmi_action_t a = feed(&h, &v, KILN_INPUT_PRESS);
+    CHECK(a.kind == KILN_HMI_ACT_WIFI_SCAN);
+    CHECK(h.screen == KILN_HMI_SCREEN_NETWORKS);
+}
+
+/*
+ * @relation(SWR-NET-11, scope=function)
+ */
+KILN_TEST(swrnet11_scanning_and_finding_nothing_look_different)
+{
+    kiln_hmi_view_t v = net_view();
+    v.net_count = 0;
+
+    kiln_hmi_t busy; kiln_hmi_init(&busy, 0);
+    to_network(&busy, &v);
+    v.net_scanning = true;
+    (void)feed(&busy, &v, KILN_INPUT_PRESS);
+
+    kiln_hmi_t done; kiln_hmi_init(&done, 0);
+    to_network(&done, &v);
+    v.net_scanning = false;
+    (void)feed(&done, &v, KILN_INPUT_PRESS);
+
+    /* "none found" after two seconds of scanning is a different instruction to
+     * the operator than "still looking". */
+    CHECK(memcmp(kiln_hmi_frame(&busy), kiln_hmi_frame(&done),
+                 KILN_DISPLAY_BYTES) != 0);
+}
+
+/*
+ * @relation(SWR-NET-12, scope=function)
+ */
+KILN_TEST(swrnet12_an_open_network_needs_no_passphrase)
+{
+    kiln_hmi_t h; kiln_hmi_init(&h, 0);
+    const kiln_hmi_view_t v = net_view();
+    to_network(&h, &v);
+    (void)feed(&h, &v, KILN_INPUT_PRESS);               /* -> the list   */
+
+    (void)feed(&h, &v, KILN_INPUT_CW);
+    (void)feed(&h, &v, KILN_INPUT_CW);                  /* the open one  */
+    const kiln_hmi_action_t a = feed(&h, &v, KILN_INPUT_PRESS);
+
+    CHECK(a.kind == KILN_HMI_ACT_WIFI_CONNECT);
+    CHECK(a.network_index == 2);
+    CHECK_MSG(kiln_hmi_passphrase(&h)[0] == '\0',
+              "an open network must not carry a passphrase");
+}
+
+/*
+ * @relation(SWR-NET-12, scope=function)
+ */
+KILN_TEST(swrnet12_a_secured_network_asks_for_a_passphrase_and_types_it)
+{
+    kiln_hmi_t h; kiln_hmi_init(&h, 0);
+    const kiln_hmi_view_t v = net_view();
+    to_network(&h, &v);
+    (void)feed(&h, &v, KILN_INPUT_PRESS);               /* -> the list   */
+    (void)feed(&h, &v, KILN_INPUT_PRESS);               /* "studio"      */
+    CHECK(h.screen == KILN_HMI_SCREEN_PASSPHRASE);
+
+    /* The knob starts on 'a'; eight presses give the shortest legal WPA
+     * passphrase, which is the boundary SWR-NET-12 names. */
+    for (int i = 0; i < 8; i++) { (void)feed(&h, &v, KILN_INPUT_PRESS); }
+    CHECK_MSG(strcmp(kiln_hmi_passphrase(&h), "aaaaaaaa") == 0,
+              "typed %s", kiln_hmi_passphrase(&h));
+
+    /* One turn backwards from the first character reaches "connect", which is
+     * why delete and connect sit at the end of the set rather than the start. */
+    (void)feed(&h, &v, KILN_INPUT_CCW);
+    const kiln_hmi_action_t a = feed(&h, &v, KILN_INPUT_PRESS);
+    CHECK(a.kind == KILN_HMI_ACT_WIFI_CONNECT);
+    CHECK(a.network_index == 0);
+    CHECK(h.screen == KILN_HMI_SCREEN_NETWORK);
+}
+
+/*
+ * @relation(SWR-NET-12, scope=function)
+ */
+KILN_TEST(swrnet12_a_passphrase_shorter_than_eight_is_not_accepted)
+{
+    kiln_hmi_t h; kiln_hmi_init(&h, 0);
+    const kiln_hmi_view_t v = net_view();
+    to_network(&h, &v);
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+    (void)feed(&h, &v, KILN_INPUT_PRESS);               /* passphrase    */
+
+    for (int i = 0; i < 7; i++) { (void)feed(&h, &v, KILN_INPUT_PRESS); }
+    (void)feed(&h, &v, KILN_INPUT_CCW);                 /* "connect"     */
+    const kiln_hmi_action_t a = feed(&h, &v, KILN_INPUT_PRESS);
+
+    /* WPA-PSK cannot be seven characters.  Accepting it would spend a join
+     * attempt to discover what the standard already says. */
+    CHECK(a.kind == KILN_HMI_ACT_NONE);
+    CHECK(h.screen == KILN_HMI_SCREEN_PASSPHRASE);
+}
+
+/*
+ * @relation(SWR-NET-12, scope=function)
+ */
+KILN_TEST(swrnet12_delete_removes_the_last_character)
+{
+    kiln_hmi_t h; kiln_hmi_init(&h, 0);
+    const kiln_hmi_view_t v = net_view();
+    to_network(&h, &v);
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+
+    (void)feed(&h, &v, KILN_INPUT_PRESS);               /* 'a'           */
+    (void)feed(&h, &v, KILN_INPUT_CW);                  /* 'b'           */
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+    CHECK(strcmp(kiln_hmi_passphrase(&h), "ab") == 0);
+
+    /* Two turns backwards from 'b' is "delete". */
+    (void)feed(&h, &v, KILN_INPUT_CCW);
+    (void)feed(&h, &v, KILN_INPUT_CCW);
+    (void)feed(&h, &v, KILN_INPUT_CCW);
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+    CHECK_MSG(strcmp(kiln_hmi_passphrase(&h), "a") == 0,
+              "after delete: %s", kiln_hmi_passphrase(&h));
+
+    /* Deleting past the start is not an underflow. */
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+    CHECK(kiln_hmi_passphrase(&h)[0] == '\0');
+}
+
+/*
+ * @relation(SWR-NET-12, scope=function)
+ */
+KILN_TEST(swrnet12_abandoning_entry_takes_the_passphrase_with_it)
+{
+    kiln_hmi_t h; kiln_hmi_init(&h, 0);
+    const kiln_hmi_view_t v = net_view();
+    to_network(&h, &v);
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+    for (int i = 0; i < 5; i++) { (void)feed(&h, &v, KILN_INPUT_PRESS); }
+    CHECK(kiln_hmi_passphrase(&h)[0] != '\0');
+
+    (void)feed(&h, &v, KILN_INPUT_LONG_PRESS);
+    CHECK(h.screen == KILN_HMI_SCREEN_NETWORKS);
+    CHECK_MSG(kiln_hmi_passphrase(&h)[0] == '\0',
+              "half a passphrase was left behind for the next attempt");
+}
+
+/*
+ * @relation(SWR-NET-12, scope=function)
+ */
+KILN_TEST(swrnet12_the_charset_reaches_every_printable_character)
+{
+    /* A passphrase this cannot type is a network this kiln cannot join, and
+     * the device raises no access point to fall back to. */
+    kiln_hmi_t h; kiln_hmi_init(&h, 0);
+    const kiln_hmi_view_t v = net_view();
+    to_network(&h, &v);
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+
+    bool seen[127] = { false };
+    for (int i = 0; i < 200; i++) {
+        kiln_hmi_t probe = h;
+        probe.pass_len = 0;
+        probe.pass[0]  = '\0';
+        (void)feed(&probe, &v, KILN_INPUT_PRESS);
+        const unsigned char c = (unsigned char)probe.pass[0];
+        if (c >= 32u && c < 127u) { seen[c] = true; }
+        (void)feed(&h, &v, KILN_INPUT_CW);
+    }
+    for (unsigned char c = 32; c < 127u; c++) {
+        CHECK_MSG(seen[c], "the knob cannot reach '%c' (%u)", c, (unsigned)c);
+    }
+}
+
+/*
+ * @relation(SWR-NET-11, scope=function)
+ */
+KILN_TEST(swrnet11_the_list_scrolls_and_keeps_the_selection_visible)
+{
+    kiln_hmi_view_t v = net_view();
+    v.net_count = KILN_HMI_MAX_NETWORKS;
+    for (uint8_t i = 0; i < KILN_HMI_MAX_NETWORKS; i++) {
+        (void)snprintf(v.net_list_ssid[i], KILN_HMI_SSID_LEN, "net-%u", (unsigned)i);
+        v.net_list_secured[i] = true;
+    }
+
+    kiln_hmi_t h; kiln_hmi_init(&h, 0);
+    to_network(&h, &v);
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+
+    for (uint8_t i = 0; i < KILN_HMI_MAX_NETWORKS; i++) {
+        CHECK_MSG(h.net_sel >= h.net_top && h.net_sel < h.net_top + 4u,
+                  "selection %u is outside the window at %u", (unsigned)h.net_sel,
+                  (unsigned)h.net_top);
+        (void)feed(&h, &v, KILN_INPUT_CW);
+    }
+}

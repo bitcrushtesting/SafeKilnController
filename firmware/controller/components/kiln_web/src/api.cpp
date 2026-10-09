@@ -916,13 +916,12 @@ kiln_err_t handle_net(kiln_api_ctx_t *ctx, kiln_api_resp_t *resp)
     kiln_net_status_t ns = {};
     if ((ctx->net != nullptr) && (ctx->net->status != nullptr) &&
         ctx->net->status(ctx->net->ctx, &ns) == KILN_OK) {
-        static const char *const states[] = { "down", "connecting", "connected",
-                                              "ap_fallback" };
+        static const char *const states[] = { "down", "connecting", "connected" };
         /* The table must cover the enum, checked at compile time rather than by
          * a runtime bound the compiler can prove is always true.  The runtime
          * guard stays for a value an adapter may have corrupted, and compares
          * the underlying integer so it remains a real test. */
-        static_assert(std::size(states) == KILN_NET_AP_FALLBACK + 1,
+        static_assert(std::size(states) == KILN_NET_STA_CONNECTED + 1,
                       "states[] must cover every kiln_net_state_t");
         const size_t state_idx = static_cast<size_t>(ns.state);
         kiln_json_kv_str(&j, "state",

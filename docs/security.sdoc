@@ -624,15 +624,17 @@ STATEMENT: >>>
 **Open provisioning access point.**
 <<<
 VIA: >>>
-[LINK: SWR-NET-02] AP fallback; if `net.ap_pass` is empty the AP is open.
+The AP fallback of the withdrawn `SWR-NET-02`; if `net.ap_pass` was empty the AP was open.
 <<<
 CONSEQUENCE: >>>
-Anyone in radio range reaches the provisioning page and can supply their own credentials.
+Anyone in radio range reached the provisioning page and could supply their own credentials.
 <<<
-SAFETY_RELEVANT: Yes
-STATUS: Active
+SAFETY_RELEVANT: Closed
+STATUS: Resolved
 COMMENT: >>>
-**Has no security goal.** The stale appendix routed it through `SEC-01`, which is withdrawn. This is the most security-sensitive surface the device has and the one most likely to be reachable without credentials, and it is currently answered by nothing but [LINK: OQ-S4]. Carried as [LINK: SRR-08].
+**Closed 2026-10-09 by deleting the access point**, not by giving it a passphrase rule. It never had a security goal: the stale appendix routed it through `SEC-01`, which is withdrawn, and for a while nothing stood against it but [LINK: OQ-S4].
+
+[LINK: SWR-NET-11] and [LINK: SWR-NET-12] move network setup to the local display, so the most security-sensitive surface this device had, a page that exists to accept credentials, reachable by anybody in radio range, is gone rather than guarded. What replaces it needs physical presence, which is the same answer [LINK: SEC-12] gives for firmware and `SEC-00` gives for control.
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -1247,16 +1249,16 @@ RELATIONS:
 [SECURITY_RESIDUAL_RISK]
 UID: SRR-08
 STATEMENT: >>>
-**The AP fallback may be open.** [LINK: SWR-NET-02] starts an access point with a provisioning page; nothing requires `net.ap_pass` to be non-empty.
+**The AP fallback may be open.** The withdrawn `SWR-NET-02` started an access point with a provisioning page, and nothing required `net.ap_pass` to be non-empty.
 <<<
 WHY_IT_STANDS: >>>
-No minimum-passphrase rule exists.
+It does not. **Closed 2026-10-09 by removing the access point**, not by adding the minimum-passphrase rule this asked for. [LINK: SWR-NET-11] and [LINK: SWR-NET-12] put network setup on the local display, `net.ap_ssid` and `net.ap_pass` are gone from the schema, and the device raises no second radio for anybody to reach.
 <<<
 CARRIED_BY: >>>
-The installer.
+Nobody, now. It was the installer's.
 <<<
 MITIGATION: >>>
-None. The provisioning page is the most security-sensitive surface the device has, and it is the one most likely to be reachable without credentials. Open as [LINK: OQ-S4].
+The surface is deleted rather than guarded, which is the strongest form this document recognises and the same move `SEC-00` made for the web interface. What replaces it can only be used by somebody standing at the kiln.
 <<<
 STATUS: Active
 RELATIONS:
@@ -1429,11 +1431,13 @@ UID: OQ-S4
 STATEMENT: >>>
 Should `net.ap_pass` have an enforced minimum, or should the access point refuse to start open?
 <<<
-STATUS: Active
+STATUS: Resolved
 COMMENT: >>>
 [LINK: TH-11] currently has no security goal at all, so this question is the only thing standing against it.
 
-**Promoted 2026-10-09 from an open question to the one on the critical path.** [LINK: UR-REG-004] requires a product to be shipped in a **secure default configuration**, and an access point that will start with no passphrase is a default-insecure state rather than a flexible one. Of everything the Cyber Resilience Act asks of this project, this is the only item that is a live weakness in code that exists today; the rest is either unbuilt or paperwork. Answering it is a few lines in the WiFi adapter and a bound in the configuration table.
+**Promoted on 2026-10-09 from an open question to the one on the critical path, and answered the same day by removing what it asked about.** [LINK: UR-REG-004] requires a product to be shipped in a secure default configuration, and an access point that will start with no passphrase is a default-insecure state rather than a flexible one. It was the only item on the Act's list that was a live weakness in code that existed; the rest was unbuilt or paperwork.
+
+The answer is neither of the two this question offered. There is no minimum passphrase and no refusal to start open, because **there is no access point**: [LINK: SWR-NET-11] and [LINK: SWR-NET-12] put network setup on the local display, `net.ap_ssid` and `net.ap_pass` leave the schema, and [LINK: TH-11] and [LINK: SRR-08] close with them. A rule about a surface is worth less than not having the surface.
 <<<
 RELATIONS:
 - TYPE: Parent

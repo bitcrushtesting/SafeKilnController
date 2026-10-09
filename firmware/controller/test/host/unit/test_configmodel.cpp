@@ -94,7 +94,7 @@ KILN_TEST(swrcfg02_the_minimum_item_set_is_present)
         "current.overcurrent_a", "current.contactor_life_ops", "current.enabled",
         "log.interval_s",
         "hmi.units", "hmi.dim_timeout_s", "hmi.alarm_duration_s",
-        "net.wifi_mode", "net.wifi_ssid", "net.hostname", "net.ntp_server",
+        "net.wifi_ssid", "net.hostname", "net.ntp_server",
         "net.timezone",
     };
 
@@ -214,7 +214,9 @@ KILN_TEST(swrcfg07_secrets_are_flagged_so_they_are_never_serialised_outward)
 {
     /* security.web_password was removed on 2026-10-06: SWR-WEB-26 left nothing
      * over the network to authenticate, so there was nothing for it to guard. */
-    const char *secrets[] = { "net.wifi_pass", "net.ap_pass" };
+    /* net.ap_pass went with the provisioning access point (SWR-NET-11): the
+       device raises no AP, so there is no second passphrase to keep. */
+    const char *secrets[] = { "net.wifi_pass" };
     for (size_t i = 0; i < sizeof(secrets) / sizeof(secrets[0]); i++) {
         const kiln_cfg_item_t *it = kiln_config_find(secrets[i]);
         CHECK_MSG(it != NULL, "%s is not in the schema", secrets[i]);

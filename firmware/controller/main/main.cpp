@@ -22,6 +22,7 @@
 
 #include "kiln_app/app.h"
 #include "kiln_app/run_index.h"
+#include "kiln_app/settings.h"
 #include "kiln_core/faults.h"
 #include "kiln_core/fileslots.h"
 #include "kiln_core/suplink.h"
@@ -429,6 +430,13 @@ namespace {
  */
 kiln_hmi_t s_hmi;
 
+/* SWR-NET-11.  The scan results live here rather than in the view builder,
+ * which runs ten times a second: asking the driver for them on every frame
+ * would be a copy of a kilobyte per frame to show four rows that change twice
+ * a minute. */
+kiln_net_ap_t s_scan[KILN_HMI_MAX_NETWORKS];
+uint8_t       s_scan_count;
+
 void hmi_apply(const kiln_hmi_action_t *a)
 {
     /* The HMI asks; kiln_app decides.  Every one of these can be refused --
@@ -454,6 +462,36 @@ void hmi_apply(const kiln_hmi_action_t *a)
          * the belt to that braces. */
         e = KILN_ERR_NOT_FOUND;
         break;
+
+    case KILN_HMI_ACT_WIFI_SCAN:
+        /* SWR-NET-11.  The results arrive asynchronously; the view builder
+         * collects them once the driver says the scan is done. */
+        s_scan_count = 0;
+        e = (s_net_port.scan_begin != nullptr)
+              ? s_net_port.scan_begin(s_net_port.ctx) : KILN_ERR_UNSUPPORTED;
+        break;
+
+    case KILN_HMI_ACT_WIFI_CONNECT: {
+        /* SWR-NET-12.  Persist first, then join: a device that joins without
+         * remembering comes back from a power cut with no network and nobody
+         * at the display, which is the state this whole screen exists to get
+         * out of. */
+        if (a->network_index >= s_scan_count) {
+            e = KILN_ERR_NOT_FOUND;
+            break;
+        }
+        const char *ssid = s_scan[a->network_index].ssid;
+        const char *pass = kiln_hmi_passphrase(&s_hmi);
+        (void)snprintf(s_app.cfg.wifi_ssid, sizeof(s_app.cfg.wifi_ssid), "%s", ssid);
+        (void)snprintf(s_app.cfg.wifi_pass, sizeof(s_app.cfg.wifi_pass), "%s", pass);
+        e = kiln_settings_save(&s_kv, &s_app.cfg);
+        if (e == KILN_OK) {
+            e = (s_net_port.connect != nullptr)
+                  ? s_net_port.connect(s_net_port.ctx, ssid, pass)
+                  : KILN_ERR_UNSUPPORTED;
+        }
+        break;
+    }
     default: return;
     }
     if (e != KILN_OK) {
@@ -495,8 +533,8 @@ void hmi_build_view(kiln_hmi_view_t *v)
     kiln_net_status_t ns = {};
     if (s_net_port.status != nullptr &&
         s_net_port.status(s_net_port.ctx, &ns) == KILN_OK) {
-        v->net_up = (ns.state == KILN_NET_STA_CONNECTED) ||
-                    (ns.state == KILN_NET_AP_FALLBACK);
+        v->net_up = (ns.state == KILN_NET_STA_CONNECTED);
+        (void)snprintf(v->net_ssid, sizeof(v->net_ssid), "%s", ns.ssid);
         /* The device's own name, not the SSID: SWR-HMI-07 asks where the web
          * interface is, and "safekiln" is half that answer. */
         (void)snprintf(v->hostname, sizeof(v->hostname), "%s", ns.hostname);
@@ -506,6 +544,22 @@ void hmi_build_view(kiln_hmi_view_t *v)
         v->net_up = false;
         (void)snprintf(v->hostname, sizeof(v->hostname), "%s", "wifi down");
         (void)snprintf(v->ip, sizeof(v->ip), "%s", "-");
+    }
+
+    /* SWR-NET-11: collect the scan once, when the radio says it has finished. */
+    if (s_net_port.scan_busy != nullptr) {
+        v->net_scanning = s_net_port.scan_busy(s_net_port.ctx);
+        if (!v->net_scanning && s_scan_count == 0u &&
+            s_net_port.scan_results != nullptr) {
+            s_scan_count = s_net_port.scan_results(s_net_port.ctx, s_scan,
+                                                   (uint8_t)KILN_HMI_MAX_NETWORKS);
+        }
+    }
+    v->net_count = s_scan_count;
+    for (uint8_t i = 0; i < s_scan_count && i < KILN_HMI_MAX_NETWORKS; i++) {
+        (void)snprintf(v->net_list_ssid[i], KILN_HMI_SSID_LEN, "%s", s_scan[i].ssid);
+        v->net_list_rssi[i]    = s_scan[i].rssi;
+        v->net_list_secured[i] = s_scan[i].secured;
     }
 }
 

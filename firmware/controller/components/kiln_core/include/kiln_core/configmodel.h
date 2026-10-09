@@ -71,8 +71,9 @@ typedef enum {
 
 typedef enum {
     KILN_WIFI_STA = 0,
-    KILN_WIFI_AP,
-    KILN_WIFI_STA_AP_FALLBACK,     /* SWR-NET-02 */
+    /* Station and nothing else since the provisioning AP was removed: the
+     * operator joins a network at the display (SWR-NET-11, SWR-NET-12), so
+     * there is no second mode to configure and no `net.wifi_mode` item. */
     KILN_WIFI_MODE_COUNT,
 } kiln_wifi_mode_t;
 
@@ -159,11 +160,8 @@ typedef struct {
     uint16_t alarm_duration_s;
 
     /* network */
-    uint8_t  wifi_mode;                  /* kiln_wifi_mode_t */
     char     wifi_ssid[KILN_CFG_STR_LEN];
     char     wifi_pass[KILN_CFG_PASS_LEN];
-    char     ap_ssid[KILN_CFG_STR_LEN];
-    char     ap_pass[KILN_CFG_PASS_LEN];
     char     hostname[KILN_CFG_HOST_LEN];
     char     ntp_server[KILN_CFG_HOST_LEN];
     char     timezone[KILN_CFG_HOST_LEN];

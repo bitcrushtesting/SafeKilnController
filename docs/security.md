@@ -484,7 +484,6 @@ renumbering identifiers other documents cite.
 | Do not expose the device to the internet; do not port-forward to it | `SWR-NFR-20`, SRR-03 |
 | Prefer an isolated network segment or VLAN over a flat home LAN | SRR-09 |
 | Set a web password; it is optional (`SWR-WEB-23`) and the device ships without one | SEC-01 |
-| Set an AP passphrase before relying on the provisioning fallback | SRR-08 |
 | Treat physical access to the controller as equivalent to knowing the WiFi password | SRR-05 |
 | **Erase flash before disposing of or selling a device** | SRR-05, ADV-4 |
 | Fit the independent hardware over-temperature cutout; it is the only protection no attacker can reach | `SYS-HW-13`, [§7](#7-security-as-a-safety-concern) |
@@ -594,7 +593,7 @@ The essential requirements of Annex I Part I, against what this project has:
 | Requirement | State |
 |---|---|
 | Security updates can be delivered | **Specified, barely built.** [§6.2](#62-the-update-path-and-why-it-points-outwards), `SWR-UPD-09` to `SWR-UPD-16`. One of the seven implementation steps exists (the manifest format and its signing tool); `SRR-11` still blocks release |
-| Shipped in a **secure default configuration** | **Open, and the only live weakness in code that exists today**: `OQ-S4`, the provisioning access point will start with no passphrase. Few lines to fix, and it should be fixed first |
+| Shipped in a **secure default configuration** | **Closed 2026-10-09**, and not in the way `OQ-S4` expected: the provisioning access point that could start without a passphrase is **removed** rather than given a rule. Network setup is on the local display (`SWR-NET-11`, `SWR-NET-12`), so the device raises no second radio and `TH-11` and `SRR-08` close with it |
 | No known exploitable vulnerabilities | Nothing known. Worth stating that the honest basis for this is a small codebase with no network transport yet, not a penetration test (`SRR-01`) |
 | Confidentiality of **stored** data | **`OQ-S3`, reframed from a preference into a requirement.** `net.wifi_pass` is plaintext in NVS (`SRR-05`); the Annex asks for state-of-the-art protection. The routes may diverge, a self-build unencrypted and a sold unit not, as `OQ-S2` let secure boot be per-unit. What cannot happen is the question staying open while units ship |
 | Confidentiality of data **in transit** | `SEC-11` is `Absent` by decision, with `SWR-NFR-20`'s trusted-LAN assumption in its place (`SRR-03`). Defensible for a read-only dashboard of kiln temperatures; it is a position to argue in the file, not to leave unmentioned |
@@ -633,9 +632,8 @@ name against it, and this document cannot supply one.
 
 Not the longest item, the one that is a weakness today:
 
-1. **Close `OQ-S4`.** An access point that starts open is a live default-insecure
-   state in shipped code. Everything else on these two tables is either unbuilt
-   or paperwork.
+1. ~~Close `OQ-S4`.~~ **Done 2026-10-09**, by deleting the access point rather
+   than regulating it. The remaining items are all either unbuilt or paperwork.
 2. **Create and read the `SECURITY.md` mailbox**, and write the Article 14
    procedure behind it, because that clock starts in September 2026 and runs
    whether or not the firmware is finished.
