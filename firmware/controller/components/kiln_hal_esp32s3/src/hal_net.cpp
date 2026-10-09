@@ -1,8 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * WiFi station, scanning, joining and SNTP (SWR-NET-01..SWR-NET-12,
- * except SWR-NET-04: see the note on mDNS below).
+ * WiFi station, scanning, joining, mDNS and SNTP: SWR-NET-01 to SWR-NET-12.
  *
  * ---------------------------------------------------------------------------
  * SWR-NET-07 is the requirement that shapes this file
@@ -23,6 +22,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+#include "mdns.h"
 
 #include "esp_event.h"
 #include "esp_log.h"
@@ -380,17 +381,31 @@ kiln_err_t kiln_hal_net_init(const kiln_config_t *cfg, kiln_port_net_t *out)
         return KILN_ERR_IO;
     }
 
-    /* SWR-NET-04 wants kiln.local, and it is **not implemented here**.
+    /* SWR-NET-04: kiln.local.
      *
-     * mDNS left the ESP-IDF tree for the component manager, and UR-CON-04 forbids
-     * a build-time fetch from an unpinned source -- the same constraint that
-     * has LittleFS waiting to be vendored (tasklist E7).  Adding a managed
-     * dependency to get a convenience feature would be the wrong trade against
-     * a constraint the project applies to everything else, so the device is
-     * reachable by IP until mDNS is vendored deliberately.
+     * The project's one managed dependency, pinned exactly and locked, on the
+     * terms UR-CON-04 now sets out; see this component's idf_component.yml for
+     * why that was the trade rather than vendoring a protocol implementation
+     * or dropping the requirement.
      *
-     * The address is on the network screen (SWR-HMI-07), which is where an
-     * operator standing at the kiln would look for it anyway. */
+     * Best effort, like everything else in this file. An operator who cannot
+     * resolve the name still has the IP on the network screen (SWR-HMI-07),
+     * and SWR-NET-07 means none of this can touch a firing either way. */
+    if (mdns_init() == ESP_OK) {
+        (void)mdns_hostname_set(s_net.hostname);
+        (void)mdns_instance_name_set("Safe Kiln Controller");
+        /* Advertised so that a browser or a phone finds the interface by
+         * looking rather than by being told an address. It is the read-only
+         * interface of SWR-WEB-26: advertising it exposes nothing that an
+         * HTTP GET to the same port does not. */
+        (void)mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
+        ESP_LOGI(TAG, "mdns: %s.local", s_net.hostname);
+    }
+    else {
+        /* Not a failure of anything the kiln needs. The address is on the
+         * display and the API answers on it. */
+        ESP_LOGW(TAG, "mdns did not start; reach the device by IP");
+    }
 
     /* SWR-NET-06.  Best effort by design: no route to the internet is normal in
      * a workshop, and warning 105 says so rather than anything failing. */

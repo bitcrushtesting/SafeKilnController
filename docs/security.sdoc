@@ -366,7 +366,7 @@ CAPABILITY: >>>
 Code execution in the image.
 <<<
 REALISTIC: >>>
-Low: no package manager at build time, assets vendored ([LINK: UR-CON-04]), dependencies are ESP-IDF itself.
+Low: dependencies are ESP-IDF itself plus one pinned managed component (`espressif/mdns`, Apache-2.0), with the content hash in a committed `dependencies.lock`; web assets are vendored, not fetched. [LINK: UR-CON-04] holds the conditions. A compromise of the registry therefore has to produce the hash that is already in the repository, and the upstream of the pinned version remains a path in.
 <<<
 
 [[/SECTION]]
@@ -677,7 +677,7 @@ STATEMENT: >>>
 **mDNS and network reconnaissance.**
 <<<
 VIA: >>>
-`kiln.local` advertised on the LAN ([LINK: SWR-NET-05]).
+`kiln.local` advertised on the LAN ([LINK: SWR-NET-04]).
 <<<
 CONSEQUENCE: >>>
 Makes the device trivially discoverable; a precondition for the rest rather than a threat alone.
@@ -685,7 +685,7 @@ Makes the device trivially discoverable; a precondition for the rest rather than
 SAFETY_RELEVANT: No
 STATUS: Active
 COMMENT: >>>
-**Has no security goal, and never had one.** Discoverability is accepted: the device is meant to be found by its operator, and `SWR-NET-05` asks for exactly that. Recorded so the acceptance is explicit rather than an omission.
+**Has no security goal, and never had one.** Discoverability is accepted: the device is meant to be found by its operator, and `SWR-NET-04` asks for exactly that. Recorded so the acceptance is explicit rather than an omission. Live since 2026-10-09, when mDNS was implemented; the link used to name the withdrawn `SWR-NET-05`, which was the access point's passphrase rule.
 <<<
 RELATIONS:
 - TYPE: Parent

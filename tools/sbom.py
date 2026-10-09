@@ -465,6 +465,72 @@ def make_component(name, version, licenses, ctype="library", purl=None,
     }
 
 
+def managed_component(name, directory):
+    """A component the component manager fetched, described as what it is.
+
+    These are the only third-party sources in the image that did not arrive with
+    ESP-IDF, so they are the only ones whose version an advisory can be matched
+    against. Describing one as `esp-idf-x` at the IDF version, which is what the
+    generic path below would do, states the wrong version for the one entry where
+    the version is the whole point: UR-CON-04 requires the exact pin and the
+    committed lockfile precisely so that a CRA Article 13(1) question about a
+    known vulnerability can be answered from the repository.
+
+    Returns None when the directory is not a managed component, so the caller
+    falls through to treating it as part of IDF.
+    """
+    if "managed_components" not in pathlib.Path(directory).parts:
+        return None
+    d = pathlib.Path(directory)
+    meta = {}
+    manifest = d / "idf_component.yml"
+    if manifest.is_file():
+        # Read by hand rather than with a YAML parser: this is two flat keys out
+        # of a file the component manager wrote, and pulling in PyYAML to get
+        # them would make a build-time gate depend on a package that may not be
+        # in the CI container's python.
+        lines = manifest.read_text(errors="replace").splitlines()
+        for i, line in enumerate(lines):
+            for key in ("version", "description"):
+                prefix = key + ":"
+                if not line.startswith(prefix) or key in meta:
+                    continue
+                value = line[len(prefix):].strip().strip("'\"")
+                # The manager writes long values folded, so the rest of the
+                # sentence sits on the following indented lines. Without this
+                # the description ends mid-word, which reads as a bug in the
+                # SBOM rather than as what it is.
+                for cont in lines[i + 1:]:
+                    if not cont[:1].isspace() or not cont.strip():
+                        break
+                    value += " " + cont.strip()
+                meta[key] = value
+    # `espressif__mdns` is the directory name the manager uses for `espressif/mdns`.
+    registry_name = name.replace("__", "/", 1)
+    chash = ""
+    hashfile = d / ".component_hash"
+    if hashfile.is_file():
+        chash = hashfile.read_text().strip()
+    version = meta.get("version", "")
+    description = (
+        f"Managed component `{registry_name}` {version or 'at an unknown version'}, "
+        f"fetched from the ESP-IDF component registry and linked into the image. "
+        f"Pinned exactly and locked per UR-CON-04")
+    if chash:
+        description += f"; registry content hash {chash}"
+    if meta.get("description"):
+        description += f". Upstream describes it as: {meta['description']}"
+    licences = scan_licenses(d)
+    if not licences:
+        licences = [NOASSERTION]
+    return make_component(
+        registry_name, version, licences,
+        purl=f"pkg:idf/{registry_name}@{version}" if version else None,
+        description=description,
+        supplier="Espressif Systems",
+    )
+
+
 def web_assets(version=None):
     """The browser assets, with hashes, and the point they make by being listed.
 
@@ -583,6 +649,16 @@ def build_inventory(build_dir=None, image=None, supervisor_elf=None, repo=ROOT):
             ))
 
         for name, directory in sorted(desc["components"].items()):
+            managed = managed_component(name, directory)
+            if managed is not None:
+                if managed["licenses"] == [NOASSERTION]:
+                    warnings.append((
+                        "licence",
+                        f"managed component {managed['name']} carries no SPDX tag, "
+                        "and UR-CON-04 allows a fetched component only when its "
+                        "licence is recorded"))
+                components.append(managed)
+                continue
             licences = scan_licenses(directory)
             description = f"ESP-IDF component `{name}`, linked into the image"
             if not licences:
@@ -931,6 +1007,46 @@ def self_test():
                lambda: read_project_description(bd))
         raises("a build dir with no description",
                lambda: find_build_dir(d))
+
+    # --- managed components, whose version is the point -------------------
+    with tempfile.TemporaryDirectory() as tmp:
+        d = pathlib.Path(tmp) / "managed_components" / "espressif__mdns"
+        d.mkdir(parents=True)
+        (d / "idf_component.yml").write_text(
+            "dependencies:\n  idf:\n    version: '>=5.0'\n"
+            "description: Multicast UDP service used to provide local network\n"
+            "  service and host discovery.\n"
+            "version: 1.14.0\n")
+        (d / ".component_hash").write_text("b5b3002\n")
+        (d / "mdns.c").write_bytes(b"/* SPDX-License-Identifier: Apache-2.0 */\n")
+        c = managed_component("espressif__mdns", str(d))
+        check("a managed component is recognised", c is not None, True)
+        check("named as the registry names it", c["name"], "espressif/mdns")
+        check("its own version, not IDF's", c["version"], "1.14.0")
+        check("licence from its sources", c["licenses"], ["Apache-2.0"])
+        check("purl identifies it for an advisory match",
+              c["purl"], "pkg:idf/espressif/mdns@1.14.0")
+        check("the locked hash is recorded",
+              "b5b3002" in c["description"], True)
+        check("and the upstream description, unfolded rather than cut mid-line",
+              c["description"].endswith(
+                  "Multicast UDP service used to provide local network service "
+                  "and host discovery."), True)
+        # The version key of a *dependency* is indented and must not be mistaken
+        # for the component's own, which is the one an advisory is matched on.
+        check("an indented version key is not the component's",
+              c["version"], "1.14.0")
+        plain = pathlib.Path(tmp) / "components" / "freertos"
+        plain.mkdir(parents=True)
+        check("a component inside IDF is not treated as managed",
+              managed_component("freertos", str(plain)), None)
+        bare = pathlib.Path(tmp) / "managed_components" / "someone__thing"
+        bare.mkdir(parents=True)
+        b = managed_component("someone__thing", str(bare))
+        check("no manifest, no version asserted", b["version"], NOASSERTION)
+        check("and no purl rather than a wrong one", b["purl"], None)
+        check("an untagged managed component is NOASSERTION, not silent",
+              b["licenses"], [NOASSERTION])
 
     # --- the documents ---------------------------------------------------
     product = make_component(

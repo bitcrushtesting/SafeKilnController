@@ -748,7 +748,15 @@ Logged data and programs shall live on internal flash. **No SD card** shall be r
 [CONSTRAINT]
 UID: UR-CON-04
 STATEMENT: >>>
-The project shall be licensed **GPL-3.0-or-later**, and every third-party component shall carry a licence compatible with distribution under GPL-3.0. Web assets shall be vendored, not fetched at build time from an unpinned source.
+The project shall be licensed **GPL-3.0-or-later**, and every third-party component shall carry a licence compatible with distribution under GPL-3.0.
+
+Third-party code may be fetched at build time only through the ESP-IDF component manager, and only under all three of the following conditions, so that what a given release was built from stays recoverable from the repository alone:
+
+1. the version is pinned exactly (`==`), never to a range or to the newest available;
+2. the resolved `dependencies.lock`, which carries the content hash, is committed;
+3. the component appears in the generated SBOM with its licence.
+
+Web assets shall be vendored rather than fetched, at any version: they are reachable from the network at run time and are not covered by the component manager's integrity check.
 <<<
 
 [CONSTRAINT]

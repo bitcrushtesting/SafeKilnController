@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Bitcrush Testing
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The one managed dependency this project has (UR-CON-04).
+#
+# mDNS left the ESP-IDF tree for the component registry, and SWR-NET-04 asks for
+# kiln.local, so the choice was between vendoring several thousand lines of
+# somebody else's protocol implementation, dropping the requirement, or taking
+# the dependency under conditions that make it auditable. UR-CON-04 states
+# those conditions and this file meets them:
+#
+#   PINNED TO AN EXACT VERSION, not a range. "~1.14" would let a build pick up
+#   code nobody reviewed, which is the whole thing the constraint exists to
+#   prevent; a release has to be reproducible from its tag years later.
+#
+#   dependencies.lock IS COMMITTED, so the resolved version and its checksum
+#   are in the repository rather than in whatever the registry served that
+#   afternoon.
+#
+#   IT APPEARS IN THE SBOM automatically, by its registry name and its OWN
+#   version rather than the ESP-IDF version it was built against, because the
+#   version is the only thing an advisory can be matched against. tools/sbom.py
+#   reads the components the build actually linked and scans each one's SPDX
+#   tags, so this one is listed as espressif/mdns 1.14.0, Apache-2.0 (checked:
+#   compatible with distribution under GPL-3.0), with the registry content hash
+#   in its description, and nobody maintains a list.
+#
+# managed_components/ stays out of git: it is a cache, the lockfile is the
+# record, and committing both would be two sources of truth for one fact.
+dependencies:
+  espressif/mdns: "==1.14.0"

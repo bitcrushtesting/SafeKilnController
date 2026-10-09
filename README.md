@@ -223,7 +223,7 @@ three-phase kiln, so it is out of scope rather than partially supported.
 | Output | Zero-cross SSR in series with a safety contactor |
 | Supply | **Single phase only.** One current transformer on the heater conductor |
 | Door interlock | Optional normally-closed switch, stops the heater immediately when the door opens |
-| Connectivity | WiFi station only. **No access point:** the network is selected and its passphrase typed at the display, so setting it up needs somebody at the kiln. mDNS (`kiln.local`) is specified and not implemented, so the device is reached by IP, which the display shows |
+| Connectivity | WiFi station only. **No access point:** the network is selected and its passphrase typed at the display, so setting it up needs somebody at the kiln. Reachable at `kiln.local` over mDNS, and by IP, which the display shows |
 
 Details and rationale are in
 [requirements §6](docs/03_software_req.sdoc).

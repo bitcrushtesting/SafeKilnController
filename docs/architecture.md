@@ -40,7 +40,7 @@ as a decision in [§3](#3-key-decisions).
 | 3 | **Control and safety must meet hard deadlines regardless of load.** | `SWR-NFR-01`–`SWR-NFR-04` | Core affinity split, priority ordering, no blocking calls on the control path, message passing instead of shared locks. |
 | 4 | **No SD card, no external database, no external host.** | `UR-CON-03`, `SWR-WEB-02` | Log store as a raw circular flash partition; web assets embedded and gzipped in the firmware image; charting rendered client-side from the device's own API. |
 | 5 | **Fits an 8 MB / no-PSRAM ESP32-S3 and runs for a week.** | `SWR-NFR-10`–`SWR-NFR-14` | Fixed-size records, static allocation in the core, bounded HTTP buffers, flash write pattern designed against an endurance budget. |
-| 6 | **GPL-3.0-or-later, self-contained, vendored dependencies.** | `UR-CON-04` | No build-time network fetch, third-party licences audited and recorded. |
+| 6 | **GPL-3.0-or-later, self-contained, dependencies pinned.** | `UR-CON-04` | Web assets vendored. One managed component (`espressif/mdns`), pinned exactly with the content hash in a committed lockfile; third-party licences audited and recorded in the SBOM. |
 
 ## 3. Key decisions
 
