@@ -693,9 +693,19 @@ extern "C" void app_main(void)
         if (fe == KILN_OK) {
             kiln_fileslots_bind(&s_fileslots, &s_fs);
             ports.filestore = &s_fs;
+            const unsigned retired =
+                (unsigned)kiln_fileslots_retired_regions(&s_fileslots);
             ESP_LOGI(TAG, "file store: %u of %u regions used",
                      (unsigned)kiln_fileslots_used_regions(&s_fileslots),
                      (unsigned)s_fileslots.region_count);
+            if (retired > 0u) {
+                /* A region retires when a write did not read back as written,
+                 * which is how NOR wears out.  The store carries on in another
+                 * region, so nothing above this notices; this line is the only
+                 * warning anybody gets that the part is on its way out. */
+                ESP_LOGW(TAG, "file store: %u region(s) retired after a failed "
+                              "write; the flash is wearing out", retired);
+            }
         } else {
             /* As with the log: a kiln that cannot store programs is still a
              * kiln that can be watched, so this warns rather than halting. */

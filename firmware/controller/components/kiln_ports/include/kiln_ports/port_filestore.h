@@ -15,6 +15,11 @@
 #include "kiln/err.h"
 #include "kiln/types.h"
 
+/* Including the terminator, and the stored name field is exactly this, so a
+ * longer path is REFUSED with KILN_ERR_INVALID_ARG rather than truncated.
+ * Storing a file under a name the caller did not ask for is the worse of the
+ * two failures; both callers produce five-character slot paths, so nothing
+ * generates one today. */
 constexpr size_t KILN_PATH_MAX = 64;
 
 typedef struct kiln_port_filestore {

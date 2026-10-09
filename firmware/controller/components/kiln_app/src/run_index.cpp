@@ -1,5 +1,22 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
- * SPDX-License-Identifier: GPL-3.0-or-later */
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * The 20 most recent firings, one record a slot, oldest overwritten first
+ * (SWR-LOG-09).
+ *
+ * Every operation here walks all 20 slots: append reads them to find the oldest,
+ * and mark_truncated and baseline read them to find the one they want.  That is
+ * not as expensive as it looks -- the file store answers a read from its in-RAM
+ * index and a 554 byte CRC, with one region write at the end of an append -- and
+ * the walk is now the only reason this file reads at all.
+ *
+ * It is also the one place where the store being a fixed array rather than a
+ * directory costs something: with a name to look up rather than a slot to scan,
+ * each of the three would be one access instead of twenty.  Left as it is
+ * because twenty accesses once per firing is not a cost worth a mechanism, and
+ * recorded here because it is the natural thing to simplify if this file is ever
+ * revisited for another reason.
+ */
 
 #include <stdio.h>
 #include <string.h>

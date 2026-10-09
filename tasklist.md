@@ -741,46 +741,70 @@ weakness first, the deadline second, the sentence third, the engineering last.
 
 ## Q. The file store, SWA-21
 
-- [ ] **Q1. The store has never seen a worn sector.** Every test runs on a fake
-  that writes what it is told. A real NOR sector near the end of its life fails
-  a program or reads back something it was not given, and the store's answer to
-  that is the CRC, which rejects the copy and falls back to the other one. That
-  is the designed behaviour and it is tested, but it has been tested against
-  simulated corruption rather than against a worn part. There is no bad-region
-  retirement: a region whose both sectors have failed will keep being chosen
-  and keep failing, where a filesystem would have remapped it. At 40 regions of
-  two sectors each, written single-digit times a year against a 100 000 cycle
-  rating, that is a defensible trade rather than an oversight, but it is a trade
-  and this is where it is recorded.
+- [x] **Q1. Wear is now handled at the write. Done 2026-10-09.** The store had
+  never seen a worn sector, and the failure mode it was written against was the
+  wrong one: a NOR sector at the end of its life does not report an error, it
+  takes the write, returns success and holds something else. The CRC caught that
+  on the next read, which on this device is after a firing rather than during
+  the write it could still have redirected.
 
-- [ ] **Q2. The index is built by reading every region at every boot.** 64
-  regions, two copies each, each validated by streaming its payload through the
-  CRC. That is up to 128 sector reads and about 320 kB of CRC at startup,
-  measured at nothing in particular because it has only ever run under QEMU and
-  on the host. If it turns out to cost real time on a board it can be made lazy,
-  since the only thing mount actually needs eagerly is which copy of each region
-  wins. Worth measuring before it is worth optimising.
+  Every write is now read back and re-validated through the same path a mount
+  uses before the index points at it. A copy that does not verify retires its
+  region and the write is re-attempted in a free region at a higher seq, up to
+  three regions; the caller gets `KILN_OK`, because the file is stored and only
+  its location changed. Retirement needs no bad-block table: the old region is
+  erased best effort after the new copy verifies, and if that erase fails, which
+  is what a finished sector does, the stale copy stays at a lower seq, two
+  regions claim one name, and mount resolves it by seq and retires the loser.
+  The erase is what stops a deleted file from coming back at the next mount.
 
-- [ ] **Q3. `exists` and `list` are implemented and have no caller.** They are
-  in the port contract, so the store provides them and the tests cover them, but
-  `program_store` and `run_index` use neither. They are the natural way a local
-  program editor would enumerate what is there, which is `P3`, so they are kept
-  rather than removed.
+  Still no wear levelling, and deliberately: the endurance arithmetic of
+  architecture 10.4 has four orders of magnitude of headroom, so a region keeps
+  its file for as long as it works.
 
-- [ ] **Q4. A name longer than 63 bytes is refused rather than truncated.**
-  `KILN_PATH_MAX` is 64 including the terminator and the name field is exactly
-  that, so a longer path returns `KILN_ERR_INVALID_ARG`. Nothing generates one
-  today, since both callers produce five-character slot paths, and refusing is
-  the right answer rather than silently storing a different file than the caller
-  asked for. Noted because a future caller with user-supplied names will meet it.
+  Five new host tests, driven by two new knobs on the flash fake that model a
+  sector which accepts a write and keeps zeros, and a sector that will not
+  erase. The retired count is logged at boot and is the only warning anybody
+  gets that the part is going.
 
-- [ ] **Q5. The run index rewrites more than it needs to.** `kiln_run_index_append`
-  reads every slot to find the oldest, then writes one. On this store that is 20
-  reads served from the in-RAM index plus one region write, which is cheap. But
-  `kiln_run_index_mark_truncated` and `kiln_run_index_baseline` both walk all 20
-  slots too, and the walk is now the only reason `run_index` reads at all. Not a
-  problem, just the place where the store being an array rather than a directory
-  would let the index get simpler if it were ever revisited.
+- [x] **Q2. The mount cost is measured. Done 2026-10-09.** It was described
+  rather than measured, and the description was low by a third. On the medium
+  this firmware actually produces, 20 programs of 398 bytes and 20 run records
+  of 554, a mount costs **768 reads and 47 808 bytes** of CRC. A partition full
+  of maximum-size files with both copies valid costs **8 192 reads and 524 288
+  bytes**, the whole partition.
+
+  Both are asserted in `test_fileslots`, against a model derived in the test
+  rather than a constant, so making mount lazy fails the suite instead of
+  happening quietly. 47 kB of flash reads is not a start-up problem on this
+  part, so there is nothing here to optimise; if a board ever says otherwise,
+  the only thing mount needs eagerly is which copy of each region wins, and the
+  payload CRC could move to the read.
+
+- [ ] **Q3. `exists` and `list` are implemented and have no caller, and the
+  reason they were kept has gone.** They were kept for `P3`'s local program
+  editor, and the decision there was pre-compiled profiles with nothing
+  editing them, so there is no prospective caller left. Three implementations
+  (`fileslots`, the host HAL, the simulator) and two tests exist for an
+  interface nothing above uses. Either the port contract loses both and the
+  implementations go with them, or they stay with an honest reason written down.
+  **A decision rather than a task**, and it travels with `P3`.
+
+- [x] **Q4. A name longer than 63 bytes is refused rather than truncated.
+  Recorded 2026-10-09.** `KILN_PATH_MAX` is 64 including the terminator and the
+  name field is exactly that, so a longer path returns `KILN_ERR_INVALID_ARG`.
+  Both callers produce five-character slot paths, so nothing generates one
+  today; storing a file under a name the caller did not ask for is the worse
+  failure. Now stated where it is enforced, in `port_filestore.h` and
+  architecture 10.6, with the test that proves it, rather than only here.
+
+- [x] **Q5. The run index walks all 20 slots, and that is where it stays.
+  Recorded 2026-10-09.** Append reads every slot to find the oldest, and
+  `mark_truncated` and `baseline` walk them too. Twenty reads answered from the
+  in-RAM index plus one region write, once per firing, is not a cost worth a
+  mechanism. It is the one place where the store being a fixed array rather
+  than a directory costs anything, and that is now recorded in `run_index.cpp`
+  where somebody revisiting the file will see it.
 
 ---
 

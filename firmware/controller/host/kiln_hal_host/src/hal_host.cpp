@@ -19,6 +19,9 @@ void kiln_host_flash_init(kiln_host_flash_t *f, uint8_t *storage,
     f->size_bytes   = size_bytes;
     f->sector_bytes = sector_bytes;
     f->powered      = true;
+    /* Not zero: zero is the first sector's offset, and a fault injector that is
+     * armed by default would be found the hard way. */
+    f->fail_erase_off = KILN_HOST_NO_OFFSET;
     memset(storage, 0xFF, size_bytes);
 }
 
@@ -62,6 +65,7 @@ kiln_err_t hf_read(void *ctx, uint32_t off, void *out, size_t len)
 
     memcpy(out, &f->data[off], len);
     f->reads++;
+    f->bytes_read += (uint32_t)len;
     return KILN_OK;
 }
 
@@ -107,8 +111,15 @@ kiln_err_t hf_write(void *ctx, uint32_t off, const void *data, size_t len)
         return KILN_ERR_IO;
     }
 
+    /* Wear, as NOR actually presents it: the write is accepted, the status says
+     * success, and the cell holds something else.  Modelled as stuck-at-zero
+     * because that is the direction a programmed cell fails in and the only one
+     * a write could produce.  Reported as KILN_OK deliberately -- a store that
+     * only notices the errors it is told about does not notice this one. */
+    const bool garble = f->garble_every_write ||
+                        ((f->garble_write_at != 0u) && (f->writes == f->garble_write_at));
     for (size_t i = 0; i < len; i++) {
-        f->data[off + i] &= src[i];
+        f->data[off + i] &= garble ? 0x00u : src[i];
     }
     f->bytes_written += (uint32_t)len;
     return KILN_OK;
@@ -135,6 +146,13 @@ kiln_err_t hf_erase(void *ctx, uint32_t off, size_t len)
 
     const uint32_t sectors = (uint32_t)(len / f->sector_bytes);
     if ((f->fail_erase_after != 0u) && f->erases + sectors > f->fail_erase_after) {
+        return KILN_ERR_IO;
+    }
+    /* A sector that will not erase, which is the other half of how NOR ends:
+     * the whole call fails, including a multi-sector erase that covers it, and
+     * nothing in the range is touched. */
+    if ((f->fail_erase_off != KILN_HOST_NO_OFFSET) &&
+        (f->fail_erase_off >= off) && (f->fail_erase_off < off + len)) {
         return KILN_ERR_IO;
     }
 

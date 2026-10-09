@@ -10,10 +10,15 @@
  * a file that was already there, and here the test can actually cut the power.
  */
 
+#include <stdio.h>
 #include <string.h>
 #include "kiln_check.h"
 #include "kiln_core/fileslots.h"
 #include "kiln_hal_host/hal_host.h"
+/* For the two blob sizes the real callers store, in the mount-cost tests at the
+ * end of this file: a cost measured against made-up payloads measures nothing. */
+#include "kiln_app/program_store.h"
+#include "kiln_app/run_index.h"
 
 constexpr size_t SECTOR_BYTES = 4096u;
 /* 20 programs plus 20 run records, plus two spare to prove the store refuses a
@@ -426,4 +431,349 @@ KILN_TEST(swa10_the_store_validates_its_arguments)
     CHECK_ERR(cold_port.read(cold_port.ctx, "/p/00", buf, sizeof(buf), nullptr),
               KILN_ERR_INVALID_ARG);
     CHECK_ERR(kiln_fileslots_format(&cold), KILN_ERR_STATE);
+}
+
+/* ===========================================================================
+ * WEAR  (tasklist Q1)
+ * ===========================================================================
+ * A NOR sector at the end of its life takes the write, reports success, and
+ * keeps something other than what it was given. Every test above this point
+ * drives a medium that does what it is told, so the one failure mode the part
+ * will actually exhibit was the one nothing exercised.
+ *
+ * The flash fake grows two knobs for it: garble_write_at spoils one write,
+ * garble_every_write spoils all of them, and both return KILN_OK, because an
+ * error code is exactly what this failure does not come with.
+ */
+
+/* The write counter after priming, so a test can spoil the next write rather
+ * than guess which one it is. */
+static void spoil_next_write(rig_t *r)
+{
+    r->flash.garble_write_at = r->flash.writes + 1u;
+}
+
+/*
+ * @relation(SWA-21, scope=function)
+ */
+KILN_TEST(swa21_a_sector_that_lies_about_a_write_retires_its_region)
+{
+    rig_t *r = &g_rig;
+    rig_init(r);
+
+    CHECK_OK(put(r, "/r/00", "first", 6));
+    CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs), 1u);
+    CHECK_EQ_UINT(kiln_fileslots_retired_regions(&r->fs), 0u);
+
+    /* The region the file is in is about to stop holding what it is given. */
+    spoil_next_write(r);
+    CHECK_OK(put(r, "/r/00", "second", 7));
+
+    /* The caller gets KILN_OK because the file IS stored -- somewhere else. */
+    uint8_t buf[16];
+    size_t  n = 0;
+    CHECK_OK(get(r, "/r/00", buf, sizeof(buf), &n));
+    CHECK_STR_EQ(as_str(buf), "second");
+    CHECK_EQ_UINT(n, 7u);
+
+    CHECK_EQ_UINT(kiln_fileslots_retired_regions(&r->fs), 1u);
+    CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs), 1u);
+
+    /* And the retired region is not handed out again. */
+    r->flash.garble_write_at = 0;
+    CHECK_OK(put(r, "/r/01", "other", 6));
+    CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs), 2u);
+    CHECK_EQ_UINT(kiln_fileslots_retired_regions(&r->fs), 1u);
+    CHECK_OK(get(r, "/r/00", buf, sizeof(buf), nullptr));
+    CHECK_STR_EQ(as_str(buf), "second");
+}
+
+/*
+ * @relation(SWA-21, scope=function)
+ */
+KILN_TEST(swa21_a_migration_leaves_no_stale_copy_to_come_back_later)
+{
+    rig_t *r = &g_rig;
+    rig_init(r);
+
+    CHECK_OK(put(r, "/r/00", "first", 6));
+    spoil_next_write(r);
+    CHECK_OK(put(r, "/r/00", "second", 7));
+    r->flash.garble_write_at = 0;
+
+    /* The erase of the retired region succeeded, so nothing on the medium
+     * claims the name twice and the region is back in the pool at the next
+     * boot: a sector that can still be erased has not earned a life sentence
+     * from one bad write. */
+    rig_remount(r);
+    CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs), 1u);
+    CHECK_EQ_UINT(kiln_fileslots_retired_regions(&r->fs), 0u);
+
+    uint8_t buf[16];
+    CHECK_OK(get(r, "/r/00", buf, sizeof(buf), nullptr));
+    CHECK_STR_EQ(as_str(buf), "second");
+
+    /* The case this erase is for: a removed file must not be resurrected by a
+     * copy the migration left behind. */
+    CHECK_OK(r->store.remove(r->store.ctx, "/r/00"));
+    rig_remount(r);
+    CHECK_ERR(get(r, "/r/00", buf, sizeof(buf), nullptr), KILN_ERR_NOT_FOUND);
+    CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs), 0u);
+}
+
+/*
+ * @relation(SWA-21, scope=function)
+ */
+KILN_TEST(swa21_a_region_that_cannot_even_be_erased_stays_retired_across_a_reboot)
+{
+    rig_t *r = &g_rig;
+    rig_init(r);
+
+    CHECK_OK(put(r, "/r/00", "first", 6));
+
+    /* Now region 0, where the file lives, is properly gone: it keeps zeros
+     * instead of data, and it will not erase either, so the copy it holds
+     * cannot be cleaned up after the migration. */
+    spoil_next_write(r);
+    r->flash.fail_erase_off = 0u;    /* region 0, copy 0 */
+    CHECK_OK(put(r, "/r/00", "second", 7));
+    r->flash.garble_write_at = 0;
+    r->flash.fail_erase_off = KILN_HOST_NO_OFFSET;
+
+    uint8_t buf[16];
+    CHECK_OK(get(r, "/r/00", buf, sizeof(buf), nullptr));
+    CHECK_STR_EQ(as_str(buf), "second");
+
+    /* Two regions now hold /r/00. Mount resolves it by seq and retires the
+     * loser, which is the region whose write failed -- so retirement outlives
+     * the power cycle without a bad-block table anywhere. */
+    rig_remount(r);
+    CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs), 1u);
+    CHECK_EQ_UINT(kiln_fileslots_retired_regions(&r->fs), 1u);
+    CHECK_OK(get(r, "/r/00", buf, sizeof(buf), nullptr));
+    CHECK_STR_EQ(as_str(buf), "second");
+
+    /* Twice, because a resolution that is not stable is not a resolution. */
+    rig_remount(r);
+    CHECK_EQ_UINT(kiln_fileslots_retired_regions(&r->fs), 1u);
+    CHECK_OK(get(r, "/r/00", buf, sizeof(buf), nullptr));
+    CHECK_STR_EQ(as_str(buf), "second");
+
+    /* An explicit factory reset takes it back: FR-CFG-12 erases everything, and
+     * refusing to try the region again would leave the operator no way to find
+     * out whether the part is really finished. */
+    CHECK_OK(kiln_fileslots_format(&r->fs));
+    CHECK_EQ_UINT(kiln_fileslots_retired_regions(&r->fs), 0u);
+}
+
+/*
+ * @relation(SWA-21, scope=function)
+ */
+KILN_TEST(swa21_a_part_with_nowhere_left_to_write_says_so)
+{
+    rig_t *r = &g_rig;
+    rig_init(r);
+
+    CHECK_OK(put(r, "/r/00", "first", 6));
+
+    /* Every write from here keeps zeros. Three regions are tried, which is
+     * KILN_FILESLOT_WRITE_TRIES, and then the store stops spending erase
+     * cycles on a part that is not coming back. */
+    r->flash.garble_every_write = true;
+    CHECK_ERR(put(r, "/r/00", "second", 7), KILN_ERR_CORRUPT);
+    r->flash.garble_every_write = false;
+
+    CHECK_EQ_UINT(kiln_fileslots_retired_regions(&r->fs), 3u);
+
+    /* The previous content is still there: the write that failed was the one
+     * that did not happen, not the file. */
+    uint8_t buf[16];
+    CHECK_OK(get(r, "/r/00", buf, sizeof(buf), nullptr));
+    CHECK_STR_EQ(as_str(buf), "first");
+    CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs), 1u);
+
+    rig_remount(r);
+    CHECK_OK(get(r, "/r/00", buf, sizeof(buf), nullptr));
+    CHECK_STR_EQ(as_str(buf), "first");
+}
+
+/*
+ * @relation(SWA-21, scope=function)
+ */
+KILN_TEST(swa21_a_fresh_file_migrates_too_and_the_store_can_fill_up_with_retirements)
+{
+    rig_t *r = &g_rig;
+    rig_init(r);
+
+    /* A file that has no home yet meets the same sector. Nothing has to be
+     * preserved here, which is the easy half, but the region still has to be
+     * retired or the next attempt goes straight back into it. */
+    spoil_next_write(r);
+    CHECK_OK(put(r, "/p/00", "program", 8));
+    r->flash.garble_write_at = 0;
+
+    uint8_t buf[16];
+    CHECK_OK(get(r, "/p/00", buf, sizeof(buf), nullptr));
+    CHECK_STR_EQ(as_str(buf), "program");
+    CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs), 1u);
+    CHECK_EQ_UINT(kiln_fileslots_retired_regions(&r->fs), 1u);
+
+    /* Retired regions are not capacity. Fill what is left and the store
+     * reports no space rather than retrying a region it has written off. */
+    for (size_t i = 1; i < TEST_REGIONS - 1u; i++) {
+        char path[16];
+        (void)snprintf(path, sizeof(path), "/p/%02zu", i);
+        CHECK_OK(put(r, path, "x", 2));
+    }
+    CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs), TEST_REGIONS - 1u);
+    CHECK_ERR(put(r, "/p/99", "y", 2), KILN_ERR_NO_SPACE);
+}
+
+/* ===========================================================================
+ * WHAT A MOUNT COSTS  (tasklist Q2)
+ * ===========================================================================
+ * Mount reads every copy of every region and streams its payload through the
+ * CRC, so start-up is paid in flash reads and CRC bytes before the controller
+ * does anything. That cost had been described rather than measured, and the
+ * description was wrong by 60 %.
+ *
+ * These two tests measure it on the medium the partition actually gives us: 64
+ * regions, both copies valid, which is the state normal operation leaves behind
+ * because a region keeps the copy it is replacing until the next write.
+ *
+ * The expected numbers are DERIVED here rather than written down, so the tests
+ * pin the model of the cost instead of a constant somebody would update to
+ * whatever the code now does. Make mount lazy and they fail, which is the
+ * point: that is a change to when start-up is paid for, and it should not pass
+ * unnoticed.
+ */
+constexpr size_t COST_REGIONS = KILN_FILESLOT_REGIONS_MAX;   /* 64 */
+constexpr size_t COST_CRC_CHUNK = 64u;    /* read_copy's streaming buffer */
+
+typedef struct {
+    uint8_t               storage[COST_REGIONS * 2u * SECTOR_BYTES];
+    kiln_host_flash_t     flash;
+    kiln_port_flash_t     port;
+    kiln_fileslots_t      fs;
+    kiln_port_filestore_t store;
+} cost_rig_t;
+
+static cost_rig_t g_cost;
+
+/* Reads and bytes that validating one committed copy of `len` payload bytes
+ * costs: the 76 byte header, then the payload in 64 byte chunks. */
+static void copy_cost(size_t len, uint32_t *reads, uint32_t *bytes)
+{
+    *reads = 1u + (uint32_t)((len + COST_CRC_CHUNK - 1u) / COST_CRC_CHUNK);
+    *bytes = KILN_FILESLOT_HDR + (uint32_t)len;
+}
+
+/* Fill every region, writing each file twice so that both copies are valid --
+ * the state a running kiln leaves the medium in. */
+static void cost_fill(cost_rig_t *r, size_t payload)
+{
+    memset(r, 0, sizeof(*r));
+    kiln_host_flash_init(&r->flash, r->storage, sizeof(r->storage), SECTOR_BYTES);
+    kiln_host_flash_bind(&r->flash, &r->port);
+    CHECK_OK(kiln_fileslots_mount(&r->fs, &r->port));
+    kiln_fileslots_bind(&r->fs, &r->store);
+    CHECK_EQ_UINT(r->fs.region_count, COST_REGIONS);
+
+    static uint8_t blob[4096];
+    memset(blob, 0xA5, sizeof(blob));
+    for (size_t i = 0; i < COST_REGIONS; i++) {
+        char path[16];
+        (void)snprintf(path, sizeof(path), "/x/%02zu", i);
+        CHECK_OK(r->store.write_atomic(r->store.ctx, path, blob, payload));
+        CHECK_OK(r->store.write_atomic(r->store.ctx, path, blob, payload));
+    }
+    CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs), COST_REGIONS);
+}
+
+/*
+ * @relation(SWA-21, scope=function)
+ */
+KILN_TEST(swa21_a_full_mount_costs_what_the_model_says)
+{
+    /* The largest payload a 4 096 byte sector can hold once the 76 byte header
+     * is taken out, rounded down to a word: (4096 - 76) & ~3. */
+    const size_t payload = 4020u;
+
+    cost_rig_t *r = &g_cost;
+    cost_fill(r, payload);
+    CHECK_EQ_UINT(r->fs.payload_max, payload);
+
+    r->flash.reads = 0;
+    r->flash.bytes_read = 0;
+    CHECK_OK(kiln_fileslots_mount(&r->fs, &r->port));
+
+    uint32_t per_reads = 0;
+    uint32_t per_bytes = 0;
+    copy_cost(payload, &per_reads, &per_bytes);
+
+    /* Two valid copies per region, both validated in full. */
+    CHECK_EQ_UINT(r->flash.reads, 2u * COST_REGIONS * per_reads);
+    CHECK_EQ_UINT(r->flash.bytes_read, 2u * COST_REGIONS * per_bytes);
+
+    /* The absolute figures, so a reader of this suite does not have to do the
+     * arithmetic: 8 192 reads and 524 288 bytes, which is the whole partition.
+     * That is the number the architecture's start-up budget has to carry, and
+     * it is 1.6 times the 320 kB the task list had guessed at. */
+    CHECK_EQ_UINT(r->flash.reads, 8192u);
+    CHECK_EQ_UINT(r->flash.bytes_read, 524288u);
+}
+
+/*
+ * @relation(SWA-21, scope=function)
+ */
+KILN_TEST(swa21_the_mount_this_product_actually_pays_for)
+{
+    /* What the two real callers store: 20 programs and 20 run records, at the
+     * sizes their own serialisers produce. The worst case above is what the
+     * partition permits; this is what the firmware puts in it, and the
+     * difference is a factor of nine. */
+    constexpr size_t PROG_BLOB = 8u + sizeof(kiln_program_t) + 2u;
+    constexpr size_t RUN_BLOB  = 8u + sizeof(kiln_run_record_t) + 2u;
+
+    cost_rig_t *r = &g_cost;
+    memset(r, 0, sizeof(*r));
+    kiln_host_flash_init(&r->flash, r->storage, sizeof(r->storage), SECTOR_BYTES);
+    kiln_host_flash_bind(&r->flash, &r->port);
+    CHECK_OK(kiln_fileslots_mount(&r->fs, &r->port));
+    kiln_fileslots_bind(&r->fs, &r->store);
+
+    static uint8_t blob[4096];
+    memset(blob, 0x5A, sizeof(blob));
+    for (size_t i = 0; i < 20u; i++) {
+        char path[16];
+        (void)snprintf(path, sizeof(path), "/p/%02zu", i);
+        CHECK_OK(r->store.write_atomic(r->store.ctx, path, blob, PROG_BLOB));
+        CHECK_OK(r->store.write_atomic(r->store.ctx, path, blob, PROG_BLOB));
+        (void)snprintf(path, sizeof(path), "/r/%02zu", i);
+        CHECK_OK(r->store.write_atomic(r->store.ctx, path, blob, RUN_BLOB));
+        CHECK_OK(r->store.write_atomic(r->store.ctx, path, blob, RUN_BLOB));
+    }
+
+    r->flash.reads = 0;
+    r->flash.bytes_read = 0;
+    CHECK_OK(kiln_fileslots_mount(&r->fs, &r->port));
+
+    uint32_t pr = 0, pb = 0, rr = 0, rb = 0;
+    copy_cost(PROG_BLOB, &pr, &pb);
+    copy_cost(RUN_BLOB, &rr, &rb);
+
+    /* 40 regions hold a file; the other 24 cost one failed header read each. */
+    const uint32_t want_reads = 2u * 20u * (pr + rr) + (uint32_t)(COST_REGIONS - 40u) * 2u;
+    const uint32_t want_bytes = 2u * 20u * (pb + rb)
+                              + (uint32_t)(COST_REGIONS - 40u) * 2u * KILN_FILESLOT_HDR;
+    CHECK_EQ_UINT(r->flash.reads, want_reads);
+    CHECK_EQ_UINT(r->flash.bytes_read, want_bytes);
+    printf("    mount: %u reads, %u bytes (program blob %zu, run blob %zu)\n",
+           r->flash.reads, r->flash.bytes_read, PROG_BLOB, RUN_BLOB);
+
+    /* Measured: 768 reads and 47 808 bytes, against 8 192 and 524 288 for a
+     * medium full of maximum-size files. A ninth of the worst case, and the
+     * reason the worst case is a bound rather than a budget. */
+    CHECK_EQ_UINT(r->flash.reads, 768u);
+    CHECK_EQ_UINT(r->flash.bytes_read, 47808u);
 }
