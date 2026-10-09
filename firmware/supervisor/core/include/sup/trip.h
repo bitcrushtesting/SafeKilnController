@@ -188,71 +188,127 @@ constexpr uint32_t SUP_DISAGREE_MS = 10000u;
  */
 constexpr uint32_t SUP_PERMIT_SETTLE_MS = 2000u;
 
+/**
+ * @brief One cycle's view of the world, as handed to @ref sup_step.
+ *
+ * @rangeof Temperatures are q7 (1/128 degC). Every `bool` is **positive
+ *          logic**, so a zero-filled snapshot means "nothing proven" and
+ *          withholds heat. That is the convention the whole structure follows
+ *          and the reason it is safe to forget a field.
+ *
+ * @errorbehaviour
+ * The one deliberate exception to the convention is @ref permit_sense, and it
+ * is documented on the field itself.
+ *
+ * @implements SWR-SAF-22, SWR-SAF-36, SWR-SAF-37, SWR-SAF-38
+ */
 typedef struct {
-    int32_t  chamber_q7;    /* couple 1, linearised, 1/128 degC              */
-    bool     chamber_valid; /* a conversion completed and was in range        */
-    /* SWR-SAF-37: the second chamber couple, on its own SPI bus and its own
-     * front end. Zero-initialised to invalid, so a caller that does not fit a
-     * second couple gets single-channel behaviour rather than a false
-     * agreement between a reading and a zero. */
+    int32_t  chamber_q7;    /**< Couple 1, linearised, 1/128 degC. */
+    bool     chamber_valid; /**< A conversion completed and was in range. */
+
+    /**
+     * @brief Couple 2, on its own SPI bus and its own front end (SWR-SAF-37).
+     *
+     * Zero-initialised to invalid, so a caller that does not fit a second
+     * couple gets single-channel behaviour rather than a false agreement
+     * between a reading and a zero.
+     */
     int32_t  chamber2_q7;
-    bool     chamber2_valid;
-    uint16_t fault_bits;    /* KILN_TC_FAULT_*, 0 for none                    */
-    bool     clear_pressed; /* the local clear button, debounced by the cycle */
-    /* SWR-SAF-38: the coil drive node, sensed. True means energised.
+    bool     chamber2_valid; /**< Couple 2 produced a usable reading. */
+
+    uint16_t fault_bits;    /**< `SUP_TC_FAULT_*` set, 0 for none. */
+    bool     clear_pressed; /**< The local clear button, debounced by the cycle. */
+
+    /**
+     * @brief The coil drive node, sensed. True means energised (SWR-SAF-38).
      *
      * Positive logic again, but note what the safe default is here: a
-     * zero-initialised input reads "not energised", which is the BENIGN value,
-     * because the dangerous direction is a coil that stays on after the permit
-     * is withdrawn. A board with no readback fitted therefore reports no fault
-     * rather than a permanent one, and SWR-SAF-38 is explicit that the
-     * diagnostic is absent on such a board rather than passing. */
+     * zero-initialised input reads "not energised", which is the **benign**
+     * value, because the dangerous direction is a coil that stays on after the
+     * permit is withdrawn. A board with no readback fitted therefore reports
+     * no fault rather than a permanent one, and SWR-SAF-38 is explicit that
+     * the diagnostic is **absent** on such a board rather than passing.
+     */
     bool     permit_sense;
-    /* SWR-SAF-36: every self-diagnostic passed this cycle.
+
+    /**
+     * @brief Every self-diagnostic passed this cycle (SWR-SAF-36).
      *
-     * POSITIVE logic, so that a zero-initialised input means "not proven
-     * healthy" and withholds heat. That is the same convention chamber_valid
-     * uses and for the same reason: the safe state has to be the one you get
-     * by forgetting to set a field.
+     * Positive logic, so that a zero-initialised input means "not proven
+     * healthy" and withholds heat. Same convention as @ref chamber_valid and
+     * for the same reason: the safe state has to be the one you get by
+     * forgetting to set a field.
      *
-     * A false here is heavier than a thermocouple fault. It clears selftest_ok,
-     * which makes the trip unclearable by the button, because a supervisor
-     * whose RAM, stack or program sequence has failed cannot be trusted to
-     * evaluate the condition the operator would be acknowledging. */
+     * A false here is heavier than a thermocouple fault. It clears
+     * @ref sup_t::selftest_ok, which makes the trip unclearable by the button,
+     * because a supervisor whose RAM, stack or program sequence has failed
+     * cannot be trusted to evaluate the condition the operator would be
+     * acknowledging.
+     */
     bool     diag_ok;
 } sup_input_t;
 
+/**
+ * @brief The trip logic's own state: the decision, and the timers behind it.
+ *
+ * @rangeof All intervals are whole milliseconds and saturate rather than wrap.
+ *
+ * @rationale
+ * Held in a structure the caller owns rather than in globals, which is what
+ * lets a host test construct any situation it likes and step it without a
+ * kiln, a clock or a board.
+ *
+ * @implements SWR-SAF-18, SWR-SAF-22, SWR-SAF-36, SWR-SAF-37
+ */
 typedef struct {
-    bool              permit;      /* heat is allowed *now*                   */
-    bool              tripped;     /* latched, needs a local clear            */
-    sup_trip_reason_t reason;      /* why, latched with the trip              */
-    bool              selftest_ok;
-    uint32_t          fault_ms;    /* how long the fault has persisted        */
-    /* Whether a usable reading has *ever* arrived.  Before the first one the
-     * supervisor withholds permission but does not latch: "the sensor never
-     * got going" and "the sensor was working and stopped" are different, and
-     * only the second is a fault to acknowledge.  Without this the stale timer
-     * runs from the first cycle and latches at boot if the front end's first
-     * conversion takes longer than the grace, which is a trip with nothing
-     * wrong behind it. */
+    bool              permit;      /**< Heat is allowed *now*. */
+    bool              tripped;     /**< Latched; needs a local clear. */
+    sup_trip_reason_t reason;      /**< Why, latched with the trip. */
+    bool              selftest_ok; /**< The start-up self-test has not been revoked. */
+    uint32_t          fault_ms;    /**< How long the front-end fault has persisted. */
+
+    /**
+     * @brief Whether a usable reading has *ever* arrived.
+     *
+     * Before the first one the supervisor withholds permission but does not
+     * latch: "the sensor never got going" and "the sensor was working and
+     * stopped" are different, and only the second is a fault to acknowledge.
+     * Without this the stale timer runs from the first cycle and latches at
+     * boot whenever the front end's first conversion takes longer than the
+     * grace, which is a trip with nothing wrong behind it.
+     */
     bool              seen_valid;
-    /* The clear button is edge triggered, and these are why.
+
+    /**
+     * @brief Whether the clear button has been seen released since it last acted.
      *
-     * A latch cleared on the pin *level* is not a latch: a button shorted to
-     * ground, or one stuck down, would clear it on every cycle, and the
-     * supervisor would then permit heat whenever the instantaneous condition
-     * happened to be good.  That is the latch defeated by a single solder
-     * bridge.
+     * The button is edge triggered, and this is why. A latch cleared on the
+     * pin **level** is not a latch: a button shorted to ground, or one stuck
+     * down, would clear it on every cycle, and the supervisor would then
+     * permit heat whenever the instantaneous condition happened to be good.
+     * That is the latch defeated by a single solder bridge.
      *
-     * So the input has to be seen *released* before it can clear anything
-     * (`clear_armed`), and it has to be held (`clear_s`).  A shorted line
-     * never arms, because it is never seen released, including at power-on. */
+     * So the input has to be seen released before it can clear anything, and
+     * then held for @ref SUP_CLEAR_HOLD_MS. A shorted line never arms, because
+     * it is never seen released, including at power-on.
+     */
     bool              clear_armed;
-    uint32_t          clear_ms;
-    /* How long the two couples have disagreed, and how long the coil has read
-     * energised while the permit was withdrawn. Both delay the LATCH, not the
-     * protection: heat is withheld on the first cycle either way. */
+    uint32_t          clear_ms;    /**< How long the armed button has been held. */
+
+    /**
+     * @brief How long the two couples have disagreed.
+     *
+     * Delays the **latch**, not the protection: the higher reading is acted on
+     * from the first cycle either way.
+     */
     uint32_t          disagree_ms;
+
+    /**
+     * @brief How long the coil has read energised while the permit was withdrawn.
+     *
+     * Delays the latch for the same reason as @ref disagree_ms, and gives the
+     * charge pump time to decay before a slow release is called a stuck coil.
+     */
     uint32_t          permit_stuck_ms;
 } sup_t;
 

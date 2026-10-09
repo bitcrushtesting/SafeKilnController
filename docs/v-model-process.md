@@ -160,11 +160,17 @@ worth stating:
   `\implements`, `\derivedfrom` and `\verifiedby`, each of which becomes a
   cross-referenced index page in the generated document.
 - **The gate is doxygen's warnings**, with `WARN_AS_ERROR`, so an undocumented
-  parameter fails CI rather than producing a document with a hole in it.
-- **Coverage is counted separately**, by `tools/udd-coverage.py`, because
-  doxygen is silent about a file carrying no comment blocks at all: a clean run
-  proves the comments that exist are well formed and nothing about the ones
-  that do not.
+  function, struct or parameter fails CI rather than producing a document with
+  a hole in it. That needs `EXTRACT_ALL = NO` **and** `HIDE_UNDOC_MEMBERS =
+  NO`, which is the only one of the four combinations that warns; the
+  Doxyfile's table records the other three, each of which is silent.
+- **Coverage is counted separately**, by `tools/udd-coverage.py`, and the
+  separation has earned itself twice. Doxygen cannot see a file that carries no
+  `\file` block at all, members included, and says nothing about it: two of
+  the four headers were in exactly that state while the build was green. It
+  also cannot notice that an `EXCLUDE_SYMBOLS` pattern meant to exempt the
+  board layer has reached into the safety function and quietly removed five
+  documented constants, which is what happened and what the count caught.
 
 The fields each unit carries, and why those: `firmware/supervisor/Doxyfile`
 states the five questions an assessment under EN ISO 13849-1:2023 cl. 4.6 or
@@ -375,7 +381,7 @@ and its realisation is visible rather than assumed away.
 | 2 System requirements | [`02_system_req.sdoc`](02_system_req.sdoc) | `SYS-HW-`, `SYS-SAF-`, `SYS-ASM-` | written |
 | 3 Software requirements | [`03_software_req.sdoc`](03_software_req.sdoc) | `SWR-` + area | written |
 | 4 Software architecture | [`04_software_arch.sdoc`](04_software_arch.sdoc) | `SWA-` | written |
-| 5 Unit design | Doxygen comments in the source, built by [`tools/udd.sh`](../tools/udd.sh) | not `SWD-`, see below | **Partial, and generated rather than written.** `firmware/supervisor/core/include/sup/trip.h`, the whole trip logic, is complete: 10 of the supervisor's 76 public functions and constants. Three headers remain (tasklist R13). The controller has none. |
+| 5 Unit design | Doxygen comments in the source, built by [`tools/udd.sh`](../tools/udd.sh) | not `SWD-`, see below | **Written for the supervisor, and generated rather than maintained.** All four headers complete: 76 of 76 public functions and constants, with no exemption in `core/` or `protocol/`. Enforced two ways, and both are needed. The controller has none. |
 | 7 Unit tests | `07_unit_tests.sdoc` | `UT-` | **not written** |
 | 8 Software tests | `08_software_tests.sdoc` | `SWT-` | **not written** |
 | 9 Integration tests | `09_integration_tests.sdoc` | `IT-` | **not written** |

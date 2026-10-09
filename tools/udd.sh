@@ -92,7 +92,11 @@ fi
 # with EXTRACT_ALL off it simply omits it, so "0 warnings" can mean "nothing is
 # documented" as easily as "everything is".  That is the vacuous pass this
 # project refuses elsewhere, so the number is computed and printed every time.
-python3 "$here/udd-coverage.py" "$sup" "$out"
+if [ "$lenient" = "1" ]; then
+    python3 "$here/udd-coverage.py" "$sup" "$out"
+else
+    python3 "$here/udd-coverage.py" --require-complete "$sup" "$out"
+fi
 
 echo
 echo "Unit Design Document: $out/html/index.html"

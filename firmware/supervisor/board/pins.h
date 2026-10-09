@@ -34,6 +34,21 @@
  *    supervisor).  USART2_RX would be PA3, and PA3 is used as a plain input
  *    instead, so the receiver is not merely unused, it is unwired.
  */
+/**
+ * @file pins.h
+ * @brief The supervisor pin map for the STM32G031K8T6 (LQFP32).
+ *
+ * @derivedfrom SWA-22. The assignment itself is in
+ *              `firmware/supervisor/README.md`, with the three properties of
+ *              it that must survive any change: everything on port A, PA9 to
+ *              PA12 avoided entirely, and the UART's receive pin never
+ *              configured so the link is unwired rather than merely unused.
+ *
+ * The `static_assert`s below are the unit design of this file: they prove at
+ * compile time that no two pins share a bit and that nothing landed on the
+ * remappable PA9..PA14 range.
+ */
+
 #ifndef SUP_PINS_H
 #define SUP_PINS_H
 
@@ -133,6 +148,20 @@
  * is a window at every reset where the element's state is whatever the board
  * leaks to, which is the inverse of the open-drain problem tasklist K1 records
  * about the chain this replaces. */
+/**
+ * @brief Polarity of the permit output: 1 means a high level permits heat.
+ *
+ * @rangeof 1. A board that inverts the drive must change this.
+ *
+ * @errorbehaviour
+ * This places a requirement on the hardware, and it is the one to check first
+ * on a new board: every GPIO is a high-impedance input between reset and the
+ * first instruction, so the series element must be held **off by an external
+ * pull-down** rather than by this pin. Without it there is a window at every
+ * reset where the element's state is whatever the board leaks to.
+ *
+ * @implements SWR-SAF-22
+ */
 #define SUP_PERMIT_ACTIVE_HIGH 1
 
 /* --- the permit readback (SWR-SAF-38) -----------------------------------
@@ -153,6 +182,17 @@
  * inverts it must change this, and the firmware checks sense against command, so
  * getting it backwards fails loudly on the first cycle rather than quietly
  * agreeing half the time. */
+/**
+ * @brief Polarity of the permit readback: 1 means a high level reads energised.
+ *
+ * @rangeof 1. A board that inverts the sense must change this.
+ *
+ * @errorbehaviour
+ * The firmware checks sense against command, so getting this backwards fails
+ * loudly on the first cycle rather than quietly agreeing half the time.
+ *
+ * @implements SWR-SAF-38
+ */
 #define SUP_PERMIT_SENSE_ACTIVE_HIGH 1
 
 /* --- why the second couple has a ~FAULT pin too -------------------------
@@ -184,6 +224,20 @@
  * addition carries where a bitwise OR absorbs, so the two agree if and only if
  * no bit appears twice. No <bit>, no popcount, no constexpr function: it holds
  * in a freestanding build. */
+/**
+ * @brief The bit a pin number occupies in a port register.
+ *
+ * @param p Pin number, 0 to 15.
+ * @return `1u << p`.
+ *
+ * @rationale
+ * A function-like macro rather than a `constexpr` function because it is used
+ * inside the `static_assert`s below in a freestanding build with no `<bit>`
+ * and no `popcount`. Those assertions are the unit design of this file:
+ * sum-equals-OR is the whole trick, since both fold the same `1u << pin`
+ * terms, addition carries where a bitwise OR absorbs, and the two agree if and
+ * only if no bit appears twice.
+ */
 #define SUP_BIT(p) (1u << (p))
 
 /* Written out rather than folded by a variadic macro: the preprocessor does not
