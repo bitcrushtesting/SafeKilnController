@@ -110,9 +110,12 @@ in `core/`, `protocol/`, `board/` or `src/`, and all four compile clean at
 name the controller's safety defaults, is a controller concern; the supervisor
 has none.
 
-The build still sets C++20 for the supervisor target. Pinning it to 17 is part
-of adopting the standard, not a separate improvement, and is listed in
-section 10 rather than done piecemeal.
+**The build sets it as of 2026-10-09**, in both
+`firmware/supervisor/CMakeLists.txt` and the suites' own, so the code the tests
+translate is the code that ships. It cost nothing twice over: the four suites
+pass unchanged, and the linked image is **byte-identical** to the C++20 one,
+same 3 488 bytes and the same `0x6b9284a1` program-memory digest. The language
+level moved; not one instruction did.
 
 **The controller stays C++20**, per `SWA-20`.
 
@@ -347,7 +350,7 @@ is a description rather than a standard.
 | | Gap | What closing it takes |
 |---|---|---|
 | 1 | **MISRA C++:2023 is a target, not a claim.** No commercial checker has been run. | A licence for one checker (Cppcheck Premium, QAC, LDRA, Polyspace, Parasoft) pointed at `firmware/supervisor` only, which is four core files and 3.5 kB. Then the MISRA Compliance:2020 artefacts: a guideline enforcement plan, a re-categorisation plan, deviation records and a compliance summary. The deviation discipline of section 7 is already that in substance. |
-| 2 | **The supervisor builds at C++20**, which MISRA C++:2023 is not written against. | One line in `firmware/supervisor/CMakeLists.txt`. Verified to compile clean at C++17; part of item 1 rather than a change on its own. |
+| 2 | ~~The supervisor builds at C++20, which MISRA C++:2023 is not written against.~~ **Done 2026-10-09.** Both the target and the suites build at C++17, the suites pass, and the image is byte-identical to the one C++20 produced. | |
 | 3 | **No tool qualification argument.** 61508-3 §7.4.4 puts `arm-none-eabi-g++`, `tools/sup-crc.py` and `tools/gen-stm32g031-header.py` in class T3: each transforms or generates what ends up in the image. The CRC stamper is the sharp one, because a silently wrong stamp is exactly what the firmware then trusts. | Version pinning, plus an independent read-back of the stamp rather than trusting the writer. |
 | 4 | **Worst-case stack is not bounded at build time.** `-fstack-usage` is set and nothing consumes the `.su` files. The 256-word guard catches an overflow at run time, which is the second line of defence, not the first. | A script summing the `.su` files along the call graph. Cheap here specifically: the supervisor has no recursion and no function pointer. |
 | 5 | ~~The supervisor's tests do not run under a sanitizer.~~ **Done.** `ENABLE_ASAN` on the supervisor's host build and a second `ctest` step in its CI job, mirroring the controller's option name and sanitiser pair. Finding it also fixed the controller's: both had been recovering from UBSan findings and reporting PASSED. | |

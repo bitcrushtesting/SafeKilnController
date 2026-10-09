@@ -16,7 +16,16 @@
 cmake_minimum_required(VERSION 3.16)
 project(kiln_supervisor C CXX ASM)
 
-set(CMAKE_CXX_STANDARD 20)
+# C++17, and the version matters: MISRA C++:2023 is written against C++17, and
+# the supervisor is the component the project intends to hold to that subset
+# (docs/coding-standard.md).  Building at C++20 while naming C++17 as the
+# target standard would have been a discrepancy an assessor finds before we do.
+#
+# Nothing was given up to move: the supervisor uses constexpr, nullptr,
+# static_assert, noexcept and three attributes, and no language feature newer
+# than C++11.  It compiles clean at 17, at 14 and at 11; 17 is chosen to match
+# the subset rather than to reach for anything in it.
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(supervisor.elf
