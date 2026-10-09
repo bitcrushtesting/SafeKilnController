@@ -596,6 +596,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The command block below is run by the action as bash -c with the
+      # WHOLE block inside single quotes. One apostrophe anywhere in it, in a
+      # comment as readily as in a string, ends that quoting and bash exits 2
+      # on a parse error before any of it runs. That happened, and the symptom
+      # was a job failing with no output at all. So the block is four lines
+      # with no quoting hazard in them, and everything else lives in
+      # tools/qemu-smoke.sh where it can be read, reviewed and run locally.
       - name: Build and run under QEMU
         uses: espressif/esp-idf-ci-action@v1
         with:
@@ -603,101 +610,10 @@ jobs:
           target: esp32s3
           path: firmware/controller
           command: |
-            export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.qemu"
             python "$IDF_PATH/tools/idf_tools.py" install qemu-xtensa
             . "$IDF_PATH/export.sh"
-            # export.sh does not put qemu-xtensa on PATH in this image, and
-            # THAT is why this job produced an empty log for weeks: `idf.py
-            # qemu` exited 127, "command not found", and `|| true` swallowed
-            # it. Find the binary and fail loudly if the install did not
-            # produce one, rather than running a smoke test with no emulator.
-            qemu_bin="$(find "${IDF_TOOLS_PATH:-$HOME/.espressif}" \
-                          -name qemu-system-xtensa -type f -perm -u+x \
-                          2>/dev/null | head -1)"
-            if [ -z "$qemu_bin" ]; then
-              echo "::error::qemu-system-xtensa is not there after installing qemu-xtensa"
-              exit 1
-            fi
-            export PATH="$(dirname "$qemu_bin"):$PATH"
-            idf.py build
-            # No monitor: it wants a tty.  Serial goes to stdout, and the
-            # firmware prints a telemetry line a second.
-            #
-            # ---------------------------------------------------------------
-            # THIS STEP HAS BEEN PRODUCING A LOG WITH NO DEVICE OUTPUT IN IT
-            # ---------------------------------------------------------------
-            # Every assertion below then fails for one reason, and none of
-            # those reasons is the firmware: the log ends at QEMU's own launch
-            # banner and carries nothing from the target.  The same commands on
-            # a developer machine with the same IDF v6.0.1 and the same QEMU
-            # produce 20 kB of ROM output and telemetry, under SIGKILL and with
-            # stdin closed, so neither output buffering nor a missing tty
-            # explains it: the cause is specific to this container and is not
-            # yet known.
-            #
-            # Rather than ship a guess, this step now reports what the next run
-            # needs in order to be diagnosed: which binary ran, what it says
-            # about itself, how the run ended, and how much came back.  The
-            # assertions stay as they are, because a smoke test that is quietly
-            # skipped is worse than one that fails loudly.
-            echo "--- qemu: $(command -v qemu-system-xtensa || echo 'NOT ON PATH') ---"
-            qemu-system-xtensa --version 2>&1 | head -2 || true
-            # SIGINT rather than SIGKILL so QEMU can exit cleanly, with a KILL
-            # 15 s later as the backstop.  `rc` is captured rather than
-            # swallowed by `|| true`: "QEMU exited immediately" and "QEMU ran
-            # for the full three minutes" are different faults and the old form
-            # could not tell them apart.
-            rc=0
-            timeout --signal=INT --kill-after=15 180 \
-                idf.py qemu > qemu.log 2>&1 || rc=$?
-            echo "--- idf.py qemu exited $rc after $(wc -c < qemu.log) bytes ---"
-            tail -40 qemu.log
-
-      - name: Assert it booted and started firing
-        run: |
-          log=firmware/controller/qemu.log
-          test -s "$log" || { echo "::error::QEMU produced no output"; exit 1; }
-
-          fail=0
-          want() {
-            if grep -qE "$1" "$log"; then
-              echo "ok: $2"
-            else
-              echo "::error::$2 -- expected /$1/ in the QEMU log"
-              fail=1
-            fi
-          }
-
-          # The banner is "Safe Kiln Controller <ver> (<built>, IDF <ver>) on <target>".
-          # This assertion previously looked for 'Safe Kiln Controller starting', which
-          # the firmware has never printed -- so it could only ever have passed
-          # vacuously or failed.  Matched against what main.cpp actually logs.
-          want 'kiln: Safe Kiln Controller .* on esp32s3' 'the composition root ran'
-          want 'SIMULATED PLANT'                 'the simulated plant was bound'
-          want 'started "'                       'a program was accepted and started'
-          want '^\[RUN'                          'the run controller reached Running'
-          want 'HEAT'                            'the safety supervisor granted heat authority'
-
-          # The kiln has to actually get somewhere: a controller that boots and
-          # then sits at ambient would satisfy every check above.  The state is
-          # padded inside its brackets, so strip the whole bracketed field before
-          # reading the temperature rather than counting on where it lands.
-          if ! awk '/^\[/ { gsub(/\[[^]]*\]/, ""); if ($1+0 > 100) found = 1 }
-                    END { exit !found }' "$log"; then
-            echo "::error::the simulated kiln never passed 100 degC"
-            fail=1
-          fi
-
-          # And it has to get there without tripping a rule.  A spurious fault is
-          # the failure mode that matters most: a rule that stops a working kiln
-          # is worse than no rule, because it gets switched off.
-          if grep -qE '^\s+FAULT [0-9]+' "$log"; then
-            echo "::error::a fault latched during an unperturbed firing"
-            grep -E '^\s+FAULT [0-9]+' "$log" | head -5
-            fail=1
-          fi
-
-          exit $fail
+            cd ../..
+            tools/qemu-smoke.sh
 
       - uses: actions/upload-artifact@v4
         if: always()
