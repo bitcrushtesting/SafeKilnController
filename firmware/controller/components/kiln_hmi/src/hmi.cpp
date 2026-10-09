@@ -305,8 +305,13 @@ void draw_networks(kiln_hmi_t *h, const kiln_hmi_view_t *v)
 
         char line[24];
         /* 18 characters of SSID is what fits beside the marks at this size. */
+        /* The precision is the point: truncation here is deliberate, and
+         * writing it as "%s" into a short buffer makes it look accidental to
+         * the compiler, which says so (-Wformat-truncation, and GCC is right).
+         * An explicit bound states that 18 characters is the design. */
         char name[19];
-        (void)snprintf(name, sizeof(name), "%s", v->net_list_ssid[i]);
+        (void)snprintf(name, sizeof(name), "%.*s", (int)(sizeof(name) - 1u),
+                       v->net_list_ssid[i]);
         if (strlen(v->net_list_ssid[i]) > sizeof(name) - 1u) {
             name[sizeof(name) - 2u] = '.';
             name[sizeof(name) - 3u] = '.';

@@ -38,7 +38,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-IDF_BUILD=${IDF_BUILD:-firmware/build}
+# firmware/controller/build since the split into controller and supervisor.
+# This said firmware/build, so the script ran and then reported the database
+# missing, which reads like "you forgot to build" and is not that.
+IDF_BUILD=${IDF_BUILD:-firmware/controller/build}
 DB=$IDF_BUILD/compile_commands.json
 OUT=${OUT:-$IDF_BUILD/tidy-target}
 SRC_DIR=firmware/controller/components/kiln_hal_esp32s3/src
