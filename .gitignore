@@ -57,6 +57,10 @@ dist/
 # headers on demand and published as a CI artifact; a copy in git would be the
 # second description of the code that generating it exists to avoid.
 firmware/supervisor/build-udd/
+# And the LaTeX tree doxygen writes when GENERATE_LATEX is on or when it is run
+# with a configuration piped in from somewhere else, which is how a stray copy
+# of one got committed once.
+firmware/supervisor/latex/
 
 # Python bytecode from the tools/ scripts.
 __pycache__/
