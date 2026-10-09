@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <stddef.h>
 #include <string.h>
 #include "kiln_core/configmodel.h"
 #include "kiln_core/logrec.h"      /* kiln_crc16 */
@@ -68,7 +69,6 @@ const kiln_cfg_item_t k_items[] = {
     NUM("control.dwell_tol_c",        "degC",  "SWR-CTL-12",   KILN_CFG_T_FLOAT, dwell_tol_c,           0.5,    50,        5,  0),
 
     /* sensing */
-    ENUMI("sense.tc_type",                     "SWR-ACQ-02",   tc_type,      k_tc_names, KILN_TC_TYPE_COUNT, KILN_TC_TYPE_K, SAFE | BOOTR),
     ENUMI("sense.case_tc_type",                "SWR-ACQ-02",   case_tc_type, k_tc_names, KILN_TC_TYPE_COUNT, KILN_TC_TYPE_K, SAFE | BOOTR),
     NUM("sense.line_filter_hz",       "Hz",    "SWR-ACQ-06",   KILN_CFG_T_U16,   line_filter_hz,         50,    60,       50,  LOCKED),
     NUM("sense.filter_tau_s",         "s",     "SWR-ACQ-07",   KILN_CFG_T_FLOAT, filter_tau_s,            0,    30,        2,  0),
@@ -511,9 +511,39 @@ kiln_err_t kiln_config_decode(const void *blob, size_t len, kiln_config_t *cfg)
 
     /* Equal or older: take what the stored payload holds, leave the rest at the
      * defaults already in place.  That is exactly "migrate, filling new items
-     * with defaults". */
-    const size_t take = payload < sizeof(kiln_config_t) ? payload : sizeof(kiln_config_t);
-    memcpy(cfg, &p[CFG_HDR_BYTES], take);
+     * with defaults".
+     *
+     * Version 1 needs more than that, because schema 2 REMOVED a field rather
+     * than adding one.  `sense.tc_type` was one byte immediately before
+     * `case_tc_type` (SWR-ACQ-02 took it away), so every byte after that hole
+     * sits one lower in the version 2 struct and a straight copy would land
+     * the whole sensing, control and network block one byte out of place:
+     * `line_filter_hz` would read as half of itself plus half a calibration
+     * offset, and the CRC would have passed on the way in.  The splice is
+     * explicit for that reason, and is what keeps an operator's configuration
+     * across the update instead of resetting it to defaults. */
+    const uint8_t *stored = &p[CFG_HDR_BYTES];
+    if (ver == 1u) {
+        const size_t hole = offsetof(kiln_config_t, case_tc_type);
+        const size_t head = (payload < hole) ? payload : hole;
+        memcpy(cfg, stored, head);
+        if (payload > (hole + 1u)) {
+            size_t tail = payload - hole - 1u;
+            if (tail > (sizeof(kiln_config_t) - hole)) {
+                tail = sizeof(kiln_config_t) - hole;
+            }
+            /* Byte arithmetic on the struct, for the reason field_of above
+             * gives: offsetof yields a byte offset and the address has to be
+             * walked as bytes.
+             * NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast) */
+            memcpy(reinterpret_cast<char *>(cfg) + hole, stored + hole + 1u, tail);
+        }
+    }
+    else {
+        const size_t take = payload < sizeof(kiln_config_t) ? payload
+                                                            : sizeof(kiln_config_t);
+        memcpy(cfg, stored, take);
+    }
     cfg->schema_version = KILN_CFG_SCHEMA_VERSION;
 
     /* A blob that passed its CRC can still hold a value outside a range this

@@ -162,8 +162,15 @@ kiln_err_t kiln_app_init(kiln_app_t *app, const kiln_app_ports_t *ports,
         (void)app->ports.counters->load(app->ports.counters->ctx, &app->counters);
     }
     if (app->ports.tc->configure != nullptr) {
-        (void)app->ports.tc->configure(app->ports.tc->ctx,
-                                       (kiln_tc_type_t)app->cfg.tc_type,
+        /* SWR-ACQ-02: type K, from here and not from the configuration, which
+         * no longer carries a chamber type at all.  On the product this call
+         * is refused anyway -- the supervisor owns that front end and
+         * kiln_suplink returns KILN_ERR_UNSUPPORTED -- and the refusal is the
+         * point: a caller that still thinks it owns the front end finds out.
+         * On a host or simulated build, where the chamber port is a fake that
+         * accepts it, type K is what the supervisor would have been
+         * linearising for. */
+        (void)app->ports.tc->configure(app->ports.tc->ctx, KILN_TC_TYPE_K,
                                        (uint8_t)app->cfg.line_filter_hz);
     }
     if ((app->ports.case_tc != nullptr) && (app->ports.case_tc->configure != nullptr)) {

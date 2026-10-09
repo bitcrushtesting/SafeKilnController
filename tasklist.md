@@ -794,11 +794,21 @@ weakness first, the deadline second, the sentence third, the engineering last.
   peak, and validation on start is what refuses that firing rather than running
   it into a limit.
 
-- [ ] **P4. Untested against a client.** It compiles and passes analysis. No
-  request has been made of it. The host API suite covers every route's
-  behaviour, so what is unverified is specifically the socket half: URI
-  splitting, chunked streaming, the four-session limit, and whether a slow
-  client can hold a buffer long enough to matter.
+- [ ] **P4. The API has been driven by a client; `esp_http_server` has not.**
+  Narrowed on 2026-10-10 rather than closed. The development harness is a real
+  socket server running the same handler code, and it has now answered real
+  requests over TCP: the program routes, an id past the end as `404`, the
+  storage response, a log query with its chunk framing and terminator, and four
+  SSE frames in three and a half seconds each carrying a parseable payload.
+  That found a bug no unit test would have, the harness announcing
+  `Transfer-Encoding: chunked` and then sending unframed SSE.
+
+  What remains unverified is specifically `esp_http_server`, which the harness
+  does not use and which no host test can reach: URI splitting in its parser,
+  `httpd_resp_send_chunk` against a real client, the socket limit with two
+  sessions parked on streams, the async handler's lifetime when a browser tab
+  closes mid-push, and whether a slow client can hold the shared 4 kB response
+  buffer long enough to matter. All of it needs the device.
 
 ---
 
@@ -869,15 +879,30 @@ Designed in [`docs/safety-supervisor.md`](docs/safety-supervisor.md). Nothing
 below can start until `R1` to `R4` are answered, because each of them changes
 either the supervisor's pin count or a requirement.
 
-- [ ] **R9. Retire `sense.tc_type` from the chamber channel.** The reason is
-  now in the code: `kiln_suplink`'s `configure` returns
-  `KILN_ERR_UNSUPPORTED`, because the ESP32 no longer owns that front end.
-  The config item is therefore dead on this side. `SWR-ACQ-02` now
-  fixes the chamber couple as type K, and after `SWA-22` the ESP32 does not
-  configure that front end at all, so the config item is meaningless on this
-  side. Removing it is a schema change (`KILN_CFG_SCHEMA_VERSION`,
-  `SWR-CFG-05` migration), so do it in the same commit as the rest of the
-  supervisor's firmware work rather than bumping the schema twice.
+- [x] **R9. `sense.tc_type` is retired. Done 2026-10-10.** The chamber front
+  end belongs to the supervisor, which linearises for type K, so an item that
+  let this side change the type would change what the supervisor's backstop
+  means. `kiln_suplink`'s `configure` already refused, which made the config
+  item a setting an operator could set and believe while nothing acted on it.
+
+  `KILN_CFG_SCHEMA_VERSION` is 2, and the migration is the interesting part.
+  Every earlier version change added fields, which a prefix copy handles; this
+  one *removes* a byte from the middle, so every field after the hole sits one
+  lower. A prefix copy would have landed the whole sensing, control and network
+  block one byte out of place -- the stored line filter frequency reading as
+  half of itself plus half a calibration offset -- and the CRC would have
+  passed on the way in, so nothing would have reported it. A device would come
+  back from an update quietly mis-calibrated.
+
+  `kiln_config_decode` therefore splices version 1 explicitly, which is
+  `SWR-CFG-05`'s "older: migrate" met rather than answered with defaults. The
+  test forges a real version 1 blob and checks fields on both sides of the hole
+  plus a re-encode round trip. `SWR-CFG-02` records that there is no chamber TC
+  type, and a test asserts the item does not come back.
+
+  `kiln_app_boot` now passes `KILN_TC_TYPE_K` to the chamber port from the code
+  rather than from configuration: refused on the product, which is the point,
+  and correct on the simulated build where the port accepts it.
 
 - [ ] **R5. Write the requirement deltas.** Six new requirements and nine
   changed ones, listed in section 11 of the design. `SWR-SAF-23` and `SWR-ACQ-02` are

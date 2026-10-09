@@ -3,6 +3,7 @@
  * kiln_core/configmodel -- SWR-CFG-01..SWR-CFG-08, SWR-NFR-19.
  */
 
+#include <stddef.h>
 #include <string.h>
 #include "kiln_check.h"
 #include "kiln_core/configmodel.h"
@@ -85,7 +86,7 @@ KILN_TEST(swrcfg02_the_minimum_item_set_is_present)
         "control.kp", "control.ki", "control.kd", "control.loop_period_ms",
         "control.window_ms", "control.min_on_ms", "control.min_off_ms",
         "control.duty_max", "control.holdback_band_c", "control.dwell_tol_c",
-        "sense.tc_type", "sense.line_filter_hz", "sense.filter_tau_s",
+        "sense.case_tc_type", "sense.line_filter_hz", "sense.filter_tau_s",
         "sense.cal_offset_c", "sense.cal_gain",
         "tune.amplitude", "tune.hysteresis_c", "tune.rule", "tune.timeout_s",
         "current.ct_a_per_v", "current.nominal_a", "current.mains_v",
@@ -102,6 +103,14 @@ KILN_TEST(swrcfg02_the_minimum_item_set_is_present)
         CHECK_MSG(kiln_config_find(required[i]) != NULL,
                   "SWR-CFG-02 requires an item %s", required[i]);
     }
+
+    /* And one item SWR-ACQ-02 requires NOT to exist. The chamber front end
+     * belongs to the supervisor, which linearises for type K; an item that let
+     * this side change that would make the backstop mean something else, and
+     * one that was offered and then ignored would be worse, because an
+     * operator can set it and believe it. */
+    CHECK_MSG(kiln_config_find("sense.tc_type") == NULL,
+              "SWR-ACQ-02: the chamber TC type is configurable again");
 }
 
 /*
@@ -422,4 +431,106 @@ KILN_TEST(encode_refuses_a_buffer_that_is_too_small)
     uint8_t tiny[8];
     CHECK_ERR(kiln_config_encode(&cfg, tiny, sizeof(tiny), NULL), KILN_ERR_NO_SPACE);
     CHECK_ERR(kiln_config_encode(NULL, tiny, sizeof(tiny), NULL), KILN_ERR_INVALID_ARG);
+}
+
+/* ===========================================================================
+ * SCHEMA 2: A REMOVED FIELD  (SWR-CFG-05, SWR-ACQ-02, tasklist R9)
+ * ===========================================================================
+ * Schema 1 carried `sense.tc_type` as one byte immediately before
+ * `case_tc_type`. SWR-ACQ-02 took it away, because the chamber front end
+ * belongs to the supervisor and an item that let this side change the type
+ * would change what the supervisor's backstop means.
+ *
+ * Every earlier migration added fields, which a prefix copy handles. A removal
+ * in the middle shifts every byte after the hole, and a prefix copy would land
+ * the whole sensing, control and network block one byte out of place: the
+ * stored line filter frequency would read as half of itself plus half a
+ * calibration offset, and the CRC would have passed on the way in, so nothing
+ * would report it. The device would come back from an update quietly
+ * mis-calibrated.
+ *
+ * This forges a real version 1 blob and checks the fields on both sides of the
+ * hole, because that is the only way to know the splice is right.
+ */
+
+/*
+ * @relation(SWR-CFG-05, scope=function)
+ */
+KILN_TEST(swrcfg05_a_version_1_blob_survives_the_removed_field)
+{
+    /* The version 1 layout is the version 2 layout with one extra byte at
+     * offsetof(case_tc_type). Built by taking a version 2 encoding apart and
+     * inserting the byte, which is exactly what the old firmware wrote. */
+    kiln_config_t in;
+    kiln_config_defaults(&in);
+
+    /* Distinctive values on both sides of the hole, chosen in range so that a
+     * clamp cannot hide a misplaced byte. */
+    in.max_temp_c      = 1150.0f;        /* before  */
+    in.case_tc_type    = (uint8_t)KILN_TC_TYPE_N;
+    in.line_filter_hz  = 60u;            /* after, and the one a shift ruins */
+    in.filter_tau_s    = 7.5f;
+    in.cal_offset_c    = -3.25f;
+    in.cal_gain        = 1.002f;
+    in.log_interval_s  = 30u;
+    in.dim_timeout_s   = 45u;
+    CHECK_OK(kiln_config_validate(&in, nullptr));
+
+    uint8_t v2[1024];
+    size_t v2len = 0;
+    CHECK_OK(kiln_config_encode(&in, v2, sizeof(v2), &v2len));
+
+    constexpr size_t HDR = 8u;
+    const size_t hole = offsetof(kiln_config_t, case_tc_type);
+    const size_t v1_payload = sizeof(kiln_config_t) + 1u;
+
+    uint8_t v1[1200];
+    memset(v1, 0, sizeof(v1));
+    /* Header: magic as encoded, version 1, the longer payload. */
+    memcpy(v1, v2, HDR);
+    v1[4] = 1u; v1[5] = 0u;
+    v1[6] = (uint8_t)(v1_payload & 0xFFu);
+    v1[7] = (uint8_t)(v1_payload >> 8u);
+    /* Payload: everything before the hole, the removed byte, then the rest. */
+    memcpy(&v1[HDR], &v2[HDR], hole);
+    v1[HDR + hole] = (uint8_t)KILN_TC_TYPE_S;   /* the field that went away */
+    memcpy(&v1[HDR + hole + 1u], &v2[HDR + hole], sizeof(kiln_config_t) - hole);
+    const size_t crc_at = HDR + v1_payload;
+    const uint16_t crc = kiln_crc16(v1, crc_at);
+    v1[crc_at]      = (uint8_t)crc;
+    v1[crc_at + 1u] = (uint8_t)(crc >> 8u);
+
+    kiln_config_t out;
+    kiln_config_defaults(&out);
+    /* Migrated, so the caller is told to write it back. */
+    CHECK_ERR(kiln_config_decode(v1, crc_at + 2u, &out), KILN_ERR_UNSUPPORTED);
+    CHECK_EQ_UINT(out.schema_version, KILN_CFG_SCHEMA_VERSION);
+
+    /* Before the hole. */
+    CHECK_NEAR(out.max_temp_c, 1150.0f, 0.01f);
+
+    /* At the hole: the enclosure type, which in version 1 sat one byte later. */
+    CHECK_EQ_UINT(out.case_tc_type, (uint8_t)KILN_TC_TYPE_N);
+
+    /* After the hole, which is where a prefix copy would have gone wrong. */
+    CHECK_EQ_UINT(out.line_filter_hz, 60u);
+    CHECK_NEAR(out.filter_tau_s, 7.5f, 0.001f);
+    CHECK_NEAR(out.cal_offset_c, -3.25f, 0.001f);
+    CHECK_NEAR(out.cal_gain, 1.002f, 0.0001f);
+    CHECK_EQ_UINT(out.log_interval_s, 30u);
+    CHECK_EQ_UINT(out.dim_timeout_s, 45u);
+
+    /* And the whole thing is still a valid configuration, which is what the
+     * device is about to run a kiln on. */
+    CHECK_OK(kiln_config_validate(&out, nullptr));
+
+    /* The migration is not a one-way street into nonsense: re-encoded and
+     * decoded, it is now a clean version 2 blob. */
+    uint8_t again[1024];
+    size_t again_len = 0;
+    CHECK_OK(kiln_config_encode(&out, again, sizeof(again), &again_len));
+    kiln_config_t back;
+    CHECK_OK(kiln_config_decode(again, again_len, &back));
+    CHECK_EQ_UINT(back.line_filter_hz, 60u);
+    CHECK_EQ_UINT(back.case_tc_type, (uint8_t)KILN_TC_TYPE_N);
 }
