@@ -17,7 +17,10 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-fw="$here/../firmware"
+# firmware/controller since the split into controller and supervisor: this
+# still said ../firmware, which is a directory with no CMakeLists in it, so the
+# script failed on the first build.  The same move broke the esp32s3 tidy job.
+fw="$here/../firmware/controller"
 action="${1:-all}"
 
 if [[ -z "${IDF_PATH:-}" ]]; then

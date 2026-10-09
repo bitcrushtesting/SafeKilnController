@@ -70,6 +70,17 @@ jobs:
           fi
           echo "clean"
 
+      - name: Release tool self-tests (SWR-UPD-11, SEC-05)
+        run: |
+          # The tools that sign things carry their own checks and need neither a
+          # board nor ESP-IDF. They are run here because the failure mode is
+          # quiet: a manifest whose signature does not verify, or a bootloader
+          # that overruns the partition table, is discovered on a device that
+          # cannot then be told otherwise.
+          python3 tools/update-manifest.py --self-test
+          python3 tools/secure-boot.py --self-test
+          python3 tools/sbom.py --self-test
+
       - name: SPDX header on every source file (SWR-NFR-18, UR-CON-04)
         run: |
           missing=0
@@ -79,7 +90,7 @@ jobs:
           done < <(git ls-files \
                      '*.cpp' '*.h' '*.md' '*.sdoc' 'CMakeLists.txt' '*/CMakeLists.txt' \
                      'firmware/controller/**/Kconfig*' 'firmware/controller/*.csv' 'firmware/controller/sdkconfig.*' \
-                     'tools/*.sh' '.github/workflows/*.yml' 'strictdoc.toml' \
+                     'tools/*.sh' 'tools/*.py' '.github/workflows/*.yml' 'strictdoc.toml' \
                    | grep -v '^LICENSE' \
                    | grep -vE '^fixture/(board|firmware)/')
             # fixture/board and fixture/firmware are generated verbatim by
@@ -209,7 +220,15 @@ jobs:
             # IDF_TOOLS_PATH is /opt/esp in this image; the script needs it to
             # find the xtensa picolibc headers, and fails loudly without them
             # rather than analysing nothing and calling it clean.
-            cd "$GITHUB_WORKSPACE"
+            #
+            # `cd ../..` rather than `cd "$GITHUB_WORKSPACE"`: that variable is
+            # not exported into this container, so `cd ""` quietly succeeded,
+            # left the shell in firmware/controller and the next line died with
+            # "tools/tidy-target.sh: No such file or directory" (exit 127). The
+            # action runs the command from `path:` above, so two levels up is
+            # the repository root and does not depend on an environment this
+            # container may not carry.
+            cd ../..
             tools/tidy-target.sh
 
   # SWR-TST-19.  The line floor is enforced; measured at 97.5 % on kiln_core when
@@ -473,6 +492,12 @@ jobs:
             idf.py build
             idf.py size > build/size.txt
             idf.py size-components > build/size-components.txt
+            # SWR-NFR-28, and it has to run HERE rather than in a step after
+            # this one: the component licences are scanned from the ESP-IDF tree
+            # on disk, and that tree exists only inside this container.
+            python3 ../../tools/sbom.py --build-dir build \
+                                        --image build/safekiln.bin \
+                                        --out-dir build/sbom --format both
 
       # Summarised from a normal step: $GITHUB_STEP_SUMMARY is a path on the
       # runner, and the step above runs in a container that mounts only the
@@ -486,6 +511,22 @@ jobs:
             echo '```'
             cat firmware/controller/build/size.txt
             echo '```'
+            echo
+            echo '### Bill of materials'
+            echo
+            echo 'SWR-NFR-28, CycloneDX and SPDX, generated from the build:'
+            echo '```'
+            python3 - <<'PY'
+import glob, json
+for f in sorted(glob.glob('firmware/controller/build/sbom/*.cdx.json')):
+    d = json.load(open(f))
+    c = d['metadata']['component']
+    print(f"{c['name']} {c['version']}: {len(d['components'])} components")
+    for comp in d['components']:
+        if not comp.get('licenses'):
+            print(f"  licence unresolved: {comp['name']}")
+PY
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
@@ -498,6 +539,7 @@ jobs:
             firmware/controller/build/bootloader/bootloader.bin
             firmware/controller/build/partition_table/partition-table.bin
             firmware/controller/build/flasher_args.json
+            firmware/controller/build/sbom/
             firmware/controller/build/size.txt
             firmware/controller/build/size-components.txt
           if-no-files-found: error
@@ -529,7 +571,35 @@ jobs:
             idf.py build
             # No monitor: it wants a tty.  Serial goes to stdout, and the
             # firmware prints a telemetry line a second.
-            timeout --signal=KILL 180 idf.py qemu > qemu.log 2>&1 || true
+            #
+            # ---------------------------------------------------------------
+            # THIS STEP HAS BEEN PRODUCING A LOG WITH NO DEVICE OUTPUT IN IT
+            # ---------------------------------------------------------------
+            # Every assertion below then fails for one reason, and none of
+            # those reasons is the firmware: the log ends at QEMU's own launch
+            # banner and carries nothing from the target.  The same commands on
+            # a developer machine with the same IDF v6.0.1 and the same QEMU
+            # produce 20 kB of ROM output and telemetry, under SIGKILL and with
+            # stdin closed, so neither output buffering nor a missing tty
+            # explains it: the cause is specific to this container and is not
+            # yet known.
+            #
+            # Rather than ship a guess, this step now reports what the next run
+            # needs in order to be diagnosed: which binary ran, what it says
+            # about itself, how the run ended, and how much came back.  The
+            # assertions stay as they are, because a smoke test that is quietly
+            # skipped is worse than one that fails loudly.
+            echo "--- qemu: $(command -v qemu-system-xtensa || echo 'NOT ON PATH') ---"
+            qemu-system-xtensa --version 2>&1 | head -2 || true
+            # SIGINT rather than SIGKILL so QEMU can exit cleanly, with a KILL
+            # 15 s later as the backstop.  `rc` is captured rather than
+            # swallowed by `|| true`: "QEMU exited immediately" and "QEMU ran
+            # for the full three minutes" are different faults and the old form
+            # could not tell them apart.
+            rc=0
+            timeout --signal=INT --kill-after=15 180 \
+                idf.py qemu > qemu.log 2>&1 || rc=$?
+            echo "--- idf.py qemu exited $rc after $(wc -c < qemu.log) bytes ---"
             tail -40 qemu.log
 
       - name: Assert it booted and started firing

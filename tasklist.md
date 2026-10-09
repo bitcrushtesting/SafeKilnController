@@ -20,11 +20,11 @@ reused: gaps in the numbering are items that have been closed.
 | **P2** | Required for a release that claims the requirements are met. |
 | **P3** | Correctness polish, consistency, cleanup. |
 
-## State, 2026-10-06
+## State, 2026-10-09
 
 | | |
 |---|---|
-| **Firmware logic** | Complete and tested. C++20, 398 host tests green plain and under ASan/UBSan, `clang-tidy` clean on host, target and webhost with no suppressions baseline, `esp32s3` builds with zero warnings at 243 kB (88 % of the OTA slot free), QEMU boots the image and fires it. |
+| **Firmware logic** | Complete and tested. C++20, 398 host tests green plain and under ASan/UBSan, `clang-tidy` clean on host, target and webhost with no suppressions baseline, `esp32s3` builds with zero warnings at 246 kB (88 % of the OTA slot free). QEMU boots the image and fires it **on a developer machine**; the CI job that asserts the same thing gets a log with no device output in it and has never passed (`C14`). |
 | **Firmware on hardware** | 15 of 16 ports are wired on the target. Only `update` has nothing behind it (`H2`). **None of it has been run against real hardware** (`L2`, `O3`, `P4`, `M3`). |
 | **Schematic** | ERC clean apart from one known `SDO` false positive (`A11`). Carries the lid interlock and the thermocouple-fault interlock. Does not carry the phase strap (`HR-22`) or the second and third CT inputs (`HR-23`). |
 | **PCB** | Updated from the schematic and placement started. **Not routed at all** (`A23`, `K4`). |
@@ -35,7 +35,7 @@ reused: gaps in the numbering are items that have been closed.
 | | | Open |
 |---|---|---|
 | [A](#a-schematic-and-pcb) | Schematic and PCB | 22 |
-| [C](#c-build-test-and-ci-infrastructure) | Build, test and CI | 8 |
+| [C](#c-build-test-and-ci-infrastructure) | Build, test and CI | 9 |
 | [D](#d-documentation-and-open-questions) | Documentation and open questions | 2 |
 | [F](#f-static-analysis) | Static analysis | 2 |
 | [G](#g-door-interlock-sr-31) | Door interlock | 3 |
@@ -45,10 +45,11 @@ reused: gaps in the numbering are items that have been closed.
 | [K](#k-hardware-interlock-chain) | Hardware interlock chain | 5 |
 | [L](#l-target-adapters) | Target adapters | 2 |
 | [M](#m-kiln_hmi-the-local-interface) | `kiln_hmi` | 3 |
+| [N](#n-security-obligations-and-the-cyber-resilience-act) | Security obligations and the CRA | 5 |
 | [O](#o-wifi-fr-net) | WiFi | 3 |
 | [P](#p-http-transport-and-the-api) | HTTP transport and the API | 4 |
 | [Q](#q-the-file-store-ad-21) | The file store | 5 |
-| [R](#r-the-independent-safety-supervisor-ad-22) | Independent safety supervisor | 7 |
+| [R](#r-the-independent-safety-supervisor-ad-22) | Independent safety supervisor | 6 |
 
 ---
 
@@ -200,7 +201,7 @@ reused: gaps in the numbering are items that have been closed.
   for two reasons: the files were being edited at the time, and the name is not
   only a filename there. `kilncontrol` appears in several hundred internal
   references, as `(project "kilncontrol")` in every symbol instance of the
-  schematic and as `(sheetfile "kilncontrol.kicad_sch")` in every footprint of
+  schematic and as `(sheetfile "safekiln.kicad_sch")` in every footprint of
   the PCB. Do it with KiCad's own Save As / rename rather than `git mv` plus a
   substitution, so the cross-references are rewritten by the tool that owns
   them. `board_pins.h` cites the schematic filename and will follow.
@@ -296,6 +297,28 @@ reused: gaps in the numbering are items that have been closed.
   autotune is enforced; 100 % of safety decision branches (`SWR-TST-19`) is not.
   Branch coverage was around 83 % when last measured.
 
+- [ ] **C14. The QEMU smoke test gets a log with no device output in it.** The
+  job has never passed. Its log ends at QEMU's own launch banner and carries
+  nothing from the target, so all six assertions fail for one reason and none
+  of those reasons is the firmware.
+
+  **Not reproducible off CI.** The same commands on a developer machine with
+  ESP-IDF v6.0.1 and the QEMU that `idf_tools` installs produce 20 kB of ROM
+  output and telemetry, with every assertion's pattern present, and they still
+  do when the run is killed with `SIGKILL` and when stdin is `/dev/null`. So
+  neither output buffering nor the missing tty explains it, and both of those
+  were the obvious suspects.
+
+  The job now prints which `qemu-system-xtensa` it found, what version it
+  reports, the exit status of `idf.py qemu` (previously swallowed by `|| true`)
+  and the byte count of the log. The next red run should say which of "QEMU
+  exited at once" and "QEMU ran for three minutes in silence" is happening,
+  which is the fork this has been stuck on.
+
+  Worth considering if that does not settle it: run `qemu-system-xtensa`
+  directly rather than through `idf.py qemu`, so the invocation is the job's
+  own and its stderr is not somebody else's wrapper.
+
 ---
 
 ## D. Documentation and open questions
@@ -370,12 +393,57 @@ question is whether it is worth its cost.
 
 ## H. Field update and local control
 
-- [ ] **H2. There is no field update path at all.** `SWR-UPD-01` was inverted:
-  no firmware image is accepted over the network. That closes TH-04 completely
-  and leaves no way to ship a fix without physical access, including a
-  security fix. `OQ-08` asks what replaces it (USB/serial via `esptool`, or an
-  image staged over the network but applied only after a physical confirmation
-  at the kiln). **This blocks release**, and is tracked as `SRR-11`.
+- [ ] **H2. The update path is specified and entirely unbuilt.** `OQ-08` is
+  resolved as of 2026-10-09: the device **pulls** a signed static manifest from
+  `update.bitcrushtesting.com` once a day, announces an available release on the
+  local display, and installs it only on a deliberate confirmation there. The
+  web interface stays read-only and gains no exception, which is why pull was
+  chosen over staging an image over the LAN: `SEC-00` keeps its absolute form.
+  `SWR-UPD-09` to `SWR-UPD-16` and `SWR-HMI-16` are the requirements,
+  [`docs/security.md` §6.2](docs/security.md) the reasoning, and
+  [`docs/architecture.md` §13.5](docs/architecture.md) the sequence.
+
+  **This still blocks release** (`SRR-11`), because none of it exists. What has
+  to be written, roughly in dependency order:
+
+  1. **Generate the manifest signing key**, on a machine it can then leave.
+     `tools/update-manifest.py keygen` exists and the format it signs is in
+     [`docs/architecture.md` §13.5](docs/architecture.md); what does not exist
+     is the key, so `firmware/controller/main/update_pubkey.h` is not committed
+     and nothing can verify anything yet. One command, and then the key is an
+     obligation for the whole support period (`SRR-12`).
+  2. **The verifier, host-tested first.** Signature check, semver comparison
+     against `kiln_fw_info_t::version`, target check, and the refusal of
+     anything not strictly newer (`SWR-UPD-13`). All of it is pure logic and
+     belongs in a component the host suite can beat on with a tampered manifest,
+     a wrong key, a truncated image and a replayed old release.
+  3. **The adapter**, `esp_https_ota` behind `check` and `install` in
+     `port_update.h` (both already declared there), streaming into the inactive
+     slot. `otadata`, `ota_0` and `ota_1` already exist in `partitions.csv`, so
+     the layout needs nothing.
+  4. **The screen** (`SWR-HMI-16`), which is the only place an install can be
+     authorised and therefore part of the security design rather than of the
+     interface. Needs the German strings too (`J`).
+  5. **`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` is already on**; what is missing
+     is the late `confirm_running()` of `SWR-UPD-15`, called when the supervisor
+     link, both couples, the config, the programs and the display have all been
+     seen working. Calling it in start-up code is the defect this requirement
+     exists to prevent.
+  6. **The `update.check_enabled` and `update.url` configuration items**, with
+     the opt-out reachable from the display, since the web interface cannot
+     write configuration.
+  7. **`tools/update.py`** for `SWR-UPD-14`'s USB recovery: write to `ota_0`,
+     erase `otadata`, and leave `nvs`, `kilnfs`, `kilnlog` and `prod` alone. The
+     mistake it exists to prevent is erasing the production data block.
+
+  Two things that are project work rather than firmware work, and that no amount
+  of firmware discharges: the release channel with an advisory per security
+  release and a **declared support period** (`SWR-UPD-16`, at least five years),
+  and the CRA Article 14 reporting route, which is live from **11 September
+  2026** while the main obligations start on 11 December 2027.
+
+  It also depends on `P`: there is still no HTTP stack on the target, and this
+  needs an HTTPS *client* even though it needs no server.
 
 - [ ] **H3. Local control is now the only control, and it has never been
   operated.** The web interface is read-only by design, so starting, pausing,
@@ -506,6 +574,90 @@ question is whether it is worth its cost.
   the wrong way on real hardware, swap the two `pcnt_channel_set_edge_action`
   pairs; it is a one-line fix and not a design error, but it will be wrong half
   the time until somebody turns a real knob.
+
+---
+
+## N. Security obligations and the Cyber Resilience Act
+
+The inventory is [`docs/security.md` §13](docs/security.md), split into the
+firmware half and the half that is not firmware. These are the items it leaves
+open, and the order below is the order of [§13.3](docs/security.md): the live
+weakness first, the deadline second, the sentence third, the engineering last.
+
+- [ ] **N1. The access point will start without a passphrase.** `OQ-S4`, and of
+  everything the CRA asks of this project it is the only item that is a live
+  weakness in code that exists today rather than something unbuilt or on paper.
+  A product must ship in a **secure default configuration**; an open AP, offered
+  as flexibility, is not one. The fix is a bound in the configuration table and
+  a refusal in the WiFi adapter: either enforce a minimum length on
+  `net.ap_pass` or refuse to start the AP without one, and say which in
+  `TH-11`'s goal, since that threat still has none. Overlaps `O`.
+
+- [ ] **N2. The Article 14 reporting procedure, and the mailbox behind
+  `SECURITY.md`.** `SECURITY.md` exists and names
+  `security@bitcrushtesting.com` as the single point of contact required by
+  Article 13(17); **that mailbox has to exist and be read by a person**. Behind
+  it: a written procedure for an actively exploited vulnerability or a severe
+  incident, being an early warning to ENISA and the relevant CSIRT within 24
+  hours, a notification within 72, a final report within 14 days, and users
+  informed without undue delay. **This applies from 11 September 2026**, more
+  than a year before the Act's main obligations, and it does not wait for the
+  firmware. Carried as `SRR-14`.
+
+- [ ] **N3. Choose the support period, and declare it.** At least five years
+  (`SWR-UPD-16`), and the service life of a kiln controller is well beyond that
+  floor. The number gates the information given to users, how long the SBOM has
+  to be kept, and how long `update.bitcrushtesting.com` and its signing key have
+  to keep existing (`SRR-12`). It is a sentence to write and an obligation to
+  mean, and it is half of `OQ-R5`; the other half is the conformity assessment
+  route, where a kiln controller does not appear in the Act's important or
+  critical lists, so self-assessment should be available. Record the conclusion
+  rather than assume it.
+
+- [ ] **N4. Three requirements with no implementation.** Each was a gap nobody
+  had named until 2026-10-09:
+
+  - `SWR-LOG-16`, **security event logging with an owner opt-out** (`SEC-13`).
+    The event log records process events; nothing records a refused manifest, a
+    rollback, a configuration change or a client joining the provisioning AP.
+    The opt-out is required as explicitly as the log, and the log must not
+    become a second copy of `SRR-05` by capturing credentials.
+  - `SWR-CFG-09`, **a factory reset that erases rather than unlinks**
+    (`SEC-14`). Reachable from the display, leaving the production data block
+    alone, with a test that reads the raw partition back and looks for the
+    secret. This is what turns `SRR-05`'s disposal obligation from a line in a
+    manual into a function of the product, and it is `ADV-4`'s only answer.
+  - **The SBOM's two loose ends.** `tools/sbom.py` satisfies `SWR-NFR-28` and
+    runs in CI and in the release workflow, which leaves **retention** of the
+    published documents for the support period, needing `N3` answered first,
+    and turning on `--require-licences` once four ESP-IDF v6.0.1 components
+    resolve: `cmock`, `esp_netif_stack`, `http_parser` and `protobuf-c` carry
+    no SPDX tag in their sources, three ship a licence file the SBOM points at
+    and `esp_netif_stack` ships neither, which is worth raising upstream. The
+    flag stays off by default because it would gate a release on a vendor
+    tree's tagging habits.
+
+  Also unowned, and not requirements because they are process: somebody has to
+  **read ESP-IDF and mbedTLS advisories**, and the Annex II information for
+  users (contact, point of contact, intended use, limitations, how updates
+  arrive, end of support, secure disposal) has to be written with the
+  instructions `SYS-SAF-24` already shapes.
+
+- [ ] **N5. Two decisions that are now requirements rather than preferences.**
+  `OQ-S3`, flash encryption, stops being a trade the project may decline on the
+  SoldUnits route: the Act requires stored data to be protected by
+  state-of-the-art means and `net.wifi_pass` is plaintext in NVS. And secure
+  boot, which exists as an opt-in provisioning step, should be **on by default
+  for a sold unit**, which is a production-line decision nobody has recorded.
+  Both may legitimately differ between the two routes to market, as `OQ-S2`
+  already let secure boot be a per-unit decision; what cannot happen is either
+  staying open while units ship.
+
+  Framing worth keeping: `security.md` §13.1 marks six of the Annex I Part I
+  items as **evidence rather than work**, because the read-only interface, the
+  absence of `malloc`, the isolation of control from the network and the test
+  apparatus already satisfy them. The job there is citing them in a conformity
+  file, not building anything.
 
 ---
 
@@ -678,83 +830,6 @@ either the supervisor's pin count or a requirement.
   state only the ESP32 knows; a supervisor latching on it regardless would trip
   on every cold load. So `SWR-SAF-31` and `SYS-HW-21` are unchanged, the lid sense stays
   on the ESP32, and `Q5`'s branch is the only one section K loses.
-
-- [x] **R10. The supervisor is integer-only.** Done. The internal unit is q7,
-  1/128 degC in an `int32_t`, which is the MAX31856's own LSB, so the decode is
-  a shift and nothing else; the wire stays integer tenths and the one scaling
-  step is `sup_q7_to_dc`, which has its own tests. `nm` on the linked image
-  finds no `__aeabi_f*` symbol and no `lroundf`, and the text segment went from
-  6 736 to 3 488 bytes: the soft-float helpers were 2.7 kB of a 6.7 kB image.
-
-  Three things worth carrying forward. **Every NaN case is gone rather than
-  passing**, because an `int32_t` has no NaN, which also removed the `dt`
-  sign guard in `sup_step` (a `uint32_t` interval cannot be negative) and two
-  tests that existed only to pin NaN behaviour. **Timers saturate rather than
-  wrap**, via `add_ms`, because a latch timer that wrapped would fall back below
-  its threshold and un-arm a live condition. And `disagreeing` now takes its
-  magnitude in unsigned arithmetic, so neither a signed overflow nor negating
-  `INT32_MIN` is reachable even for inputs the decode cannot produce.
-
-  `--specs=nano.specs` **stays**, and the reason changed: the only remaining
-  C library dependency is `memcpy` and `memset`, which the compiler emits for
-  the zero-initialised structs rather than anything anyone wrote. Verified by
-  trying `-nostdlib`, which now fails on exactly those two symbols and nothing
-  else. Supplying them locally is a decision with its own review, not a flag
-  change, so it is not done here.
-
-- [x] **R12. The supervisor's tests run under ASan and UBSan**, and the
-  controller's sanitiser job was found to be reporting findings while passing.
-  `SWR-TST-20` only ever said the build shall *support* the sanitisers, and the
-  supervisor's did not; it does now, through the same `ENABLE_ASAN` option name
-  the controller's host build uses, plus a second `ctest` step in the
-  `supervisor` CI job.
-
-  The part worth recording is what adding it uncovered. **UBSan's default is to
-  print a runtime error and carry on**, leaving the exit code at zero, so
-  `ctest` reports PASSED for a test that triggered real undefined behaviour.
-  The controller's `asan+ubsan` matrix leg had been green on exactly those
-  terms since it was written, over three genuine findings. Both builds now pass
-  `-fno-sanitize-recover=undefined`.
-
-  Those three findings turned out to be one class and not defects: `test_faults`
-  casting 999 to a fault code, `test_safety_current` casting 200, and
-  `test_suplink` feeding 200 as a wire trip reason, each deliberately, to prove
-  an out-of-range value from outside is rejected. It is the same behaviour
-  `firmware/controller/test/.clang-tidy` already exempts `EnumCastOutOfRange`
-  for, so UBSan's `enum` check is excluded in both CMakeLists with that reason
-  written down. Everything else UBSan checks now aborts.
-
-  Verified the way the tidy canary is: reintroducing the signed `hi - lo` that
-  `disagreeing` avoids makes the sanitised step fail with "signed integer
-  overflow" and leaves the plain step passing. A gate that has not been shown
-  to fail is not known to be a gate.
-
-- [x] **R11. The supervisor is inside the static-analysis gate.** Found while
-  writing `docs/coding-standard.md`: `SWR-NFR-25` says code shall pass the
-  project's static analysis configuration, and `firmware/supervisor` passed
-  through no analyser at all. `.clang-tidy`'s `HeaderFilterRegex` named only
-  `firmware/controller/...`, `tools/tidy.sh` built databases only from the
-  controller's two host projects, and `tools/tidy-target.sh` hardcodes
-  `kiln_hal_esp32s3`. C11 records the same hole for `main.cpp` and `httpd.cpp`
-  and did not mention the supervisor, so the one component whose argument is
-  independent reviewability was the one component clang-tidy had never seen.
-
-  `tools/tidy.sh` now drives four databases, 65 translation units. The
-  supervisor's two target-only units need no ARM toolchain: they include
-  nothing but `<stdint.h>` and the project's own headers, so they are analysed
-  against a synthesised database with clang's `thumbv6m-none-eabi` target and
-  `-ffreestanding`, with the same vacuous-pass canary `tidy-target.sh` carries.
-
-  It reported 207 findings, all in the supervisor, and the split is the useful
-  part. 46 were `macro-to-enum` in the core headers and were **fixed**, every
-  object-like macro in `core/` and `protocol/` becoming `constexpr`. 7 were
-  `const-correctness` in the suites and were fixed. 3 were narrow false
-  positives and carry a `NOLINTNEXTLINE` with the reason. The remaining ~150
-  were one class, memory-mapped register access, in `board/` and `src/` only,
-  and are exempted by two directory-scoped `.clang-tidy` files on the same
-  grounds `kiln_hal_esp32s3` already has one. **Nothing is relaxed for
-  `core/` or `protocol/`**, which is the half that matters: the safety function
-  is clean under the unmodified root profile.
 
 - [ ] **R8. The supervisor's firmware, and its own test strategy.** Small
   enough to read in one sitting, which is a design constraint and not an
