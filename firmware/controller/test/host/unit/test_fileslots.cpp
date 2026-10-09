@@ -285,11 +285,12 @@ KILN_TEST(swa10_remove_frees_the_region_for_another_name)
     rig_t *r = &g_rig;
     rig_init(r);
 
+    uint8_t buf[16];
     CHECK_OK(put(r, "/p/00", "gone", 5));
-    CHECK_OK(r->store.exists(r->store.ctx, "/p/00"));
+    CHECK_OK(get(r, "/p/00", buf, sizeof(buf), nullptr));
     CHECK_OK(r->store.remove(r->store.ctx, "/p/00"));
 
-    CHECK_ERR(r->store.exists(r->store.ctx, "/p/00"), KILN_ERR_NOT_FOUND);
+    CHECK_ERR(get(r, "/p/00", buf, sizeof(buf), nullptr), KILN_ERR_NOT_FOUND);
     CHECK_EQ_UINT(kiln_fileslots_used_regions(&r->fs), 0u);
     CHECK_ERR(r->store.remove(r->store.ctx, "/p/00"), KILN_ERR_NOT_FOUND);
 
@@ -356,7 +357,7 @@ KILN_TEST(swa10_a_short_buffer_is_refused_rather_than_truncated)
 /*
  * @relation(SWA-10, scope=function)
  */
-KILN_TEST(swa10_usage_and_list_report_what_is_stored)
+KILN_TEST(swa10_usage_reports_what_is_stored)
 {
     rig_t *r = &g_rig;
     rig_init(r);
@@ -370,17 +371,12 @@ KILN_TEST(swa10_usage_and_list_report_what_is_stored)
     CHECK_EQ_UINT(used, 10u);
     CHECK_EQ_UINT(total, (size_t)TEST_REGIONS * r->fs.payload_max);
 
-    struct counter { unsigned n; size_t bytes; } c = {0, 0};
-    auto const tally = [](void *user, const char *name, size_t size) -> bool {
-        (void)name;
-        struct counter *k = static_cast<struct counter *>(user);
-        k->n++;
-        k->bytes += size;
-        return true;
-    };
-    CHECK_OK(r->store.list(r->store.ctx, "/p/", tally, &c));
-    CHECK_EQ_UINT(c.n, 1u);
-    CHECK_EQ_UINT(c.bytes, 4u);
+    /* usage is reported from the in-RAM index, so it has to survive a reboot
+     * on the strength of the mount alone. */
+    rig_remount(r);
+    used = 0;
+    CHECK_OK(r->store.usage(r->store.ctx, nullptr, &used));
+    CHECK_EQ_UINT(used, 10u);
 }
 
 /*

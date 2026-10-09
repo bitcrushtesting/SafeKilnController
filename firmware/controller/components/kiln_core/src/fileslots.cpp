@@ -485,39 +485,6 @@ kiln_err_t fs_remove(void *ctx, const char *path)
     return KILN_OK;
 }
 
-kiln_err_t fs_exists(void *ctx, const char *path)
-{
-    const kiln_fileslots_t *fs = static_cast<const kiln_fileslots_t *>(ctx);
-    if ((fs == nullptr) || !fs->mounted || !name_ok(path)) {
-        return KILN_ERR_INVALID_ARG;
-    }
-    return (find_region(fs, path) == fs->region_count) ? KILN_ERR_NOT_FOUND : KILN_OK;
-}
-
-kiln_err_t fs_list(void *ctx, const char *dir,
-                          bool (*fn)(void *user, const char *name, size_t size),
-                          void *user)
-{
-    const kiln_fileslots_t *fs = static_cast<const kiln_fileslots_t *>(ctx);
-    if ((fs == nullptr) || !fs->mounted || (fn == nullptr)) {
-        return KILN_ERR_INVALID_ARG;
-    }
-    const size_t pre = (dir != nullptr) ? strnlen(dir, KILN_PATH_MAX) : 0u;
-    for (uint16_t r = 0; r < fs->region_count; r++) {
-        const kiln_fileslot_entry_t *en = &fs->entry[r];
-        if (!en->used) {
-            continue;
-        }
-        if ((pre > 0u) && (strncmp(en->name, dir, pre) != 0)) {
-            continue;
-        }
-        if (!fn(user, en->name, en->len)) {
-            break;
-        }
-    }
-    return KILN_OK;
-}
-
 kiln_err_t fs_usage(void *ctx, size_t *total, size_t *used)
 {
     const kiln_fileslots_t *fs = static_cast<const kiln_fileslots_t *>(ctx);
@@ -551,7 +518,5 @@ void kiln_fileslots_bind(kiln_fileslots_t *fs, kiln_port_filestore_t *out)
     out->read         = fs_read;
     out->write_atomic = fs_write_atomic;
     out->remove       = fs_remove;
-    out->exists       = fs_exists;
-    out->list         = fs_list;
     out->usage        = fs_usage;
 }
