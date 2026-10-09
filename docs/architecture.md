@@ -150,7 +150,7 @@ double is a compile-time-checked substitution.
 | `port_logstore` | `append(record)`, `iterate(range, cb)`, `stats()`, `erase_all()` | `kiln_core/logring` over `port_flash` (`SWA-19`) |
 | `port_counters` | `load()`, `add_contactor_ops()`, `add_ssr_ops()`, `flush()` | NVS with RAM accumulation (`SWR-CUR-13`); spy |
 | `port_system` | `reset_cause()`, `fw_info()`, `stats()`, `wdt_subscribe/feed()` | `esp_system` + task WDT; stub |
-| `port_update` | `begin/write/finish()`, `confirm_running()`, `rollback()` | `esp_ota_ops`; stub |
+| `port_update` | `check()`, `fetch()`, `begin/write/finish()`, `confirm_running()`, `rollback()` | `esp_https_ota` for the pull path of §13.5, `esp_ota_ops` for the slots; stub |
 | `port_kvstore` | `get/set/erase(namespace, key, blob)` | NVS; in-memory fake |
 | `port_filestore` | `list/read/write/delete(path)` | `kiln_core/fileslots` over `port_flash` (`SWA-21`); RAM fake on host |
 | `port_net` | `state()`, `connect()`, `start_ap()`, `stats()` | WiFi + mDNS + SNTP; stub |
@@ -749,7 +749,13 @@ set (`SWR-WEB-23`).
 | `POST` | `/api/current/calibrate` | One-point calibration against a reference reading | `SWR-CUR-06` |
 | `GET` | `/api/storage` | Log and filesystem health | `SWR-LOG-15` |
 | `GET` | `/api/net` | WiFi diagnostics | `SWR-NET-09` |
-| `POST` | `/api/ota` | Upload firmware | `SWR-UPD-01` |
+| | | **No firmware route.** The update path points outwards, §13.5 | `SWR-UPD-01`, `SWR-UPD-08` |
+
+> **This table predates the read-only decision of 2026-10-06** and still lists
+> the state-changing routes it removed. Every non-`GET` request now returns
+> `403 read_only` (`SWR-WEB-26`), and the handlers are deleted from the image
+> rather than disabled. Read the method column as "what the route would have
+> been"; `kiln_web`'s API surface is the authority.
 
 ### 12.2 Request handling
 
@@ -856,6 +862,121 @@ Measured and reported by the instrumented build (`SWR-TST-18`).
 | HTTP server + 4 sessions | ≤ 40 kB |
 | Free internal heap, minimum | ≥ 48 kB (`SWR-NFR-12`) |
 | Application image | ≤ 2 MB (`SWR-NFR-13`) |
+
+### 13.5 Firmware update
+
+The path decided on 2026-10-09 (`SWR-UPD-09` to `SWR-UPD-16`, `OQ-08`), and the
+reasoning for its direction is in
+[`security.md` §6.2](security.md#62-the-update-path-and-why-it-points-outwards).
+The device **pulls**; the operator at the display **authorises**; the web
+interface stays read-only and gains no exception.
+
+```mermaid
+sequenceDiagram
+    participant UP as update task (core 0)
+    participant SVC as update.bitcrushtesting.com
+    participant APP as kiln_app
+    participant HMI as display + encoder
+    UP->>SVC: GET /safekiln/stable.json (daily, jittered)
+    SVC-->>UP: manifest + detached signature
+    UP->>UP: verify signature, parse, compare semver locally
+    UP->>APP: available(version, security?)
+    APP->>HMI: announce, not over a firing screen
+    HMI->>APP: operator confirms (deliberate act)
+    APP->>UP: fetch and install
+    UP->>SVC: GET the image
+    UP->>UP: stream into the inactive slot, digest + image signature
+    UP->>APP: ready, restart to apply
+    HMI->>APP: operator confirms the restart
+    APP->>UP: set boot partition, reboot
+    UP->>UP: next boot: pending-verify until the self-checks pass
+```
+
+Five properties of this that are decisions rather than details:
+
+1. **The manifest is static and the comparison is local** (`SWR-UPD-10`). One
+   file for every device, no query string, no identifier, no installed version
+   in the request. That is what keeps the check out of the telemetry category
+   (`SEC-06`) and it constrains the service as much as the client: a per-device
+   URL would break it.
+2. **Authenticity does not come from the connection** (`SWR-UPD-11`). The
+   manifest signature is checked against a public key in the image, from an
+   offline key that is **not** the secure boot key, and the image is checked
+   against both the manifest digest and its own appended signature. HTTPS is
+   required and assumed to fail eventually.
+3. **The update task lives on core 0**, with networking, and holds no authority
+   over heat (`SWA-15`, `SWA-04`). It posts an availability fact to `kiln_app`
+   and waits; it never reaches into `kiln_core`.
+4. **Nothing installs without a local act** (`SWR-UPD-12`, `SWR-HMI-16`), and
+   the restart is a second one. `SWR-UPD-04`'s refusal during a run or autotune
+   is enforced in `kiln_app`, where the state machine lives, not in the port.
+5. **Rollback is cancelled late** (`SWR-UPD-15`). The first boot of a new image
+   stays pending-verify until the supervisor link, both thermocouples, the
+   configuration, the stored programs and the display have all proved themselves
+   in the running system. `confirm_running()` in start-up code would make
+   `SWR-UPD-02` decoration.
+
+#### The manifest
+
+One static file per channel, served at `<update.url>/<channel>.json`, built and
+signed by [`tools/update-manifest.py`](../tools/update-manifest.py). It is an
+envelope whose `payload` is the base64 of the **exact bytes that were signed**:
+
+```json
+{
+  "alg": "RSA3072-PSS-SHA256",
+  "key_id": "3f2a91c4",
+  "payload": "eyJzY2hlbWEiOiAxLCAicHJvZHVjdCI6ICJzYWZla2lsbiIsIC4uLg==",
+  "sig": "<base64 of 384 bytes>"
+}
+```
+
+Signing the bytes rather than the object is the decision worth defending. A
+device that re-serialised the parsed JSON to check a signature would have to
+agree with the signing tool about key order, spacing and number formatting for
+ever, and the usual failure is a verifier that passes on every manifest it was
+tested with and rejects the one that matters. Here the device base64-decodes,
+verifies over those bytes, and parses afterwards, so canonicalisation is nobody's
+problem.
+
+The payload, once decoded:
+
+| Field | Meaning |
+|---|---|
+| `schema` | `1`. A later format change is detectable rather than confusing |
+| `product` | `safekiln` |
+| `channel` | `stable`, matching the filename |
+| `target` | `esp32s3`, cross-checked by the tool against the image's own chip id |
+| `version` | a **release** semantic version, `1.4.2`. Never `1.4.2+7.gabc1234.dirty`: `SWR-UPD-06` allows build metadata on a build that is not on a tag, and `SWR-UPD-13` compares versions, so publishing one would put a non-release in a channel |
+| `released` | ISO date, for the operator and the advisory, not for logic |
+| `security` | `true` for a security release (`SWR-UPD-16`), which then requires `advisory` |
+| `advisory` | relative path to the advisory |
+| `image` | relative path to the image |
+| `size`, `sha256` | checked before the image is marked bootable (`SWR-UPD-11`) |
+
+**Every path is relative**, resolved against the manifest's own directory, and
+the tool refuses an absolute one. `update.url` exists so a site can mirror the
+service rather than let the controller out to the internet (`SRR-13`), and with
+relative paths a mirror is a directory copy; one absolute URL would send every
+mirrored device back to the origin.
+
+What the manifest deliberately does **not** carry is release notes. The display
+is 128×64 pixels and `SWR-HMI-16` shows a version and whether it is a security
+release; a field only a browser could render would become the reason somebody
+adds a browser. The advisory is a URL for a human on another device.
+
+The signing key is **RSA-3072, PSS, SHA-256**, matching the scheme the ESP32-S3
+ROM already verifies for secure boot so the release process has one key size to
+think about. It is **not** the secure boot key (`SRR-12`): that one decides what
+a board will *boot* and its digest is burnt into eFuses, this one decides what a
+board will be *offered*. The public half is compiled in as DER
+SubjectPublicKeyInfo, generated by `update-manifest.py pubkey --header`, so
+`mbedtls_pk_parse_public_key` can take it without a PEM decoder.
+
+The partition table needs no change: `otadata`, `ota_0` and `ota_1` are already
+there (§10.1), sized at 2 MB against the ≤ 2 MB image budget of §13.4. What is
+unbuilt is the client, the verifier, the screen and the discipline in point 5,
+and all of it waits on the HTTP stack that §12 still describes as unimplemented.
 
 ## 14. Build and test architecture
 
@@ -994,6 +1115,20 @@ flowchart LR
     H --> I
     I --> J["mergeable"]
 ```
+
+The `idf.py build` job carries one step that is not a check: it generates the
+bill of materials (`SWR-NFR-28`, [`tools/sbom.py`](../tools/sbom.py)) **inside**
+the IDF container. That placement is forced rather than chosen. The component
+list comes from the build's own `project_description.json`, which names what was
+actually linked, and each component's licence is scanned from the
+`SPDX-License-Identifier` tags in its own sources, so both inputs exist only
+where the ESP-IDF tree is. A step after the container sees the JSON and none of
+the sources, and would produce an inventory with every licence unresolved.
+
+The release workflow runs the same tool with `--strict`, which fails on a gap in
+this project's own build (no image digest, no toolchain), and publishes
+CycloneDX and SPDX as release assets with a `SOURCE_DATE_EPOCH` taken from the
+tag's commit date, so rebuilding a tag reproduces the SBOM byte for byte.
 
 ## 15. Traceability
 

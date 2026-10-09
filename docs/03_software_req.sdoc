@@ -1060,6 +1060,16 @@ If the display fails to initialise or stops acknowledging on I²C, the system sh
 PRIORITY: M
 VERIFICATION: T
 
+[REQUIREMENT]
+UID: SWR-HMI-16
+STATEMENT: >>>
+**The update screen.** When a newer release has been found ([LINK: SWR-UPD-09]), the display shall show that one is available, its version, and whether it is a security release, without displacing a firing screen. Confirming it shall take a deliberate act rather than a single click of the encoder, and the screen shall state plainly that the kiln will restart. While an update is downloading the display shall show progress and shall allow it to be abandoned; afterwards it shall show the result, success or failure with a reason, until acknowledged ([LINK: SWR-UPD-07], [LINK: SWR-UPD-12]).
+
+This screen is the **only** place a firmware update can be authorised ([LINK: SWR-UPD-08]), which makes it part of the security design and not only of the interface.
+<<<
+PRIORITY: M
+VERIFICATION: T
+
 [[/SECTION]]
 
 [[SECTION]]
@@ -1410,6 +1420,25 @@ The system shall report log store health: used and free capacity, oldest and new
 PRIORITY: S
 VERIFICATION: T
 
+[REQUIREMENT]
+UID: SWR-LOG-16
+STATEMENT: >>>
+**Security-relevant events shall be recorded, and the recording shall be disableable.** The event log shall record, timestamped and distinguishable from process events:
+
+- a firmware update offered, confirmed, installed, abandoned or refused, with the version and the reason for a refusal ([LINK: SWR-UPD-09], [LINK: SWR-UPD-12]);
+- a manifest or an image that failed verification, which is the signature of somebody trying ([LINK: SWR-UPD-11]);
+- a rollback, whether the new image failed to confirm itself or was reverted deliberately ([LINK: SWR-UPD-15]);
+- every change to configuration, and which interface made it;
+- the provisioning access point starting, and a client associating with it;
+- a reset whose cause was abnormal ([LINK: SWR-NFR-15]).
+
+The log shall be readable by the operator, shall survive a restart, and the recording of these events shall be **disableable by the owner**: [LINK: UR-REG-004] asks for the opt-out as explicitly as it asks for the log, and a device that logs access to itself regardless of its owner's wishes is a surveillance feature rather than a security one.
+
+It shall contain nothing that the device does not already show: no credential, no key material, no request body. A log that records what an attacker wanted is useful; one that records the WiFi password is a second copy of [LINK: SRR-05].
+<<<
+PRIORITY: M
+VERIFICATION: T
+
 [[/SECTION]]
 
 [[SECTION]]
@@ -1476,6 +1505,20 @@ VERIFICATION: T
 UID: SWR-CFG-08
 STATEMENT: >>>
 The system shall reject changes to safety-relevant configuration while a run is in progress.
+<<<
+PRIORITY: M
+VERIFICATION: T
+
+[REQUIREMENT]
+UID: SWR-CFG-09
+STATEMENT: >>>
+**The owner shall be able to erase everything, from the device itself.** A factory reset reachable from the local display shall permanently remove the configuration, the WiFi and access point credentials, the stored programs, the run records, the sample log and the wear counters. It shall leave the production data block of [LINK: SWR-PROD-01] and the firmware alone: those identify the unit for its whole life and are not the owner's data.
+
+It shall require a deliberate confirmation of the same kind as a firmware install ([LINK: SWR-HMI-16]), shall be refused while a run or an autotune is in progress, and shall report what it erased rather than only that it finished.
+
+**Erasure means gone, not unreferenced.** A flash region holding a credential shall be erased or overwritten, not merely delisted, and the test for this requirement shall read the raw partition back and look for the secret rather than asking the API whether it is still configured.
+
+This is the requirement that turns [LINK: SRR-05]'s disposal obligation from a line in a manual into a function of the product, which is how [LINK: UR-REG-004]'s requirement to permanently remove all data and settings is met. Until it exists, the only honest instruction is "erase the flash with a cable before you sell it", and most owners will not.
 <<<
 PRIORITY: M
 VERIFICATION: T
@@ -1575,7 +1618,9 @@ TITLE: 3.11 Firmware update (FR-UPD)
 [REQUIREMENT]
 UID: SWR-UPD-01
 STATEMENT: >>>
-The system shall **not** accept a firmware image over the network ([LINK: SWR-WEB-26]): an update path is total and persistent control of the heater, and the web interface is an observation surface. A local update path (USB/serial, or an update initiated at the kiln) shall be specified before release, see [LINK: OQ-08]. Until then the device has **no field update path**, which is a known and accepted gap.
+The system shall **not** accept a firmware image pushed to it over the network ([LINK: SWR-WEB-26]): an inbound update route is total and persistent control of the heater, and the web interface is an observation surface. Instead the system shall **fetch** images itself from the manufacturer's update service ([LINK: SWR-UPD-09]) and shall install one only after a confirmation given at the local display ([LINK: SWR-UPD-12]).
+
+The **direction** is the whole design, and it is what [LINK: OQ-08] resolved: nothing on the network can offer this device an image, and nothing on the network can make it take one. The web interface stays read-only ([LINK: SWR-WEB-26]) with no exception carved into it, and the device gains a field update path without gaining an inbound one.
 <<<
 PRIORITY: M
 VERIFICATION: I
@@ -1631,10 +1676,82 @@ VERIFICATION: D
 [REQUIREMENT]
 UID: SWR-UPD-08
 STATEMENT: >>>
-No client, authenticated or otherwise, shall be able to initiate a firmware update over the network ([LINK: SWR-UPD-01], [LINK: SWR-WEB-26]).
+No client on the network, authenticated or otherwise, shall be able to initiate, offer, authorise, postpone or cancel a firmware update ([LINK: SWR-UPD-01], [LINK: SWR-WEB-26]). The device initiates its own check ([LINK: SWR-UPD-09]) and the operator standing at the display authorises the install ([LINK: SWR-UPD-12]). There shall be no route to either over HTTP, and in particular no `POST /api/ota`.
 <<<
 PRIORITY: M
 VERIFICATION: T
+
+[REQUIREMENT]
+UID: SWR-UPD-09
+STATEMENT: >>>
+**The update check.** The system shall look for a newer release by fetching a **static manifest** over HTTPS from the manufacturer's update service, whose default host is `update.bitcrushtesting.com`. The check shall:
+
+- run at most once per 24 hours, at a random offset within the day, and not before the network and the wall clock are available;
+- be enabled by default, disableable from the local display (`update.check_enabled`), and point at a configurable URL (`update.url`) so that a site may mirror the service rather than reach it directly;
+- never block, delay or fault anything. A failed check is a **diagnostic**, not an error: a device on a network with no route to the internet shall remain fully functional and shall say that its last check failed, not that it has a fault.
+<<<
+PRIORITY: M
+VERIFICATION: T
+
+[REQUIREMENT]
+UID: SWR-UPD-10
+STATEMENT: >>>
+**The check shall reveal nothing about the device.** It shall carry no serial number, no installed version, no configuration, no usage data, no identifier of any kind and no query parameters. The manifest shall be a static file, byte-identical for every device, and the comparison against the running version shall happen **on the device**. What the request discloses is what any HTTPS GET discloses: an address and a time ([LINK: SWR-NFR-21]).
+<<<
+PRIORITY: M
+VERIFICATION: T
+
+[REQUIREMENT]
+UID: SWR-UPD-11
+STATEMENT: >>>
+**Authenticity, and what it does not rest on.** The manifest shall carry a signature made with an **offline** key, verified on the device against a public key compiled into the image. A manifest whose signature does not verify shall be discarded without being parsed further and without being shown to the operator. The image a valid manifest names shall be verified against the digest in that manifest **and** against its own appended image signature before it is marked bootable ([LINK: SWR-UPD-03]), on a secure-boot unit and equally on one that was never provisioned.
+
+Transport security shall be HTTPS with certificate validation, and shall deliberately **not** be the thing the design depends on: an attacker who defeats TLS, spoofs DNS or takes over the service still cannot produce a manifest or an image that verifies, and the worst they achieve is silence.
+<<<
+PRIORITY: M
+VERIFICATION: T
+
+[REQUIREMENT]
+UID: SWR-UPD-12
+STATEMENT: >>>
+**Local confirmation, and no automatic install.** An available update shall be announced on the local display ([LINK: SWR-HMI-16]) and shall be installed **only** after an explicit confirmation given at the device. The system shall never install an update by itself, on any schedule, for any severity.
+
+The announcement shall not displace a firing screen; the confirmation shall be refused while a run or an autotune is in progress ([LINK: SWR-UPD-04]); and the restart that puts the new image into service shall be a separate act, equally local. The reason this is not the automatic default-on installation that a general consumer product would be expected to provide is safety rather than preference: this device switches kilowatts into a kiln, and an unattended reboot into untried firmware while a load is inside it is not an acceptable trade for promptness.
+<<<
+PRIORITY: M
+VERIFICATION: T
+
+[REQUIREMENT]
+UID: SWR-UPD-13
+STATEMENT: >>>
+**No downgrade from the service.** The system shall refuse an image whose version is not strictly greater than the running version, and shall refuse one whose target is not this target. A deliberate downgrade shall remain possible over the local path of [LINK: SWR-UPD-14] and shall not be reachable through the update service, so that a replayed or rolled-back manifest cannot return a unit to a version whose vulnerability is known.
+<<<
+PRIORITY: M
+VERIFICATION: T
+
+[REQUIREMENT]
+UID: SWR-UPD-14
+STATEMENT: >>>
+**The local path stays, as the recovery path.** A firmware update over USB shall remain available for a device whose update service is unreachable, whose new image will not confirm itself, or which has to be downgraded deliberately. It shall require physical access, shall preserve the `nvs`, `kilnfs`, `kilnlog` and `prod` partitions, and shall be a documented procedure carried out by a tool rather than hand-typed commands, because the mistake it invites, erasing the production data block, is not recoverable in the field.
+<<<
+PRIORITY: M
+VERIFICATION: D
+
+[REQUIREMENT]
+UID: SWR-UPD-15
+STATEMENT: >>>
+**A new image shall earn its rollback cancellation.** An image booted for the first time shall cancel the rollback of [LINK: SWR-UPD-02] only after it has demonstrated, in the running system, that the supervisor link is delivering valid frames, that both chamber thermocouples read plausibly ([LINK: SWR-SAF-37]), that the configuration and the stored programs are readable, and that the display is alive. Until then it shall remain pending-verify, so that any reset returns the previous image to service. Cancelling the rollback during start-up, before any of this is known, shall be treated as a defect and not as an implementation choice.
+<<<
+PRIORITY: M
+VERIFICATION: T
+
+[REQUIREMENT]
+UID: SWR-UPD-16
+STATEMENT: >>>
+**Security releases, separately.** A security fix shall be released separately from functional change where that is technically feasible, shall be marked as a security release in the manifest, and shall be accompanied by an advisory that says what it fixes. The **support period** over which such releases are provided shall be declared in the documentation and shall be at least five years from placing on the market ([LINK: UR-REG-004]), the expected service life of a kiln controller being considerably longer than that floor.
+<<<
+PRIORITY: M
+VERIFICATION: I
 
 [[/SECTION]]
 
@@ -1988,7 +2105,7 @@ VERIFICATION: T
 [REQUIREMENT]
 UID: SWR-NFR-20
 STATEMENT: >>>
-The device is designed for a **trusted local network**. It shall not be exposed directly to the internet, and the documentation shall state this.
+The device is designed for a **trusted local network**. It shall accept **no inbound connection** from outside that network, it shall not be exposed directly to the internet, and the documentation shall state this. The one connection it originates outwards is the update check of [LINK: SWR-UPD-09], which carries no information about the device ([LINK: SWR-UPD-10]), which can be turned off at the display, and whose absence costs nothing but the check itself.
 <<<
 PRIORITY: M
 VERIFICATION: I
@@ -1996,7 +2113,13 @@ VERIFICATION: I
 [REQUIREMENT]
 UID: SWR-NFR-21
 STATEMENT: >>>
-The system shall not transmit any data to any third party.
+The system shall not transmit any data to any third party. The update check of [LINK: SWR-UPD-09] is to the **manufacturer's own** service, carries no information about the device ([LINK: SWR-UPD-10]) and is disableable; beyond the three exceptions named below, no outbound connection shall exist, and there shall be no telemetry and no analytics on any route.
+
+Three exceptions, named here rather than discovered later:
+
+1. The **update check** of [LINK: SWR-UPD-09], to the manufacturer's own service, carrying nothing about the device.
+2. The **SNTP client** behind `port_clock`, which contacts a time server and therefore a third party. It transmits nothing about the device but does reveal that the device exists. Its server shall be configurable and its default shall be stated in the documentation.
+3. The **syslog destination** of [LINK: SWR-NET-10], which is off unless the owner sets it and then points at the owner's own server. It is the owner's data going to the owner's host, which is not a third party in any sense that matters, but it crosses the network in cleartext over UDP and the documentation shall say so.
 <<<
 PRIORITY: M
 VERIFICATION: I
@@ -2045,6 +2168,24 @@ VERIFICATION: I
 UID: SWR-NFR-27
 STATEMENT: >>>
 Uncommanded heater current ([LINK: SWR-SAF-25]) shall de-energise heating within **1 s** of the offending measurement window, and the weld discrimination of [LINK: SWR-SAF-27] shall reach its verdict within a further **3 s**.
+<<<
+PRIORITY: M
+VERIFICATION: T
+
+[REQUIREMENT]
+UID: SWR-NFR-28
+STATEMENT: >>>
+**The build shall emit a machine-readable bill of materials.** A release build shall produce an SBOM in **CycloneDX 1.6 JSON**, and shall be able to produce the same inventory as **SPDX 2.3 JSON**, naming at least the top-level dependencies with their versions and licences: ESP-IDF and every component actually linked, mbedTLS by its own version, the toolchain, the browser assets, and this project itself. It shall be **generated by the build** rather than maintained by hand, because a hand-written inventory of dependencies is wrong within one release of being written and wrong by omission, and it shall be published with the release artefacts and kept for the whole support period ([LINK: SWR-UPD-16]).
+
+Three properties the generator shall have, each of which is a way this requirement is otherwise met in name only:
+
+- **The component list comes from the build**, specifically from the artefact the build writes naming what it linked, and not from a list maintained in the generator.
+- **A licence is scanned from the component's own sources**, from the `SPDX-License-Identifier` tags the vendor put there, and a component that carries none shall be reported as `NOASSERTION` rather than given a plausible default. A scan is evidence, not a legal conclusion, and the difference shall survive into the document.
+- **The same build shall produce the same bytes.** Components sorted, the serial number derived from the inventory rather than generated randomly, and the timestamp overridable, so that a diff between two SBOMs shows the product changing rather than the clock.
+
+Two things worth recording because they are **not** what a reader expects. The browser assets are **first-party**: there is no vendored third-party JavaScript, which resolves `OQ-04`, and the SBOM states that with file digests rather than by saying nothing. And the independent safety supervisor links no third-party source at all, its register definitions being generated from ST's own SVD ([LINK: SWA-22]).
+
+This exists because [LINK: UR-REG-004] requires it, and because the question it answers, "is this unit affected by the advisory published this morning", cannot be answered after the fact by a project that did not record what it shipped.
 <<<
 PRIORITY: M
 VERIFICATION: T
@@ -2704,8 +2845,11 @@ STATUS: Resolved
 [QUESTION]
 UID: OQ-08
 STATEMENT: >>>
-What replaces the removed over-the-web firmware update ([LINK: SWR-UPD-01])? USB/serial via `esptool`, an image staged over the network but applied only after a physical confirmation at the kiln, or no field update at all? The device currently has **no update path**, so this blocks release rather than merely being open.
+**Resolved 2026-10-09: the device fetches, the operator at the display confirms, and the web interface stays read-only.** What replaces the removed over-the-web firmware update ([LINK: SWR-UPD-01]) is a **pull** path, not a staged push: a daily check of a signed static manifest at `update.bitcrushtesting.com` ([LINK: SWR-UPD-09]) that reveals nothing about the device ([LINK: SWR-UPD-10]), an announcement on the local display, and an install that happens only on a deliberate confirmation there ([LINK: SWR-UPD-12], [LINK: SWR-HMI-16]). USB remains as the recovery and downgrade path ([LINK: SWR-UPD-14]).
+
+Choosing pull over the staged push this question also offered has one decisive consequence: **no inbound route is created at all**, so [LINK: SWR-WEB-26] and `SEC-00` keep their absolute form instead of being narrowed to "read-only except for firmware". What the answer costs is a new outbound connection and a dependency on the manufacturer's service, both carried in `security.md` section 6.2. `SRR-11` stays open until this is built rather than merely specified.
 <<<
+STATUS: Resolved
 
 [QUESTION]
 UID: OQ-09

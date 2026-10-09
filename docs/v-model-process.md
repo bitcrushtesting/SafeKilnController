@@ -407,12 +407,19 @@ finished units placed on the market by Bitcrush Testing, and a published design
 built by somebody else who then becomes the manufacturer of the finished machine.
 `UR-REG-` items carry a `ROUTE` field for this reason.
 
-One finding from writing that section deserves to be read by anyone planning a
+One finding from writing that section deserved to be read by anyone planning a
 release: **the Cyber Resilience Act requires security updates to be available,
-and this device has no field update path at all.** That is `UR-REG-004` against
-`SRR-11`, and it means `OQ-08` is now a regulatory deadline rather than an
-engineering preference. Two further questions, `OQ-R1` on whether the controller
-is a machinery safety component and `OQ-R2` on the radio conformity route, decide
+and this device had no field update path at all.** That was `UR-REG-004` against
+`SRR-11`, and it made `OQ-08` a regulatory deadline rather than an engineering
+preference. `OQ-08` and `OQ-R4` were answered on 2026-10-09: the device pulls a
+signed manifest from `update.bitcrushtesting.com`, the local display announces an
+available release, and the operator confirms there, with the web interface
+staying read-only ([`security.md` §6.2](security.md), `SWR-UPD-09` to
+`SWR-UPD-16`). The deadline has not gone away, it has changed character:
+`SRR-11` now stands on **implementation** rather than on an open decision, and
+the CRA's reporting obligations start on 11 September 2026 regardless of what the
+firmware does. Two further questions, `OQ-R1` on whether the controller is a
+machinery safety component and `OQ-R2` on the radio conformity route, still decide
 how expensive the sold-units route is. None of section 2 is a conformity
 assessment, and `SYS-SAF-24` already requires the documentation to say what this
 device is not.

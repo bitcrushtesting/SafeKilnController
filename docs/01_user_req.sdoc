@@ -291,7 +291,13 @@ APPLICABILITY: >>>
 Whole product. Annex I Part II requires, among other things, that vulnerabilities be addressed and that **security updates be made available** for the support period.
 <<<
 ASSESSMENT: >>>
-**This collides head-on with `SRR-11`.** The project deliberately removed every network update path (`SWR-UPD-01`), leaving no way to deliver a security fix without physical access to each unit. Under the CRA that is not merely an engineering limitation, it is an obstacle to placing the product on the market as sold units at all. `OQ-08` has to be answered before this route is viable, and answering it is now a regulatory deadline rather than a preference. The free-and-open-source provisions do not rescue the SoldUnits route, because they turn on supply outside a commercial activity.
+**The collision with `SRR-11` is answered in design as of 2026-10-09, and not yet in code.** It used to read that the project had removed every network update path, leaving no way to deliver a security fix without visiting each unit, which under the CRA is an obstacle to placing finished units on the market at all. `OQ-08` is now resolved: the device fetches a signed manifest from `update.bitcrushtesting.com` once a day, announces an available release on its **local display**, and installs it only when the operator confirms there (`SWR-UPD-09` to `SWR-UPD-16`). The web interface stays read-only, so no inbound route is created.
+
+Two points a conformity file has to make rather than assume. First, Annex I Part I expects security updates to install **automatically by default where applicable**, and this design deliberately does not: a kiln controller must not reboot into untried firmware unattended with a load inside, which is the reasoned basis for a manual confirmation, recorded in `SWR-UPD-12` and in `security.md` section 7. The *check* is automatic and on by default; only the install waits for a person. Second, Part II's dissemination obligation lands on the project rather than on the firmware: a release channel, an advisory per security release, security fixes separated from functional ones (`SWR-UPD-16`), a declared support period of at least five years, an SBOM, and the Article 14 reporting route, which starts on 11 September 2026, a year before the main obligations.
+
+The free-and-open-source provisions still do not rescue the SoldUnits route, because they turn on supply outside a commercial activity.
+
+**The full inventory of what this instrument requires, and what the project has against each item, is `security.md` section 13**, split into the firmware half and the half that is not firmware. Three gaps were named there on 2026-10-09 that had not been recorded anywhere before: security event logging with a user opt-out ([LINK: SWR-LOG-16]), permanent removal of all data and settings as a function of the product rather than an instruction in a manual ([LINK: SWR-CFG-09]), and a machine-readable SBOM emitted by the build ([LINK: SWR-NFR-28]). Two existing open questions changed character rather than content: `OQ-S4`, the access point that will start without a passphrase, is a **secure-default** requirement and is the only item on the list that is a live weakness in code that exists today, and `OQ-S3`, flash encryption, stops being a trade the project may decline on this route. `SRR-14` carries the obligations that are nobody's yet.
 <<<
 STATUS: Active
 RELATIONS:
@@ -700,7 +706,18 @@ STATUS: Active
 [QUESTION]
 UID: OQ-R4
 STATEMENT: >>>
-**Does [LINK: UR-REG-004] make the SoldUnits route impossible as designed?** The Cyber Resilience Act requires security updates to be made available for the support period, and `SRR-11` records that the device has no field update path at all. Either `OQ-08` is answered with a real update mechanism, or finished units cannot be placed on the EU market after the Act's main obligations apply. There is no third option that involves shipping as-is.
+**Resolved 2026-10-09 in design: no, provided the update path specified under `OQ-08` is built.** The question was whether [LINK: UR-REG-004] makes the SoldUnits route impossible as designed, the Act requiring security updates to be made available for the support period while `SRR-11` recorded no field update path at all. `OQ-08` is answered with a pull update path, a local confirmation and a read-only web interface, so the route is viable rather than blocked. What remains is not a decision but implementation: `SRR-11` stays open until the firmware exists, and the non-firmware obligations inventoried in `security.md` section 13, a release channel, advisories, a declared support period, an SBOM and the reporting route, are project work that no amount of firmware discharges. `SRR-14` carries them.
+<<<
+STATUS: Resolved
+
+[QUESTION]
+UID: OQ-R5
+STATEMENT: >>>
+**Which conformity assessment route does [LINK: UR-REG-004] put this product on, and what is the declared support period?** Two decisions that have to be made together, because each constrains the documentation the other needs.
+
+On classification: a kiln controller does not appear in the Act's list of important or critical products with digital elements, so the default category and self-assessment should be available. That is a conclusion to **record and defend** rather than assume, and it is the cybersecurity counterpart of [LINK: OQ-R1] on the machinery side, where the answer may well be the less convenient one.
+
+On the support period: the Act sets a floor of five years unless the expected lifetime is shorter, and the expected lifetime of a kiln controller is considerably longer. The number chosen gates [LINK: SWR-UPD-16], the information given to users, how long the SBOM of [LINK: SWR-NFR-28] has to be retained, and how long `update.bitcrushtesting.com` and its signing key have to keep existing (`SRR-12`). It is a sentence to write and an obligation to mean.
 <<<
 STATUS: Active
 

@@ -31,6 +31,33 @@ CONFIG_ESP_SYSTEM_PANIC_PRINT_REBOOT=y
 CONFIG_FREERTOS_UNICORE=n
 CONFIG_FREERTOS_HZ=1000
 
+# --- SWR-UPD-02 / SWR-UPD-15: rollback.  The bootloader marks a newly set image
+# `pending-verify` and reverts to the previous slot on the next reset unless the
+# running image cancels it.  The cancellation belongs where the image has proved
+# itself (supervisor link, both couples, config, display), NOT in start-up code:
+# cancelling it early turns this flag into decoration, which SWR-UPD-15 names as a
+# defect rather than a choice.
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+
+# Two update-related options deliberately NOT set here, each with its reason:
+#
+#   CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK burns a monotonic eFuse counter so an
+#   older image cannot run at all.  It has few increments, cannot be undone, and
+#   would make the fuse rather than the operator decide whether a unit can be
+#   recovered.  SWR-UPD-13 refuses a downgrade in software instead; see
+#   docs/security.md section 6.2.
+#
+#   CONFIG_ESP_HTTPS_OTA_ALLOW_HTTP must stay off.  SWR-UPD-11 requires HTTPS with
+#   certificate validation, while deliberately not depending on it: authenticity
+#   comes from the offline manifest key, so plain HTTP would lose the one thing TLS
+#   does buy here, which is privacy of the request.
+#
+# Signature verification on a board without secure boot (the
+# CONFIG_SECURE_SIGNED_APPS_NO_SECURE_BOOT family) is wanted by SWR-UPD-11 so that
+# an unprovisioned unit still authenticates what it installs.  It is left for the
+# update client's own commit, because the exact option names move between IDF
+# versions and setting them blind here would be a configuration nobody has built.
+
 # --- SWR-NFR-25 ---
 CONFIG_COMPILER_WARN_WRITE_STRINGS=y
 CONFIG_COMPILER_OPTIMIZATION_SIZE=y

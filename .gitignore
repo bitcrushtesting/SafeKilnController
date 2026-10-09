@@ -47,6 +47,12 @@ dependencies.lock
 *_signing_key*
 secure_boot_digest.bin
 
+# Release artefacts from tools/update-manifest.py: a signed manifest and the
+# image it names belong on the update server, not in git. The public half of the
+# signing key is the exception and IS committed, as the generated header the
+# firmware compiles in (SWR-UPD-11); `*.pem` above keeps the private half out.
+dist/
+
 # Python bytecode from the tools/ scripts.
 __pycache__/
 *.pyc

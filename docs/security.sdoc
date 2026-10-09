@@ -2,7 +2,7 @@
 TITLE: Safe Kiln Controller, Security Concept
 UID: SAFEKILN-SECURITY
 VERSION: 0.1 (draft)
-DATE: 2026-10-08
+DATE: 2026-10-09
 OPTIONS:
   MARKUP: Markdown
   VIEW_STYLE: Table
@@ -462,15 +462,19 @@ RELATIONS:
 [THREAT]
 UID: TH-04
 STATEMENT: >>>
-**Hostile firmware upload.**
+**Hostile firmware reaching the device.**
 <<<
 CONSEQUENCE: >>>
-Would have been total and persistent control of the heater.
+Total and persistent control of the heater.
 <<<
-SAFETY_RELEVANT: Closed
-STATUS: Resolved
+SAFETY_RELEVANT: Yes
+STATUS: Active
 COMMENT: >>>
-**Closed by [LINK: SWR-UPD-01].** No image is accepted over the network. Note the cost: the device now has **no field update path at all** ([LINK: OQ-08]), so a security fix needs a physical visit. Carried as [LINK: SRR-11], which blocks release.
+**Closed on 2026-10-06, reopened on 2026-10-09.** [LINK: SWR-UPD-01] used to close this threat absolutely, by accepting no image over the network at all. The Cyber Resilience Act requires that security fixes can reach a unit ([LINK: UR-REG-004]), `OQ-08` answered that with the pull path of [LINK: SWR-UPD-09] onwards, and a threat that is closed by the absence of a feature reopens when the feature arrives. Saying so is the point of keeping the node.
+
+What stands in place of closure is no longer one property but three that have to hold together, and [LINK: SEC-12] is where they are stated: the manifest and the image verify against an **offline** key, nothing on the network can initiate or authorise an install ([LINK: SWR-UPD-08]), and the install waits for a person at the display ([LINK: SWR-UPD-12]). An attacker needs the key **and** somebody at the kiln pressing to confirm.
+
+Kept as one threat rather than split into push and pull, because the asset and the consequence are unchanged and only the route is new.
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -479,9 +483,6 @@ RELATIONS:
 - TYPE: Parent
   VALUE: HZ-01
   ROLE: Reaches
-- TYPE: Child
-  VALUE: SWR-UPD-01
-  ROLE: Closed by
 
 [THREAT]
 UID: TH-05
@@ -492,7 +493,7 @@ VIA: >>>
 [LINK: ADV-2]; the operator's own browser is the confused deputy.
 <<<
 CONSEQUENCE: >>>
-Reduced by [LINK: TH-01] to [LINK: TH-04] being closed: the worst a forged request can now do is **edit a stored firing program**, which takes effect only if an operator starts it at the kiln.
+Reduced by [LINK: TH-01] to [LINK: TH-03] being closed, and by [LINK: TH-04] having no inbound route to it: the worst a forged request can now do is **edit a stored firing program**, which takes effect only if an operator starts it at the kiln.
 <<<
 SAFETY_RELEVANT: Indirect
 STATUS: Active
@@ -689,6 +690,57 @@ RELATIONS:
   VALUE: ADV-1
   ROLE: Exploited by
 
+[THREAT]
+UID: TH-14
+STATEMENT: >>>
+**A hostile or impersonated update service.**
+<<<
+VIA: >>>
+DNS spoofing or interception on the LAN ([LINK: ADV-1]), a compromise of `update.bitcrushtesting.com` or of the release process behind it ([LINK: ADV-6]), or an attacker on the path from the internet ([LINK: ADV-5]).
+<<<
+CONSEQUENCE: >>>
+A manifest or an image of the attacker's choosing, which is [LINK: A-6] and therefore [LINK: A-1]. It fails unless they also hold the offline signing key; with the key, the last obstacle left is the person at the display.
+<<<
+SAFETY_RELEVANT: Yes
+STATUS: Active
+COMMENT: >>>
+**This is the threat the update path buys, and it is why [LINK: SWR-UPD-11] refuses to lean on TLS.** Certificate validation is required and is not load-bearing: taking over the host, the DNS or the connection gets an attacker as far as *silence*, because what they serve has to verify against a key that is not on the server. Silence is its own problem, a fix that never arrives rather than a hostile one that does, and it is carried as [LINK: SRR-12] rather than pretended away here.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: A-6
+  ROLE: Threatens
+- TYPE: Parent
+  VALUE: ADV-5
+  ROLE: Exploited by
+- TYPE: Parent
+  VALUE: HZ-01
+  ROLE: Reaches
+
+[THREAT]
+UID: TH-15
+STATEMENT: >>>
+**Downgrade to a release whose vulnerability is published.**
+<<<
+VIA: >>>
+Replaying an older, genuinely signed manifest, or standing up a mirror and getting it into `update.url`.
+<<<
+CONSEQUENCE: >>>
+A unit returned to a version with a known hole, after which the hole is the attack. The signature verifies, because the image is authentic; it is merely old.
+<<<
+SAFETY_RELEVANT: Indirect
+STATUS: Active
+COMMENT: >>>
+Worth stating separately from [LINK: TH-14] because a signature does not stop a replay, and the usual reflex, "images are signed", does not answer it. [LINK: SWR-UPD-13] does: no image installs unless its version is **strictly greater** than the running one, and the service offers no route to a downgrade. The eFuse anti-rollback counter is deliberately **not** burnt, for the reason `security.md` section 6.2 gives: it would make the counter, rather than the operator, the thing that decides whether a unit can ever be recovered.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: A-6
+  ROLE: Threatens
+- TYPE: Parent
+  VALUE: ADV-1
+  ROLE: Exploited by
+
 [[/SECTION]]
 
 [[SECTION]]
@@ -851,7 +903,9 @@ The device reveals and transmits nothing to third parties.
 IMPLEMENTATION: Built
 STATUS: Active
 COMMENT: >>>
-Structurally: there is no cloud client, no telemetry, no analytics and no outbound connection in the codebase. This is a property of what was never written, which is why it carries no threat relation: it answers no specific threat and forecloses a category.
+Structurally: there is no cloud client, no telemetry and no analytics. This is a property of what was never written, which is why it carries no threat relation: it answers no specific threat and forecloses a category.
+
+**Amended 2026-10-09**, because "no outbound connection in the codebase" stops being true when the update check of [LINK: SWR-UPD-09] is built. The goal survives the change, and it survives on a distinction worth being explicit about rather than comfortable with: the update service is the **manufacturer's own**, not a third party, and the request carries nothing about the device ([LINK: SWR-UPD-10]) because the manifest is static and the version comparison is local. What it unavoidably reveals is an IP address and a time, to the party that sold the unit, and that is carried as [LINK: SRR-13]. The time client is the other outbound connection and the less tidy one, since an NTP server **is** a third party; [LINK: SWR-NFR-21] now says so out loud.
 <<<
 RELATIONS:
 - TYPE: Child
@@ -957,6 +1011,89 @@ RELATIONS:
   VALUE: SWR-NFR-20
   ROLE: Realised by
 
+[SECURITY_GOAL]
+UID: SEC-12
+STATEMENT: >>>
+**Only firmware the manufacturer signed can be installed, and only a person at the kiln can install it.**
+<<<
+IMPLEMENTATION: Spec
+STATUS: Active
+COMMENT: >>>
+The goal that carries the reopened [LINK: TH-04]. It is three independent conditions, and the design is worth no more than the weakest of them:
+
+1. **Authenticity from an offline key.** The manifest is signed and verified against a public key in the image, and the image is verified against its own appended signature as well as the manifest's digest ([LINK: SWR-UPD-11]). Nothing here depends on the server, the DNS or TLS being honest.
+2. **No network authority.** No request can initiate, offer, authorise, postpone or cancel an install ([LINK: SWR-UPD-08]); the device decides when to *ask* and the operator decides whether to *install*. `SEC-00` keeps its absolute form because this path creates no inbound route.
+3. **A person at the display.** The install happens on a deliberate local confirmation ([LINK: SWR-UPD-12], [LINK: SWR-HMI-16]) and never automatically, which is also what keeps the attacker who somehow holds the key from reaching an unattended kiln.
+
+`Spec`, and the honest status is weaker than that word suggests: the HTTP client, the manifest verifier, the screen and the rollback discipline of [LINK: SWR-UPD-15] are all unwritten. Until they exist, [LINK: SRR-11] stands and nothing here may be cited as a deployed control.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: TH-04
+  ROLE: Addresses
+- TYPE: Parent
+  VALUE: TH-14
+  ROLE: Addresses
+- TYPE: Parent
+  VALUE: TH-15
+  ROLE: Addresses
+- TYPE: Child
+  VALUE: SWR-UPD-08
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SWR-UPD-11
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SWR-UPD-12
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SWR-UPD-13
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SWR-UPD-15
+  ROLE: Realised by
+
+[SECURITY_GOAL]
+UID: SEC-13
+STATEMENT: >>>
+**What happened to the device is recorded, and the owner may turn that off.**
+<<<
+IMPLEMENTATION: Spec
+STATUS: Active
+COMMENT: >>>
+Required as of 2026-10-09 by [LINK: SWR-LOG-16], and the gap it closes had never been named: the event log existed for *process* events, and nothing asked it to record a refused manifest, a rollback, a configuration change or a client joining the provisioning access point. Those are the records that answer "was this attempted here", which is a question no amount of prevention answers after the fact.
+
+Two halves worth keeping together. [LINK: UR-REG-004] asks for the log **and** for a user opt-out, and the second half is not a loophole: a device that records access to itself regardless of its owner's wishes is a surveillance feature wearing a security label. The same reasoning as [LINK: SWR-UPD-10]'s refusal to put an identifier in the update check.
+
+It also has a failure mode of its own, which is why the requirement is explicit about it: a log that captures credentials or request bodies is a second copy of [LINK: SRR-05] in a file the operator can read over the network.
+<<<
+RELATIONS:
+- TYPE: Child
+  VALUE: SWR-LOG-16
+  ROLE: Realised by
+
+[SECURITY_GOAL]
+UID: SEC-14
+STATEMENT: >>>
+**The owner can permanently erase everything the device knows, from the device.**
+<<<
+IMPLEMENTATION: Spec
+STATUS: Active
+COMMENT: >>>
+Required as of 2026-10-09 by [LINK: SWR-CFG-09]. Until then the answer to [LINK: ADV-4], the person who buys a second-hand controller, was an instruction in a manual: "erase flash before disposing of or selling a device". That is an obligation most owners will not discharge, it needs a cable and a tool, and [LINK: UR-REG-004] asks for the capability to be **in the product**.
+
+The distinction that makes this a real requirement rather than a menu entry: erasure means the bytes are gone, not that the index no longer points at them. The test reads the raw partition back and looks for the secret. A factory reset that clears a flag and leaves `net.wifi_pass` recoverable in a flash dump would satisfy a tick-box and nothing else.
+
+It does **not** erase the production data block of [LINK: SWR-PROD-01]: a serial number identifies the unit for its whole life and is not the owner's data. That boundary is the one place this goal and [LINK: A-4] disagree, and the partition split already decided it.
+<<<
+RELATIONS:
+- TYPE: Parent
+  VALUE: TH-06
+  ROLE: Addresses
+- TYPE: Child
+  VALUE: SWR-CFG-09
+  ROLE: Realised by
+
 [[/SECTION]]
 
 [[SECTION]]
@@ -1030,16 +1167,16 @@ RELATIONS:
 [SECURITY_RESIDUAL_RISK]
 UID: SRR-04
 STATEMENT: >>>
-**Firmware images are validated but not authenticated.** [LINK: SWR-UPD-03] requires checking an image is *valid for this target*; no requirement anywhere asks for a **signature**, and secure boot is not enabled.
+**Firmware images are validated but not authenticated, in the shipped firmware.** [LINK: SWR-UPD-03] requires checking an image is *valid for this target*. A requirement asking for a **signature** finally exists, [LINK: SWR-UPD-11] as of 2026-10-09, and secure boot has existed as a provisioning step since 2026-10-08; neither is implemented in the application, and a default build is neither signed nor provisioned.
 <<<
 WHY_IT_STANDS: >>>
-Signing was never specified.
+Signing is specified now and built nowhere. The secure boot mechanism is opt-in rather than default, so an unprovisioned board authenticates nothing, and [LINK: SWR-UPD-11]'s manifest and image verification is a requirement with no code behind it yet.
 <<<
 CARRIED_BY: >>>
 The project.
 <<<
 MITIGATION: >>>
-Only [LINK: SWR-UPD-08]'s authentication stands between an attacker and [LINK: TH-04], and that is specification only. With secure boot absent, physical reflash ([LINK: ADV-3]) bypasses it entirely. Open as [LINK: OQ-S2].
+Only [LINK: SWR-UPD-08]'s authentication stands between an attacker and [LINK: TH-04], and that is specification only. On an unprovisioned board, physical reflash ([LINK: ADV-3]) bypasses it entirely. [LINK: OQ-S2] is `Resolved` as of 2026-10-09 without closing this: a unit taken through `tools/secure-boot.py` will not run unsigned code, the supervisor has no equivalent and is deliberately not getting one, and no requirement asks for either. What is left for this risk is a `SWR-` for signing, not a mechanism.
 <<<
 STATUS: Active
 RELATIONS:
@@ -1059,7 +1196,7 @@ CARRIED_BY: >>>
 The owner, and anyone who disposes of a device.
 <<<
 MITIGATION: >>>
-None. [LINK: ADV-4] is the under-considered case: a device sold on or thrown out carries the credentials with it. Open as [LINK: OQ-S3].
+[LINK: SEC-14]'s factory reset, specified on 2026-10-09 as [LINK: SWR-CFG-09] and not yet built, which turns [LINK: ADV-4] from "a device sold on carries the credentials with it" into "a device sold on without being reset does". That is a real improvement and not a solution: the credentials are still plaintext while the device is in service, which is [LINK: OQ-S3] and is no longer a matter of taste, [LINK: UR-REG-004] asking for stored data to be protected by state-of-the-art means.
 <<<
 STATUS: Active
 RELATIONS:
@@ -1150,22 +1287,84 @@ RELATIONS:
 [SECURITY_RESIDUAL_RISK]
 UID: SRR-11
 STATEMENT: >>>
-**No field update path.** Removing OTA closed [LINK: TH-04] completely and left the device with no way to receive a fix, including a security fix, without physical access.
+**No field update path, in a shipped image.** Removing OTA closed [LINK: TH-04] completely and left the device with no way to receive a fix, including a security fix, without physical access.
 <<<
 WHY_IT_STANDS: >>>
-[LINK: SWR-UPD-01] was inverted deliberately; the replacement is [LINK: OQ-08] and is not yet specified.
+**Specified 2026-10-09, built not at all.** `OQ-08` is resolved and [LINK: SWR-UPD-09] to [LINK: SWR-UPD-16] say what the path is, so what stands between a unit and a security fix is no longer a decision anybody still has to take. It is the HTTP client, the manifest verifier, the update screen and the rollback discipline, none of which exist, on a target that has no HTTP transport either ([LINK: SRR-01]).
 <<<
 CARRIED_BY: >>>
-The project. **This blocks release**, not merely an open question.
+The project. **This blocks release**, and it blocks the SoldUnits route specifically, because [LINK: UR-REG-004]'s main obligations apply from 11 December 2027.
 <<<
 MITIGATION: >>>
-None. A vulnerability found after shipping currently requires visiting every device.
+[LINK: SWR-UPD-14]'s USB path, which is real today and needs a visit to every device. Nothing else, until the pull path is written.
 <<<
 STATUS: Active
 RELATIONS:
 - TYPE: Parent
   VALUE: TH-04
   ROLE: Remains against
+
+[SECURITY_RESIDUAL_RISK]
+UID: SRR-12
+STATEMENT: >>>
+**The update service is a dependency, and the signing key is the fleet.** Every unit that updates itself depends on `update.bitcrushtesting.com` resolving, answering and being honest, and on a key the project keeps. Lose the key and no unit can be updated again; lose the host, let the domain lapse or let somebody else acquire it, and the same is true with an additional hazard attached.
+<<<
+WHY_IT_STANDS: >>>
+Inherent in any pull update path. The alternative, no update path, is [LINK: SRR-11], and it is worse.
+<<<
+CARRIED_BY: >>>
+The project, for the lifetime of the support period, which outlasts most of the decisions in this document.
+<<<
+MITIGATION: >>>
+The key is offline and is not the secure boot key; [LINK: SWR-UPD-11] means a compromise of the host alone yields silence rather than control; [LINK: SWR-UPD-12] means even a compromise of the key still needs somebody at the kiln; `update.url` lets a site mirror the service; and [LINK: SWR-UPD-14]'s USB path survives the service disappearing entirely. What has no technical mitigation is the domain and the key outliving the project's interest in them, which is an organisational commitment and should be written as one.
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: SEC-12
+  ROLE: Remains under
+
+[SECURITY_RESIDUAL_RISK]
+UID: SRR-13
+STATEMENT: >>>
+**The check tells the manufacturer that a device exists, and needs the device to reach the internet.** A daily HTTPS GET discloses an IP address and a time to the party that sold the unit, and a device on a segment with no outbound route never checks at all.
+<<<
+WHY_IT_STANDS: >>>
+Any pull path reveals this much by existing. It is the price of not building a push path, which would have cost [LINK: SEC-00]'s absolute form instead.
+<<<
+CARRIED_BY: >>>
+The owner.
+<<<
+MITIGATION: >>>
+[LINK: SWR-UPD-10] keeps the request free of anything about the device: static manifest, local comparison, no identifier, no version, no query. The check is disableable at the display and redirectable with `update.url`, so a site that will not let the controller out can mirror the manifest internally. Note the tension with [LINK: SRR-09], which advises an isolated segment: that advice and the update path now pull in opposite directions, and the documentation has to say which the owner should prefer and why, rather than printing both.
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: SEC-06
+  ROLE: Remains under
+
+[SECURITY_RESIDUAL_RISK]
+UID: SRR-14
+STATEMENT: >>>
+**The Cyber Resilience Act's non-firmware obligations have no owner, no dates and no artefacts.** No published disclosure policy until 2026-10-09, no machine-readable SBOM, no procedure for the Article 14 reporting route, no declared support period, no Annex II information for users, and no decision on the conformity assessment route. None of it is code, and none of it is discharged by writing code.
+<<<
+WHY_IT_STANDS: >>>
+The project's instinct, and the reason its technical documentation is unusually good, is to answer a requirement by building something. Roughly half of what [LINK: UR-REG-004] requires cannot be built: it is a mailbox somebody reads, a file kept for five years, a date declared in a manual, and a report filed within 24 hours by a person who knows they have to.
+<<<
+CARRIED_BY: >>>
+The project, and specifically whoever signs the declaration of conformity. The **reporting** half is the sharp end: it applies from **11 September 2026**, more than a year before the main obligations of 11 December 2027, and it does not wait for the firmware.
+<<<
+MITIGATION: >>>
+Two of the rows are closed as of 2026-10-09. `SECURITY.md` carries the disclosure policy, the single point of contact and the reporting commitments. The SBOM of [LINK: SWR-NFR-28] is a real build output, `tools/sbom.py`, generated from the component list the build writes and from the licence tags in each component's own sources, published in both CycloneDX and SPDX by the release workflow; what remains of that row is **retaining** the documents for the support period, which needs the period chosen.
+
+Everything else stands. [LINK: SWR-UPD-16] requires the support period to be declared and nobody has declared it, and a requirement is not an artefact: `security.md` section 13 is the inventory, and most rows of its second table still need a name against them. The reporting procedure is the one with a date attached.
+<<<
+STATUS: Active
+RELATIONS:
+- TYPE: Parent
+  VALUE: SEC-12
+  ROLE: Remains under
 
 [[/SECTION]]
 
@@ -1200,9 +1399,9 @@ UID: OQ-S2
 STATEMENT: >>>
 Should firmware images be **signed** ([LINK: SWR-UPD-03] requires validity, not authenticity), and should secure boot be enabled?
 <<<
-STATUS: Active
+STATUS: Resolved
 COMMENT: >>>
-Both have real field-recovery costs for an open-source device users are expected to build themselves. Bound up with [LINK: OQ-08], since whatever replaces the removed update path has to answer this at the same time.
+**Answered 2026-10-09, differently for each of the two microcontrollers of [LINK: SWA-22], with the argument in `security.md` section 6.1.** ESP32-S3: **yes**, signed images and Secure Boot V2, but as a per-unit provisioning step (`sdkconfig.secure`, `tools/secure-boot.py`) rather than a project default, because the field-recovery cost this question named is real and falls on self-builders: the key holder becomes the only party who can ever update a provisioned board. Supervisor (STM32G031K8T6): **no**, and there is nothing to enable, the G0 line having no ROM-verified signature chain and this part no key store or crypto accelerator; the readout protection it does have is refused on purpose, because RDP Level 2 is irreversible and would close the SWD that [LINK: SWA-22]'s independence argument depends on, while [LINK: ADV-3] can jumper the permit line more cheaply than reflash anything. Program-memory integrity is covered at run time by a CRC-32 over the whole image instead. This closes the question without closing [LINK: SRR-04], which stands while the default build is unsigned and no requirement asks otherwise. [LINK: OQ-08] is untouched, and now has a signing mechanism to use.
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -1216,7 +1415,9 @@ Should flash encryption be enabled by default?
 <<<
 STATUS: Active
 COMMENT: >>>
-It complicates self-builders and field debugging, and it is the only answer to [LINK: SRR-05].
+It complicates self-builders and field debugging, and it is the only answer to [LINK: SRR-05] while the device is in service.
+
+**Reframed 2026-10-09, and the framing is the point.** This was recorded as a trade-off the project could decline, between a security property and the convenience of people who build their own boards. On the SoldUnits route it is not: [LINK: UR-REG-004] requires the confidentiality of stored data to be protected by state-of-the-art means, and the user's WiFi password sits in plaintext NVS. The two routes can diverge here, a self-build staying unencrypted and a sold unit not, in the same way [LINK: OQ-S2] let secure boot be a per-unit provisioning decision; what cannot happen is the question staying open while units ship. [LINK: SEC-14]'s factory reset reduces the disposal case and does nothing for a board lifted out of a working kiln.
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -1231,6 +1432,8 @@ Should `net.ap_pass` have an enforced minimum, or should the access point refuse
 STATUS: Active
 COMMENT: >>>
 [LINK: TH-11] currently has no security goal at all, so this question is the only thing standing against it.
+
+**Promoted 2026-10-09 from an open question to the one on the critical path.** [LINK: UR-REG-004] requires a product to be shipped in a **secure default configuration**, and an access point that will start with no passphrase is a default-insecure state rather than a flexible one. Of everything the Cyber Resilience Act asks of this project, this is the only item that is a live weakness in code that exists today; the rest is either unbuilt or paperwork. Answering it is a few lines in the WiFi adapter and a bound in the configuration table.
 <<<
 RELATIONS:
 - TYPE: Parent
