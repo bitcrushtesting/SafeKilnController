@@ -1420,3 +1420,153 @@ KILN_TEST(the_api_validates_its_own_arguments)
                                    .body_len = 0, .authenticated = true};
     CHECK_ERR(kiln_api_handle(&r.api, &nopath, &resp), KILN_ERR_INVALID_ARG);
 }
+
+/* ===========================================================================
+ * THE EVENT STREAM'S FRAMING  (SWR-WEB-05, tasklist P2)
+ * ===========================================================================
+ * The payload has been tested since it was written; what was missing was
+ * anything to send it over. The transport cannot be host-tested -- it is
+ * esp_http_server sockets and a FreeRTOS task -- so the part of SSE that can
+ * be got wrong lives here instead: the framing. A frame that is half written,
+ * or that carries a newline into a data field, does not fail visibly. It
+ * desynchronises the stream for every frame after it, on a browser in a
+ * workshop, where nobody is reading a log.
+ */
+
+/*
+ * @relation(SWR-WEB-05, scope=function)
+ */
+KILN_TEST(swrweb05_a_frame_is_what_the_browser_is_listening_for)
+{
+    /* app.js opens an EventSource on /api/events and listens for a named
+     * `telemetry` event, so the frame has to carry the name and end with the
+     * blank line that completes it. */
+    char buf[128];
+    const char *data = "{\"kiln_c\":523.5}";
+    const size_t n = kiln_api_sse_frame(buf, sizeof(buf), "telemetry",
+                                        data, strlen(data));
+    CHECK(n > 0);
+    CHECK_STR_EQ(buf, "event: telemetry\ndata: {\"kiln_c\":523.5}\n\n");
+    CHECK_EQ_UINT(n, strlen(buf));
+
+    /* Without a name it is still a frame, which is what a client using
+     * onmessage rather than addEventListener receives. */
+    const size_t m = kiln_api_sse_frame(buf, sizeof(buf), nullptr, data, strlen(data));
+    CHECK_STR_EQ(buf, "data: {\"kiln_c\":523.5}\n\n");
+    CHECK_EQ_UINT(m, strlen(buf));
+}
+
+/*
+ * @relation(SWR-WEB-05, scope=function)
+ */
+KILN_TEST(swrweb05_a_frame_that_does_not_fit_is_not_written_at_all)
+{
+    /* Half an SSE frame is worse than no frame: the client reads the next
+     * frame's `event:` line as part of this one's data and never recovers,
+     * because there is no resynchronisation in the protocol other than a blank
+     * line that has already been consumed. */
+    char buf[32];
+    memset(buf, 'x', sizeof(buf));
+    const char *data = "{\"this\":\"does not fit in thirty-two bytes at all\"}";
+    CHECK_EQ_UINT(kiln_api_sse_frame(buf, sizeof(buf), "telemetry",
+                                     data, strlen(data)), 0u);
+    /* Nothing written: not a prefix, not a terminator. */
+    for (size_t i = 0; i < sizeof(buf); i++) { CHECK_EQ_INT(buf[i], 'x'); }
+
+    /* Exactly one byte short still writes nothing. */
+    const char *small = "{\"a\":1}";
+    const size_t need = strlen("data: ") + strlen(small) + 2u + 1u;
+    char tight[64];
+    CHECK_EQ_UINT(kiln_api_sse_frame(tight, need - 1u, nullptr, small,
+                                     strlen(small)), 0u);
+    CHECK_EQ_UINT(kiln_api_sse_frame(tight, need, nullptr, small,
+                                     strlen(small)), need - 1u);
+}
+
+/*
+ * @relation(SWR-WEB-05, scope=function)
+ */
+KILN_TEST(swrweb05_a_newline_in_the_payload_is_refused_not_passed_on)
+{
+    /* A newline inside a data field is SSE's own way of writing a multi-line
+     * payload, so passing one through would move the frame boundary into the
+     * middle of a JSON document. Nothing this device serialises contains one;
+     * the check is here because the consequence of being wrong about that is
+     * silent and remote. */
+    char buf[128];
+    const char *lf = "{\"a\":1}\n{\"b\":2}";
+    CHECK_EQ_UINT(kiln_api_sse_frame(buf, sizeof(buf), "telemetry", lf, strlen(lf)), 0u);
+
+    const char *cr = "{\"a\":1}\r";
+    CHECK_EQ_UINT(kiln_api_sse_frame(buf, sizeof(buf), "telemetry", cr, strlen(cr)), 0u);
+
+    /* And the event name is not a way round it either. */
+    CHECK_EQ_UINT(kiln_api_sse_comment(buf, sizeof(buf), "two\nlines"), 0u);
+}
+
+/*
+ * @relation(SWR-WEB-05, scope=function)
+ */
+KILN_TEST(swrweb05_the_keepalive_is_a_comment_and_carries_no_data)
+{
+    /* A proxy or a phone's radio drops an idle TCP connection, and a stream
+     * pushing once a second is only idle because the device stopped. The
+     * keepalive has to be invisible to the client's event handlers, which in
+     * SSE means a comment line. */
+    char buf[32];
+    const size_t n = kiln_api_sse_comment(buf, sizeof(buf), "ping");
+    CHECK(n > 0);
+    CHECK_STR_EQ(buf, ": ping\n\n");
+    CHECK_EQ_UINT(n, strlen(buf));
+    CHECK_EQ_INT(buf[0], ':');          /* not "data:", so no event fires */
+}
+
+/*
+ * @relation(SWR-WEB-05, scope=function)
+ */
+KILN_TEST(swrweb05_the_real_telemetry_payload_frames_cleanly)
+{
+    /* The two halves together, against the payload the device actually
+     * produces rather than a short literal: this is what proves the status
+     * JSON has no newline in it, which is the assumption the refusal above
+     * rests on. */
+    static rig_t r;
+    rig_init(&r);
+    rig_run(&r, 2.0);
+
+    char payload[1024];
+    const size_t plen = kiln_api_telemetry_event(&r.api, payload, sizeof(payload));
+    CHECK(plen > 0);
+
+    char frame[2048];
+    const size_t flen = kiln_api_sse_frame(frame, sizeof(frame), "telemetry",
+                                           payload, plen);
+    CHECK_MSG(flen > 0, "the device's own telemetry does not frame: %u bytes",
+              (unsigned)plen);
+
+    /* The frame ends the way SSE requires and nowhere else. */
+    CHECK_EQ_INT(frame[flen - 1], '\n');
+    CHECK_EQ_INT(frame[flen - 2], '\n');
+    CHECK_EQ_UINT(flen, strlen(frame));
+
+    /* And the data line still parses as the status object, so the UI's one
+     * parser is one parser. */
+    const char *p = strstr(frame, "data: ");
+    CHECK(p != nullptr);
+    if (p == nullptr) {
+        /* CHECK records and carries on, so without this the next line
+         * dereferences the null it just reported and takes the runner with it,
+         * turning a failed assertion into a crash with no summary. */
+        return;
+    }
+    p += 6;
+    kiln_json_tok_t t[RTOKS];
+    const int tn = kiln_json_parse(p, strlen(p) - 2u, t, RTOKS);
+    CHECK(tn > 0);
+    CHECK(kiln_json_find(p, t, tn, 0, "kiln_c") > 0);
+
+    /* The transport's buffer is 2 kB and the frame has to fit it with the
+     * event line on top, which is the sizing this test exists to pin. */
+    CHECK_MSG(flen < 2048u, "the frame is %u bytes and httpd's SSE buffer is "
+                            "2048", (unsigned)flen);
+}
