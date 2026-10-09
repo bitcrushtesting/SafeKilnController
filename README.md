@@ -18,8 +18,9 @@ An open-source PID controller for electric ceramic and glass kilns, built on the
 **ESP32-S3** with **ESP-IDF**.
 
 - **Simple local display**: a 128×64 OLED showing current and target temperature at a glance, plus state, segment progress and rate of rise.
-- **Web interface**: served by the device itself. Live dashboard, charts of the logged data, power and energy, and the firing programs as stored. **Observation only**: nothing reachable over the network can start a firing, heat the kiln, change its configuration or author a program. Every one of those is done at the kiln.
+- **Web interface**: served by the device itself. Live dashboard, charts of the logged data, power and energy, and the firing programs the firmware carries. **Observation only**: nothing reachable over the network can start a firing, heat the kiln or change its configuration. Those are done at the kiln.
 - **PID with automatic tuning**: relay (Åström–Hägglund) autotune on the real kiln; no manual gain hunting.
+- **Firing profiles are compiled in**: the device ships with its curves and nothing edits them, not over the network and not at the kiln. That removes every authoring path and the attack surface each one carries, and it has a real cost: a curve of your own means building a firmware that carries it.
 - **Safety first**: thermal runaway, thermocouple failure, shorted-SSR, over-temperature and door-interlock detection, with a safety supervisor that has sole authority over a heat-enable line that decays unless actively refreshed.
 - **Current monitoring**: a current transformer turns relay and element failures from slow thermal inferences into fast electrical facts, with the thermal rules retained as an independent backstop.
 - **Self-contained**: no SD card, no external database, no account, no filesystem. Logs live in a circular partition on internal flash and programs in a fixed-slot one, each built so a power cut cannot tear a record; web assets are embedded in the firmware. The device makes **one** outbound connection, a daily check for a firmware update that carries nothing about the device and can be turned off at the display.

@@ -708,12 +708,31 @@ weakness first, the deadline second, the sentence third, the engineering last.
   handler. The UI falls back to nothing: it reads `/api/status` on a timer
   already, so this is a refinement rather than a gap in function.
 
-- [ ] **P3. Where do firing programs come from now?** Recorded as `OQ-09`.
-  Authoring is gone from the web and there is no local editor, so a user
-  cannot create a curve of their own: they get the seeded examples of
-  `SWR-PRG-09` and nothing else. This is a real functional gap and the most
-  likely thing to make somebody reverse the read-only decision. A file import
-  at provisioning time is probably the cheapest answer.
+- [ ] **P3. The program store has no writer, and 17 of its 20 slots have no
+  purpose.** Answered rather than open: `OQ-09` is resolved, the profiles are
+  compiled into the firmware and nothing edits them, so `SWR-PRG-07`,
+  `SWR-PRG-08` and `SWR-PRG-10` are withdrawn. What is left is the machinery
+  those requirements justified.
+
+  `kiln_program_store_save` and `kiln_program_store_delete` are now called by
+  **nothing but their own tests**. `SWR-PRG-04` asks for 20 program slots in
+  non-volatile storage persisting across a firmware update, and the three
+  programs that exist arrive with the firmware, so the persistence is storing
+  a copy of something the image already contains.
+
+  Two ways to finish it, and this is a decision rather than a task:
+
+  - **Keep the store, narrow the requirement.** Seeding stays, the slots stay,
+    `SWR-PRG-04` is reworded to say what it is now for. Cheapest, and leaves
+    tested code that nothing calls.
+  - **Read the profiles straight from `kiln_profile_example()`.** The program
+    store stops existing for programs; `kilnfs` keeps the run records, which
+    are the other half of `SWA-21`. Removes a subsystem, a partition's worth
+    of wear, the seeding path and its failure modes, and about 200 lines. It
+    also deletes tested code, which wants care rather than enthusiasm.
+
+  The second is the one consistent with the decision. Neither should be done
+  without someone deciding which.
 
 - [ ] **P4. Untested against a client.** It compiles and passes analysis. No
   request has been made of it. The host API suite covers every route's

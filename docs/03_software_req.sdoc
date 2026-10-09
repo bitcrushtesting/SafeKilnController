@@ -795,7 +795,7 @@ VERIFICATION: T
 [REQUIREMENT]
 UID: SWR-PRG-05
 STATEMENT: >>>
-The system shall validate a program on save and on start, rejecting it with a specific reason if: no segments; any target above the configured maximum temperature; any field out of range; total predicted duration above 168 h.
+The system shall validate a program on start, rejecting it with a specific reason if: no segments; any target above the configured maximum temperature; any field out of range; total predicted duration above 168 h.
 <<<
 PRIORITY: M
 VERIFICATION: T
@@ -811,7 +811,11 @@ VERIFICATION: T
 [REQUIREMENT]
 UID: SWR-PRG-07
 STATEMENT: >>>
-The system shall allow creating, reading, updating, renaming, duplicating and deleting programs through the web interface.
+**Withdrawn 2026-10-09: programs are pre-compiled and are not edited anywhere.** This required creating, reading, updating, renaming, duplicating and deleting programs through the web interface.
+
+Half of it was already gone: [LINK: SWR-WEB-26] made the interface read-only, so nothing over the network could create or change a program. The rest goes with the decision that the set of firing profiles is **fixed at build time** ([LINK: SWR-PRG-09]), which answers `OQ-09` by removing the question rather than by choosing one of the editors it offered.
+
+What that buys, and it is the reason to prefer it: there is no authoring path to secure, no file format to validate, no import to get wrong, and no editor to build on a rotary encoder. What it costs is stated plainly in [LINK: SWR-PRG-09]: a user who wants a curve of their own builds one into the firmware.
 <<<
 PRIORITY: M
 VERIFICATION: T
@@ -819,7 +823,9 @@ VERIFICATION: T
 [REQUIREMENT]
 UID: SWR-PRG-08
 STATEMENT: >>>
-The system shall export and import a program as a documented, human-readable JSON file.
+**Withdrawn 2026-10-09 with [LINK: SWR-PRG-07].** This required exporting and importing a program as a documented JSON file.
+
+Import is authoring by another name, and the set of profiles is fixed at build time. Export has no purpose on its own: what a user would export is already in the source, under version control, readable.
 <<<
 PRIORITY: M
 VERIFICATION: T
@@ -827,7 +833,11 @@ VERIFICATION: T
 [REQUIREMENT]
 UID: SWR-PRG-09
 STATEMENT: >>>
-The system shall ship with at least **3** example programs (e.g. bisque cone 06, glaze cone 6, glass fusing) marked read-only.
+The system shall ship with at least **3** example programs (e.g. bisque cone 06, glaze cone 6, glass fusing), compiled into the firmware and read-only.
+
+**These are the only firing programs the device has**, as of the 2026-10-09 decision that withdrew [LINK: SWR-PRG-07], [LINK: SWR-PRG-08] and [LINK: SWR-PRG-10]. A user who wants a different curve adds it here and builds, which is a real cost and is the honest consequence of having no authoring path at all: it puts a compiler between a potter and a firing schedule.
+
+The trade was taken deliberately. Every authoring route costs something this design is not willing to spend: over the network reopens a write path that [LINK: SWR-WEB-26] closed, at the display means editing five segments of target, rate and dwell on a rotary encoder, and an import file is a parser accepting operator-supplied data on the component that commands a heater.
 <<<
 PRIORITY: S
 VERIFICATION: I
@@ -835,7 +845,9 @@ VERIFICATION: I
 [REQUIREMENT]
 UID: SWR-PRG-10
 STATEMENT: >>>
-The system shall permit editing the *remaining* segments of a running program; edits to the current or already-completed segments shall be rejected.
+**Withdrawn 2026-10-09 with [LINK: SWR-PRG-07].** This required editing the remaining segments of a running program while rejecting edits to the current or completed ones.
+
+It was the most delicate requirement in this section, because it asks the run controller to accept a change to the thing it is executing, and it is now moot: there is no editor and no segment to change. [LINK: SWR-RUN-07]'s abort remains the way to stop a firing that is doing the wrong thing.
 <<<
 PRIORITY: S
 VERIFICATION: T
@@ -2892,7 +2904,13 @@ STATUS: Resolved
 [QUESTION]
 UID: OQ-09
 STATEMENT: >>>
-Where are firing programs authored, now that [LINK: SWR-WEB-26] has made the web interface read-only? A local editor on a rotary encoder and a 128x64 display is possible but unpleasant; importing from a file on first boot, or shipping only the examples of [LINK: SWR-PRG-09], are the alternatives. Until this is answered a user cannot create a curve of their own, which is a real functional gap rather than a nicety.
+**Resolved 2026-10-09: nowhere. The profiles are pre-compiled and nothing edits them.** The question was where firing programs are authored now that [LINK: SWR-WEB-26] has made the web interface read-only, with a local editor, a file import, or shipping only the examples as the candidates.
+
+The answer is the third, taken as a decision rather than as a default. [LINK: SWR-PRG-09]'s examples are the device's whole repertoire; [LINK: SWR-PRG-07], [LINK: SWR-PRG-08] and [LINK: SWR-PRG-10] are withdrawn.
+
+**The gap this leaves is real and is not being minimised**: a potter who wants a curve of their own needs a toolchain and a flash, which for most of them means somebody else does it. That is a genuine cost of the read-only decision and it should be stated in the user documentation rather than discovered.
+
+What it buys is that there is no authoring path at all: nothing over the network to secure, no file format to validate, no parser accepting operator data on the processor that commands a heater, and no editor to design for a rotary encoder. If the cost proves too high in use, the cheapest reversal is the file import of [LINK: SWR-PRG-08] at service time, which needs physical access and so leaves the security argument intact.
 <<<
 
 [QUESTION]
