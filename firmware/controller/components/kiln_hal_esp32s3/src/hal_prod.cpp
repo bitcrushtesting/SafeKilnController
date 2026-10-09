@@ -45,7 +45,7 @@ bool             s_ready;
 bool get_str(nvs_handle_t h, const char *key, char *out, size_t cap)
 {
     size_t len = cap;
-    esp_err_t e = nvs_get_str(h, key, out, &len);
+    const esp_err_t e = nvs_get_str(h, key, out, &len);
     if (e != ESP_OK) {
         ESP_LOGW(TAG, "%s: %s", key, esp_err_to_name(e));
         out[0] = '\0';
