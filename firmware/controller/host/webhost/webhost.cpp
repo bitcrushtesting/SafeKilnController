@@ -209,6 +209,17 @@ bool send_all(int fd, const char *data, size_t len)
 
 bool send_str(int fd, const char *s) { return send_all(fd, s, strlen(s)); }
 
+/* The two lengths that are not a length.  CHUNKED is the log stream, which is
+ * framed by chunk_write below; UNFRAMED is the event stream, which is framed by
+ * SSE itself and ends when the connection closes.
+ *
+ * They were one value, -1, and the event stream therefore announced
+ * Transfer-Encoding: chunked and then sent raw SSE frames -- a response whose
+ * body does not match its own framing, which a browser is entitled to reject
+ * outright and which this harness got away with only because nothing checked. */
+constexpr long BODY_CHUNKED  = -1;
+constexpr long BODY_UNFRAMED = -2;
+
 void send_headers(int fd, int status, const char *content_type,
                          long content_length, const char *extra)
 {
@@ -233,9 +244,11 @@ void send_headers(int fd, int status, const char *content_type,
     if (content_length >= 0) {
         n += snprintf(h + n, sizeof(h) - (size_t)n, "Content-Length: %ld\r\n",
                       content_length);
-    } else {
+    } else if (content_length == BODY_CHUNKED) {
         n += snprintf(h + n, sizeof(h) - (size_t)n, "Transfer-Encoding: chunked\r\n");
     }
+    /* BODY_UNFRAMED: neither header.  With Connection: close above, the body
+     * runs until the socket does, which is what an event stream is. */
     if (extra != nullptr) {
         n += snprintf(h + n, sizeof(h) - (size_t)n, "%s", extra);
     }
@@ -379,7 +392,7 @@ void handle_request(client_t *c)
 
     /* SWR-WEB-05: the SSE stream. */
     if (strcmp(target, "/api/events") == 0 && m == KILN_HTTP_GET) {
-        send_headers(c->fd, 200, "text/event-stream", -1,
+        send_headers(c->fd, 200, "text/event-stream", BODY_UNFRAMED,
                      "X-Accel-Buffering: no\r\n");
         c->sse = true;
         return;
@@ -415,7 +428,7 @@ void handle_request(client_t *c)
              * envelope.  The device's transport can do better because
              * esp_http_server lets it set the status after the handler returns;
              * this is a harness, and the API suite covers the status codes. */
-            send_headers(c->fd, 200, "application/json", -1, NULL);
+            send_headers(c->fd, 200, "application/json", BODY_CHUNKED, NULL);
             (void)kiln_api_log_stream(&g_api, &req, chunk_write, &sink, &meta);
             if (sink.ok && meta.streaming) {
                 (void)send_str(c->fd, "0\r\n\r\n");
@@ -449,9 +462,13 @@ void push_sse(void)
         return;
     }
 
+    /* The same framing the device uses, rather than this harness's own
+     * snprintf: two implementations of one wire format is how a harness comes
+     * to pass while the firmware does not, and this one was the implementation
+     * the browser had actually been tested against. */
     char frame[8600];
-    const int fn = snprintf(frame, sizeof(frame), "event: telemetry\ndata: %s\n\n", ev);
-    if (fn <= 0) {
+    const size_t fn = kiln_api_sse_frame(frame, sizeof(frame), "telemetry", ev, n);
+    if (fn == 0u) {
         return;
     }
 
@@ -459,7 +476,7 @@ void push_sse(void)
         if (!g_clients[i].in_use || !g_clients[i].sse) {
             continue;
         }
-        if (!send_all(g_clients[i].fd, frame, (size_t)fn)) {
+        if (!send_all(g_clients[i].fd, frame, fn)) {
             close(g_clients[i].fd);
             g_clients[i].in_use = false;
         }

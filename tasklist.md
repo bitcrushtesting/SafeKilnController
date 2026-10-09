@@ -724,11 +724,40 @@ weakness first, the deadline second, the sentence third, the engineering last.
 
 ## P. HTTP transport and the API
 
-- [ ] **P2. Server-Sent Events are not implemented.** `SWR-WEB-05` wants live
-  values pushed at least once a second, and `kiln_api_telemetry_event()` is
-  written and tested for exactly that, but the transport has no `/api/events`
-  handler. The UI falls back to nothing: it reads `/api/status` on a timer
-  already, so this is a refinement rather than a gap in function.
+- [x] **P2. The telemetry stream is implemented. Done 2026-10-10.** The
+  payload had been written and tested since `kiln_api_telemetry_event` landed,
+  and the browser had been asking for it all along: `app.js` opens an
+  `EventSource` on `/api/events` and listens for a `telemetry` event. Nothing
+  answered, so the dashboard went stale after four seconds exactly as
+  `SWR-WEB-25` says it should.
+
+  It does not stream from the handler, and that is the whole design.
+  `esp_http_server` runs one task and serialises handlers on it, so a handler
+  looping once a second would hold that task for as long as a browser tab
+  stayed open and the kiln would appear to hang the moment somebody left a
+  dashboard open and then loaded the log. Instead the handler parks the socket
+  with `httpd_req_async_handler_begin` and returns; one task at priority 3
+  pushes to at most two parked subscribers once a second, with a comment frame
+  every fifteen pushes so an idle proxy does not drop a stream that is working.
+  A third subscriber gets `503` with `Retry-After`. Six sockets rather than
+  four, because `SWR-WEB-21` counts clients and a client with the dashboard
+  open needs a second socket for everything else.
+
+  The framing is in `kiln_web/api`, host-tested, and shared with the
+  development harness: a frame that does not fit is not written at all and a
+  payload with a newline is refused, because half a frame does not fail
+  visibly, it moves the frame boundary into the middle of a JSON document and
+  every frame after it is misread. Five tests.
+
+  Verified against a real client, not only by unit test: the harness served
+  four frames in three and a half seconds over a socket, each
+  `event: telemetry` with a parseable payload and a rising temperature. That
+  also found a bug nothing else would have: the harness announced
+  `Transfer-Encoding: chunked` on the event stream and then sent unframed SSE,
+  a response whose body contradicts its own headers, which a browser may
+  reject outright. The log stream is chunked and stays chunked; the event
+  stream now declares neither length nor chunking and ends with the
+  connection, which is what an event stream is.
 
 - [ ] **P3. The program store has no writer, and 17 of its 20 slots have no
   purpose.** Answered rather than open: `OQ-09` is resolved, the profiles are

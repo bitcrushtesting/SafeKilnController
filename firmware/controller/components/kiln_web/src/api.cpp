@@ -956,6 +956,74 @@ size_t kiln_api_telemetry_event(kiln_api_ctx_t *ctx, char *buf, size_t cap)
     return kiln_json_ok(&j) ? kiln_json_len(&j) : 0;
 }
 
+/* --- Server-Sent Events framing (SWR-WEB-05) ---------------------------- */
+
+size_t kiln_api_sse_frame(char *buf, size_t cap, const char *event,
+                          const char *data, size_t data_len)
+{
+    if ((buf == nullptr) || (cap == 0u) || (data == nullptr)) {
+        return 0;
+    }
+    for (size_t i = 0; i < data_len; i++) {
+        if ((data[i] == '\n') || (data[i] == '\r')) {
+            /* Refused rather than escaped.  A newline in a data field is SSE's
+             * own way of writing a multi-line payload, so passing one through
+             * would move the frame boundary into the middle of a JSON
+             * document, and every frame after it would be misread.  Nothing
+             * this device serialises contains one; if that changes, the fix is
+             * at the serialiser rather than a rewrite here. */
+            return 0;
+        }
+    }
+
+    const size_t ev_len  = (event != nullptr) ? strlen(event) : 0u;
+    /* "event: " + name + "\n" + "data: " + payload + "\n\n", and the NUL that
+     * makes the result printable in a log. */
+    const size_t needed = (ev_len > 0u ? (7u + ev_len + 1u) : 0u)
+                        + 6u + data_len + 2u + 1u;
+    if (needed > cap) {
+        return 0;
+    }
+
+    size_t n = 0;
+    if (ev_len > 0u) {
+        memcpy(&buf[n], "event: ", 7u); n += 7u;
+        memcpy(&buf[n], event, ev_len); n += ev_len;
+        buf[n++] = '\n';
+    }
+    memcpy(&buf[n], "data: ", 6u); n += 6u;
+    memcpy(&buf[n], data, data_len); n += data_len;
+    buf[n++] = '\n';
+    buf[n++] = '\n';
+    buf[n]   = '\0';
+    return n;
+}
+
+size_t kiln_api_sse_comment(char *buf, size_t cap, const char *text)
+{
+    if ((buf == nullptr) || (cap == 0u)) {
+        return 0;
+    }
+    const char *s = (text != nullptr) ? text : "";
+    const size_t len = strlen(s);
+    for (size_t i = 0; i < len; i++) {
+        if ((s[i] == '\n') || (s[i] == '\r')) {
+            return 0;
+        }
+    }
+    if ((2u + len + 2u + 1u) > cap) {
+        return 0;
+    }
+    size_t n = 0;
+    buf[n++] = ':';
+    buf[n++] = ' ';
+    memcpy(&buf[n], s, len); n += len;
+    buf[n++] = '\n';
+    buf[n++] = '\n';
+    buf[n]   = '\0';
+    return n;
+}
+
 /* --- dispatch ---------------------------------------------------------- */
 
 kiln_err_t kiln_api_handle(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,

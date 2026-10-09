@@ -876,6 +876,39 @@ The SSE connection drives every live value; on disconnect the UI marks values
 stale and reconnects with backoff rather than showing old data as current
 (`SWR-WEB-25`).
 
+**How the stream is served, and why not from the handler.** `esp_http_server`
+runs one task and serialises handlers on it, so a handler that looped pushing a
+frame a second would hold that task for as long as a browser tab stayed open:
+the other sockets would never be served again, and the kiln would appear to
+hang the moment somebody left a dashboard open and then tried to load the log.
+
+So `/api/events` does not stream from its handler. It hands the socket to the
+server's async machinery (`httpd_req_async_handler_begin`), parks the request in
+a two-slot table and returns, which releases the server task immediately. One
+task at priority 3 -- below the server's 4, far below control and safety --
+pushes to every parked subscriber once a second, with an SSE comment frame every
+fifteen pushes to keep an idle proxy or a phone's radio from dropping a stream
+that is working.
+
+Two subscribers, not four: a stream holds its socket indefinitely, so letting
+every socket become one would leave nothing for the page, the log or an update
+check. Two is a dashboard on a phone and one on a laptop. A third is refused
+with `503` and `Retry-After` rather than queued, because a client that is told
+to come back does and one left hanging does not. The socket count is six rather
+than four for the same reason: `SWR-WEB-21` counts *clients*, and a client with
+a dashboard open holds one socket parked on the stream and needs another to
+fetch anything else.
+
+The framing is in `kiln_web/api` rather than in the transport, because it is the
+part of SSE that can be got wrong and the transport cannot be host-tested. A
+frame that does not fit its buffer is not written at all, and a payload
+containing a newline is refused: a newline inside a data field is SSE's own way
+of writing a multi-line payload, so half a frame or a stray newline does not
+fail visibly, it moves the frame boundary into the middle of a JSON document and
+every frame after it is misread. The development harness in
+`firmware/controller/host/webhost` uses the same framing function, so the format
+the browser is tested against is the format the device sends.
+
 ### 12.4 Asset budget
 
 | Asset | Budget (gzipped) | Measured 2026-10-09 |

@@ -145,4 +145,27 @@ bool kiln_api_needs_auth(const kiln_api_req_t *req);
  * so the UI has one parser. */
 size_t kiln_api_telemetry_event(kiln_api_ctx_t *ctx, char *buf, size_t cap);
 
+/* Wrap a payload as one Server-Sent Events frame: an optional `event:` line,
+ * then `data:`, then the blank line that ends it.  Returns the length written,
+ * or 0 if it did not fit, in which case nothing is written -- half an SSE frame
+ * on the wire desynchronises the stream for every frame after it, so the only
+ * safe partial write is none.
+ *
+ * `data` must contain no newline.  A newline inside a data field is how SSE
+ * expresses a multi-line payload, so one arriving unannounced would be read by
+ * the client as a frame boundary in the middle of a JSON document.  The JSON
+ * this device produces has none; the check is here because the consequence of
+ * being wrong about that is silent and remote.
+ *
+ * Here rather than in the transport because it is the part of SSE that can be
+ * got wrong, and the transport cannot be host-tested (SWA-01). */
+size_t kiln_api_sse_frame(char *buf, size_t cap, const char *event,
+                          const char *data, size_t data_len);
+
+/* The comment frame SSE uses as a keepalive.  A proxy or a phone's radio will
+ * drop an idle TCP connection, and a stream that has been pushing once a second
+ * is only idle because the device stopped; this is what keeps the distinction
+ * visible rather than papering over it. */
+size_t kiln_api_sse_comment(char *buf, size_t cap, const char *text);
+
 #endif

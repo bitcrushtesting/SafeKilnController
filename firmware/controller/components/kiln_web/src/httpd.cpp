@@ -47,6 +47,9 @@
 
 #include "esp_http_server.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+#include "freertos/task.h"
 
 #include "kiln_web/httpd.h"
 
@@ -177,6 +180,195 @@ static bool stream_sink(void *user, const char *data, size_t len)
     return httpd_resp_send_chunk(req, data, (ssize_t)len) == ESP_OK;
 }
 
+/* --- the telemetry stream (SWR-WEB-05) ----------------------------------
+ *
+ * SWR-WEB-05 asks for live values at least once a second by push rather than
+ * by polling, and the browser already asks for it: app.js opens an
+ * EventSource on /api/events and listens for a `telemetry` event.  Until now
+ * nothing answered, so the interface fell back on nothing and the dashboard
+ * went stale after four seconds exactly as SWR-WEB-25 says it should.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY A TASK, AND NOT A LOOP IN THE HANDLER
+ * ---------------------------------------------------------------------------
+ * esp_http_server runs one task and serialises handlers on it.  A handler that
+ * sat in a loop pushing a frame a second would therefore hold that task for as
+ * long as the browser tab stayed open, and the other three sockets of
+ * SWR-WEB-21 would never be served again: the kiln would appear to hang the
+ * moment somebody left a dashboard open and then tried to load the log.
+ *
+ * So the handler does not stream.  It hands the socket to the server's async
+ * machinery (httpd_req_async_handler_begin), parks the request in the table
+ * below, and returns, which frees the server task immediately.  One low
+ * priority task then pushes to every parked subscriber once a second.
+ *
+ * Bounded at two subscribers of the four sockets SWR-WEB-21 allows.  A stream
+ * holds its socket indefinitely, so letting every socket become a stream would
+ * leave nothing for the page itself, the log or an update check; two is a
+ * dashboard on a phone and one on a laptop, which is the case this is for.
+ * A third is refused with 503 and a Retry-After rather than queued, because a
+ * client that is told to come back does, and one left hanging does not.
+ */
+#define SSE_MAX_SUBS      2
+#define SSE_PERIOD_MS     1000
+#define SSE_BUF_BYTES     2048
+/* A comment frame every fifteen pushes, which is what keeps an idle proxy or a
+ * phone's radio from dropping a stream that is working. */
+#define SSE_PING_EVERY    15
+
+typedef struct {
+    httpd_req_t *req;        /* the async copy; NULL when the slot is free */
+    uint32_t     pushes;
+} sse_sub_t;
+
+static sse_sub_t      s_subs[SSE_MAX_SUBS];
+static SemaphoreHandle_t s_subs_lock;
+static TaskHandle_t   s_sse_task;
+static char           s_sse_buf[SSE_BUF_BYTES];
+
+/* Drop a subscriber and give its socket back to the server.  Called with the
+ * lock held, from the pushing task only: the handler never closes a request it
+ * has already parked, because the task may be writing to it. */
+static void sse_release(sse_sub_t *s)
+{
+    if (s->req != NULL) {
+        (void)httpd_req_async_handler_complete(s->req);
+        s->req = NULL;
+    }
+    s->pushes = 0;
+}
+
+/* One frame to one subscriber.  Returns false when the socket is gone, which
+ * is the only way a stream ends: the client closes the tab, the radio drops,
+ * or the page is reloaded, and none of those is an error worth logging at
+ * anything above debug. */
+static bool sse_push(sse_sub_t *s, const char *frame, size_t len)
+{
+    const esp_err_t e = httpd_resp_send_chunk(s->req, frame, (ssize_t)len);
+    return e == ESP_OK;
+}
+
+static void sse_task(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(SSE_PERIOD_MS));
+
+        if (xSemaphoreTake(s_subs_lock, pdMS_TO_TICKS(100)) != pdTRUE) {
+            continue;
+        }
+
+        bool any = false;
+        for (int i = 0; i < SSE_MAX_SUBS; i++) {
+            if (s_subs[i].req != NULL) { any = true; break; }
+        }
+        if (!any) {
+            (void)xSemaphoreGive(s_subs_lock);
+            continue;
+        }
+
+        /* Serialised once for every subscriber: the payload is identical, and
+         * building it per socket would be the same work twice on the processor
+         * that is also running a kiln. */
+        char payload[1024];
+        const size_t plen = kiln_api_telemetry_event(s_http.api, payload,
+                                                     sizeof(payload));
+        size_t flen = 0;
+        if (plen > 0u) {
+            flen = kiln_api_sse_frame(s_sse_buf, sizeof(s_sse_buf), "telemetry",
+                                      payload, plen);
+        }
+        if (flen == 0u) {
+            /* Nothing to say, or it did not fit.  A half frame would
+             * desynchronise the stream for good, so the second is skipped as
+             * silently as the first and SWR-WEB-25 shows the dashboard going
+             * stale, which is the truth. */
+            ESP_LOGW(TAG, "sse: no frame this second (payload %u bytes)",
+                     (unsigned)plen);
+            (void)xSemaphoreGive(s_subs_lock);
+            continue;
+        }
+
+        for (int i = 0; i < SSE_MAX_SUBS; i++) {
+            sse_sub_t *s = &s_subs[i];
+            if (s->req == NULL) {
+                continue;
+            }
+            if (!sse_push(s, s_sse_buf, flen)) {
+                ESP_LOGD(TAG, "sse: subscriber %d gone after %u pushes",
+                         i, (unsigned)s->pushes);
+                sse_release(s);
+                continue;
+            }
+            s->pushes++;
+            if ((s->pushes % SSE_PING_EVERY) == 0u) {
+                char ping[32];
+                const size_t n = kiln_api_sse_comment(ping, sizeof(ping), "ping");
+                if ((n > 0u) && !sse_push(s, ping, n)) {
+                    sse_release(s);
+                }
+            }
+        }
+        (void)xSemaphoreGive(s_subs_lock);
+    }
+}
+
+/* Park this request as a subscriber.  Returns false when there is no room, in
+ * which case the caller answers rather than this. */
+static bool sse_subscribe(httpd_req_t *req)
+{
+    if ((s_subs_lock == NULL) || (s_sse_task == NULL)) {
+        return false;
+    }
+    httpd_req_t *copy = NULL;
+    if (httpd_req_async_handler_begin(req, &copy) != ESP_OK) {
+        return false;
+    }
+
+    bool parked = false;
+    if (xSemaphoreTake(s_subs_lock, pdMS_TO_TICKS(100)) == pdTRUE) {
+        for (int i = 0; i < SSE_MAX_SUBS; i++) {
+            if (s_subs[i].req == NULL) {
+                s_subs[i].req    = copy;
+                s_subs[i].pushes = 0;
+                parked = true;
+                break;
+            }
+        }
+        (void)xSemaphoreGive(s_subs_lock);
+    }
+    if (!parked) {
+        (void)httpd_req_async_handler_complete(copy);
+    }
+    return parked;
+}
+
+static esp_err_t handle_events(httpd_req_t *req)
+{
+    (void)httpd_resp_set_type(req, "text/event-stream");
+    /* No caching and no buffering anywhere in between: a cached event stream is
+     * a dashboard showing a firing that finished yesterday. */
+    (void)httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    (void)httpd_resp_set_hdr(req, "X-Accel-Buffering", "no");
+    (void)httpd_resp_set_hdr(req, "X-Content-Type-Options", "nosniff");
+
+    if (!sse_subscribe(req)) {
+        /* Full.  Said plainly, with how long to wait: app.js reconnects with
+         * backoff on any error, so a 503 costs the client a second and a
+         * silent drop costs it the same with no explanation in the log. */
+        (void)httpd_resp_set_status(req, status_line(503));
+        (void)httpd_resp_set_type(req, "application/json");
+        (void)httpd_resp_set_hdr(req, "Retry-After", "5");
+        return httpd_resp_sendstr(req,
+            "{\"error\":{\"code\":\"too_many_streams\","
+            "\"message\":\"the device streams to two clients at a time\"}}");
+    }
+
+    /* Parked.  The first frame comes from the pushing task within the second,
+     * and returning here releases the server task for everybody else. */
+    return ESP_OK;
+}
+
 /* --- the single handler ------------------------------------------------- */
 
 static esp_err_t handle_any(httpd_req_t *req)
@@ -224,6 +416,12 @@ static esp_err_t handle_any(httpd_req_t *req)
     kiln_api_resp_t resp = {};
     resp.body     = h->buf;
     resp.body_cap = sizeof(h->buf);
+
+    /* The telemetry stream, which does not answer here at all: it parks the
+     * socket and returns, so this task is free for the next request. */
+    if ((strcmp(uri, "/api/events") == 0) && (ar.method == KILN_HTTP_GET)) {
+        return handle_events(req);
+    }
 
     /* The log is the one route that streams: a 24 h run is far larger than any
      * buffer worth having, so it is pushed in chunks rather than built. */
@@ -277,9 +475,12 @@ kiln_err_t kiln_httpd_start(kiln_api_ctx_t *api)
     s_http.api = api;
 
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
-    /* SWR-WEB-21: four concurrent clients, which is what the requirement asks
-     * for and what architecture 13.4's RAM budget was written against. */
-    cfg.max_open_sockets   = 4;
+    /* SWR-WEB-21 asks for four concurrent clients.  Six sockets, because a
+     * client with the dashboard open holds one of them parked on the telemetry
+     * stream and still needs another to fetch the log or the config: four with
+     * two of them streaming would be the requirement met on paper and not in a
+     * workshop.  Architecture 13.4's RAM budget carries the extra two. */
+    cfg.max_open_sockets   = 6;
     cfg.lru_purge_enable   = true;
     cfg.uri_match_fn       = httpd_uri_match_wildcard;
     cfg.max_uri_handlers   = 2;
@@ -292,6 +493,22 @@ kiln_err_t kiln_httpd_start(kiln_api_ctx_t *api)
     if (httpd_start(&s_http.server, &cfg) != ESP_OK) {
         ESP_LOGE(TAG, "httpd_start failed");
         return KILN_ERR_IO;
+    }
+
+    /* SWR-WEB-05's pushing task.  Priority 3, below the server's 4 and well
+     * below control and safety: a frame that is late is a dashboard that
+     * updates in 1.1 s, and SWR-NFR-02 does not negotiate. */
+    if (s_subs_lock == NULL) {
+        s_subs_lock = xSemaphoreCreateMutex();
+    }
+    if ((s_subs_lock != NULL) && (s_sse_task == NULL)) {
+        if (xTaskCreatePinnedToCore(sse_task, "kiln_sse", 3072, NULL, 3,
+                                    &s_sse_task, 0) != pdPASS) {
+            s_sse_task = NULL;
+            /* The interface still works: app.js falls back to showing the
+             * dashboard going stale, which is SWR-WEB-25 and is honest. */
+            ESP_LOGE(TAG, "sse task would not start; /api/events will answer 503");
+        }
     }
 
     /* SWR-WEB-26: GET and nothing else is ever registered.  A POST does not
@@ -318,6 +535,18 @@ kiln_err_t kiln_httpd_start(kiln_api_ctx_t *api)
 
 void kiln_httpd_stop(void)
 {
+    /* The task goes first, and its subscribers with it: stopping the server
+     * under a task that is writing to one of its sockets is a use-after-free
+     * with a kiln attached. */
+    if (s_sse_task != nullptr) {
+        vTaskDelete(s_sse_task);
+        s_sse_task = nullptr;
+    }
+    if (s_subs_lock != nullptr) {
+        for (int i = 0; i < SSE_MAX_SUBS; i++) {
+            sse_release(&s_subs[i]);
+        }
+    }
     if (s_http.server != nullptr) {
         (void)httpd_stop(s_http.server);
         s_http.server = nullptr;
