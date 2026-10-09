@@ -118,12 +118,11 @@ telemetry, nothing that reaches off the box.
         <ul id="prog-list" class="list"></ul>
       </div>
       <div class="col">
-        <h2 id="ed-title" data-i18n="editor">Editor</h2>
-        <div id="ed-ro" class="note" hidden>
-          A built-in example is read-only. Copy it to make changes.
-        </div>
-        <label class="field">Name <input id="ed-name" maxlength="31"></label>
-        <label class="field">Description <input id="ed-desc" maxlength="95"></label>
+        <!-- Not an editor. The profiles are compiled into the firmware and
+             nothing edits them, here or at the kiln, so this shows the one
+             that is selected and draws its curve. -->
+        <h2 id="ed-title" data-i18n="program">Program</h2>
+        <p id="ed-desc" class="muted"></p>
         <table class="segs">
           <thead><tr>
             <th>#</th><th>Target &deg;C</th><th>Rate &deg;C/h</th>
@@ -131,14 +130,13 @@ telemetry, nothing that reaches off the box.
           </tr></thead>
           <tbody id="ed-body"></tbody>
         </table>
-        <div class="controls">        </div>
-        <div id="ed-msg" class="note" hidden></div>
         <canvas id="ed-chart" height="200"></canvas>
       </div>
     </div>
     <p id="programs-readonly-note" class="readonly-note">
-      <strong>Display only.</strong> Firing programs are shown here but are
-      authored at the kiln, not over the network.
+      <strong>Display only.</strong> The firing programs are compiled into the
+      firmware. They are not edited here, and not at the kiln either: adding
+      one means building a firmware that carries it.
     </p>
   </section>
 

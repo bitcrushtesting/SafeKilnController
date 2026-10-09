@@ -86,7 +86,7 @@ const I18N = {
     save: 'Speichern',
     copy: 'Kopieren',
     delete: 'Löschen',
-    editor: 'Editor',
+    program: 'Programm',
     run_history: 'Brandverlauf',
     dl_csv: 'CSV herunterladen',
     dl_json: 'JSON herunterladen',
@@ -372,24 +372,22 @@ function segRow(seg, i) {
   rm.title = 'delete segment';
   rm.onclick = () => {
     editing.segments.splice(i, 1);
-    renderEditor();
+    renderProgram();
   };
   btn.append(rm);
   tr.append(btn);
   return tr;
 }
 
-/* SWR-WEB-26: a viewer, not an editor.  Every field is disabled unconditionally
-   rather than by the program's readonly flag, because nothing here can be
-   saved whatever the flag says. */
-function renderEditor() {
+/* A viewer, and since OQ-09 not a disabled editor either. The profiles are
+   compiled into the firmware (SWR-PRG-09) and nothing edits them, so the name
+   and description are text rather than inputs somebody has to discover are
+   dead, and the readonly flag is no longer worth showing: every program has
+   it. */
+function renderProgram() {
   if (!editing) return;
   $('ed-title').textContent = editing.name || 'Program';
-  $('ed-ro').hidden = !editing.readonly;
-  $('ed-name').value = editing.name || '';
-  $('ed-desc').value = editing.description || '';
-  $('ed-name').disabled = true;
-  $('ed-desc').disabled = true;
+  $('ed-desc').textContent = editing.description || '';
 
   const body = $('ed-body');
   body.innerHTML = '';
@@ -398,9 +396,9 @@ function renderEditor() {
   previewEdit();
 }
 
-/* SWR-WEB-12: the resulting curve, previewed before saving.  Computed locally so
- * it follows every keystroke; the server still re-validates on save, which is
- * SWR-WEB-13 and is the check that counts. */
+/* SWR-WEB-12: the curve the selected program describes, drawn locally from
+ * its segments. It used to preview an edit before saving; there is no saving
+ * now, so it draws what the firmware will run. */
 function previewEdit() {
   if (!edChart || !editing) return;
   let t = 0, from = 20;
@@ -421,7 +419,7 @@ function previewEdit() {
 async function editProgram(id) {
   const p = await get(`/api/programs/${id}`);
   editing = { ...p, segments: p.segments.map(s => ({ ...s })) };
-  renderEditor();
+  renderProgram();
 }
 
 /* --- history (SWR-WEB-09, SWR-WEB-18) ------------------------------------ */
@@ -650,7 +648,7 @@ function show(name) {
   if (name === 'programs' && !edChart) {
     edChart = new Chart($('ed-chart'), { interactive: false });
   }
-  if (name === 'programs') loadPrograms().then(renderEditor).catch(() => {});
+  if (name === 'programs') loadPrograms().then(renderProgram).catch(() => {});
   if (name === 'history') {
     if (!histChart) histChart = new Chart($('hist-chart'));
     loadRuns().catch(e => toast($('diag'), e.message, 'bad'));
