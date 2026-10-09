@@ -806,7 +806,16 @@ kiln_err_t handle_current(kiln_api_ctx_t *ctx, const kiln_api_req_t *req,
         kiln_json_kv_bool(&j, "reference_rejected", c->ref_rejected);
         kiln_json_kv_uint(&j, "flags", kiln_current_flags(c));
 
-        /* SWR-CUR-07, with the assumption stated as the requirement demands. */
+        /* SWR-CUR-07, with the assumption stated as the requirement demands.
+         *
+         * `channels` and `mains_v` are here because the interface has to say
+         * what produced the kilowatts: power is the measured current times the
+         * configured supply voltage, and a reader whose supply is 240 V needs
+         * to see which figure was used.  One channel is structural rather than
+         * configurable, single phase having been settled by OQ-06, so it is
+         * stated as a fact rather than counted. */
+        kiln_json_kv_uint(&j, "channels", 1u);
+        kiln_json_kv_num(&j, "mains_v", (double)c->cfg.mains_v, 0);
         kiln_json_kv_num(&j, "apparent_va", kiln_app_apparent_va(app), 0);
         kiln_json_kv_num(&j, "energy_wh", kiln_app_energy_wh(app), 1);
         kiln_json_kv_str(&j, "power_basis",

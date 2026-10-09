@@ -3,6 +3,8 @@ SPDX-FileCopyrightText: 2026 Bitcrush Testing
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
+![Safe Kiln Controller](docs/images/safe-kiln-control.png)
+
 # Safe Kiln Controller
 
 [![CI](https://img.shields.io/github/actions/workflow/status/bitcrushtesting/SafeKilnController/ci.yml?branch=main&label=CI&style=flat-square)](https://github.com/bitcrushtesting/SafeKilnController/actions/workflows/ci.yml)
@@ -23,17 +25,39 @@ An open-source PID controller for electric ceramic and glass kilns, built on the
 - **Self-contained**: no SD card, no external database, no cloud, no filesystem. Logs live in a circular partition on internal flash and programs in a fixed-slot one, each built so a power cut cannot tear a record; web assets are embedded in the firmware.
 - **Designed for testability**: all decision logic is hardware-free C++ that runs on a development host against a simulated kiln.
 
+![The web dashboard during a bisque firing, showing 813.6 °C tracking an 812.5 °C setpoint at 152 °C/h in segment 3 of 5, with the logged curve and the preheat dwell visible](docs/images/web-dashboard.png)
+
+The dashboard mid-firing. Everything on it is read from the device: the `RUN`
+and `HEAT` badges, the segment progress, the logged curve. There is no button
+here that changes what the kiln is doing, because there is no route behind one
+(`SWR-WEB-26`), which is why both notices at the foot of the page say so
+plainly.
+
+No kiln was involved. That is the development harness of
+[`host/webhost`](firmware/controller/host/webhost) running the real firmware
+logic against a simulated one, and it is two commands if you want to click
+around yourself:
+
+```sh
+cmake -B build-webhost -S firmware/controller/host/webhost && cmake --build build-webhost
+./build-webhost/webhost --accel 60 --fire "Bisque cone 06"   # then open http://127.0.0.1:8080
+```
+
+`--fire` exists because of the read-only interface: a firing cannot be started
+from the browser, so the harness starts one of the built-in examples
+(`SWR-PRG-09`) through the same call the local display makes.
+
 ## Status
 
 **In development.** The firmware is C++20. The control, safety, storage and web
 logic is implemented and tested, and the hardware adapters are written but have
 not yet been run against a board. The browser UI is not served yet, its assets
-are not embedded in the image, and there is currently **no field update path**
-(see below).
+are not embedded in the image, and the **field update path is specified but not
+built** (see below).
 
 398 host tests pass plain and under AddressSanitizer/UBSan, `clang-tidy` is
 clean on host and target, the `esp32s3` image builds with zero warnings at
-866 kB (58 % of the OTA slot free), and QEMU boots that image and fires it.
+246 kB (88 % of the OTA slot free), and QEMU boots that image and fires it.
 
 | Area | State |
 |---|---|
@@ -45,7 +69,7 @@ clean on host and target, the `esp32s3` image builds with zero warnings at
 | `kiln_hal_esp32s3`: MAX31856, SSD1306, encoder, SSR outputs, CT front end, WiFi | Implemented, **not yet run against hardware** |
 | `kiln_web`: REST API, JSON, log streaming, read-only enforcement | Implemented, host-tested; HTTP transport on target, **browser assets not yet embedded** |
 | `kiln_hmi`: the local display and encoder | Implemented and host-tested, **not yet run against hardware**; the only way to start a firing |
-| Firmware update | **Removed from the network** (SWR-UPD-01); no local path specified yet |
+| Firmware update | **Specified, not built.** The device pulls a signed manifest from `update.bitcrushtesting.com`, the local display announces it, and the operator confirms there; the web interface stays read-only and gains no inbound route (SWR-UPD-09 to SWR-UPD-16, `docs/security.md` §6.2) |
 
 You can watch a complete firing, and break it in a dozen ways, without any
 hardware at all, see [`docs/simulation.md`](docs/simulation.md):
@@ -93,9 +117,56 @@ the short version is that **losing the signing key means the unit can never run
 new firmware again**, and that secure boot stops hostile code running but does
 nothing about secrets being read off the flash (`SRR-05`).
 
-It deliberately does not burn `DIS_DOWNLOAD_MODE`. `SRR-11` records that this
-device has no field update path, so serial download is the only route a security
-fix can take; closing it as well would make a unit permanently unfixable.
+### Releasing an update
+
+A third tool, for the other end of the lifecycle. The device fetches one signed
+static manifest per channel and verifies it against a key compiled into its own
+firmware (`SWR-UPD-09` to `SWR-UPD-16`), and this builds that manifest:
+
+```sh
+tools/update-manifest.py keygen --key keys/manifest.pem          # once, then keep it offline
+tools/update-manifest.py pubkey --key keys/manifest.pem \
+    --header firmware/controller/main/update_pubkey.h            # the half that ships
+tools/update-manifest.py sign   --key keys/manifest.pem \
+    --image build-esp32s3/safekiln.bin --version 1.4.2 \
+    --security --advisory advisories/2026-002.html
+tools/update-manifest.py verify --manifest dist/update/stable.json \
+    --pubkey keys/manifest.pub.pem --image build-esp32s3/safekiln.bin \
+    --running-version 1.4.1
+```
+
+The **bill of materials** is generated rather than written
+([`tools/sbom.py`](tools/sbom.py), `SWR-NFR-28`): the component list comes from
+the build's own `project_description.json`, so it names what was actually
+linked, and each licence is scanned from that component's own
+`SPDX-License-Identifier` tags, with anything untagged reported as
+`NOASSERTION` rather than given a plausible default. CycloneDX 1.6 by default,
+SPDX 2.3 with `--format spdx`, both published with every release:
+
+```sh
+tools/sbom.py --build-dir firmware/controller/build \
+    --image firmware/controller/build/safekiln.bin --format both --strict
+```
+
+It has to run where `$IDF_PATH` is, which in CI means inside the IDF container
+rather than a step afterwards, because a licence cannot be scanned from a tree
+that is not there. The question it exists to answer is "an advisory landed this
+morning against mbedTLS 3.6.0, did we ship it", and that cannot be answered
+after the fact.
+
+**The manifest key is not the secure boot key, and the tool refuses to let it
+be** (`SRR-12`). The secure boot key decides what a provisioned board will
+*boot* and its digest is burnt into eFuses, so it can never be rotated; this one
+decides what a board will be *offered* and is used on every release. `sign` also
+refuses an image with no Secure Boot V2 signature, an image whose chip id is not
+this target, a version carrying build metadata, and a security release with no
+advisory, because each of those produces a manifest that every device must
+reject after downloading it.
+
+It deliberately does not burn `DIS_DOWNLOAD_MODE`. Serial download is
+`SWR-UPD-14`'s recovery path, for a unit whose update service is unreachable,
+whose new image will not confirm itself, or which has to be downgraded; closing
+it as well would make such a unit permanently unfixable.
 
 | Document | Contents |
 |---|---|
@@ -107,7 +178,8 @@ fix can take; closing it as well would make a unit permanently unfixable.
 | [`docs/safety.sdoc`](docs/safety.sdoc) | Hazards, safety goals and residual risks, each with an identifier, and the chain between them as checked relations: which hazards a goal mitigates, which requirements realise it, and which risk its layers leave. |
 | [`docs/safety.md`](docs/safety.md) | Safety concept: the system boundary, the layered protection concept and the independence claimed between layers, detection coverage and timing, the reaction and recovery sequence, and the obligations on the installer and on anyone changing the design. |
 | [`docs/security.sdoc`](docs/security.sdoc) | Assets, adversaries, threats, security goals, residual risks and open questions, each with an identifier, and the chain between them as checked relations: which asset a threat is aimed at, which safety hazard it reaches, which goal answers it, and what each goal's implementation status actually is. |
-| [`docs/security.md`](docs/security.md) | Security concept: scope, the attack surface and trust boundaries, why a security compromise here is a safety event, what the implementation already gets right, the obligations on the owner and on whoever implements the HTTP transport, and the verification status. |
+| [`docs/security.md`](docs/security.md) | Security concept: scope, the attack surface and trust boundaries, the physical boundary and why the supervisor's debug port is deliberately open, the update path and why it points outwards, why a security compromise here is a safety event, what the implementation already gets right, the obligations on the owner and on whoever implements the HTTP transport, the verification status, and an inventory of what the Cyber Resilience Act still requires. |
+| [`SECURITY.md`](SECURITY.md) | The security policy: where to report a vulnerability and what happens then, the single point of contact and the reporting obligations behind it, the supported versions and the support period, how a fix reaches a device, and what is already documented as a residual risk so a report need not restate it. |
 | [`docs/architecture.md`](docs/architecture.md) | Architecture prose: component decomposition, task and timing design, control and safety algorithms, persistence and flash-endurance design, REST API, and the build and test architecture. |
 | [`docs/test-concept.md`](docs/test-concept.md) | How the product is verified: unit, integration, system and hardware-in-the-loop, what each level can and cannot prove, the HIL fixture design, and an honest status against every testability requirement. |
 | [`docs/safety-supervisor.md`](docs/safety-supervisor.md) | The independent safety supervisor (`SWA-22`): a second microcontroller holding the absolute over-temperature, thermocouple-fault and lid trips, what moves and what stays, the link, the failure modes, and the questions still open. |
