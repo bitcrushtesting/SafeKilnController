@@ -49,7 +49,7 @@ reused: gaps in the numbering are items that have been closed.
 | [O](#o-wifi-fr-net) | WiFi | 4 |
 | [P](#p-http-transport-and-the-api) | HTTP transport and the API | 4 |
 | [Q](#q-the-file-store-ad-21) | The file store | 5 |
-| [R](#r-the-independent-safety-supervisor-ad-22) | Independent safety supervisor | 6 |
+| [R](#r-the-independent-safety-supervisor-ad-22) | Independent safety supervisor | 7 |
 
 ---
 
@@ -795,6 +795,29 @@ weakness first, the deadline second, the sentence third, the engineering last.
 Designed in [`docs/safety-supervisor.md`](docs/safety-supervisor.md). Nothing
 below can start until `R1` to `R4` are answered, because each of them changes
 either the supervisor's pin count or a requirement.
+
+- [ ] **R13. Finish the unit design document.** `tools/udd.sh` generates
+  V-model level 5 from the supervisor's own headers, and `trip.h` is complete:
+  every function and every threshold carries what it implements, its parameter
+  ranges, its error behaviour, its design rationale and the test that verifies
+  it. Coverage is **10 of 76** public functions and constants.
+
+  What is left is `selfcheck.h` (19), `max31856.h` (26) and `sup_proto.h` (21).
+  They are not undocumented, they carry some of the best prose in the
+  repository; what they lack is the structure an assessor reads for, which is
+  the five fields in a fixed place per unit rather than somewhere in a
+  paragraph. Converting one is an hour and mostly reorganising what is already
+  written.
+
+  Two things to keep while doing it. The gate is doxygen's warnings and it is
+  real: an undocumented parameter fails CI. The **coverage number is separate**
+  and exists because a clean doxygen run says nothing about a file that carries
+  no comment blocks at all, which is the vacuous pass this project refuses
+  everywhere else. Do not let the second one be dropped once the first is
+  green.
+
+  When all four are complete, consider whether the number should become a
+  floor, the way the coverage and MC/DC gates are.
 
 - [ ] **R9. Retire `sense.tc_type` from the chamber channel.** The reason is
   now in the code: `kiln_suplink`'s `configure` returns

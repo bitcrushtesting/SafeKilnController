@@ -1,0 +1,111 @@
+/* SPDX-FileCopyrightText: 2026 Bitcrush Testing
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * The front matter of the generated Unit Design Document.  Prose only: this
+ * file declares no code and exists to be read first.
+ */
+
+/**
+@mainpage Supervisor Unit Design Document
+
+@section udd_what This document
+
+This is level 5 of the V-model described in `docs/v-model-process.md`, for the
+independent safety supervisor of `SWA-22`: the second microcontroller that
+reads the chamber thermocouples, holds one element of the contactor coil, and
+takes instruction from nothing.
+
+**It is generated from the source and has no separate existence.** The unit
+design lives in the headers beside the code it describes, because a unit design
+kept in another file is a document that disagrees with the code, and the
+disagreement is found by whoever is auditing rather than by whoever is editing.
+What is read here was compiled.
+
+@section udd_scope Scope, and what is deliberately outside it
+
+| In | Out |
+|---|---|
+| `core/`, the trip logic, the front-end decode and the self-diagnostics | The controller (ESP32-S3), which is a separate argument and a separate document |
+| `protocol/`, the wire format the supervisor transmits | `board/stm32g031.h`, 4 000 register definitions generated from ST's CMSIS-SVD, which is nobody's unit design |
+| `src/`, the composition root and the cycle | The host test harness |
+| `board/`, the silicon boundary | |
+
+The supervisor is **3 488 bytes of program memory** and four source files carry
+the whole safety function. That is the reason this document can be read end to
+end, and the reason the architecture put the safety function on its own part.
+
+@section udd_reading What each unit states, and why those five things
+
+A unit entry answers the same five questions in the same order, because they
+are the questions an assessment under EN ISO 13849-1:2023 cl. 4.6 or
+EN IEC 60730-1 Annex H actually asks of a safety function:
+
+- **@c \\implements** the requirement that makes the unit exist, and
+  **@c \\derivedfrom** the architecture decision above it. A unit with neither
+  is a unit nobody asked for.
+- **@c \\param** and **@c \\retval** with **@c \\range**: what may be passed and
+  what comes back, in units and bounds rather than in types alone. `uint32_t`
+  is a type; "milliseconds since the previous call, saturating" is an interface.
+- **@c \\errorbehaviour**: what happens when the input is wrong. On a safety
+  function this is not an edge case, it is most of the specification.
+- **@c \\rationale**: why it is this way and not the obvious way. This is the
+  one that gets left out and the first one an assessor asks about, because a
+  decision with no recorded reason has to be re-derived by whoever reviews it,
+  and re-derivation is where a safety argument quietly changes.
+- **@c \\verifiedby**: the test that covers it. Every unit here is exercised on
+  a development host with no hardware, which is `SWA-01` applied to the
+  component whose whole argument is that it can be verified independently.
+
+@section udd_safety What this component is, in safety terms
+
+The supervisor exists so that the loss of the controller, by any means, does
+not become the loss of protection. It is single-channel and holds **one series
+element** of the contactor coil: it can refuse heat on its own and cannot
+command it on its own.
+
+@warning **No performance level and no SIL is claimed.** `docs/safety.md`
+states the position and this document does not improve on it. What is claimed
+is narrower and checkable: a documented language subset, the diagnostics listed
+below, MC/DC over the trip logic, and an architecture that keeps the safety
+function on a part the network cannot reach.
+
+The diagnostics of EN IEC 60730-1 Annex H that this component implements, each
+documented in @ref selfcheck.h :
+
+| Measure | Unit |
+|---|---|
+| Invariable memory (program memory) | `sup_flash_ok`, CRC-32 against a digest stamped in after linking |
+| Variable memory | `sup_ram_word_ok` and the walking pattern test, including an address-dependent pattern |
+| Stack | A 256-word guard, filled at start-up and checked in full every cycle |
+| Program sequence | Four stages that announce themselves, verified once per cycle |
+| Clock | Cross-checked against the LSI through a windowed watchdog |
+
+@section udd_trace Traceability
+
+Three index pages carry it, each generated from the comments rather than
+maintained:
+
+- \ref implements "Requirements implemented": every unit against the `SWR-` it
+  realises.
+- \ref derivedfrom "Architecture traceability": every unit against the `SWA-`
+  it comes from.
+- \ref verifiedby "Unit verification": every unit against the test that covers
+  it.
+
+The reverse direction, requirement to source, is also enforced outside this
+document: `strictdoc export` fails the build when a `@relation` marker in the
+source names a requirement that does not exist.
+
+@section udd_limits What this document does not tell you
+
+Stated here rather than discovered later:
+
+- **It describes units, not the system.** Whether the units compose into a
+  protection that holds is `docs/safety.md` and `docs/safety-supervisor.md`.
+- **It is not a test report.** @c \\verifiedby names the test; whether it
+  passed is the CI run and the coverage report.
+- **The transport code has never run on silicon.** The SPI bring-up, the
+  chip-select timing, the SysTick period and the USART configuration are
+  written and unproven, which `firmware/supervisor/README.md` says plainly and
+  which no amount of documentation changes.
+*/

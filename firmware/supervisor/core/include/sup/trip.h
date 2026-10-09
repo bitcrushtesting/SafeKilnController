@@ -1,5 +1,15 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+/**
+ * @file trip.h
+ * @brief The supervisor's trip logic: the whole safety function.
+ *
+ * @derivedfrom SWA-22, the independent safety supervisor.
+ * @safetyclass EN IEC 60730-1 Annex H software class B or C, the control
+ *              function under assessment. EN ISO 13849-1:2023 safety-related
+ *              part; no performance level is claimed (`docs/safety.md`).
  *
  * The supervisor's trip logic (SWA-22, docs/safety-supervisor.md section 3).
  *
@@ -50,16 +60,61 @@
  * must stay above that side's KILN_TEMP_CEILING_C of 1300 degC.  The 50 degC
  * between them is the margin (SWR-SAF-23); see safety-supervisor.md section 4 for
  * why the ceiling moved down rather than this moving up. */
+/**
+ * @brief Absolute over-temperature backstop: 1350 degC, in q7.
+ *
+ * @rangeof 1350 degC expressed as 1/128 degC counts. Compile-time constant;
+ *          there is no configuration item for it and no way to raise it at
+ *          run time, which is the property the safety and security arguments
+ *          both rest on.
+ *
+ * @rationale
+ * It must agree with `KILN_SUPERVISOR_TRIP_C` on the ESP32 and must stay above
+ * that side's 1300 degC ceiling. The 50 degC between them is the margin: the
+ * controller stops first and the supervisor is the backstop, so the two never
+ * race to trip on the same reading. `docs/safety-supervisor.md` section 4 has
+ * why the ceiling moved down rather than this moving up.
+ *
+ * @implements SWR-SAF-23
+ * @verifiedby `test_trip.cpp`, at the threshold and one LSB either side.
+ */
 constexpr int32_t SUP_OVERTEMP = sup_c_to_q7(1350);
 
 /* A reported front-end fault, or an unusable reading, must persist before it
  * latches: a single bad conversion on a noisy bus is not a dead sensor.  Heat
  * is withheld immediately either way, so the grace delays the *latch*, not the
  * protection. */
+/**
+ * @brief How long a front-end fault must persist before the trip latches: 1 s.
+ *
+ * @rangeof Whole milliseconds. Compile-time constant.
+ *
+ * @errorbehaviour
+ * Heat is withheld on the **first** cycle that reports a fault. This interval
+ * delays only the latch, so a single bad conversion on a noisy bus costs one
+ * cycle of heating rather than an operator visit.
+ *
+ * @implements SWR-SAF-22
+ * @verifiedby `test_trip.cpp`: a fault that clears inside the grace does not
+ *             latch; one that persists does.
+ */
 constexpr uint32_t SUP_FAULT_GRACE_MS = 1000u;
 
 /* How long the clear button must be held.  Long enough to be deliberate, short
  * enough not to be a puzzle.  See the note on edge triggering below. */
+/**
+ * @brief How long the clear button must be held before a latch is cleared: 500 ms.
+ *
+ * @rangeof Whole milliseconds. Compile-time constant.
+ *
+ * @rationale
+ * A deliberate act rather than a contact bounce. The button acknowledges a
+ * condition the operator has seen and dealt with, so the gesture should be one
+ * nobody performs by brushing past the panel.
+ *
+ * @implements SWR-SAF-18
+ * @verifiedby `test_trip.cpp`: a short press does not clear; a held one does.
+ */
 constexpr uint32_t SUP_CLEAR_HOLD_MS = 500u;
 
 /* SWR-SAF-37: how far the two chamber couples may disagree, and for how long.
@@ -80,7 +135,34 @@ constexpr uint32_t SUP_CLEAR_HOLD_MS = 500u;
  * enough that the comparison is about the sensors and not about the kiln. Two
  * probes at opposite ends of a chamber would need a band so wide as to detect
  * nothing. SWR-SAF-37 says so, and the commissioning documentation has to. */
+/**
+ * @brief How far two chamber couples may differ before it is a fault: 50 degC, in q7.
+ *
+ * @rangeof 50 degC expressed as 1/128 degC counts. Compile-time constant.
+ *
+ * @rationale
+ * Wide on purpose, and the limitation has to be stated rather than implied: it
+ * catches a **grossly** wrong couple, which is the hazard, and not one reading
+ * five degrees low. A band tight enough for that would stop healthy firings,
+ * and a nuisance trip is how a protection comes to be disabled.
+ *
+ * @implements SWR-SAF-37
+ * @verifiedby `test_trip.cpp`: inside the band both couples are used; outside
+ *             it the higher is acted on and the disagreement latches.
+ */
 constexpr int32_t  SUP_DISAGREE    = sup_c_to_q7(50);
+/**
+ * @brief How long two couples must disagree before the trip latches: 10 s.
+ *
+ * @rangeof Whole milliseconds. Compile-time constant.
+ *
+ * @errorbehaviour
+ * Protection does not wait for this: the **higher** reading is acted on from
+ * the first cycle of disagreement. The interval delays the latch only.
+ *
+ * @implements SWR-SAF-37
+ * @verifiedby `test_trip.cpp`, at the boundary of the interval.
+ */
 constexpr uint32_t SUP_DISAGREE_MS = 10000u;
 
 /* SWR-SAF-38: how long after withdrawing the permit the coil may still read as
@@ -89,6 +171,21 @@ constexpr uint32_t SUP_DISAGREE_MS = 10000u;
  * Longer than the contactor's drop-out plus the readback divider's settling, and
  * shorter than anything that matters. 2 s matches the interval SWR-SAF-27 already
  * uses for the ESP32's weld discrimination, for the same physical reason. */
+/**
+ * @brief How long the coil may read energised after the permit is withdrawn: 2 s.
+ *
+ * @rangeof Whole milliseconds. Compile-time constant.
+ *
+ * @rationale
+ * The contactor is a mechanical device behind a charge pump that decays rather
+ * than switches, so "energised" remains true for a while after the permit goes
+ * away. This is the settling time that distinguishes that from a coil that is
+ * stuck, which is a welded contactor and a different fault entirely.
+ *
+ * @implements SWR-SAF-22
+ * @verifiedby `test_trip.cpp`: a readback that clears inside the interval is
+ *             not a fault; one that persists latches.
+ */
 constexpr uint32_t SUP_PERMIT_SETTLE_MS = 2000u;
 
 typedef struct {
@@ -159,31 +256,169 @@ typedef struct {
     uint32_t          permit_stuck_ms;
 } sup_t;
 
-/* Comes up refusing heat: chamber_valid is false until a conversion has been
- * seen, and permit is conjunctive, so absence of evidence is not permission. */
+/**
+ * @brief Initialise the trip state so that it comes up refusing heat.
+ *
+ * @param[out] s            Trip state to initialise. Must not be NULL.
+ * @param[in]  selftest_ok  Result of the start-up self-test: the front ends
+ *                          configured, a first conversion seen, and the
+ *                          diagnostics of @ref selfcheck.h passed.
+ *
+ * @rangeof selftest_ok: `true` only when every start-up check passed. A caller
+ *        that cannot determine this passes `false`.
+ *
+ * @errorbehaviour
+ * The permit is **conjunctive**: it requires the self-test, a valid chamber
+ * reading and no latched trip, all at once. After this call none of those
+ * hold, so heat is refused until each is positively established. Absence of
+ * evidence is not permission.
+ *
+ * @rationale
+ * A state structure that is zero-initialised and then "configured" has a
+ * window in which it is neither. Starting from refusal removes the window: the
+ * dangerous direction requires work and the safe direction is the default,
+ * which is the same convention `diag_ok` uses on the input snapshot.
+ *
+ * @sideeffects
+ * None beyond `*s`. No allocation, no I/O, no globals.
+ *
+ * @reentrancy
+ * Not reentrant with respect to the same `s`; the supervisor is single
+ * threaded and calls it once, before the cycle starts.
+ *
+ * @implements SWR-SAF-22, SWR-SAF-23
+ * @verifiedby `test_trip.cpp`, the start-up cases: a supervisor that has not
+ *             seen a conversion does not permit heat even with a plausible
+ *             temperature in hand.
+ */
 void sup_init(sup_t *s, bool selftest_ok);
 
-/* One cycle.  dt_ms is the elapsed time since the previous call, in whole
- * milliseconds.
+/**
+ * @brief Advance the trip logic by one cycle and decide whether heat is permitted.
  *
- * Unsigned, which removes a guard rather than hiding one: the float version had
- * to begin by rejecting a negative or NaN interval, because either would have
- * run the latch timers backwards or stalled them for ever.  Neither value
- * exists in a uint32_t, so the condition is now unrepresentable instead of
- * checked.  The timers saturate rather than wrap, so an interval of any size is
- * safe too. */
+ * This is the unit the whole component exists for. It is a pure function of
+ * `*in`, `dt_ms` and the timers inside `*s`: no globals, no platform headers,
+ * no clock of its own.
+ *
+ * @param[in,out] s      Trip state, previously initialised by @ref sup_init.
+ * @param[in]     in     The cycle's input snapshot: both chamber readings and
+ *                       their validity, the front-end fault lines, the clear
+ *                       button, the coil readback and `diag_ok`.
+ * @param[in]     dt_ms  Elapsed time since the previous call.
+ *
+ * @rangeof dt_ms: whole milliseconds, 0 to UINT32_MAX. The nominal value is the
+ *        100 ms cycle; any value is accepted and the latch timers saturate
+ *        rather than wrap.
+ * @rangeof in: every temperature is q7 (1/128 degC); every interval is whole
+ *        milliseconds. `chamber_valid` and `diag_ok` are positive logic, so a
+ *        zero-filled snapshot withholds heat.
+ *
+ * @statemachine
+ * Permitting is conjunctive and latching is one-way within a power cycle:
+ *
+ *     PERMIT  --- any trip condition --->  LATCHED (heat refused)
+ *     LATCHED --- clear armed and held, condition no longer true ---> PERMIT
+ *
+ * A latched trip is not cleared by the condition going away on its own, and
+ * never by anything arriving over the link, because there is no receiver.
+ *
+ * @errorbehaviour
+ * Every input is treated as untrustworthy until it says otherwise:
+ * - a reading that is not valid is not a reading, and heat is refused;
+ * - a reported front-end fault refuses heat on the first cycle and latches
+ *   only after @ref SUP_FAULT_GRACE_MS, so one bad conversion on a noisy bus
+ *   is not a dead sensor;
+ * - two couples that disagree by more than @ref SUP_DISAGREE act on the
+ *   **higher** reading immediately, and latch after @ref SUP_DISAGREE_MS;
+ * - a coil that reads energised while the permit is withdrawn latches after
+ *   @ref SUP_PERMIT_SETTLE_MS;
+ * - a false `diag_ok` revokes the self-test, which is unclearable by the
+ *   button (SWR-SAF-36).
+ *
+ * @rationale
+ * `dt_ms` is unsigned, and that removes a guard rather than hiding one. The
+ * earlier floating-point version had to begin by rejecting a negative or NaN
+ * interval, because either would have run the latch timers backwards or
+ * stalled them for ever. Neither value exists in a `uint32_t`: the condition
+ * is unrepresentable instead of checked, which is a stronger property than a
+ * check that somebody could delete.
+ *
+ * Acting on the higher of two valid readings is the half that does the safety
+ * work. A couple reading low is the dangerous failure, because it lets a hot
+ * kiln look cool, and an average would let one couple reading 200 degC low
+ * pull the pair 100 degC low: the failure dressed as redundancy.
+ *
+ * @resources
+ * No allocation and no recursion. Bounded in time: a fixed sequence of
+ * comparisons with no loop over input.
+ *
+ * @reentrancy
+ * Not reentrant with respect to the same `s`. Called from one place, once per
+ * cycle, from the supervisor's only thread of control.
+ *
+ * @implements SWR-SAF-22, SWR-SAF-23, SWR-SAF-36, SWR-SAF-37
+ * @verifiedby `test_trip.cpp`, which exercises each rule at its boundary in
+ *             LSBs either side of the threshold, and reaches 100 % MC/DC over
+ *             this unit (`tools/mcdc.sh`, floor 80 %).
+ */
 void sup_step(sup_t *s, const sup_input_t *in, uint32_t dt_ms);
 
-/* Clears a latched trip.
+/**
+ * @brief Clear a latched trip.
  *
- * sup_step() calls this itself when the clear button has been armed and held,
- * so the whole behaviour is in the tested core rather than in the board layer.
- * It stays public because a test should be able to drive it directly.
+ * @param[in,out] s Trip state. Must not be NULL.
  *
- * There is no path to this from the link: the supervisor has no receiver. */
+ * @errorbehaviour
+ * Clearing does not make the kiln safe; it makes the supervisor willing to
+ * look again. The permit remains conjunctive, so if the condition that caused
+ * the trip is still true the next @ref sup_step latches it again on the same
+ * cycle. A revoked self-test (SWR-SAF-36) is **not** cleared by this: a
+ * supervisor whose memory, stack, clock, image or program sequence has failed
+ * is not in the category an operator can acknowledge.
+ *
+ * @rationale
+ * @ref sup_step calls this itself once the clear button has been armed and
+ * held, so the arming behaviour lives in the tested core rather than in the
+ * board layer where nothing exercises it. It stays public because a test
+ * should be able to drive the transition directly rather than through a
+ * simulated button.
+ *
+ * There is no path to this from the serial link: the supervisor has no
+ * receiver, which is why its independence is a property of the wiring and not
+ * of a check in software.
+ *
+ * @sideeffects
+ * Resets the latch and the timers behind it. Does not touch the self-test flag.
+ *
+ * @implements SWR-SAF-18, SWR-SAF-36
+ * @verifiedby `test_trip.cpp`: a live condition relatches on the next cycle,
+ *             and a revoked self-test survives a clear.
+ */
 void sup_clear(sup_t *s);
 
-/* The flags byte for the wire, derived rather than tracked separately. */
+/**
+ * @brief Build the status flags byte that goes on the wire.
+ *
+ * @param[in] s  Trip state.
+ * @param[in] in The same input snapshot that was passed to @ref sup_step.
+ * @return The flags byte of the frame described in @ref sup_proto.h.
+ * @retval 0 No flag set: nothing valid, nothing permitted, nothing latched.
+ *
+ * @rangeof return value: each bit is one `SUP_FLAG_*` of @ref sup_proto.h.
+ *
+ * @rationale
+ * Derived on demand rather than tracked in a field that is updated alongside
+ * the state. A separate copy of the truth is a copy that can disagree with it,
+ * and this one would disagree exactly when the frame mattered most: after a
+ * trip.
+ *
+ * @sideeffects
+ * None. Pure function of its arguments.
+ *
+ * @implements SWR-SAF-38
+ * @verifiedby `test_proto.cpp` and `test_trip.cpp`: the flags a given state
+ *             produces, including after a latch.
+ */
 uint8_t sup_flags(const sup_t *s, const sup_input_t *in);
 
 #endif /* SUP_TRIP_H */
