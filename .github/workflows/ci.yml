@@ -606,6 +606,19 @@ jobs:
             export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.qemu"
             python "$IDF_PATH/tools/idf_tools.py" install qemu-xtensa
             . "$IDF_PATH/export.sh"
+            # export.sh does not put qemu-xtensa on PATH in this image, and
+            # THAT is why this job produced an empty log for weeks: `idf.py
+            # qemu` exited 127, "command not found", and `|| true` swallowed
+            # it. Find the binary and fail loudly if the install did not
+            # produce one, rather than running a smoke test with no emulator.
+            qemu_bin="$(find "${IDF_TOOLS_PATH:-$HOME/.espressif}" \
+                          -name qemu-system-xtensa -type f -perm -u+x \
+                          2>/dev/null | head -1)"
+            if [ -z "$qemu_bin" ]; then
+              echo "::error::qemu-system-xtensa is not there after installing qemu-xtensa"
+              exit 1
+            fi
+            export PATH="$(dirname "$qemu_bin"):$PATH"
             idf.py build
             # No monitor: it wants a tty.  Serial goes to stdout, and the
             # firmware prints a telemetry line a second.

@@ -146,8 +146,12 @@ uint8_t net_scan_results(void *ctx, kiln_net_ap_t *out, uint8_t max)
         if (recs[i].ssid[0] == '\0') {
             continue;               /* hidden: nothing to show and nothing to pick */
         }
-        (void)snprintf(out[kept].ssid, sizeof(out[kept].ssid), "%s",
-                       reinterpret_cast<const char *>(recs[i].ssid));
+        /* memcpy rather than a cast: the driver's SSID is uint8_t[33] and
+         * ours is char[33], the octets are the same octets, and reinterpreting
+         * the pointer to say so is a cast the profile forbids for good reason.
+         * Copying needs no claim about aliasing at all. */
+        memcpy(out[kept].ssid, recs[i].ssid, sizeof(out[kept].ssid) - 1u);
+        out[kept].ssid[sizeof(out[kept].ssid) - 1u] = '\0';
         out[kept].rssi    = recs[i].rssi;
         out[kept].secured = (recs[i].authmode != WIFI_AUTH_OPEN);
         kept++;
