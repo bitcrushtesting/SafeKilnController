@@ -15,6 +15,26 @@
 
 namespace {
 
+/* SWR-NET-12.  A WPA passphrase is printable ASCII, so the knob has to reach
+ * all of it: lowercase first because most passphrases are mostly lowercase,
+ * then uppercase, digits and symbols, then the two rows that are not
+ * characters at all.
+ *
+ * DEL and DONE live at the END of the set rather than the start.  At the start
+ * they sit between the operator and the letters on every single character; at
+ * the end they are one turn backwards from the first letter, which is where a
+ * knob reaches them fastest. */
+const char k_charset[] =
+    "abcdefghijklmnopqrstuvwxyz"
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "0123456789"
+    "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~ ";
+
+constexpr uint8_t K_CHARS   = (uint8_t)(sizeof(k_charset) - 1u);
+constexpr uint8_t K_SEL_DEL = K_CHARS;          /* one past the last char   */
+constexpr uint8_t K_SEL_OK  = (uint8_t)(K_CHARS + 1u);
+constexpr uint8_t K_SEL_N   = (uint8_t)(K_CHARS + 2u);
+
 float to_display_c(const kiln_hmi_view_t *v, float c)
 {
     /* SWR-HMI-13: degF is a display conversion and nothing else.  Every stored,
@@ -253,10 +273,95 @@ void draw_network(kiln_hmi_t *h, const kiln_hmi_view_t *v)
      * standing at the kiln actually has. */
     kiln_fb_text(&h->fb, 0, 0, "NETWORK", 1, true);
     kiln_fb_hline(&h->fb, 0, 9, KILN_DISPLAY_W, true);
-    kiln_fb_text(&h->fb, 0, 14, v->net_up ? "connected" : "not connected", 1, true);
-    kiln_fb_text(&h->fb, 0, 26, v->hostname, 1, true);
-    kiln_fb_text(&h->fb, 0, 38, v->ip, 1, true);
-    kiln_fb_text(&h->fb, 0, 54, "display only", 1, true);
+    kiln_fb_text(&h->fb, 0, 13, v->net_up ? "connected" : "not connected", 1, true);
+    kiln_fb_text(&h->fb, 0, 23, v->net_up ? v->net_ssid : "", 1, true);
+    kiln_fb_text(&h->fb, 0, 33, v->hostname, 1, true);
+    kiln_fb_text(&h->fb, 0, 43, v->ip, 1, true);
+    /* SWR-NET-11: this is the only route into WiFi setup, and it says so.  The
+     * device raises no access point, so if this screen cannot be reached the
+     * network cannot be configured at all. */
+    kiln_fb_text(&h->fb, 0, 54, "press: set up wifi", 1, true);
+}
+
+/* SWR-NET-11.  Four rows at a time, strongest first, with a bar for signal and
+ * a mark for "this one wants a passphrase".  No SSID is truncated silently:
+ * the row is as wide as the screen and a long name is cut with an ellipsis so
+ * the operator can see that it was cut. */
+void draw_networks(kiln_hmi_t *h, const kiln_hmi_view_t *v)
+{
+    kiln_fb_text(&h->fb, 0, 0, "WIFI NETWORKS", 1, true);
+    kiln_fb_hline(&h->fb, 0, 9, KILN_DISPLAY_W, true);
+
+    if (v->net_count == 0u) {
+        kiln_fb_text(&h->fb, 0, 24,
+                     v->net_scanning ? "scanning..." : "none found", 1, true);
+        kiln_fb_text(&h->fb, 0, 54, "hold: back", 1, true);
+        return;
+    }
+
+    for (uint8_t row = 0; row < 4u; row++) {
+        const uint8_t i = (uint8_t)(h->net_top + row);
+        if (i >= v->net_count) { break; }
+
+        char line[24];
+        /* 18 characters of SSID is what fits beside the marks at this size. */
+        char name[19];
+        (void)snprintf(name, sizeof(name), "%s", v->net_list_ssid[i]);
+        if (strlen(v->net_list_ssid[i]) > sizeof(name) - 1u) {
+            name[sizeof(name) - 2u] = '.';
+            name[sizeof(name) - 3u] = '.';
+        }
+        (void)snprintf(line, sizeof(line), "%c%s%s",
+                       (i == h->net_sel) ? '>' : ' ',
+                       name,
+                       v->net_list_secured[i] ? " *" : "");
+        kiln_fb_text(&h->fb, 0, (int)(13 + row * 10), line, 1, true);
+    }
+
+    /* Sized for the widest this can print rather than for the line it is
+     * drawn on: the compiler is right that %u of an unsigned is ten digits,
+     * and a truncated footer is a worse answer than a wide buffer. */
+    char foot[40];
+    (void)snprintf(foot, sizeof(foot), "%u of %u   * needs key",
+                   (unsigned)(h->net_sel + 1u), (unsigned)v->net_count);
+    kiln_fb_text(&h->fb, 0, 54, foot, 1, true);
+}
+
+/* SWR-NET-12.  One knob, one character at a time.  The passphrase is shown in
+ * clear: it is the operator's own network, they are standing in front of the
+ * kiln, and a row of asterisks on a 128x64 display means typing it blind with
+ * a rotary encoder, which is how it gets typed wrong four times. */
+void draw_passphrase(kiln_hmi_t *h, const kiln_hmi_view_t *v)
+{
+    (void)v;
+    kiln_fb_text(&h->fb, 0, 0, "PASSPHRASE", 1, true);
+    kiln_fb_hline(&h->fb, 0, 9, KILN_DISPLAY_W, true);
+
+    /* The tail, because that is where the cursor is: 20 characters fit and a
+     * longer passphrase scrolls under them. */
+    const uint8_t shown = (h->pass_len > 20u) ? 20u : h->pass_len;
+    char tail[22];
+    (void)snprintf(tail, sizeof(tail), "%s", h->pass + (h->pass_len - shown));
+    kiln_fb_text(&h->fb, 0, 14, tail, 1, true);
+    kiln_fb_text(&h->fb, (int)(shown * 6), 14, "_", 1, true);
+
+    char pick[24];
+    if (h->charset_sel == K_SEL_DEL) {
+        (void)snprintf(pick, sizeof(pick), "[ delete ]");
+    } else if (h->charset_sel == K_SEL_OK) {
+        /* The length rule is shown where it is enforced, so "nothing happened
+         * when I pressed" never has to be guessed at. */
+        (void)snprintf(pick, sizeof(pick), "%s",
+                       (h->pass_len >= 8u) ? "[ connect ]" : "[ 8 or more ]");
+    } else {
+        (void)snprintf(pick, sizeof(pick), "   %c", k_charset[h->charset_sel]);
+    }
+    kiln_fb_text(&h->fb, 0, 30, pick, 1, true);
+
+    char foot[40];
+    (void)snprintf(foot, sizeof(foot), "%u chars   hold: cancel",
+                   (unsigned)h->pass_len);
+    kiln_fb_text(&h->fb, 0, 54, foot, 1, true);
 }
 
 void draw_diag(kiln_hmi_t *h, const kiln_hmi_view_t *v)
@@ -444,7 +549,81 @@ kiln_hmi_action_t kiln_hmi_update(kiln_hmi_t *h, const kiln_hmi_view_t *view,
             }
             break;
 
-        default:   /* NETWORK, DIAG, INFO: read-only, any press returns */
+        case KILN_HMI_SCREEN_NETWORK:
+            /* SWR-NET-11: the status screen is where setting up WiFi starts,
+             * because it is where an operator goes when the network is the
+             * thing on their mind. */
+            if (ev == KILN_INPUT_LONG_PRESS) {
+                h->screen = KILN_HMI_SCREEN_MENU;
+            } else if (ev == KILN_INPUT_PRESS) {
+                act.kind    = KILN_HMI_ACT_WIFI_SCAN;
+                h->net_sel  = 0;
+                h->net_top  = 0;
+                h->screen   = KILN_HMI_SCREEN_NETWORKS;
+            }
+            break;
+
+        case KILN_HMI_SCREEN_NETWORKS:
+            if (ev == KILN_INPUT_CW)       { step(&h->net_sel, view->net_count, true); }
+            else if (ev == KILN_INPUT_CCW) { step(&h->net_sel, view->net_count, false); }
+            else if (ev == KILN_INPUT_LONG_PRESS) {
+                /* Back, and a second chance to scan: an empty list usually
+                 * means the scan ran before the radio was ready. */
+                h->screen = KILN_HMI_SCREEN_NETWORK;
+            } else if (ev == KILN_INPUT_PRESS && view->net_count > 0u &&
+                       h->net_sel < view->net_count) {
+                if (view->net_list_secured[h->net_sel]) {
+                    h->pass_len    = 0;
+                    h->pass[0]     = '\0';
+                    h->charset_sel = 0;
+                    h->screen      = KILN_HMI_SCREEN_PASSPHRASE;
+                } else {
+                    /* An open network needs no passphrase, and asking for one
+                     * would be a blank screen the operator has to guess past. */
+                    h->pass_len       = 0;
+                    h->pass[0]        = '\0';
+                    act.kind          = KILN_HMI_ACT_WIFI_CONNECT;
+                    act.network_index = h->net_sel;
+                    h->screen         = KILN_HMI_SCREEN_NETWORK;
+                }
+            }
+            if (h->net_sel < h->net_top)            { h->net_top = h->net_sel; }
+            else if (h->net_sel >= h->net_top + 4u) { h->net_top = (uint8_t)(h->net_sel - 3u); }
+            break;
+
+        case KILN_HMI_SCREEN_PASSPHRASE:
+            if (ev == KILN_INPUT_CW)       { step(&h->charset_sel, K_SEL_N, true); }
+            else if (ev == KILN_INPUT_CCW) { step(&h->charset_sel, K_SEL_N, false); }
+            else if (ev == KILN_INPUT_LONG_PRESS) {
+                /* Abandon it, and take the typed passphrase with it rather
+                 * than leaving half of one in memory for the next attempt. */
+                h->pass_len = 0;
+                h->pass[0]  = '\0';
+                h->screen   = KILN_HMI_SCREEN_NETWORKS;
+            } else if (ev == KILN_INPUT_PRESS) {
+                if (h->charset_sel == K_SEL_DEL) {
+                    if (h->pass_len > 0u) {
+                        h->pass_len--;
+                        h->pass[h->pass_len] = '\0';
+                    }
+                } else if (h->charset_sel == K_SEL_OK) {
+                    /* WPA-PSK is 8 to 63 characters.  A shorter one cannot be
+                     * right, and accepting it here would spend the join
+                     * attempt and the operator's patience to find that out. */
+                    if (h->pass_len >= 8u) {
+                        act.kind          = KILN_HMI_ACT_WIFI_CONNECT;
+                        act.network_index = h->net_sel;
+                        h->screen         = KILN_HMI_SCREEN_NETWORK;
+                    }
+                } else if (h->pass_len + 1u < KILN_HMI_PASS_LEN) {
+                    h->pass[h->pass_len] = k_charset[h->charset_sel];
+                    h->pass_len++;
+                    h->pass[h->pass_len] = '\0';
+                }
+            }
+            break;
+
+        default:   /* DIAG, INFO: read-only, any press returns */
             if (ev == KILN_INPUT_PRESS || ev == KILN_INPUT_LONG_PRESS) {
                 h->screen = KILN_HMI_SCREEN_MENU;
             }
@@ -481,7 +660,9 @@ kiln_hmi_action_t kiln_hmi_update(kiln_hmi_t *h, const kiln_hmi_view_t *view,
         }
         break;
     case KILN_HMI_SCREEN_CONFIRM:  draw_confirm(h, view); break;
-    case KILN_HMI_SCREEN_NETWORK:  draw_network(h, view); break;
+    case KILN_HMI_SCREEN_NETWORK:    draw_network(h, view);    break;
+    case KILN_HMI_SCREEN_NETWORKS:   draw_networks(h, view);   break;
+    case KILN_HMI_SCREEN_PASSPHRASE: draw_passphrase(h, view); break;
     case KILN_HMI_SCREEN_DIAG:     draw_diag(h, view);    break;
     case KILN_HMI_SCREEN_INFO:     draw_info(h, view);    break;
     case KILN_HMI_SCREEN_MAIN:

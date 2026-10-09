@@ -1456,7 +1456,7 @@ VERIFICATION: T
 [REQUIREMENT]
 UID: SWR-CFG-02
 STATEMENT: >>>
-The configuration shall include at minimum: **safety**: maximum chamber temperature, maximum enclosure temperature, runaway detection parameters, power-loss recovery policy; **control**: Kp, Ki, Kd, loop period, PWM window, minimum on/off time, maximum duty, hold-back band, dwell tolerance; **sensing**: TC types, line filter frequency, filter time constant, calibration offset and gain for both channels; **tuning**: amplitude, hysteresis, rule, timeout; **current**: CT ratio and output type, nominal heater current, mains voltage, fail-on and fail-off thresholds and settle times, deviation bands, over-current limit, relay life limits, monitoring enable; **logging**: sample interval; **HMI**: units, dim timeout, alarm duration; **network**: WiFi mode and credentials, hostname, AP SSID and passphrase, NTP server, timezone; **security**: none, since [LINK: SWR-WEB-26] left nothing reachable over the network to authenticate.
+The configuration shall include at minimum: **safety**: maximum chamber temperature, maximum enclosure temperature, runaway detection parameters, power-loss recovery policy; **control**: Kp, Ki, Kd, loop period, PWM window, minimum on/off time, maximum duty, hold-back band, dwell tolerance; **sensing**: TC types, line filter frequency, filter time constant, calibration offset and gain for both channels; **tuning**: amplitude, hysteresis, rule, timeout; **current**: CT ratio and output type, nominal heater current, mains voltage, fail-on and fail-off thresholds and settle times, deviation bands, over-current limit, relay life limits, monitoring enable; **logging**: sample interval; **HMI**: units, dim timeout, alarm duration; **network**: WiFi credentials, hostname, NTP server, timezone, there being no mode to choose and no access point since [LINK: SWR-NET-11]; **security**: none, since [LINK: SWR-WEB-26] left nothing reachable over the network to authenticate.
 <<<
 PRIORITY: M
 VERIFICATION: I
@@ -1540,10 +1540,14 @@ VERIFICATION: T
 [REQUIREMENT]
 UID: SWR-NET-02
 STATEMENT: >>>
-If no credentials are stored, or if the station connection fails for a configurable period (30–600 s, default 60 s), the system shall start its own access point and serve a provisioning page on it.
+**Withdrawn 2026-10-09. The system shall raise no access point.** This required a provisioning AP and a page served on it whenever no credentials were stored or the station failed to join for a configurable period.
+
+It is replaced by [LINK: SWR-NET-11] and [LINK: SWR-NET-12], which put network setup on the local display. The reasoning is the same one behind [LINK: SWR-WEB-26]: an access point is a second radio anybody within range can reach, with a second passphrase to get wrong, serving a page whose entire purpose is to accept credentials. The display and the encoder are already fitted, the operator is already standing at them, and what can be done there cannot be done by a passer-by at all.
+
+The device therefore has exactly one radio role, station, and a kiln whose network has changed is told the new one at the kiln. It keeps firing meanwhile, which [LINK: SWR-NET-07] requires regardless.
 <<<
 PRIORITY: M
-VERIFICATION: T
+VERIFICATION: I
 
 [REQUIREMENT]
 UID: SWR-NET-03
@@ -1564,10 +1568,12 @@ VERIFICATION: T
 [REQUIREMENT]
 UID: SWR-NET-05
 STATEMENT: >>>
-The AP fallback shall require a passphrase of at least 8 characters, with a device-unique default derived from the MAC address and shown on the local display.
+**Withdrawn 2026-10-09 with [LINK: SWR-NET-02].** This required the access point's passphrase to be at least 8 characters with a device-unique default derived from the MAC.
+
+There is no access point, so there is no second passphrase: `net.ap_ssid` and `net.ap_pass` are removed from the configuration schema. The eight-character rule survives where it still applies, as the minimum this device will accept when **joining** a WPA network ([LINK: SWR-NET-12]), which is the standard's own bound rather than this project's.
 <<<
 PRIORITY: M
-VERIFICATION: T
+VERIFICATION: I
 
 [REQUIREMENT]
 UID: SWR-NET-06
@@ -1607,6 +1613,38 @@ STATEMENT: >>>
 The system shall support optional remote logging of events to a syslog server over UDP.
 <<<
 PRIORITY: C
+VERIFICATION: T
+
+[REQUIREMENT]
+UID: SWR-NET-11
+STATEMENT: >>>
+**The device shall scan for networks and show what it found on the local display.** The scan shall be startable from the network screen, shall not block the display while it runs, and shall report the networks strongest first with, for each: the SSID, and whether it is secured.
+
+Three properties that are requirements rather than implementation detail:
+
+- **"Scanning" and "none found" shall be distinguishable.** They are different instructions to the operator, and a scan takes seconds.
+- **A scan shall be allowed while a firing runs.** It is receive-only and changes nothing; [LINK: SWR-NET-07] already forbids the network from altering a run, and an operator whose WiFi dropped mid-firing should not have to abort to fix it.
+- **An SSID too long for the line shall be shown as truncated** rather than silently cut, because picking the wrong one of two similar names is the failure this screen exists to avoid.
+<<<
+PRIORITY: M
+VERIFICATION: T
+
+[REQUIREMENT]
+UID: SWR-NET-12
+STATEMENT: >>>
+**The operator shall be able to join a network entirely from the local display**, selecting it from the scan of [LINK: SWR-NET-11] and entering its passphrase on the rotary encoder. This is the **only** way the device is given network credentials: no access point, and no route over the network itself ([LINK: SWR-WEB-26]).
+
+What the entry has to provide, each because its absence makes a network unjoinable:
+
+- **Every printable ASCII character**, since a passphrase this cannot type is a network this kiln cannot join and there is no fallback to correct it from.
+- **Deletion**, and deleting past the start shall not underflow.
+- **Abandoning entry shall discard what was typed**, rather than leaving half a passphrase for the next attempt.
+- **A passphrase shorter than 8 characters shall not be offered to the radio.** WPA-PSK cannot be shorter, and spending a join attempt to discover that costs the operator thirty seconds and tells them nothing.
+- **An open network shall not ask for a passphrase at all.**
+
+The credentials shall be **persisted before the join is attempted**, so that a device which joins successfully and then loses power comes back to the same network rather than to a display nobody is standing at.
+<<<
+PRIORITY: M
 VERIFICATION: T
 
 [[/SECTION]]

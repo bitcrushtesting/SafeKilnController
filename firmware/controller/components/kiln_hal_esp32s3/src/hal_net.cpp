@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Bitcrush Testing
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * WiFi station with access-point fallback and SNTP (SWR-NET-01..SWR-NET-09,
+ * WiFi station, scanning, joining and SNTP (SWR-NET-01..SWR-NET-12,
  * except SWR-NET-04: see the note on mDNS below).
  *
  * ---------------------------------------------------------------------------
@@ -62,8 +62,7 @@ typedef struct {
 
     uint32_t  retry_ms;
     int64_t   first_attempt_us;
-    uint16_t  fallback_after_s;   /* SWR-NET-02 */
-    bool      ap_started;
+    bool      scanning;           /* SWR-NET-11 */
     bool      sta_configured;
     esp_timer_handle_t retry_timer;
 } net_t;
@@ -90,60 +89,99 @@ bool copy_checked(void *dst, size_t cap, const char *src, const char *what)
     return true;
 }
 
-/* --- the AP fallback (SWR-NET-02, SWR-NET-05) ----------------------------- */
+/* --- scanning and joining (SWR-NET-11, SWR-NET-12) ------------------------ */
 
-/* SWR-NET-05: at least eight characters, device-unique, derived from the MAC so
- * it can be printed on the display and on a label rather than being a shared
- * secret every Safe Kiln Controller in the world has. */
-void default_ap_pass(char *out, size_t n)
+/* There is no access point here any more.  It used to come up when the station
+ * could not join, serving a provisioning page, and with it came a second
+ * passphrase to get wrong and a second radio anybody in the building could
+ * reach.  The operator sets WiFi up at the display instead, which is a place
+ * only somebody at the kiln can use. */
+
+kiln_err_t net_scan_begin(void *ctx)
 {
-    uint8_t mac[6] = {};
-    (void)esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP);
-    (void)snprintf(out, n, "kiln%02X%02X%02X", mac[3], mac[4], mac[5]);
+    (void)ctx;
+    if (s_net.scanning) {
+        return KILN_OK;
+    }
+    /* Active, all channels, and NOT blocking: a blocking scan would stall this
+     * task for two seconds, and the display has to keep saying "scanning". */
+    wifi_scan_config_t sc = {};
+    sc.show_hidden = false;
+    if (esp_wifi_scan_start(&sc, false) != ESP_OK) {
+        return KILN_ERR_IO;
+    }
+    s_net.scanning = true;
+    return KILN_OK;
 }
 
-void start_ap(const kiln_config_t *cfg)
+bool net_scan_busy(void *ctx)
 {
-    if (s_net.ap_started) {
-        return;
-    }
-    /* As elsewhere in this component: ESP-IDF's idiom is zero then assign, and
-     * wifi_config_t carries enums with no zero enumerator.  The fields this
-     * code depends on are all set below; the rest the driver fills from its
-     * own defaults.
-     * NOLINTNEXTLINE(bugprone-invalid-enum-default-initialization) */
-    wifi_config_t ap = {};
-    const char *ssid = (cfg->ap_ssid[0] != '\0') ? cfg->ap_ssid : "safekiln";
-    if (!copy_checked(ap.ap.ssid, sizeof(ap.ap.ssid), ssid, "net.ap_ssid")) {
-        ssid = "safekiln";
-        (void)copy_checked(ap.ap.ssid, sizeof(ap.ap.ssid), ssid, "fallback");
-    }
-    ap.ap.ssid_len       = (uint8_t)strlen(ssid); /* just copied from here */
-    ap.ap.max_connection = 4;
-    ap.ap.channel        = 1;
+    (void)ctx;
+    return s_net.scanning;
+}
 
-    if (cfg->ap_pass[0] != '\0' && strlen(cfg->ap_pass) >= 8u &&
-        copy_checked(ap.ap.password, sizeof(ap.ap.password), cfg->ap_pass,
-                     "net.ap_pass")) {
-        ap.ap.authmode = WIFI_AUTH_WPA2_PSK;
-    } else {
-        /* SWR-NET-05 again: never an open access point.  An open AP serving the
-         * provisioning page would hand the kiln to anyone in radio range, and
-         * "the installer did not set one" is not a reason to do that. */
-        char gen[16];
-        default_ap_pass(gen, sizeof(gen));
-        (void)copy_checked(ap.ap.password, sizeof(ap.ap.password), gen, "default");
-        ap.ap.authmode = WIFI_AUTH_WPA2_PSK;
-        ESP_LOGW(TAG, "no AP passphrase configured; using the device default '%s'", gen);
+uint8_t net_scan_results(void *ctx, kiln_net_ap_t *out, uint8_t max)
+{
+    (void)ctx;
+    if ((out == nullptr) || (max == 0u)) {
+        return 0;
+    }
+    uint16_t found = 0;
+    if (esp_wifi_scan_get_ap_num(&found) != ESP_OK || found == 0u) {
+        return 0;
+    }
+    if (found > max) { found = max; }
+
+    /* One record at a time rather than an array of wifi_ap_record_t on the
+     * stack: the IDF record is ~80 bytes and twelve of them is a kilobyte this
+     * task does not have (architecture 13.4). */
+    static wifi_ap_record_t recs[KILN_NET_SCAN_MAX];
+    uint16_t n = (found > KILN_NET_SCAN_MAX) ? KILN_NET_SCAN_MAX : found;
+    if (esp_wifi_scan_get_ap_records(&n, recs) != ESP_OK) {
+        return 0;
     }
 
-    (void)esp_wifi_set_mode(s_net.sta_configured ? WIFI_MODE_APSTA : WIFI_MODE_AP);
-    (void)esp_wifi_set_config(WIFI_IF_AP, &ap);
-    s_net.ap_started = true;
-    s_net.state      = KILN_NET_AP_FALLBACK;
-    (void)snprintf(s_net.ssid, sizeof(s_net.ssid), "%s", ssid);
-    (void)snprintf(s_net.ip, sizeof(s_net.ip), "%s", "192.168.4.1");
-    ESP_LOGW(TAG, "access point '%s' up: no station connection", ssid);
+    uint8_t kept = 0;
+    for (uint16_t i = 0; i < n && kept < max; i++) {
+        if (recs[i].ssid[0] == '\0') {
+            continue;               /* hidden: nothing to show and nothing to pick */
+        }
+        (void)snprintf(out[kept].ssid, sizeof(out[kept].ssid), "%s",
+                       reinterpret_cast<const char *>(recs[i].ssid));
+        out[kept].rssi    = recs[i].rssi;
+        out[kept].secured = (recs[i].authmode != WIFI_AUTH_OPEN);
+        kept++;
+    }
+    return kept;
+}
+
+kiln_err_t net_connect(void *ctx, const char *ssid, const char *pass)
+{
+    (void)ctx;
+    if ((ssid == nullptr) || (ssid[0] == '\0')) {
+        return KILN_ERR_INVALID_ARG;
+    }
+    /* NOLINTNEXTLINE(bugprone-invalid-enum-default-initialization) */
+    wifi_config_t sta = {};
+    if (!copy_checked(sta.sta.ssid, sizeof(sta.sta.ssid), ssid, "ssid")) {
+        return KILN_ERR_RANGE;
+    }
+    if ((pass != nullptr) && (pass[0] != '\0') &&
+        !copy_checked(sta.sta.password, sizeof(sta.sta.password), pass, "passphrase")) {
+        return KILN_ERR_RANGE;
+    }
+
+    (void)esp_wifi_disconnect();
+    (void)esp_wifi_set_mode(WIFI_MODE_STA);
+    if (esp_wifi_set_config(WIFI_IF_STA, &sta) != ESP_OK) {
+        return KILN_ERR_IO;
+    }
+    s_net.sta_configured = true;
+    s_net.retry_ms       = RETRY_MIN_MS;
+    s_net.state          = KILN_NET_CONNECTING;
+    (void)copy_checked(s_net.ssid, sizeof(s_net.ssid), ssid, "ssid");
+    ESP_LOGI(TAG, "joining '%s' as asked at the display", ssid);
+    return (esp_wifi_connect() == ESP_OK) ? KILN_OK : KILN_ERR_IO;
 }
 
 /* --- events ------------------------------------------------------------- */
@@ -158,12 +196,24 @@ void retry_now(void *arg)
 
 void on_wifi(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
-    const kiln_config_t *cfg = static_cast<const kiln_config_t *>(arg);
+    /* The configuration was read here to decide when to raise the access
+     * point.  There is no access point now, and the handler needs nothing from
+     * it; the argument stays because the event loop was registered with it and
+     * a future handler may want it. */
+    (void)arg;
 
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
         s_net.state            = KILN_NET_CONNECTING;
         s_net.first_attempt_us = esp_timer_get_time();
         (void)esp_wifi_connect();
+        return;
+    }
+
+    /* SWR-NET-11: the scan is asynchronous, and this is the only thing that
+     * knows it has finished.  Without it the display says "scanning" for ever
+     * and the results are never read. */
+    if (base == WIFI_EVENT && id == WIFI_EVENT_SCAN_DONE) {
+        s_net.scanning = false;
         return;
     }
 
@@ -177,15 +227,12 @@ void on_wifi(void *arg, esp_event_base_t base, int32_t id, void *data)
         s_net.state  = KILN_NET_CONNECTING;
         s_net.ip[0]  = '\0';
 
-        /* SWR-NET-02: give up on the station after the configured period and
-         * bring the AP up, so a kiln on a changed network is still reachable
-         * to be told the new one. */
-        const int64_t trying_s =
-            (esp_timer_get_time() - s_net.first_attempt_us) / 1000000;
-        if (!s_net.ap_started && trying_s >= (int64_t)s_net.fallback_after_s) {
-            start_ap(cfg);
-        }
-
+        /* No fallback to bring up: a kiln whose network changed is told the
+         * new one at the display (SWR-NET-11), and meanwhile it fires exactly
+         * as well as it did before, which SWR-NET-07 requires anyway.
+         *
+         * The retry below therefore runs for ever rather than until something
+         * else takes over, which is SWR-NET-03 read literally. */
         /* SWR-NET-03: exponential backoff, event-driven, never a spin. */
         (void)esp_timer_stop(s_net.retry_timer);
         (void)esp_timer_start_once(s_net.retry_timer,
@@ -263,12 +310,15 @@ kiln_err_t kiln_hal_net_init(const kiln_config_t *cfg, kiln_port_net_t *out)
     memset(&s_net, 0, sizeof(s_net));
     s_net.state            = KILN_NET_DOWN;
     s_net.retry_ms         = RETRY_MIN_MS;
-    s_net.fallback_after_s = 60;        /* SWR-NET-02 default */
     (void)snprintf(s_net.hostname, sizeof(s_net.hostname), "%s",
                    (cfg->hostname[0] != '\0') ? cfg->hostname : "safekiln");
 
-    out->ctx    = &s_net;
-    out->status = net_status;
+    out->ctx          = &s_net;
+    out->status       = net_status;
+    out->scan_begin   = net_scan_begin;
+    out->scan_busy    = net_scan_busy;
+    out->scan_results = net_scan_results;
+    out->connect      = net_connect;
 
     if (esp_netif_init() != ESP_OK) {
         return KILN_ERR_IO;
@@ -277,7 +327,6 @@ kiln_err_t kiln_hal_net_init(const kiln_config_t *cfg, kiln_port_net_t *out)
         return KILN_ERR_IO;             /* already created is fine upstream */
     }
     (void)esp_netif_create_default_wifi_sta();
-    (void)esp_netif_create_default_wifi_ap();
 
     const wifi_init_config_t ic = WIFI_INIT_CONFIG_DEFAULT();
     if (esp_wifi_init(&ic) != ESP_OK) {
@@ -312,13 +361,15 @@ kiln_err_t kiln_hal_net_init(const kiln_config_t *cfg, kiln_port_net_t *out)
             s_net.sta_configured = true;
             (void)copy_checked(s_net.ssid, sizeof(s_net.ssid), cfg->wifi_ssid, "ssid");
         } else {
-            /* Credentials that cannot be used are the same as none, and the AP
-             * is how the operator gets a chance to correct them. */
-            start_ap(cfg);
+            /* Credentials that cannot be used are the same as none: the radio
+             * stays a station with nothing to join, and the operator corrects
+             * them at the display (SWR-NET-12). */
+            ESP_LOGW(TAG, "stored credentials are unusable; waiting for the display");
+            (void)esp_wifi_set_mode(WIFI_MODE_STA);
         }
     } else {
-        ESP_LOGW(TAG, "no stored credentials; starting the provisioning AP");
-        start_ap(cfg);
+        ESP_LOGW(TAG, "no stored credentials; set the network up at the display");
+        (void)esp_wifi_set_mode(WIFI_MODE_STA);
     }
 
     if (esp_wifi_start() != ESP_OK) {

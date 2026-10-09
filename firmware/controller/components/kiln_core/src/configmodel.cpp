@@ -10,7 +10,6 @@
 namespace {
 
 const char *const k_recovery_names[] = { "abort", "resume" };
-const char *const k_wifi_names[]     = { "sta", "ap", "sta_ap_fallback" };
 const char *const k_units_names[]    = { "C", "F" };
 const char *const k_lang_names[]     = { "en", "de" };
 const char *const k_tc_names[]       = { "B", "E", "J", "K", "N", "R", "S", "T" };
@@ -122,11 +121,12 @@ const kiln_cfg_item_t k_items[] = {
     NUM("hmi.alarm_duration_s",       "s",     "SWR-RUN-06",   KILN_CFG_T_U16,   alarm_duration_s,        0,   600,       30, 0),
 
     /* network */
-    ENUMI("net.wifi_mode",                     "SWR-NET-02",   wifi_mode, k_wifi_names, KILN_WIFI_MODE_COUNT, KILN_WIFI_STA_AP_FALLBACK, BOOTR),
-    STR("net.wifi_ssid",                       "SWR-NET-01",   wifi_ssid, KILN_CFG_STR_LEN,  "",            BOOTR),
-    STR("net.wifi_pass",                       "SWR-NET-01",   wifi_pass, KILN_CFG_PASS_LEN, "",            BOOTR | SECRET),
-    STR("net.ap_ssid",                         "SWR-NET-02",   ap_ssid,   KILN_CFG_STR_LEN,  "safekiln", BOOTR),
-    STR("net.ap_pass",                         "SWR-NET-02",   ap_pass,   KILN_CFG_PASS_LEN, "",            BOOTR | SECRET),
+    /* Set at the display (SWR-NET-12) rather than typed into a configuration
+     * editor, and not BOOTR: joining a network takes effect when the operator
+     * confirms it, which is the moment they are standing there to see whether
+     * it worked. */
+    STR("net.wifi_ssid",                       "SWR-NET-01",   wifi_ssid, KILN_CFG_STR_LEN,  "",            0),
+    STR("net.wifi_pass",                       "SWR-NET-01",   wifi_pass, KILN_CFG_PASS_LEN, "",            SECRET),
     STR("net.hostname",                        "SWR-NET-04",   hostname,  KILN_CFG_HOST_LEN, "kiln",     BOOTR),
     STR("net.ntp_server",                      "SWR-LOG-12",   ntp_server,KILN_CFG_HOST_LEN, "pool.ntp.org", 0),
     STR("net.timezone",                        "SWR-LOG-12",   timezone,  KILN_CFG_HOST_LEN, "UTC0",         0),

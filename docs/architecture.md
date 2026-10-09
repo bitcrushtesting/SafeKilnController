@@ -153,7 +153,7 @@ double is a compile-time-checked substitution.
 | `port_update` | `check()`, `fetch()`, `begin/write/finish()`, `confirm_running()`, `rollback()` | `esp_https_ota` for the pull path of §13.5, `esp_ota_ops` for the slots; stub |
 | `port_kvstore` | `get/set/erase(namespace, key, blob)` | NVS; in-memory fake |
 | `port_filestore` | `list/read/write/delete(path)` | `kiln_core/fileslots` over `port_flash` (`SWA-21`); RAM fake on host |
-| `port_net` | `state()`, `connect()`, `start_ap()`, `stats()` | WiFi + mDNS + SNTP; stub |
+| `port_net` | `status()`, `scan_begin/busy/results()`, `connect()` | WiFi station, scanning and joining (§5.4), plus SNTP; stub. **No access point**: network setup is on the display |
 
 ### 5.3 Application (`kiln_app`)
 
