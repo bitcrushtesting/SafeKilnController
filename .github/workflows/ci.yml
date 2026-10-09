@@ -516,16 +516,15 @@ jobs:
             echo
             echo 'SWR-NFR-28, CycloneDX and SPDX, generated from the build:'
             echo '```'
-            python3 - <<'PY'
-import glob, json
-for f in sorted(glob.glob('firmware/controller/build/sbom/*.cdx.json')):
-    d = json.load(open(f))
-    c = d['metadata']['component']
-    print(f"{c['name']} {c['version']}: {len(d['components'])} components")
-    for comp in d['components']:
-        if not comp.get('licenses'):
-            print(f"  licence unresolved: {comp['name']}")
-PY
+            # jq rather than a python heredoc: a heredoc body starts at column
+            # zero, which ends the YAML block scalar this step is written in and
+            # makes the whole workflow file invalid.  The same trap the release
+            # notes step documents, found the same way.
+            for f in firmware/controller/build/sbom/*.cdx.json; do
+              [ -e "$f" ] || continue
+              jq -r '"\(.metadata.component.name) \(.metadata.component.version): \(.components|length) components"' "$f"
+              jq -r '.components[] | select(has("licenses") | not) | "  licence unresolved: \(.name)"' "$f"
+            done
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 

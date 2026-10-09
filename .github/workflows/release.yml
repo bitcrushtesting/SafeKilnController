@@ -178,14 +178,11 @@ jobs:
             echo 'sources declare, and the image digest they belong to.'
             echo
             echo '```'
-            python3 - <<'PY'
-import glob, json
-for f in sorted(glob.glob('dist/*.cdx.json')):
-    d = json.load(open(f))
-    c = d['metadata']['component']
-    print(f"{c['name']} {c['version']}  {len(d['components'])} components")
-    print(f"serial {d['serialNumber']}")
-PY
+            for f in dist/*.cdx.json; do
+              [ -e "$f" ] || continue
+              jq -r '"\(.metadata.component.name) \(.metadata.component.version)  \(.components|length) components"' "$f"
+              jq -r '"serial \(.serialNumber)"' "$f"
+            done
             echo '```'
             echo
             echo '## Changes'
