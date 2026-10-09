@@ -226,9 +226,16 @@ XML_OUTPUT             = xml
 
 # --- diagrams -------------------------------------------------------------
 #
-# Graphviz is optional and HAVE_DOT is set by tools/udd.sh when dot is present,
-# so the document builds the same with or without it and nobody has to install
-# a package to read their own code.
+# HAVE_DOT is set to YES by tools/udd.sh, which refuses to run without
+# graphviz. It stopped being optional when the headers gained \dot blocks of
+# their own: the trip logic's state machine in trip.h and the program-sequence
+# graph in selfcheck.h. Those two are the pictures an assessment of a safety
+# function asks for, and \dot was chosen over PlantUML because graphviz is
+# already installed beside doxygen for the call graphs, while PlantUML would
+# add a Java runtime and a jar to vendor for notation this does not need.
+#
+# The value here stays NO so that a bare `doxygen Doxyfile` outside the script
+# produces a document rather than an error about a tool it was not told about.
 HAVE_DOT               = NO
 CALL_GRAPH             = NO
 CALLER_GRAPH           = NO

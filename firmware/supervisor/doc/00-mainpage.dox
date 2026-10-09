@@ -80,6 +80,19 @@ documented in @ref selfcheck.h :
 | Program sequence | Four stages that announce themselves, verified once per cycle |
 | Clock | Cross-checked against the LSI through a windowed watchdog |
 
+@section udd_diagrams The two diagrams
+
+Both are drawn from `\dot` blocks in the headers beside the code they
+describe, so they are versioned with it and cannot drift from it the way a
+picture in another document does:
+
+- The **trip logic's state machine**, on @ref sup_step : what permits heat,
+  what latches, what clears a latch, and the one state that nothing clears
+  within a power cycle.
+- The **program-sequence graph**, on @ref sup_flow_stage_t : the four stages of
+  a cycle and the ways a cycle can finish on time having done the wrong work,
+  which is what a watchdog cannot see.
+
 @section udd_trace Traceability
 
 Three index pages carry it, each generated from the comments rather than

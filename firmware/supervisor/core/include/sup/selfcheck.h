@@ -391,6 +391,43 @@ void sup_stack_guard_fill(volatile uint32_t *guard, size_t words);
  */
 /**
  * @brief The stages of one supervisor cycle, in the order they must run.
+ *
+ * @statemachine
+ * Each stage announces itself through @ref sup_flow_mark, and the verdict is
+ * taken once at the end by @ref sup_flow_complete. Any departure from this
+ * path, a skip, a repeat or a reorder, reaches the same place:
+ *
+ * @dot
+ * digraph flow {
+ *   rankdir=LR;
+ *   node [shape=box, style=rounded, fontname="Helvetica", fontsize=10];
+ *   edge [fontname="Helvetica", fontsize=9];
+ *
+ *   begin  [shape=point, width=0.12, label=""];
+ *   read   [label="READ\nthermocouple burst"];
+ *   step   [label="STEP\ntrip logic"];
+ *   perm   [label="PERMIT\ndrive the line"];
+ *   rep    [label="REPORT\nencode the frame"];
+ *   ok     [label="complete", penwidth=2];
+ *   broken [label="broken\ndiag_ok false\nnext cycle", style="rounded,bold"];
+ *
+ *   begin -> read [label="sup_flow_begin"];
+ *   read  -> step;
+ *   step  -> perm;
+ *   perm  -> rep;
+ *   rep   -> ok   [label="all four, once, in order"];
+ *
+ *   read -> broken [label="out of order", style=dashed];
+ *   step -> broken [label="or twice", style=dashed];
+ *   perm -> broken [style=dashed];
+ *   rep  -> broken [label="or the cycle ended\nbefore REPORT", style=dashed];
+ * }
+ * @enddot
+ *
+ * This is what a watchdog cannot see. A watchdog notices a cycle that stopped;
+ * it cannot notice one that ran on time having skipped PERMIT, which is the
+ * stage that drives the line the kiln depends on.
+ *
  * @implements SWR-SAF-35
  */
 typedef enum {

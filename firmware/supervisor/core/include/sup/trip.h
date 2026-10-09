@@ -370,13 +370,38 @@ void sup_init(sup_t *s, bool selftest_ok);
  *        zero-filled snapshot withholds heat.
  *
  * @statemachine
- * Permitting is conjunctive and latching is one-way within a power cycle:
- *
- *     PERMIT  --- any trip condition --->  LATCHED (heat refused)
- *     LATCHED --- clear armed and held, condition no longer true ---> PERMIT
- *
- * A latched trip is not cleared by the condition going away on its own, and
+ * Permitting is conjunctive and latching is one-way within a power cycle. A
+ * latched trip is not cleared by the condition going away on its own, and
  * never by anything arriving over the link, because there is no receiver.
+ *
+ * @dot
+ * digraph trip {
+ *   rankdir=LR;
+ *   node  [shape=box, style=rounded, fontname="Helvetica", fontsize=10];
+ *   edge  [fontname="Helvetica", fontsize=9];
+ *
+ *   init    [shape=point, width=0.12, label=""];
+ *   waiting [label="WAITING\nno permit, no latch"];
+ *   permit  [label="PERMITTING\nheat allowed", penwidth=2];
+ *   latched [label="LATCHED\nheat refused\nreason held"];
+ *   revoked [label="REVOKED\nself-test gone\nunclearable", style="rounded,bold"];
+ *
+ *   init    -> waiting [label="sup_init"];
+ *   waiting -> permit  [label="first valid reading,\nself-test ok,\nno fault"];
+ *   waiting -> latched [label="a trip condition\npast its grace"];
+ *   permit  -> latched [label="over-temperature,\ntc fault, stale,\ndisagree, permit stuck"];
+ *   latched -> permit  [label="clear armed and held,\ncondition no longer true"];
+ *   latched -> latched [label="clear while the\ncondition still holds"];
+ *   permit  -> revoked [label="diag_ok false"];
+ *   latched -> revoked [label="diag_ok false"];
+ *   revoked -> revoked [label="clear: refused\n(SWR-SAF-36)"];
+ * }
+ * @enddot
+ *
+ * WAITING does not latch, and the distinction is deliberate: "the sensor never
+ * got going" and "the sensor was working and stopped" are different, and only
+ * the second is a fault for an operator to acknowledge. REVOKED is reachable
+ * from either working state and leaves by no edge at all within a power cycle.
  *
  * @errorbehaviour
  * Every input is treated as untrustworthy until it says otherwise:
