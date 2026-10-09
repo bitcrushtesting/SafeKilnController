@@ -636,17 +636,7 @@ weakness first, the deadline second, the sentence third, the engineering last.
 
 ## O. WiFi, FR-NET
 
-- [ ] **O1. `SWR-NET-04` (mDNS, `kiln.local`) is not implemented.** mDNS left
-  the ESP-IDF tree for the component manager, and `UR-CON-04` forbids a
-  build-time fetch from an unpinned source. `E7` met the same constraint over
-  the file store and resolved it by not needing the dependency at all; mDNS has
-  no such escape, since the protocol is the feature. Adding a managed
-  dependency for a convenience feature would be the wrong trade against a
-  constraint the project applies everywhere else, so the device is reachable by
-  IP until mDNS is vendored deliberately. The address is on the HMI network screen, which is
-  where an operator would look anyway.
-
-- [ ] **O2. The hardware image is 888 kB, 57 % of the slot free.** Measured
+- [ ] **O2. The hardware image is 940 kB, 54 % of the slot free.** Measured
   2026-10-09, replacing numbers that predated several releases of ESP-IDF. The
   simulated build that CI publishes is **246 kB** and contains no WiFi and no
   HTTP server at all, which is worth keeping straight when reading a size
@@ -654,9 +644,9 @@ weakness first, the deadline second, the sentence third, the engineering last.
 
   `SWR-NFR-13` holds with room. The web assets measure **18 kB gzipped** in
   total against architecture 12.4's 44 kB budget (`index.html` 2.2, `app.css`
-  3.6, `app.js` 8.6, `chart.js` 4.2), so embedding them takes the hardware
-  image to about 906 kB and 55 % free. That budget had never been measured;
-  it has now, and it passes.
+  3.6, `app.js` 8.6, `chart.js` 4.2). With them embedded and mDNS linked in,
+  the hardware image measures **940 kB, 54 % of the slot free**. That budget
+  had never been measured; it has now, and it passes.
 
 - [ ] **O3. Untested against a radio, and until today it did not even
   compile.** The claim here used to be "it compiles and passes analysis", and

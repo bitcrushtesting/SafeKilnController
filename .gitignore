@@ -21,8 +21,10 @@ coverage/
 sdkconfig
 sdkconfig.old
 sdkconfig.hw
+# Fetched by the component manager and reproducible from the lockfile, so it
+# is not committed; dependencies.lock IS committed, because UR-CON-04 makes it
+# the record of what a release was built from.
 managed_components/
-dependencies.lock
 *.o
 *.d
 
