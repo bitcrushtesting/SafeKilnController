@@ -72,6 +72,7 @@ function(kiln_add_test name)
     add_test(NAME ${name} COMMAND ${name})
 endfunction()
 
+kiln_add_test(test_alarmptn    unit/test_alarmptn.cpp)
 kiln_add_test(test_pid         unit/test_pid.cpp)
 kiln_add_test(test_window      unit/test_window.cpp)
 kiln_add_test(test_suplink     unit/test_suplink.cpp)

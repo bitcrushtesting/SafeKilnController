@@ -141,7 +141,7 @@ double is a compile-time-checked substitution.
 |---|---|---|
 | `port_tc` | `configure(type, filter_hz)`, `read(→ temp_c, cj_c, fault_bits)` | MAX31856; simulator; fault-injecting stub |
 | `port_heat` | `set_duty(permille)`, `enable_refresh()`, `force_off()` | GPIO + 10 ms timer; simulator; recording spy |
-| `port_alarm` | `set(pattern)` | GPIO; spy |
+| `port_alarm` | `set(pattern)` | GPIO and a one-shot timer, stepping the rhythm table of `kiln_core/alarmptn` (§10.7); spy |
 | `port_display` | `blit(framebuffer)`, `set_contrast()`, `present()` | SSD1306 over I²C; in-memory framebuffer for golden-image tests |
 | `port_input` | `poll(→ events)` | PCNT + GPIO; scripted event source |
 | `port_current` | `start_burst(window_phase)`, `read_burst(→ samples, n)`, `present()` | ADC continuous-mode DMA burst; simulator; scripted sample source |
@@ -746,6 +746,33 @@ erased stays retired across a reboot, and a part with nowhere left to write says
 so instead of losing the previous content. The same fake drives `program_store`
 and `run_index` over the real store in `test_stores_on_flash`, which is the
 combination that runs on the board.
+
+### 10.7 What the buzzer sounds like
+
+The buzzer is a 5 V active part that makes its own tone (`SYS-HW-09`), so the
+only thing the firmware chooses is the rhythm, and `SWR-SAF-20` asks for two
+annunciations an operator can tell apart without looking.
+
+| | Pattern | Cycle | Sounding |
+|---|---|---|---|
+| Completion | three 90 ms chirps, then silence | 5 s | 270 ms, 5 % |
+| Fault | six 60 ms chirps, 400 ms gap, without end | 1.06 s | 360 ms, 34 % |
+
+They differ in rhythm, in rate and in duty, which is what "distinguishable"
+has to mean for a part with one tone and no volume control. Completion is a
+notification: a firing that took nine hours has finished correctly, and
+`hmi.alarm_duration_s` defaults to 4 s so the operator hears the burst once.
+A fault is meant to be unpleasant and to carry through a wall, and it continues
+until the fault is acknowledged, because a fault that stopped announcing itself
+is a fault nobody heard.
+
+The table and the stepper are in `kiln_core/alarmptn`, with no clock and no
+hardware, so the rhythms are host-tested and the comparison between them is
+asserted rather than described (`SWA-01`, `SWA-02`). The adapter sets a pin and
+arms a one-shot timer for the interval it is handed; it was previously the whole
+pattern, inside an `esp_timer` callback no test could reach. A pattern value
+that is not one of the three is silent: the failure direction is off, because
+an operator's only remedy for a buzzer stuck on is the mains switch.
 
 ## 11. Configuration
 

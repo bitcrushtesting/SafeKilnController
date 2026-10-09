@@ -11,6 +11,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 
+#include "kiln_core/alarmptn.h"
 #include "kiln_hal/board_pins.h"
 #include "kiln_hal/hal_esp32s3.h"
 
@@ -82,12 +83,8 @@ namespace {
 
 /* --- buzzer (SYS-HW-09, SWR-SAF-20) ---------------------------------------------- */
 /*
- * SWR-SAF-20 wants fault and completion audibly distinguishable, so this is a
- * pattern and not a level.  A 5 V active buzzer makes its own tone (SYS-HW-09), so
- * all that is needed is gating it on and off:
- *
- *   fault      200 ms on, 200 ms off   urgent, and continues until acknowledged
- *   complete   200 ms on, 1800 ms off  a periodic chirp, not an alarm
+ * The rhythms are in kiln_core/alarmptn, where they are host-tested; this is
+ * the half that cannot be: a pin and a one-shot timer.
  *
  * Driven by esp_timer rather than by the control task, because the pattern must
  * keep sounding while the operator is doing something else, and because a fault
@@ -95,8 +92,7 @@ namespace {
  */
 typedef struct {
     esp_timer_handle_t   timer;
-    kiln_alarm_pattern_t pattern;
-    bool                 on;
+    kiln_alarm_seq_t     seq;
 } alarm_t;
 
 alarm_t s_alarm;
@@ -104,19 +100,15 @@ alarm_t s_alarm;
 void alarm_tick(void *arg)
 {
     alarm_t *a = static_cast<alarm_t *>(arg);
-    if (a->pattern == KILN_ALARM_OFF) {
-        a->on = false;
-        gpio_set_level((gpio_num_t)KILN_PIN_ALARM, 0);
-        return;
+    const kiln_alarm_step_t s = kiln_alarm_seq_next(&a->seq);
+
+    gpio_set_level((gpio_num_t)KILN_PIN_ALARM, s.on ? 1 : 0);
+    if (s.hold_ms > 0u) {
+        (void)esp_timer_start_once(a->timer, (uint64_t)s.hold_ms * 1000u);
     }
-
-    a->on = !a->on;
-    gpio_set_level((gpio_num_t)KILN_PIN_ALARM, a->on ? 1 : 0);
-
-    const uint64_t next_us =
-        a->on ? 200u * 1000u
-              : ((a->pattern == KILN_ALARM_FAULT) ? 200u * 1000u : 1800u * 1000u);
-    (void)esp_timer_start_once(a->timer, next_us);
+    /* hold_ms == 0 means nothing further is due, and the level set above is
+     * already the silent one.  No timer is armed, so the buzzer stays quiet
+     * until something sets a pattern. */
 }
 
 void alarm_set(void *ctx, kiln_alarm_pattern_t pattern)
@@ -125,19 +117,13 @@ void alarm_set(void *ctx, kiln_alarm_pattern_t pattern)
     if (a == nullptr) {
         return;
     }
-    if (a->pattern == pattern) {
+    if (a->seq.pattern == pattern) {
         return;                       /* re-asserting must not restart the beat */
     }
-    a->pattern = pattern;
     (void)esp_timer_stop(a->timer);
+    kiln_alarm_seq_begin(&a->seq, pattern);
 
-    if (pattern == KILN_ALARM_OFF) {
-        a->on = false;
-        gpio_set_level((gpio_num_t)KILN_PIN_ALARM, 0);
-        return;
-    }
-    /* Start loud: the first edge is immediate, not one period away. */
-    a->on = false;
+    /* Start loud: the first interval is applied now, not one period away. */
     alarm_tick(a);
 }
 
@@ -164,8 +150,7 @@ void kiln_hal_alarm_init(kiln_port_alarm_t *out)
     args.name            = "alarm";
     (void)esp_timer_create(&args, &s_alarm.timer);
 
-    s_alarm.pattern = KILN_ALARM_OFF;
-    s_alarm.on      = false;
+    kiln_alarm_seq_begin(&s_alarm.seq, KILN_ALARM_OFF);
 
     out->ctx = &s_alarm;
     out->set = alarm_set;
