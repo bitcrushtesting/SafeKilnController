@@ -689,17 +689,63 @@ nothing can disagree with the data. The loser is left in place rather than
 erased, because it is the next write's target and erasing it at boot would spend
 an erase cycle on every power-up.
 
+A name longer than 63 bytes is **refused**, not truncated: `KILN_PATH_MAX` is 64
+including the terminator and the stored name field is exactly that, so a longer
+path returns `KILN_ERR_INVALID_ARG`. Both callers produce five-character slot
+paths, so nothing generates one today; refusing is the answer because storing a
+file under a name the caller did not ask for is worse than failing.
+
 Capacity is 40 of 64 regions for the 20 programs of `SWR-PRG-04` and the 20 run
 records of `SWR-LOG-09`. Endurance is generous for the same reason the log's is:
 a program is written when a user saves it and a run record once per firing, so a
 region sees single-digit erases per year against a 100 000 cycle rating.
 
-Three properties carry the weight and each is a host test, driven through a
-flash fake that enforces NOR semantics and can cut power part-way through a
-write: a file survives a remount, a cut before the commit leaves the previous
-copy, and a cut inside the commit header leaves the previous copy. The same
-fake drives `program_store` and `run_index` over the real store in
-`test_stores_on_flash`, which is the combination that runs on the board.
+**Wear is handled at the write rather than at the read.** A NOR sector at the
+end of its life does not report an error: it takes the write, returns success,
+and holds something else. Every write is therefore read back and re-validated
+through the same path a mount uses, and only then does the in-RAM index point at
+it. A copy that does not verify retires its region, and the write is
+re-attempted in a free region at a higher sequence number, up to three regions.
+The caller gets success, because the file is stored; what changed is where.
+
+Retirement needs no bad-block table. Once the migrated copy has verified the old
+region is erased, best effort: if that succeeds the stale copy is gone, which is
+what stops a later delete from being undone at the next mount, and the region
+returns to the pool at the next boot, which is the right answer for a sector
+that can still be erased. If the erase fails, which is what a sector that is
+genuinely finished does, the stale copy stays at a *lower* sequence number, two
+regions claim one name, and mount resolves it the only way it can be true: the
+lower sequence number is the write that failed, its region is retired again, and
+the higher one is the file. A power cut between the verify and the erase leaves
+the same state and is resolved the same way. The count of retired regions is
+logged at boot, and is the only warning anybody gets that the part is going.
+
+What the store does **not** do is spread wear. A region is chosen by index and
+keeps its file for as long as it works, because the endurance arithmetic above
+has four orders of magnitude of headroom and levelling would be mechanism bought
+for nothing. Retirement is in because its failure mode is losing a run record,
+which is cheap to prevent and annoying to explain.
+
+**What a mount costs**, measured in `test_fileslots` rather than estimated: the
+medium this firmware produces, 20 programs of 398 bytes and 20 run records of
+554, costs **768 reads and 47 808 bytes** of CRC. A partition full of
+maximum-size files, both copies valid, costs **8 192 reads and 524 288 bytes**,
+which is the whole partition. Both are paid once, at start-up, and the
+expectation is tens of milliseconds rather than a budget item; if a board ever
+says otherwise, the only thing mount needs eagerly is which copy of each region
+wins, and the payload CRC could be deferred to the read. The numbers are
+asserted so that making mount lazy cannot happen quietly.
+
+Several properties carry the weight and each is a host test, driven through a
+flash fake that enforces NOR semantics, can cut power part-way through a write,
+and can model a worn sector that accepts a write and keeps zeros: a file
+survives a remount, a cut before the commit leaves the previous copy, a cut
+inside the commit header leaves the previous copy, a sector that lies about a
+write retires its region and the file is still readable, a region that cannot be
+erased stays retired across a reboot, and a part with nowhere left to write says
+so instead of losing the previous content. The same fake drives `program_store`
+and `run_index` over the real store in `test_stores_on_flash`, which is the
+combination that runs on the board.
 
 ## 11. Configuration
 

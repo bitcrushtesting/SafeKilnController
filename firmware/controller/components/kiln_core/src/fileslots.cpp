@@ -126,7 +126,7 @@ uint16_t find_region(const kiln_fileslots_t *fs, const char *name)
 uint16_t free_region(const kiln_fileslots_t *fs)
 {
     for (uint16_t r = 0; r < fs->region_count; r++) {
-        if (!fs->entry[r].used) {
+        if (!fs->entry[r].used && !fs->retired[r]) {
             return r;
         }
     }
@@ -182,6 +182,29 @@ kiln_err_t kiln_fileslots_mount(kiln_fileslots_t *fs, const kiln_port_flash_t *f
         }
     }
 
+    /* Two regions claiming one name is the trace of a retirement (see the wear
+     * note in the header).  find_region returns the first match, so leaving
+     * both would serve whichever happens to sit at the lower index, which half
+     * the time is the copy a failed write left behind.  The higher seq is the
+     * file; the other region is the one that failed and is retired again. */
+    for (uint16_t r = 0; r < fs->region_count; r++) {
+        if (!fs->entry[r].used) {
+            continue;
+        }
+        for (uint16_t q = (uint16_t)(r + 1u); q < fs->region_count; q++) {
+            if (!fs->entry[q].used ||
+                (strcmp(fs->entry[q].name, fs->entry[r].name) != 0)) {
+                continue;
+            }
+            const uint16_t loser = (fs->entry[q].seq > fs->entry[r].seq) ? r : q;
+            fs->retired[loser] = true;
+            fs->entry[loser] = kiln_fileslot_entry_t{};
+            if (loser == r) {
+                break;   /* r holds nothing now; nothing else can match it */
+            }
+        }
+    }
+
     fs->mounted = true;
     return KILN_OK;
 }
@@ -198,8 +221,23 @@ kiln_err_t kiln_fileslots_format(kiln_fileslots_t *fs)
             return e;
         }
         fs->entry[r] = kiln_fileslot_entry_t{};
+        fs->retired[r] = false;
     }
     return KILN_OK;
+}
+
+uint16_t kiln_fileslots_retired_regions(const kiln_fileslots_t *fs)
+{
+    if ((fs == nullptr) || !fs->mounted) {
+        return 0u;
+    }
+    uint16_t n = 0;
+    for (uint16_t r = 0; r < fs->region_count; r++) {
+        if (fs->retired[r]) {
+            n++;
+        }
+    }
+    return n;
 }
 
 uint16_t kiln_fileslots_used_regions(const kiln_fileslots_t *fs)
@@ -263,29 +301,22 @@ kiln_err_t fs_read(void *ctx, const char *path, void *out, size_t cap, size_t *l
     return KILN_OK;
 }
 
-kiln_err_t fs_write_atomic(void *ctx, const char *path, const void *data, size_t len)
+/* Write one copy and prove it.
+ *
+ * Everything physical about a write is in here, so that the retry above it has
+ * one thing to call and one outcome to interpret: the copy is there and
+ * verified, or this region did not take it.
+ *
+ * The proof is read_copy, which is the same validation a mount performs. What
+ * is accepted here is therefore exactly what a reboot would accept, and a
+ * sector that took the write and kept something else -- which is how NOR fails,
+ * without an error -- is caught now, while there is still another region to put
+ * the file in. */
+kiln_err_t write_copy(kiln_fileslots_t *fs, uint16_t region, uint8_t copy,
+                      const uint8_t *namebuf, const void *data, size_t len,
+                      uint32_t seq, uint16_t *crc_out)
 {
-    kiln_fileslots_t *fs = static_cast<kiln_fileslots_t *>(ctx);
-    if ((fs == nullptr) || !fs->mounted || !name_ok(path) ||
-        ((data == nullptr) && (len > 0u))) {
-        return KILN_ERR_INVALID_ARG;
-    }
-    if (len > fs->payload_max) {
-        return KILN_ERR_RANGE;
-    }
-
-    uint16_t r      = find_region(fs, path);
-    const bool fresh = (r == fs->region_count);
-    if (fresh) {
-        r = free_region(fs);
-        if (r == fs->region_count) {
-            return KILN_ERR_NO_SPACE;
-        }
-    }
-
-    const uint8_t  target = fresh ? 0u : (uint8_t)(1u - fs->entry[r].copy);
-    const uint32_t seq    = fresh ? 1u : (fs->entry[r].seq + 1u);
-    const uint32_t base   = copy_off(fs, r, target);
+    const uint32_t base = copy_off(fs, region, copy);
 
     kiln_err_t e = fs->flash->erase(fs->flash->ctx, base, fs->sector_bytes);
     if (e != KILN_OK) {
@@ -294,11 +325,7 @@ kiln_err_t fs_write_atomic(void *ctx, const char *path, const void *data, size_t
 
     /* The name field is written in full so that its 64 bytes are what the CRC
      * covers on both sides, whatever the caller's string length. */
-    uint8_t namebuf[KILN_PATH_MAX];
-    memset(namebuf, 0, sizeof(namebuf));
-    memcpy(namebuf, path, strnlen(path, KILN_PATH_MAX - 1u));
-
-    e = fs->flash->write(fs->flash->ctx, base + OFF_NAME, namebuf, sizeof(namebuf));
+    e = fs->flash->write(fs->flash->ctx, base + OFF_NAME, namebuf, KILN_PATH_MAX);
     if (e != KILN_OK) {
         return e;
     }
@@ -322,7 +349,7 @@ kiln_err_t fs_write_atomic(void *ctx, const char *path, const void *data, size_t
         }
     }
 
-    uint16_t crc = kiln_crc16_update(KILN_CRC16_INIT, namebuf, sizeof(namebuf));
+    uint16_t crc = kiln_crc16_update(KILN_CRC16_INIT, namebuf, KILN_PATH_MAX);
     crc = kiln_crc16_update(crc, static_cast<const uint8_t *>(data), len);
 
     /* The commit.  Until these twelve bytes land the copy above does not exist,
@@ -337,14 +364,106 @@ kiln_err_t fs_write_atomic(void *ctx, const char *path, const void *data, size_t
         return e;
     }
 
-    kiln_fileslot_entry_t *en = &fs->entry[r];
-    memcpy(en->name, namebuf, sizeof(namebuf));
-    en->seq  = seq;
-    en->len  = (uint16_t)len;
-    en->crc  = crc;
-    en->copy = target;
-    en->used = true;
+    kiln_fileslot_entry_t check = {};
+    if (!read_copy(fs, region, copy, &check)) {
+        return KILN_ERR_CORRUPT;
+    }
+    if ((check.seq != seq) || (check.len != (uint16_t)len) || (check.crc != crc) ||
+        (memcmp(check.name, namebuf, KILN_PATH_MAX) != 0)) {
+        return KILN_ERR_CORRUPT;
+    }
+
+    *crc_out = crc;
     return KILN_OK;
+}
+
+kiln_err_t fs_write_atomic(void *ctx, const char *path, const void *data, size_t len)
+{
+    kiln_fileslots_t *fs = static_cast<kiln_fileslots_t *>(ctx);
+    if ((fs == nullptr) || !fs->mounted || !name_ok(path) ||
+        ((data == nullptr) && (len > 0u))) {
+        return KILN_ERR_INVALID_ARG;
+    }
+    if (len > fs->payload_max) {
+        return KILN_ERR_RANGE;
+    }
+
+    uint8_t namebuf[KILN_PATH_MAX];
+    memset(namebuf, 0, sizeof(namebuf));
+    memcpy(namebuf, path, strnlen(path, KILN_PATH_MAX - 1u));
+
+    /* Where the file lives now, if it lives anywhere.  Kept separate from the
+     * region being written, because after a retirement they differ and the old
+     * one must stay readable until the new one has verified. */
+    const uint16_t home = find_region(fs, path);
+
+    uint16_t r      = home;
+    uint8_t  target = 0u;
+    uint32_t seq    = 1u;
+    if (home == fs->region_count) {
+        r = free_region(fs);
+        if (r == fs->region_count) {
+            return KILN_ERR_NO_SPACE;
+        }
+    }
+    else {
+        target = (uint8_t)(1u - fs->entry[home].copy);
+        seq    = fs->entry[home].seq + 1u;
+    }
+
+    for (unsigned attempt = 1u; ; attempt++) {
+        uint16_t   crc = 0u;
+        const kiln_err_t e =
+            write_copy(fs, r, target, namebuf, data, len, seq, &crc);
+
+        if (e == KILN_OK) {
+            if ((home != fs->region_count) && (r != home)) {
+                /* The file has moved.  Erase what the retired region holds,
+                 * best effort and only now that the new copy has verified:
+                 *
+                 *  - it succeeds, and the stale copy is gone, which is what
+                 *    stops a later remove from being undone at the next mount
+                 *    by a copy of the file nobody asked to keep;
+                 *  - it fails, which is what a dead sector does, and the stale
+                 *    copy stays at a lower seq.  That is the trace mount reads
+                 *    to retire this region again, so retirement outlives the
+                 *    power cycle exactly when the medium is genuinely gone.
+                 *
+                 * A power cut between the verify above and this erase leaves
+                 * both copies on the medium, which is the same case and is
+                 * resolved the same way. */
+                (void)fs->flash->erase(fs->flash->ctx,
+                                       copy_off(fs, home, 0), fs->region_bytes);
+                fs->entry[home] = kiln_fileslot_entry_t{};
+            }
+            kiln_fileslot_entry_t *en = &fs->entry[r];
+            memcpy(en->name, namebuf, sizeof(namebuf));
+            en->seq  = seq;
+            en->len  = (uint16_t)len;
+            en->crc  = crc;
+            en->copy = target;
+            en->used = true;
+            return KILN_OK;
+        }
+
+        /* This region did not take the file.  It is out of the pool for the
+         * rest of the power cycle; whether it is out for good is settled at the
+         * next mount, by whether the erase above could reach it. */
+        fs->retired[r] = true;
+        if (attempt >= KILN_FILESLOT_WRITE_TRIES) {
+            return e;
+        }
+        const uint16_t next = free_region(fs);
+        if (next == fs->region_count) {
+            return e;   /* nowhere left to put it: the caller has to know */
+        }
+
+        r      = next;
+        target = 0u;
+        /* Above anything the retired region can be holding, so that a mount
+         * which finds both copies of the name resolves in favour of this one. */
+        seq    = seq + 1u;
+    }
 }
 
 kiln_err_t fs_remove(void *ctx, const char *path)

@@ -31,6 +31,9 @@
 
 constexpr uint32_t KILN_HOST_FLASH_MAX_BYTES = 2u * 1024u * 1024u;
 
+/* No sector selected, for the offset-addressed fault injection below. */
+constexpr uint32_t KILN_HOST_NO_OFFSET = 0xFFFFFFFFu;
+
 typedef struct {
     uint8_t  *data;              /* caller-provided, so the size is the test's choice */
     uint32_t  size_bytes;
@@ -41,6 +44,9 @@ typedef struct {
     uint32_t  writes;
     uint32_t  reads;
     uint32_t  bytes_written;
+    /* Mount streams every copy through the CRC, so what a mount costs is this
+     * number and not the read count (tasklist Q2). */
+    uint32_t  bytes_read;
 
     /* Fault injection. */
     uint32_t  fail_write_after;  /* 0 = never: writes fail once this many have succeeded */
@@ -51,6 +57,22 @@ typedef struct {
      * That is exactly a torn record: some bytes landed, the rest did not. */
     uint32_t  cut_power_at_write;
     uint32_t  cut_bytes;
+
+    /* A worn sector: the write returns KILN_OK and the medium keeps zeros
+     * instead of the data.  The failure mode that no error code reports, and
+     * the one fileslots' write verification exists for.  `garble_write_at` is
+     * the 1-based write to spoil (0 = none); `garble_every_write` spoils all of
+     * them, which is a part with nowhere left to write. */
+    uint32_t  garble_write_at;
+    bool      garble_every_write;
+
+    /* Refuse to erase the sector at this offset, for as long as it is set.
+     * By offset rather than by a count, because what a wear test needs to say
+     * is WHICH region is finished, not how many erases have gone by: counting
+     * them means knowing the order fileslots happens to erase in, and a test
+     * written against that measures the implementation instead of the medium.
+     * KILN_HOST_NO_OFFSET means no such sector, and is what init leaves. */
+    uint32_t  fail_erase_off;
 } kiln_host_flash_t;
 
 /* `storage` must be at least size_bytes and is set to 0xFF (erased). */
