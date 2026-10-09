@@ -961,8 +961,28 @@ either the supervisor's pin count or a requirement.
   on every cold load. So `SWR-SAF-31` and `SYS-HW-21` are unchanged, the lid sense stays
   on the ESP32, and `Q5`'s branch is the only one section K loses.
 
-- [ ] **R8. The supervisor's firmware, and its own test strategy.** Small
-  enough to read in one sitting, which is a design constraint and not an
-  aspiration. It needs its own host-testable core on the same argument as
-  `SWA-01`, and the link needs a test that proves the ESP32 withholds heat on
-  silence and on a stale sequence number, which are different failures.
+- [x] **R8. The supervisor's firmware and its test strategy. Done 2026-10-10.**
+  The firmware is 3 488 bytes of program memory across four source files, which
+  is the design constraint met rather than aspired to, and it has its own
+  host-testable core on `SWA-01`'s argument: `trip`, `selfcheck`, `max31856`
+  and the wire protocol all build and run on a development host with no
+  hardware, with MC/DC over the trip logic and a generated Unit Design
+  Document.
+
+  The link test this asked for is now there, and it was the piece genuinely
+  missing. Each stage was tested and the chain was not: `test_suplink` proved
+  silence and a stale sequence number both become `KILN_TC_FAULT_COMMS`,
+  `test_safety_thermal` proved that bit becomes `KILN_FAULT_TC_COMMS`, and
+  other tests proved a latched fault withholds heat. An assembly of proven
+  parts is not a proven assembly, and the chamber temperature enters this
+  firmware at exactly one place, over a wire.
+
+  Two integration tests now run the real application with the real decoder
+  bound as the chamber port, the way `main.cpp` binds it on the board, and
+  watch the heater: **silence** takes the heat away and opens the contactor
+  after `SWR-SAF-04`'s grace, and so does **a supervisor repeating itself** --
+  well-formed frames, good CRC, plausible temperature, sequence number
+  stuck -- which is the failure that looks like health and which a link check
+  counting bytes would have called a working channel while the kiln ran on a
+  reading from minutes ago. Both assert the kiln was heating first, so neither
+  can pass for the wrong reason.
