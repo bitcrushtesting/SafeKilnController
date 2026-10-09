@@ -81,26 +81,41 @@ flowchart TB
         KILN["Kiln body, elements,<br/>lid interlock, wiring"]
     end
     subgraph IN["Inside the boundary, Safe Kiln Controller"]
-        MCU["ESP32-S3 firmware:<br/>control + safety supervisor"]
-        CP["Charge pump → contactor coil"]
+        MCU["ESP32-S3 firmware:<br/>control + safety task"]
+        SUPV["STM32G031 supervisor:<br/>backstop + permit (SWA-22)"]
+        CP["Charge pump → coil element"]
         CON["Safety contactor"]
         SSR["Zero-cross SSR"]
-        TC["2 × MAX31856<br/>chamber + enclosure"]
+        TCC["MAX31856, chamber<br/>on the supervisor's bus"]
+        TCE["MAX31856, enclosure<br/>on the controller's bus"]
         CT["Current transformer"]
         BUZ["Buzzer"]
     end
     SUP --> CUT --> CON --> SSR --> KILN
     MCU --> CP --> CON
+    SUPV -->|"permit, a second<br/>series element"| CON
     MCU --> SSR
-    TC --> MCU
+    TCC --> SUPV
+    TCC -.->|"one junction,<br/>the common cause"| TCE
+    SUPV -->|"report only, 4 Hz"| MCU
+    TCE --> MCU
     CT --> MCU
     MCU --> BUZ --> OP
     OP -.->|"acknowledge, abort,<br/>isolate at supply"| MCU
+    OP -.->|"clear the latch<br/>(SYS-HW-28)"| SUPV
 ```
 
-**Inside the boundary.** The firmware, the two switching devices and their
-drive circuits, the two thermocouple front ends, the current transformer and
-its conditioning, and the annunciation.
+The dashed line between the two front ends is not a signal. It is there because
+the diagram would otherwise suggest two independent temperature channels: both
+MAX31856 read **one chamber junction**, which is the common cause §6 records and
+the one thing the second part does not remove.
+
+**Inside the boundary.** Both firmwares, the switching devices and their drive
+circuits, the two thermocouple front ends, the current transformer and its
+conditioning, and the annunciation. The supervisor is inside the boundary and
+is **not** a substitute for the independent cutout outside it: it shares the
+chamber couple, the 3V3 rail and the enclosure, and `SYS-HW-13` stays mandatory
+for exactly those reasons.
 
 **Outside the boundary, but relied upon.** The supply protection, the
 independent cutout, the kiln's own construction and the operator. Each is the
@@ -152,14 +167,16 @@ software being correct. Nothing below is a substitute for anything above it.
 ```mermaid
 flowchart TB
     L1["**L1: Control**<br/>setpoint clamped to the configured max,<br/>configured max clamped to 1350 °C (SWR-SAF-23)"]
-    L2["**L2: Safety supervisor**<br/>18 rules, 100 ms cycle, sole heat authority (SWA-04)<br/>thermal channel + current channel"]
+    L2["**L2: Safety supervisor (a task)**<br/>18 rules, 100 ms cycle, sole heat authority (SWA-04)<br/>thermal channel + current channel"]
+    L2S["**L2S: Independent supervisor (a part)**<br/>second MCU, own clock, watchdog, front end<br/>1350 °C backstop, own series element (SWA-22)"]
     L3["**L3: Heat authority hardware**<br/>charge pump: a square wave, not a level (SWA-05)<br/>contactor in series with the SSR (SYS-SAF-03)"]
     L4["**L4: Reset to safe**<br/>task + RTC watchdog, brownout detector,<br/>output pull-downs (SYS-HW-08), latched fault in NVS"]
     L5["**L5: Independent hardware cutout**<br/>own sensor, own contacts, outside this project (SYS-HW-13)"]
     L6["**L6: Installation and operator**<br/>supply protection, competent installation,<br/>attendance (SYS-ASM-04, SYS-ASM-06)"]
-    L1 --> L2 --> L3 --> L4 --> L5 --> L6
+    L1 --> L2 --> L2S --> L3 --> L4 --> L5 --> L6
     style L1 fill:#e8f0fe,stroke:#4a76c4
     style L2 fill:#e8f0fe,stroke:#4a76c4
+    style L2S fill:#fef0e0,stroke:#c48a4a
     style L3 fill:#fef0e0,stroke:#c48a4a
     style L4 fill:#fef0e0,stroke:#c48a4a
     style L5 fill:#e9f6ea,stroke:#4aa052
@@ -200,6 +217,61 @@ of [§6](#6-independence):
   gated to the commanded output state (`SWA-17`) so that the measurement is a
   statement about the *relay*, not an average over a mostly-off window.
 
+### 5.2a L2S, The independent supervisor
+
+**It is lettered rather than numbered, and that is deliberate.** The layer
+numbers are cited from `safety.sdoc`'s `LAYERS` fields, from the firmware and
+from the hardware design; renumbering L3 to L4 and so on to open a gap would
+break every one of those citations to no benefit, which is the same reasoning
+the system requirements give for their own numbering.
+
+A second microcontroller, an STM32G031K8T6, with its own clock, its own
+windowed watchdog cross-checked against an independent oscillator, its own
+MAX31856 on its own SPI bus, and **one element of the contactor coil**
+(`SYS-HW-26`). It reads the chamber couple, and above a backstop compiled into
+its firmware, or on a chamber thermocouple fault that persists, it opens its
+element. The whole of it is 3 488 bytes of program memory across four source
+files, which is a design constraint and not an aspiration: it is small enough
+to be read in one sitting by somebody assessing it.
+
+What it protects against is **the failure of the entire controller**, which is
+the one thing no layer above it could cover. L2 is a task on the processor that
+may itself be the problem: a controller that stops with the charge-pump pin
+toggling, or that fires on a reading it has mis-scaled, is a single failure that
+L1 and L2 are both downstream of. Until this layer existed, the honest answer to
+that was the operator's own hardware cutout at L5.
+
+What it deliberately **does not** do, each because adding it would cost more
+than it buys:
+
+- **It runs no rules of its own beyond two.** Runaway detection, the current
+  rules, the enclosure channel, hold-back, the operator's configurable maximum:
+  all of those stay at L2, where the configuration is. A backstop with
+  configuration is not a backstop.
+- **It takes no instruction.** The link is one direction and report only
+  (`SYS-HW-27`). No message can raise its threshold, lower its sensitivity,
+  clear its latch or silence it, because the part that might be compromised or
+  crashed is the part at the other end.
+- **It cannot command heat.** Holding one element of a series path is
+  permission, not control: it can refuse heat alone and cannot grant it alone.
+  So it needs no safety case for failing to permit -- a supervisor that fails
+  off is a kiln that does not fire.
+- **It keeps no non-volatile state.** Its latch does not survive a power cycle,
+  by design, and the system-level obligation to remember a fault across a power
+  loss is met by the controller's persisted fault (`SWR-SAF-17`). Section 3 of
+  [`safety-supervisor.md`](safety-supervisor.md) states the gap that leaves.
+
+Its latch is cleared by a button at the panel wired to it and to nothing else
+(`SYS-HW-28`). There are therefore **two acknowledgements** in this system and
+they are not the same: this one, and the controller's own latched fault at the
+display. An operator cannot see the difference, so the panel has to make it.
+
+**No performance level and no SIL is claimed for it**, and §9 of this document
+is not improved on by its existence. What is claimed is narrower and checkable:
+a documented language subset, the diagnostics of EN IEC 60730-1 Annex H listed
+in its unit design document, MC/DC over its trip logic, and an architecture that
+keeps the safety function on a part the network cannot reach.
+
 ### 5.3 L3, The heat authority hardware
 
 This is the layer that does not depend on the firmware being correct, only on
@@ -219,30 +291,37 @@ failing to run.
 > circuit as safety-critical, and the HIL suite verifies contactor release by
 > halting the safety task.
 
-**Four independent things now break the coil, three of them without firmware.**
+**Three independent things break the coil, and they do not share a decider.**
 The coil circuit is a series chain, and any element opening drops the contactor:
 
-| Element | Opens when | Firmware involved? |
+| Element | Opens when | What has to be working |
 |---|---|---|
-| Lid switch contacts (`SYS-HW-21`) | the door opens | **No.** Mechanical, in the coil circuit. |
-| `Q6`, gated by the chamber `FAULT` output (`SYS-HW-24`) | the chamber front end reports a fault | No, once configured. See the limit below. |
-| `Q5`, gated by the enclosure `FAULT` output (`SYS-HW-24`) | the enclosure front end reports a fault | As above. |
-| `Q3`, gated by the charge pump (`SWA-05`) | the supervisor stops toggling | Only in that it must keep running. |
+| Lid switch contacts (`SYS-HW-21`) | the door opens | **Nothing.** A mechanical contact in the coil circuit. |
+| The supervisor's permit (`SYS-HW-26`) | the chamber passes the compiled-in backstop, or the chamber front end stops answering, or the supervisor itself stops | The supervisor's own firmware, on its own clock, on a part the network cannot reach. |
+| `Q3`, gated by the charge pump (`SWA-05`) | the controller's safety task stops toggling | Only that the controller is still executing; not that it is correct. |
 
-The freewheel diode sits **across the coil**, on the kiln side of all four
+The freewheel diode sits **across the coil**, on the kiln side of all three
 (`SYS-HW-25`), so opening any of them leaves the coil current somewhere to decay
 and does not put the transient across the opening contacts.
 
-The limit of the two `FAULT` elements is worth stating rather than discovering:
-the outputs are open-drain, so an **unpowered or absent** front end leaves its
-transistor on and the path closed, and the MAX31856 detects an open circuit
-only after its fault mask has been configured. They interrupt on faults the
-device actively *reports*. A dead or unconfigured front end is covered by
-`SWR-SAF-04` in firmware (fault 5, front-end communication failure), not here. The
-lid switch carries no such caveat: it is a contact in the circuit.
+**It was four, two of them gated by the front ends' `FAULT` outputs
+(`SYS-HW-24`), and that chain is superseded** by the row above it. The limit of
+those two elements had to be stated rather than discovered: the outputs are
+open-drain, so an unpowered or absent front end left its transistor on and the
+path closed, and a MAX31856 reports an open circuit only after its fault mask
+has been configured, which is firmware work. They interrupted on faults the
+device actively *reported*, and a dead or unconfigured front end was covered by
+`SWR-SAF-04` in firmware rather than by the hardware.
+
+The supervisor has neither caveat, because it is not gated by a pin: a front end
+that is dead, absent or unconfigured is a front end that does not answer the
+supervisor, and not answering is a trip. The enclosure channel loses its
+hardware element and keeps `SWR-SAF-11` in firmware, deliberately: it is outside
+the supervisor's remit so that a failed enclosure probe can never stop a firing
+mid-glaze, which is how protections come to be disabled (`HZ-10`).
 
 In series with the charge-pump-driven contactor sits the SSR, modulating under
-the supervisor's duty command (`SYS-SAF-03`). Two devices, two drive circuits, two
+the controller's duty command (`SYS-SAF-03`). Two devices, two drive circuits, two
 failure modes. All heater and contactor control outputs carry external
 pull-downs to the de-energised state and avoid strapping pins and pins that
 glitch during reset (`SYS-HW-08`), so the safe state holds through the window before
@@ -286,11 +365,21 @@ section states where the claim is genuine and where it is not.
 | Pair | Independent? | Shared element, what defeats both |
 |---|---|---|
 | L1 control vs. L2 thermal rules | **No** | The same chamber thermocouple. A plausible-but-wrong reading (HZ-03) misleads both. This is the entire reason `SWR-SAF-04`–`SWR-SAF-06` exist: they do not measure temperature, they interrogate the *measurement*, fault bits, polarity, and whether the number moves at all. |
-| L2 thermal rules vs. L2 current rules | **Yes, physically** | Different sensor (CT vs. thermocouple), different quantity (amps vs. degrees), different front end, different failure modes. They share the supervisor task and the MCU. |
+| **L2S supervisor vs. the controller (L1–L4)** | **Yes** | Separate silicon, separate firmware in a separate language subset, separate clock, separate watchdog, separate thermocouple front end on a separate bus, separate series element in the coil, separate programming interface. **The only thing shared is the 3V3 rail**, and a failure of that rail removes heat by construction, since every element in the coil path fails towards de-energised. This is the row the second part was added to be able to write, and it is the only "yes" in this table that covers the failure of a whole processor. |
+| **L2S supervisor vs. the controller, on the chamber couple** | **No** | **One thermocouple feeds both microcontrollers.** Each has its own MAX31856, its own bus and its own linearisation, so a front-end failure is independent; the *junction* is not. A couple that reads plausibly low in a way both parts believe defeats the thermal channel at both L2 and L2S simultaneously. This is the common cause the architecture does not remove, and the reason the row below is load-bearing rather than defence in depth. It is argued at length in §9 of [`safety-supervisor.md`](safety-supervisor.md), including the two-couple option that was declined and why. |
+| L2 thermal rules vs. L2 current rules | **Yes, physically, and now load-bearing** | Different sensor (CT vs. thermocouple), different quantity (amps vs. degrees), different front end, different failure modes. They share the supervisor task and the MCU. **Promoted from defence in depth 2026-10-10**: with one chamber couple feeding both microcontrollers, the CT is the only physically independent detection channel left in the system. A kiln whose current monitoring is disabled or whose transformer was never fitted (`SWR-CUR-12`) has, for the shared-couple failure mode, exactly one channel and the operator's L5 cutout. That is a decision an installer can make; it should be made knowing this. |
 | L2 vs. L3 | **Yes, for the failure class that matters** | L3 does not depend on L2 being *correct*, only on it *running*. A logic error in a rule does not stop the toggle; a hang, crash or overrun stops it immediately. The converse is also true: L3 cannot detect anything, so a subtly wrong rule is L2's problem alone. |
 | L3 SSR vs. L3 contactor | **Yes** | Separate devices on separate outputs. A shorted SSR leaves the contactor able to interrupt; this is what `SWR-SAF-27`'s weld discrimination tests, and what makes "SSR shorted" a recoverable fault and "contactor welded" not. |
-| L2+L3 vs. L4 watchdogs | **Partly** | Same MCU and same power rail. A supply fault defeats all three, and is then safe by construction, since every one of them fails towards de-energised. |
+| L2+L3 vs. L4 watchdogs | **Partly** | Same MCU and same power rail. A supply fault defeats all three, and is then safe by construction, since every one of them fails towards de-energised. The supervisor's watchdog at L2S is not in this row: it is on the other part. |
 | L1–L4 vs. L5 cutout | **Yes, fully** | Nothing is shared: separate sensor, separate contacts, separate failure modes. This is why L5 is mandatory and why no amount of software may be offered as a substitute. |
+
+**What the second part changed in this section**, stated plainly because it is
+the point of the exercise: the table used to have no row in which the failure of
+a whole microcontroller was covered by anything inside this project. It has one
+now. What it still has no row for is the chamber couple, and adding the second
+part made that *more* exposed rather than less, because it is now the only
+shared element between two otherwise independent channels. Both things are true
+at once and neither is a reason to leave the other unsaid.
 
 **Defence in depth, stated as a rule rather than an aspiration.** The current
 rules are the *primary* detection of a failed relay, contactor or element,

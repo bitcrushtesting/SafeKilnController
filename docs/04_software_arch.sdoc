@@ -109,6 +109,13 @@ RELATIONS:
 UID: SWA-04
 STATEMENT: >>>
 **The safety supervisor is a separate, higher-priority task that owns the heat-enable output.** The control path can only *request* heat; safety alone grants it.
+
+**There are now two supervisors and this is the one made of software.** Since [LINK: SWA-22] the kiln has an independent supervisor on its own microcontroller holding its own series element in the coil, and the distinction has to be kept straight in every sentence that says "the supervisor":
+
+- **this** one is a task inside the controller's firmware. It protects against bugs, deadlocks and overruns in control, HMI, web and networking, and it enforces every configurable rule: the operator's maximum, runaway detection, the thermal and current rules;
+- **that** one is a second part. It protects against the failure of this entire processor, and enforces one rule that nothing here can change.
+
+Neither replaces the other, and the reason is what each can be wrong about. A task cannot protect against the processor it runs on; a part with no configuration, no network and 3 488 bytes of program cannot run a firing schedule. The configurable rules have to live where the configuration is, which is here, and the backstop has to live where nothing can reach it, which is there.
 <<<
 RATIONALE: >>>
 [LINK: SYS-SAF-01], [LINK: SYS-SAF-02], [LINK: SWR-SAF-13]. A bug, deadlock or overrun anywhere in control, HMI, web or networking cannot produce heat.
@@ -131,6 +138,10 @@ RELATIONS:
 UID: SWA-05
 STATEMENT: >>>
 **Heat enable is a software-generated square wave into a hardware charge pump**, not a static level.
+
+**It remains the controller's path to the coil and is no longer the only path.** Since [LINK: SWA-22] the supervisor holds a second series element with its own output, so the coil needs the charge pump *and* the supervisor's permit. The charge pump still does what it was put there for -- a hung safety task stops toggling and the contactor drops in about a second with no code involved -- and that property is now one of two, not the whole of the argument.
+
+The supervisor's element is **a static level with an external pull-down** rather than a second charge pump ([LINK: SYS-HW-26]), and that asymmetry is deliberate. A charge pump protects against a processor that has stopped executing while leaving a pin latched high, which is the failure a 240 MHz processor running WiFi, a web server and a filesystem actually has. The supervisor executes 3 488 bytes in a loop with a windowed watchdog cross-checked against an independent oscillator; what protects against *it* stopping is that stopping removes the permit. A second charge pump would add a timing requirement to the part whose value is having almost none.
 <<<
 RATIONALE: >>>
 [LINK: SYS-SAF-02], [LINK: SYS-HW-07], and gives [LINK: SWR-SAF-14] for free: a hung safety task stops toggling and the contactor drops in ~1 s with no code involved.

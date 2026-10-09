@@ -413,7 +413,15 @@ TITLE: 3.1 Temperature acquisition (FR-ACQ)
 [REQUIREMENT]
 UID: SWR-ACQ-01
 STATEMENT: >>>
-The system shall measure chamber temperature with a MAX31856 thermocouple front-end over SPI.
+Chamber temperature shall be measured with a MAX31856 thermocouple front end over SPI **by the independent supervisor**, and reported to the controller over the link of [LINK: SYS-HW-27] at not less than 4 Hz. The **enclosure** channel's MAX31856 remains the controller's own, on the controller's bus.
+
+**Amended 2026-10-10 with the supervisor (SWA-22).** This said "the system shall measure", which was accurate when one microcontroller read both front ends. It no longer is, and the difference matters to every requirement downstream: the controller does not own the chamber front end, cannot configure it ([LINK: SWR-ACQ-02]), and has no access to it other than a frame arriving on a serial line.
+
+What that makes the controller's obligation here:
+
+- **A report is a sample.** The link's rate is the controller's sample rate; there is nothing behind it to poll faster.
+- **Silence is a sensor fault, not a comms problem.** A link that has gone quiet, or that is repeating a sequence number, presents to the controller exactly as a front end that has stopped answering, and is handled by [LINK: SWR-SAF-04]'s grace and latch rather than retried. That is tested end to end: the kiln is heating, the link stops, the fault latches and the contactor opens.
+- **A reading is not trusted further than its source.** The supervisor's own fault bits and its trip reason come up the same link and are displayed, never acted on as permission.
 <<<
 PRIORITY: M
 VERIFICATION: T

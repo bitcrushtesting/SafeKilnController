@@ -132,7 +132,14 @@ VERIFICATION: I
 [REQUIREMENT]
 UID: SYS-HW-02
 STATEMENT: >>>
-The chamber and enclosure thermocouple front-ends shall be MAX31856 devices on a shared SPI bus with individual chip selects.
+Both thermocouple front ends shall be MAX31856 devices, and they shall be on **separate SPI buses belonging to different microcontrollers**:
+
+- the **chamber** front end on the supervisor's bus ([LINK: SYS-HW-26]), read by the supervisor and by nothing else;
+- the **enclosure** front end on the controller's bus, read by the controller.
+
+**Amended 2026-10-10 with the supervisor (SWA-22).** This said "a shared SPI bus with individual chip selects", which was true when one microcontroller read both. A shared bus is now exactly what must not happen: a supervisor whose chamber reading can be disturbed by the controller's bus traffic, or whose chip select can be driven by a controller that has crashed with a pin latched, is not independent of it, and independence is the whole of what the second part buys.
+
+One **common cause** survives any bus arrangement, and it is the chamber couple itself: both microcontrollers derive chamber temperature from the same junction, so the independence this requirement buys is independence against software and silicon, not against the sensor. It is recorded in `safety.md` section 6 and in section 9 of the supervisor's design rather than claimed away here.
 <<<
 PRIORITY: M
 VERIFICATION: I
@@ -268,7 +275,18 @@ VERIFICATION: I
 [REQUIREMENT]
 UID: SYS-HW-24
 STATEMENT: >>>
-The thermocouple front ends' **`FAULT` outputs shall interrupt the contactor coil in hardware**, each through its own series switching element, so that a reported sensor fault removes the heater without the firmware taking part. Each `FAULT` net shall retain its own test point. The limits of this interlock shall be documented: the outputs are open-drain, so an **unpowered or absent** front end leaves the path closed, and the MAX31856 detects an open circuit only once its fault mask has been configured. The hardware interlock therefore covers faults the device actively reports, and [LINK: SWR-SAF-04] in firmware remains the cover for a dead or unconfigured front end.
+**Superseded 2026-10-10 by [LINK: SYS-HW-26] and [LINK: SYS-SAF-25]. Rewritten rather than deleted, because the property it reached for is now delivered differently.**
+
+It required the thermocouple front ends' `FAULT` outputs to interrupt the contactor coil in hardware, each through its own series switching element, so that a reported sensor fault removed the heater with no firmware taking part. What that was buying is a sensor fault that stops the kiln without trusting the controller's firmware, and it bought it with an interlock whose limits had to be documented at length: the outputs are open-drain, so an unpowered or absent front end leaves the path closed, and a MAX31856 reports an open circuit only once its fault mask is configured, which is firmware work. The chain covered faults the device actively reported and nothing else, so [LINK: SWR-SAF-04] remained the real cover for a dead or unconfigured front end.
+
+The supervisor delivers the same property and more of it. It reads the chamber front end itself, decides on a persistent fault, and holds its own series element in the coil; a front end that is dead, absent or unconfigured is a front end that does not answer the supervisor either, and that is a trip rather than a documented limit. The discrete chain is therefore not built.
+
+What is **kept** from this requirement:
+
+- each `FAULT` net retains its own test point, which costs nothing and is how the front ends are diagnosed on a bench;
+- the enclosure channel has no hardware interlock and never did; [LINK: SWR-SAF-11] in the controller's firmware is its cover, and that channel is deliberately outside the supervisor's remit so that an enclosure fault can never cause the supervisor's trip.
+
+The lid's series contact of [LINK: SYS-HW-21] is **unchanged** and stays in the coil. It is the one element in the design that depends on no firmware at all.
 <<<
 PRIORITY: M
 VERIFICATION: I, T
@@ -282,9 +300,50 @@ PRIORITY: S
 VERIFICATION: I, T
 
 [REQUIREMENT]
+UID: SYS-HW-26
+STATEMENT: >>>
+**The independent safety supervisor shall be a separate microcontroller** with:
+
+- **its own clock and its own watchdog**, neither derived from nor serviced by the controller;
+- **its own series interrupting element in the contactor coil path**, in addition to the elements of [LINK: SYS-SAF-03] and the lid contact of [LINK: SYS-HW-21];
+- **its own chamber thermocouple front end** on its own SPI bus ([LINK: SYS-HW-02]);
+- **its own programming and debug interface**, brought out to test points, so that its firmware can be reviewed, built and flashed without the controller taking part.
+
+The permit output shall be **active high**, and the series element shall have an **external pull-down**: every GPIO is high impedance between reset and the first instruction, so without one there is a window at every supervisor reset in which the element's state is whatever the board leaks to.
+
+It can refuse heat on its own and it cannot command heat on its own: holding one element of a series path is permission, not control. That asymmetry is the whole design, and it is why the supervisor needs no safety case for its own failure to permit -- a supervisor that fails off is a kiln that does not fire.
+<<<
+PRIORITY: M
+VERIFICATION: I, T
+
+[REQUIREMENT]
+UID: SYS-HW-27
+STATEMENT: >>>
+**The link between the controller and the supervisor shall be point-to-point serial, one direction, and report only.** The supervisor transmits; it shall not act on anything received, and the controller shall have no electrical path able to change what the supervisor does.
+
+No message shall exist that can raise the supervisor's trip threshold, lower its sensitivity, clear its latch, or suppress its reports. The threshold is compiled in ([LINK: SYS-SAF-25]) and the latch is cleared locally ([LINK: SYS-HW-28]).
+
+The reason is the attack surface and the failure surface at once: a controller that can be compromised over the network, or that can simply crash with a transmitter stuck, must not be able to reach the part whose job is to disbelieve it. A link that only carries information out cannot carry instruction in.
+<<<
+PRIORITY: M
+VERIFICATION: I, T
+
+[REQUIREMENT]
+UID: SYS-HW-28
+STATEMENT: >>>
+**The supervisor's latch shall be cleared by a local action at the panel**, by a button wired to the supervisor and to nothing else, or by a power cycle.
+
+The button shall be edge triggered and shall require a deliberate hold, and a line stuck low shall never arm it, so that a short circuit fails towards the latch holding rather than towards it clearing.
+
+The panel shall not imply that there is one acknowledgement. There are two and they are not the same: this one clears the supervisor, and the controller's own latched fault ([LINK: SWR-SAF-17]) is acknowledged at the display. An operator cannot see the difference, so the labelling has to make it.
+<<<
+PRIORITY: M
+VERIFICATION: I, T
+
+[REQUIREMENT]
 UID: SYS-HW-25
 STATEMENT: >>>
-The contactor coil's freewheel diode shall be connected **across the coil itself**, on the kiln side of every series interrupting element of [LINK: SYS-HW-21] and [LINK: SYS-HW-24], so that opening any of them leaves the coil current a path to decay through. A freewheel path referenced to the raw supply instead would put the inductive transient across the opening contacts, eroding the lid switch and stressing the sense divider.
+The contactor coil's freewheel diode shall be connected **across the coil itself**, on the kiln side of every series interrupting element of [LINK: SYS-HW-21] and [LINK: SYS-HW-26], so that opening any of them leaves the coil current a path to decay through. A freewheel path referenced to the raw supply instead would put the inductive transient across the opening contacts, eroding the lid switch and stressing the sense divider.
 <<<
 PRIORITY: M
 VERIFICATION: I
@@ -340,6 +399,39 @@ STATEMENT: >>>
 The heating output stage shall consist of an SSR for modulation **in series with** an electromechanical contactor that provides an independent break, each controlled by a separate output.
 <<<
 VERIFICATION: I
+
+[REQUIREMENT]
+UID: SYS-SAF-25
+STATEMENT: >>>
+**An independent supervisor shall de-energise the heater above a hard-coded absolute chamber temperature, and on a persistent chamber thermocouple fault, independently of the controller.**
+
+The threshold shall be **compiled into the supervisor's firmware** and shall not be reachable by configuration, by the link, or by any other means short of reflashing that part. A ceiling an operator can raise is a ceiling, not a backstop: [LINK: SWR-SAF-23]'s configurable maximum is the operator's limit, and this is the one that exists for when the controller's own rules, or the controller itself, have stopped working. The two values are stated together wherever either appears, because limits that can be edited apart eventually cross.
+
+It supersedes the hardware fault chain of [LINK: SYS-HW-24], and it is a stronger claim than that chain could make: a front end that is dead, absent or unconfigured does not answer the supervisor, and not answering is a trip.
+<<<
+VERIFICATION: A, T
+
+[REQUIREMENT]
+UID: SYS-SAF-26
+STATEMENT: >>>
+**The supervisor's trip shall latch**, and shall be clearable only by a power cycle or the local action of [LINK: SYS-HW-28] -- never by a command over the link ([LINK: SYS-HW-27]).
+
+A latch that the controller could clear is not a latch: the controller is the part that may have failed, and the condition that tripped the supervisor is one the controller either did not see or did not act on. Somebody has to go and look at the kiln.
+
+The latch is **not required to survive a power cycle**, and that is deliberate rather than an omission. The supervisor holds no non-volatile state at all, so it cannot be left in a state that a reflash or a flat battery changes, and the system-level obligation to remember a fault across a power loss is met by the controller's persisted fault ([LINK: SWR-SAF-17]). Section 3 of the supervisor's design states what that leaves: a power cycle clears the supervisor's own memory of why it tripped, and the controller's record is what the operator is shown.
+<<<
+VERIFICATION: A, T
+
+[REQUIREMENT]
+UID: SYS-SAF-27
+STATEMENT: >>>
+**Chamber temperature shall be acquired by the supervisor and reported at not less than 4 Hz, and a stale report shall be treated by the controller as a sensor fault.**
+
+The controller has no other source of chamber temperature, so the report rate is the controller's sample rate and silence on the link is indistinguishable from a dead front end -- which is why it is treated as one rather than as a communications problem to retry.
+
+**The supervisor's own trip shall not depend on the link.** It shall act within one acquisition period of the condition arising, whether or not anything is listening. The link exists so that the controller can display a temperature and say why the kiln stopped; the protection works with the link unplugged.
+<<<
+VERIFICATION: A, T
 
 [REQUIREMENT]
 UID: SYS-SAF-24

@@ -472,29 +472,37 @@ question is whether it is worth its cost.
 
 ## K. Hardware interlock chain
 
-- [ ] **K1. The hardware TC interlock is not firmware-independent, and the
-  documentation now says so.** The `FAULT` outputs are open-drain: an unpowered
-  or absent front end leaves the path closed. The MAX31856 also detects an open
-  circuit only once its fault mask is configured, so out of reset the interlock
-  does not act. It covers faults the device actively reports; `SWR-SAF-04` in
-  firmware remains the cover for a dead or unconfigured front end. The lid
-  contact has no such caveat.
+**Superseded 2026-10-10 by the independent supervisor (`R7`).** The discrete
+chain in this section existed to put the thermocouple front ends' `FAULT`
+outputs in series with the contactor coil (`SYS-HW-24`). The supervisor reads
+the chamber front end itself, decides on a persistent fault, and holds its own
+series element, which is the same property delivered without the chain's
+caveats: a front end that is dead, absent or unconfigured does not answer the
+supervisor either, and not answering is a trip rather than a documented limit.
 
-- [ ] **K2. Should an enclosure thermocouple fault really stop the kiln?**
-  Both front ends are in the chain, because the request said fault pins. But
-  `SWR-SAF-11` (enclosure over-temperature) is a backstop, and a failed enclosure
-  probe killing a firing mid-glaze is a nuisance trip, which `HZ-10` says is
-  how protections get disabled. Consider a fitted-by-default `0R` in `Q5`'s
-  drain so the enclosure branch can be depopulated without cutting a track.
+`SYS-HW-24` is rewritten rather than deleted, because what it reached for is now
+delivered differently, and it keeps the one part worth keeping: each `FAULT` net
+retains its own test point.
 
-  Decide this together with the parts analysis that used to live in
-  `docs/bom-optimisation.md` (removed from the repository; see its history),
-  which reached the same question from the parts end: if this branch is depopulatable then the
-  MAX31856 on the enclosure channel has nothing left to justify it, since it is
-  bought for its `FAULT` pin rather than for measuring 40 to 90 degC. That
-  document's preferred option removes the channel entirely, using the chamber
-  front end's own cold-junction reading for `SWR-SAF-11` and a bimetallic cutout in
-  the coil for a hardware trip.
+- [x] **K1. Answered rather than mitigated.** The chain was not
+  firmware-independent: open-drain outputs leave the path closed when a front
+  end is unpowered or absent, and a MAX31856 reports an open circuit only once
+  its fault mask has been configured, which is firmware work. That is why this
+  was recorded as a limitation rather than a protection. The supervisor has
+  neither caveat.
+
+- [x] **K2. Dissolved.** The question was whether an enclosure thermocouple
+  fault should stop a firing, given that `SWR-SAF-11` is a backstop and a
+  nuisance trip is how protections get disabled (`HZ-10`). The enclosure
+  channel is not in the supervisor's remit at all, by decision: it stays an
+  ESP32 rule and can never cause the supervisor's trip. There is no branch to
+  depopulate because there is no chain.
+
+- [x] **K5. Reduced to three tests, and they are still hardware tests.** Four
+  elements in series became three: the lid contact, the controller's charge
+  pump, and the supervisor's permit. Each must drop the contactor on its own,
+  which is `G2`'s class of claim and cannot be settled in simulation. The
+  `FAULT`-pin tests are gone with the chain.
 
 - [ ] **K3. `D7` is an unwired LED.** Pre-existing, not from this change: the
   coil indicator's cathode is on `COIL_DRV` and its anode goes nowhere. It
@@ -502,17 +510,13 @@ question is whether it is worth its cost.
   `LID_SWITCH` rather than `+5V` makes it indicate "coil actually energised"
   rather than "the MCU asked".
 
-- [ ] **K4. The PCB carries section K, but is not routed.**
-  `update_pcb_from_schematic` has been run and the interlock chain's parts are
-  on the board (`J9`, `Q5`, `Q6`, `R28`–`R31`); placement is started, with 74
-  footprints positioned. **There are no tracks and no vias on the board at
-  all**, and the coil interrupt is a mains-adjacent net, so routing it is not
-  a formality: see `A23`.
-
-- [ ] **K5. HIL: verify each interrupt separately.** Four elements in series
-  means four tests: open the lid, pull each `FAULT` low, and halt the safety
-  task. Each should drop the contactor on its own. This is the same class of
-  claim as `G2` and cannot be settled in simulation.
+- [ ] **K4. The board carries the chain that is no longer wanted, and is not
+  routed.** `J9`, `Q5`, `Q6` and `R28`–`R31` are placed on the PCB for an
+  interlock the design has dropped, and the supervisor's own parts are not on
+  it at all: that is `R6`, the schematic. **There are no tracks and no vias on
+  the board**, and the coil interrupt is a mains-adjacent net, so routing it is
+  not a formality: see `A23`. Depopulating the chain's parts is the smaller
+  half of this; the supervisor and its series element are the larger.
 
 ---
 
@@ -904,24 +908,69 @@ either the supervisor's pin count or a requirement.
   rather than from configuration: refused on the product, which is the point,
   and correct on the simulated build where the port accepts it.
 
-- [ ] **R5. Write the requirement deltas.** Six new requirements and nine
-  changed ones, listed in section 11 of the design. `SWR-SAF-23` and `SWR-ACQ-02` are
-  done; still to do are `SWR-ACQ-01`, `SYS-HW-02`, `SYS-HW-24` superseded, `SWA-04`,
-  `SWA-05`, `SG-01`, `SG-03` and `safety.md` sections 5 and 6.
+- [x] **R5. The requirement deltas are written. Done 2026-10-10.** Six new
+  requirements and nine changed ones. The supervisor appeared nowhere in the
+  system or safety requirements before this, which meant the design document
+  was the only place it existed: a part holding one element of the contactor
+  coil, with no requirement to satisfy and nothing to verify against.
 
-  With `R3` and `R4` settled, §6's independence table is now writable and says
-  three specific things. A new row for the supervisor against the ESP32 that
-  genuinely says **yes**: separate silicon, firmware, clock and watchdog,
-  sharing only the 3V3 rail. A new row, or an amendment to the L1-vs-L2 one,
-  recording that the chamber couple is shared by *both* MCUs, so the
-  independence is against software and not against a plausible-but-wrong
-  reading. And the existing "thermal rules vs. current rules" row promoted from
-  defence in depth to **load-bearing**, because with one couple the CT is the
-  only physically independent detection channel left in the system.
+  **New**, in `02_system_req.sdoc`: `SYS-HW-26` the separate microcontroller
+  with its own clock, watchdog, front end, series element and programming
+  interface, and the external pull-down the reset window needs; `SYS-HW-27` the
+  one-direction report-only link, with no message able to raise the threshold
+  or clear the latch; `SYS-HW-28` the local clear button, edge triggered, a
+  stuck line never arming it; `SYS-SAF-25` the compiled-in backstop and
+  persistent-fault trip; `SYS-SAF-26` the latch and what clears it, including
+  why it deliberately does not survive a power cycle; `SYS-SAF-27` the 4 Hz
+  report, silence as a sensor fault, and the trip acting within one acquisition
+  period whether or not anything is listening.
 
-  `SWR-SAF-17` also needs a sentence: the supervisor's latch does not survive a
-  power cycle by design, and the system-level obligation is met by the ESP32's
-  persisted fault. Section 3 of the design states the gap that leaves.
+  **Changed**: `SWR-ACQ-01` (the chamber front end is the supervisor's, and a
+  report is the controller's sample), `SYS-HW-02` (separate buses on different
+  microcontrollers, where a shared bus is now exactly what must not happen),
+  `SYS-HW-24` (superseded, rewritten, test points kept), `SYS-HW-25` (its
+  freewheel reference follows), `SWA-04` (two supervisors, and which one every
+  sentence means), `SWA-05` (the charge pump is one of two paths, and why the
+  supervisor's element is deliberately a static level instead), `SG-01`
+  (strengthened on MCU failure, and more exposed on the sensor), `SG-03` ("two"
+  became "at least two", and "independent control" became true).
+  `SWR-SAF-23` and `SWR-ACQ-02` were already done.
+
+  `safety.md` gains **L2S**, lettered rather than numbered because the layer
+  numbers are cited from `safety.sdoc`, the firmware and the hardware design,
+  and renumbering to open a gap would break every citation to no benefit. Its
+  section says what the layer protects against -- the failure of the entire
+  controller, which no layer above it could cover -- and what it deliberately
+  does not do.
+
+  `safety.md`'s system-boundary diagram and its coil-path table are updated
+  with it: three elements break the coil now rather than four, and the diagram
+  carries a dashed line between the two front ends that is not a signal, so
+  that it cannot be read as two independent temperature channels when both
+  MAX31856 read one junction.
+
+  Section 6's independence table gains the three rows the design asked for: a
+  genuine **yes** for the supervisor against the controller, sharing only the
+  3V3 rail; an explicit **no** for the chamber couple, which both
+  microcontrollers read from one junction; and the thermal-versus-current row
+  **promoted from defence in depth to load-bearing**, because with one couple
+  the CT is the only physically independent detection channel left. The second
+  part made the processor-failure row writable and the couple row worse at the
+  same time, and both are said.
+
+- [x] **R7. What the supervisor supersedes is removed. Done 2026-10-10.**
+  Section K is superseded: `K1` is answered rather than mitigated, `K2`
+  dissolves, `K5` drops from four tests to three. `SYS-HW-24` is rewritten
+  rather than deleted and keeps its test points. `SWR-SAF-31` and `SYS-HW-21`
+  are unchanged, as the design said they should be: the lid's series contact
+  depends on no firmware at all, costs nothing and stays, and the lid sense
+  stays the controller's input because `SWR-SAF-31`'s latch is gated on a
+  heating state only the controller knows. A supervisor latching on the lid
+  regardless would trip on every cold load.
+
+  What is left in section K is `K3`, an unwired indicator LED that predates all
+  of this, and `K4`, which has grown rather than shrunk: the board carries the
+  chain the design has dropped and does not carry the supervisor at all.
 
 - [ ] **R11. The clear button on the panel.** `R4` decided a local button and
   the firmware implements it (edge triggered, held 0.5 s, and a line stuck low

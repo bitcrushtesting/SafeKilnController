@@ -389,9 +389,15 @@ UID: SG-01
 STATEMENT: >>>
 No single failure of software, MCU, sensor or switching device shall result in heating; every such failure shall result in heating being removed.
 <<<
-LAYERS: L2, L3, L5
+LAYERS: L2, L2S, L3, L5
 COMMENT: >>>
 Realised by [LINK: SYS-SAF-01] and by the whole of [`safety.md` §5](safety.md#5-the-protection-layers), which is why only the one requirement is named here.
+
+**Strengthened 2026-10-10 by the independent supervisor ([LINK: SYS-SAF-25]), and in one respect it has to be read more carefully than before.**
+
+"No single failure of **MCU**" was the weakest word in this goal while there was one microcontroller. A processor that stops with the charge-pump pin toggling, or that fires on a reading it has mis-scaled, is a single failure of the MCU that the MCU itself was being asked to catch; the honest position was that layers L2 and L3 are mostly *software on the part that may have failed*, with the operator's own hardware cutout ([LINK: SYS-HW-13]) behind them. That is now a second part, with its own clock, watchdog, front end and series element, and a failure of either processor removes heat.
+
+What a careful reader must not conclude is that the sensor clause is equally covered. **One thermocouple feeds both microcontrollers**, so a failure of that junction is a single failure that both channels see identically, and it is the common cause this architecture does not remove. It is detected rather than tolerated: an open, shorted or out-of-range couple is a fault to both parts, and the current rules of `SG-05` are the only physically independent detection channel left. Section 6 of `safety.md` records it as load-bearing for exactly that reason.
 <<<
 RELATIONS:
 - TYPE: Parent
@@ -436,9 +442,22 @@ RELATIONS:
 [SAFETY_GOAL]
 UID: SG-03
 STATEMENT: >>>
-There shall be two series interrupting devices under independent control, so that one failing closed does not remove the ability to interrupt.
+There shall be **at least two** series interrupting devices under independent control, so that one failing closed does not remove the ability to interrupt.
 <<<
-LAYERS: L3
+LAYERS: L2S, L3
+COMMENT: >>>
+**Amended 2026-10-10: "two" became "at least two", and "independent control" became true.**
+
+The original pair is the SSR and the contactor of [LINK: SYS-SAF-03], each with its own output. They are two devices in series, which defeats one failing closed, but both outputs came from one microcontroller: a processor that failed with both pins asserted left both devices conducting, so "independent control" meant independent *drivers* rather than independent *deciders*.
+
+The coil path now has three elements that can open it, and they do not share a decider:
+
+- the controller's charge pump ([LINK: SWA-05]), which needs its safety task to keep toggling;
+- the supervisor's permit ([LINK: SYS-HW-26]), on a different part with its own clock and watchdog, which needs the chamber below a compiled-in ceiling and the front end answering;
+- the lid's series contact ([LINK: SYS-HW-21]), which depends on no firmware at all.
+
+Any one of the three opens the coil. The first two are now genuinely under independent control, which is what this goal was reaching for and could not previously claim.
+<<<
 RELATIONS:
 - TYPE: Parent
   VALUE: HZ-01
@@ -451,6 +470,9 @@ RELATIONS:
   ROLE: Realised by
 - TYPE: Child
   VALUE: SYS-HW-07
+  ROLE: Realised by
+- TYPE: Child
+  VALUE: SYS-HW-26
   ROLE: Realised by
 
 [SAFETY_GOAL]
