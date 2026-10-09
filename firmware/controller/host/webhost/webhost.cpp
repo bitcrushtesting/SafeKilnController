@@ -16,6 +16,12 @@
  * seeing the UI and for driving the API suite by hand.
  *
  *   firmware/controller/host/webhost/build.sh && ./webhost --port 8080 --accel 60
+ *
+ * `--fire` exists because of SWR-WEB-26.  The interface is read-only, so a
+ * firing cannot be started from the browser, and an idle dashboard shows almost
+ * none of what this harness is for.  It starts one of the built-in examples
+ * (SWR-PRG-09) through the same `kiln_app_start` the local HMI calls, so what
+ * the browser then shows is a real run of the real logic rather than a mock.
  */
 
 #include <errno.h>
@@ -125,6 +131,10 @@ void device_init(void)
         exit(1);
     }
     (void)kiln_app_boot(&g_app, KILN_RESET_POWER_ON, -1.0f);
+
+    /* The built-in examples of SWR-PRG-09, so the Programs view has something in
+     * it.  Idempotent by design, and the device does this on every boot too. */
+    (void)kiln_program_store_seed(&g_fs_port);
 
     g_api.app       = &g_app;
     g_api.filestore = &g_fs_port;
@@ -456,11 +466,45 @@ void push_sse(void)
     }
 }
 
+/* Start one of the built-in examples, by index or by name.  Returns false and
+ * says why rather than starting something the caller did not ask for. */
+bool fire_example(const char *which)
+{
+    const uint8_t n = kiln_profile_example_count();
+    for (uint8_t i = 0; i < n; i++) {
+        kiln_program_t p;
+        if (kiln_profile_example(i, &p) != KILN_OK) {
+            continue;
+        }
+        char index[4];
+        (void)snprintf(index, sizeof(index), "%u", (unsigned)i);
+        if ((strcmp(which, index) != 0) && (strcmp(which, p.name) != 0)) {
+            continue;
+        }
+        if (kiln_app_start(&g_app, &p) != KILN_OK) {
+            (void)fprintf(stderr, "could not start \"%s\"\n", p.name);
+            return false;
+        }
+        printf("Firing \"%s\"\n", p.name);
+        return true;
+    }
+    (void)fprintf(stderr, "no example called \"%s\". There are %u:\n", which,
+                  (unsigned)n);
+    for (uint8_t i = 0; i < n; i++) {
+        kiln_program_t p;
+        if (kiln_profile_example(i, &p) == KILN_OK) {
+            (void)fprintf(stderr, "  %u  %s\n", (unsigned)i, p.name);
+        }
+    }
+    return false;
+}
+
 } // namespace
 
 int main(int argc, char **argv)
 {
     int port = 8080;
+    const char *fire = NULL;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
@@ -472,6 +516,9 @@ int main(int argc, char **argv)
         else if (strcmp(argv[i], "--web") == 0 && i + 1 < argc) {
             (void)snprintf(g_web_dir, sizeof(g_web_dir), "%s", argv[++i]);
         }
+        else if (strcmp(argv[i], "--fire") == 0 && i + 1 < argc) {
+            fire = argv[++i];
+        }
         else {
             (void)fprintf(stderr,
                 "Safe Kiln Controller development harness -- real firmware logic, simulated kiln.\n"
@@ -479,6 +526,9 @@ int main(int argc, char **argv)
                 "  --port N    listen port (default 8080)\n"
                 "  --accel X   simulated time multiplier (default 60)\n"
                 "  --web DIR   directory of web assets (default ./web)\n"
+                "  --fire P    start a built-in example at once, by index or name.\n"
+                "              The web interface is read-only (SWR-WEB-26), so this\n"
+                "              is the only way to see a run in it.\n"
                 "\n"
                 "NOT a production server: single-threaded, no TLS, no authentication.\n");
             return 1;
@@ -494,6 +544,10 @@ int main(int argc, char **argv)
     (void)signal(SIGPIPE, SIG_IGN);
 
     device_init();
+
+    if ((fire != NULL) && !fire_example(fire)) {
+        return 1;
+    }
 
     const int listener = socket(AF_INET, SOCK_STREAM, 0);
     if (listener < 0) { perror("socket"); return 1; }

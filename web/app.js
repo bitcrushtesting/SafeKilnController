@@ -168,7 +168,7 @@ function renderBanner(s) {
   b.className = 'banner' + (s.fault ? '' : ' warn');
 
   if (s.fault) {
-    b.append(el('b', null, `Fault ${s.fault.code} — ${s.fault.label}`));
+    b.append(el('b', null, `Fault ${s.fault.code}: ${s.fault.label}`));
     b.append(el('div', null, s.fault.message));
     if (s.fault.requirement) {
       b.append(el('div', 'tagline', `detected by ${s.fault.requirement}`));
@@ -177,7 +177,7 @@ function renderBanner(s) {
   if (warnings.length) {
     if (!s.fault) b.append(el('b', null, warnings.length === 1 ? 'Warning' : 'Warnings'));
     const ul = el('ul');
-    for (const w of warnings) ul.append(el('li', null, `${w.code} ${w.label} — ${w.message}`));
+    for (const w of warnings) ul.append(el('li', null, `${w.code} ${w.label}: ${w.message}`));
     b.append(ul);
   }
   b.hidden = false;
@@ -275,14 +275,29 @@ async function refreshPower() {
     live.power = {
       kw: (c.apparent_va || 0) / 1000,
       kwh: (c.energy_wh || 0) / 1000,
-      phases: c.phases,
-      perPhase: c.per_phase || [],
       basis: c.power_basis,
     };
+    /* Only fields /api/current actually returns.  This used to read `phases`,
+       `channels` and `per_phase`, which the API has never emitted: three-phase
+       went out of scope with OQ-06 and the client kept asking for it.  On a
+       running kiln that showed up on the dashboard as the line
+       "undefined-phase, undefined CTs fitted", which is the kind of defect a
+       screenshot finds and a unit test does not. */
     const note = $('power-basis');
     if (note) {
-      note.textContent = `${c.phases}-phase, ${c.channels} CT` +
-        (c.channels === 1 ? '' : 's') + ' fitted. ' + (c.power_basis || '');
+      if (!c.enabled) {
+        note.textContent = 'Current measurement is off, so power and energy are not measured.';
+      } else if (!c.available) {
+        note.textContent = 'Current transformer fault, so power and energy are not measured.';
+      } else {
+        /* What is fitted, and what the number assumes.  The voltage is the one
+           the device is configured for rather than a constant here: power is
+           current times that voltage, so a reader who knows their supply is
+           240 V needs to see which figure produced the kilowatts. */
+        const cts = c.channels || 1;
+        const volts = Number(c.mains_v || 0).toFixed(0);
+        note.textContent = `${cts} CT fitted. Power assumes ${volts} V AC.`;
+      }
     }
   } catch (e) {
     live.power = null;
@@ -426,7 +441,7 @@ async function loadRuns() {
     const when = r.start_utc_s
       ? new Date(r.start_utc_s * 1000).toLocaleString()
       : `run ${r.run_id}`;
-    left.append(el('div', null, `${r.program || '(unnamed)'} — ${when}`));
+    left.append(el('div', null, `${r.program || '(unnamed)'} · ${when}`));
     const bits = [`peak ${r.peak_c.toFixed(0)}°C`, fmtDur(r.duration_s), r.end_reason];
     if (r.energy_wh) bits.push(`${(r.energy_wh / 1000).toFixed(2)} kWh`);
     if (r.fault) bits.push(`fault: ${r.fault}`);

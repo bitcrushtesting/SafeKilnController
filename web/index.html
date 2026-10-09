@@ -18,7 +18,7 @@ telemetry, nothing that reaches off the box.
 
 <header class="bar">
   <div class="brand">
-    <span class="mark">KILN</span><span class="mark accent">CONTROL</span>
+    <span class="mark">Safe Kiln</span> <span class="mark accent">Controller</span>
   </div>
   <div class="bar-right">
     <span id="conn" class="conn" title="connection">
@@ -62,11 +62,14 @@ telemetry, nothing that reaches off the box.
         <span class="label" data-i18n="current">Current</span>
         <span class="value" id="r-current">--<em>A</em></span>
       </div>
-      <div class="tile">
+      <!-- `readout`, like the five above: there is no `.tile` rule in app.css,
+           so these two fell outside the grid and rendered as loose text over
+           the row. -->
+      <div class="readout">
         <span class="label" data-i18n="power">Power</span>
         <span class="value" id="r-power">--<em>kW</em></span>
       </div>
-      <div class="tile">
+      <div class="readout">
         <span class="label" data-i18n="energy_run">Energy this run</span>
         <span class="value" id="r-energy">--<em>kWh</em></span>
       </div>
@@ -102,8 +105,8 @@ telemetry, nothing that reaches off the box.
     <p id="power-basis" class="hint"></p>
     <p class="readonly-note">
       <strong>Display only.</strong> Starting, pausing and aborting a firing,
-      manual heating and acknowledging a fault are done at the kiln
-      &mdash; not over the network.
+      manual heating and acknowledging a fault are done at the kiln, not over
+      the network.
     </p>
   </section>
 
@@ -133,12 +136,11 @@ telemetry, nothing that reaches off the box.
         <canvas id="ed-chart" height="200"></canvas>
       </div>
     </div>
+    <p id="programs-readonly-note" class="readonly-note">
+      <strong>Display only.</strong> Firing programs are shown here but are
+      authored at the kiln, not over the network.
+    </p>
   </section>
-
-  <p id="programs-readonly-note" class="readonly-note">
-    <strong>Display only.</strong> Firing programs are shown here but are
-    authored at the kiln, not over the network (SWR-WEB-26).
-  </p>
 
   <!-- History -->
   <section id="view-history" class="view" hidden>
@@ -159,7 +161,7 @@ telemetry, nothing that reaches off the box.
     <div id="cfg-groups"></div>
     <p class="readonly-note">
       <strong>Display only.</strong> Configuration holds the maximum temperature
-      and the safety thresholds, so it is changed at the kiln (SWR-WEB-26).
+      and the safety thresholds, so it is changed at the kiln.
     </p>
     <div id="cfg-msg" class="note" hidden></div>
 
