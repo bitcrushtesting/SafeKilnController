@@ -118,7 +118,7 @@ const kiln_cfg_item_t k_items[] = {
     ENUMI("hmi.units",                         "SWR-HMI-13",   units, k_units_names, KILN_UNITS_COUNT, KILN_UNITS_C, 0),
     ENUMI("hmi.language",                      "SWR-NFR-23",      language, k_lang_names, KILN_LANG_COUNT, KILN_LANG_EN, 0),
     NUM("hmi.dim_timeout_s",          "s",     "SWR-HMI-12",   KILN_CFG_T_U16,   dim_timeout_s,           0,  3600,       60, 0),
-    NUM("hmi.alarm_duration_s",       "s",     "SWR-RUN-06",   KILN_CFG_T_U16,   alarm_duration_s,        0,   600,       30, 0),
+    NUM("hmi.alarm_duration_s",       "s",     "SWR-RUN-06",   KILN_CFG_T_U16,   alarm_duration_s,        0,   600,        4, 0),
 
     /* network */
     /* Set at the display (SWR-NET-12) rather than typed into a configuration

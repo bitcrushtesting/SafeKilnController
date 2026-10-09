@@ -6,6 +6,7 @@
 # core may not include a single IDF header -- tools/layercheck enforces that.
 
 set(KILN_CORE_SRCS
+    src/alarmptn.cpp
     src/autotune.cpp
     src/configmodel.cpp
     src/current.cpp

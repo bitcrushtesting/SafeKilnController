@@ -909,7 +909,9 @@ VERIFICATION: T
 [REQUIREMENT]
 UID: SWR-RUN-06
 STATEMENT: >>>
-On program completion the system shall disable heating, sound the alarm for a configurable duration (0–600 s, default 30 s), and enter Complete.
+On program completion the system shall disable heating, sound the alarm for a configurable duration (0–600 s, default 4 s), and enter Complete.
+
+**Amended 2026-10-09.** The default was 30 s, which with the completion pattern of [LINK: SWR-SAF-20] is fifteen repetitions of it. A firing that has just finished correctly is good news, and a notification is what it wants rather than half a minute of chirping, so the default is now one burst's worth. The range is unchanged: an operator who wants the kiln to keep saying so until somebody comes can still set it, and 0 silences the completion annunciation without touching the fault one.
 <<<
 PRIORITY: M
 VERIFICATION: T
@@ -2550,8 +2552,15 @@ VERIFICATION: I, T
 UID: SWR-SAF-20
 STATEMENT: >>>
 The on-board buzzer ([LINK: SYS-HW-09]) shall sound on any fault and on program completion, and the two shall be audibly distinguishable by their pattern.
+
+**Amended 2026-10-09 to say what the two patterns are**, because "distinguishable" was left to the implementation and the implementation was in a timer callback no test could reach:
+
+- **Completion** is three 90 ms chirps, then five seconds of silence. Brief and unmistakably a notification.
+- **A fault** is six 60 ms chirps at twice that rate, a 400 ms gap, and again without end until the fault is acknowledged. Twice the chirp rate, a third of the cycle sounding against a twentieth, and a cycle five times shorter: the two differ in rhythm, in rate and in duty, so neither a noisy workshop nor a closed door collapses one into the other.
+
+The patterns are a table in `kiln_core/alarmptn`, and the distinguishability is asserted as a comparison between them rather than described, which is why the verification method changes from Demonstration to Test. A buzzer that cannot be commanded, including a pattern value that is not one of the three, is silent: the failure direction is off, because an operator's only remedy for a buzzer stuck on is the mains switch.
 <<<
-VERIFICATION: D
+VERIFICATION: T
 
 [REQUIREMENT]
 UID: SWR-SAF-21
