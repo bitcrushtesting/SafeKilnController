@@ -33,6 +33,14 @@ for arg in "$@"; do
     esac
 done
 
+# Named in the output because the version matters and has bitten: Ubuntu's
+# doxygen 1.9 treats a bare \dot in prose as the start of a dot block where
+# 1.18 does not, so the same sources passed here and failed in CI. A log that
+# does not say which tool produced it cannot show that.
+if command -v doxygen >/dev/null 2>&1; then
+    echo "doxygen:  $(doxygen --version)"
+fi
+
 if ! command -v doxygen >/dev/null 2>&1; then
     echo "doxygen is not installed." >&2
     echo "  macOS:  brew install doxygen" >&2
