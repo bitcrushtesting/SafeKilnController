@@ -132,7 +132,16 @@ void draw_main(kiln_hmi_t *h, const kiln_hmi_view_t *v)
     /* Duty, and the two states worth seeing at a glance. */
     (void)snprintf(buf, sizeof(buf), "%u%%", (unsigned)(v->snap.duty_permille / 10u));
     kiln_fb_text(&h->fb, 0, 40, buf, 1, true);
-    if (v->snap.heat_authorised) { kiln_fb_text(&h->fb, 30, 40, S(v, KILN_HMI_STR_HEAT), 1, true); }
+    /* SWR-SAF-31, in the slot that would otherwise say HEAT.  The two cannot
+     * both be true -- an open door removes heat authority -- so the badge that
+     * says why the kiln is hot says why it is not, which is the question an
+     * operator standing in front of an idle kiln is actually asking. */
+    if (v->snap.door_monitoring && v->snap.door_open) {
+        kiln_fb_text(&h->fb, 30, 40, S(v, KILN_HMI_STR_DOOR), 1, true);
+    }
+    else if (v->snap.heat_authorised) {
+        kiln_fb_text(&h->fb, 30, 40, S(v, KILN_HMI_STR_HEAT), 1, true);
+    }
     if (v->snap.holdback_active) { kiln_fb_text(&h->fb, 62, 40, S(v, KILN_HMI_STR_HOLD), 1, true); }
     if (v->awaiting_ack)         { kiln_fb_text(&h->fb, 94, 40, S(v, KILN_HMI_STR_ACK), 1, true); }
 
@@ -180,9 +189,13 @@ void draw_fault(kiln_hmi_t *h, const kiln_hmi_view_t *v)
     /* The cause, wrapped to the panel.  Word wrapping rather than hard cuts:
      * these sentences are the operator's instructions, and a word split across
      * two lines in a hurry reads as a different word. */
+    /* The PANEL form, not the full cause.  The full ones run to 279
+     * characters, which is a paragraph in a browser and five lines of 21 on
+     * this screen: what fell off the bottom was the end of the sentence, and
+     * in an instruction the end of the sentence is the instruction. */
     const char *cause = sup_blame
-                      ? kiln_sup_reason_cause_in(v->sup_reason, v->language)
-                      : kiln_fault_cause_in(v->fault, v->language);
+                      ? kiln_sup_reason_panel_in(v->sup_reason, v->language)
+                      : kiln_fault_panel_in(v->fault, v->language);
     const int   cols  = KILN_DISPLAY_W / 6;
     int         y     = 16;
     while ((*cause != '\0') && y < (KILN_DISPLAY_H - 8)) {
@@ -218,12 +231,15 @@ const char *menu_label(uint8_t i, const kiln_hmi_view_t *v)
     case 3: return S(v, KILN_HMI_STR_NETWORK);
     case 4: return S(v, KILN_HMI_STR_DIAGNOSTICS);
     case 5: return S(v, KILN_HMI_STR_INFO);
+    /* SWR-CFG-09, last on purpose: it is the one entry that destroys
+     * something, and it is a long way from "Start program" by a knob. */
+    case 6: return S(v, KILN_HMI_STR_FACTORY_RESET);
     default: return "";
     }
 }
 
 } // namespace
-constexpr int MENU_ITEMS = 6;
+constexpr int MENU_ITEMS = 7;
 
 namespace {
 
@@ -264,7 +280,9 @@ void draw_confirm(kiln_hmi_t *h, const kiln_hmi_view_t *v)
     /* SWR-HMI-11: starting and aborting both require this step. */
     const char *what = (h->pending == KILN_HMI_ACT_START)
                      ? S(v, KILN_HMI_STR_START_FIRING_Q)
-                     : S(v, KILN_HMI_STR_ABORT_FIRING_Q);
+                     : (h->pending == KILN_HMI_ACT_FACTORY_RESET
+                          ? S(v, KILN_HMI_STR_ERASE_ALL_Q)
+                          : S(v, KILN_HMI_STR_ABORT_FIRING_Q));
     kiln_fb_text(&h->fb, 0, 4, what, 1, true);
 
     if (h->pending == KILN_HMI_ACT_START && h->pending_program < v->program_count) {
@@ -430,16 +448,28 @@ void draw_diag(kiln_hmi_t *h, const kiln_hmi_view_t *v)
                    (double)v->snap.current_a);
     kiln_fb_text(&h->fb, 0, 23, buf, 1, true);
 
-    /* SWR-CUR-07, in the units a kiln owner thinks in. */
-    (void)snprintf(buf, sizeof(buf), "%-5s %.2fkW", S(v, KILN_HMI_STR_POWER),
-                   v->power_w / 1000.0);
+    /* SWR-CUR-07, in the units a kiln owner thinks in.  Power and energy share
+     * a row so the door state gets one: five rows fit under the rule, and the
+     * two are read together anyway -- "it is drawing this much, it has used
+     * that much".  Their row labels are gone with the merge, and the units do
+     * the naming instead: kW is a rate and kWh is a total, which is a
+     * distinction a kiln owner makes before a firmware engineer does.  Two
+     * strings left the table rather than staying in it unused. */
+    (void)snprintf(buf, sizeof(buf), "%.2fkW %.1fkWh",
+                   v->power_w / 1000.0, v->energy_wh / 1000.0);
     kiln_fb_text(&h->fb, 0, 33, buf, 1, true);
-    (void)snprintf(buf, sizeof(buf), "%-5s %.2fkWh", S(v, KILN_HMI_STR_USED),
-                   v->energy_wh / 1000.0);
-    kiln_fb_text(&h->fb, 0, 43, buf, 1, true);
 
     (void)snprintf(buf, sizeof(buf), "%-5s %u%%", S(v, KILN_HMI_STR_DUTY),
                    (unsigned)(v->snap.duty_permille / 10u));
+    kiln_fb_text(&h->fb, 0, 43, buf, 1, true);
+
+    /* Three states and not two (SWR-SAF-31).  "shut" and "open" both
+     * presuppose a switch; a kiln with none fitted is the case warning 113
+     * exists for, and showing it as "shut" would be the one wrong answer. */
+    const char *door = !v->snap.door_monitoring ? S(v, KILN_HMI_STR_DOOR_NONE)
+                     : (v->snap.door_open ? S(v, KILN_HMI_STR_DOOR_OPEN)
+                                          : S(v, KILN_HMI_STR_DOOR_SHUT));
+    (void)snprintf(buf, sizeof(buf), "%-5s %s", S(v, KILN_HMI_STR_DOOR_LABEL), door);
     kiln_fb_text(&h->fb, 0, 53, buf, 1, true);
 }
 
@@ -571,7 +601,15 @@ kiln_hmi_action_t kiln_hmi_update(kiln_hmi_t *h, const kiln_hmi_view_t *view,
                     break;
                 case 3: h->screen = KILN_HMI_SCREEN_NETWORK; break;
                 case 4: h->screen = KILN_HMI_SCREEN_DIAG;    break;
-                default: h->screen = KILN_HMI_SCREEN_INFO;   break;
+                case 5: h->screen = KILN_HMI_SCREEN_INFO;    break;
+                default:
+                    /* SWR-CFG-09.  Confirmed like an abort, and defaulting to
+                     * NO for the same reason: the knob's first position must
+                     * not be the destructive one. */
+                    h->pending     = KILN_HMI_ACT_FACTORY_RESET;
+                    h->confirm_yes = false;
+                    h->screen      = KILN_HMI_SCREEN_CONFIRM;
+                    break;
                 }
             }
             break;

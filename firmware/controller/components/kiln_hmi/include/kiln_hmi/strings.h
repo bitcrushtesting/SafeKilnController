@@ -52,6 +52,9 @@ typedef enum {
     KILN_HMI_STR_HEAT,
     KILN_HMI_STR_HOLD,
     KILN_HMI_STR_ACK,
+    /* SWR-SAF-31: shown in the slot that would say HEAT, because an open door
+     * is why the kiln is not heating. */
+    KILN_HMI_STR_DOOR,
 
     /* Menu */
     KILN_HMI_STR_START_PROGRAM,
@@ -59,11 +62,17 @@ typedef enum {
     KILN_HMI_STR_RESUME,
     KILN_HMI_STR_PAUSE_RESUME,
     KILN_HMI_STR_ABORT,
+    KILN_HMI_STR_FACTORY_RESET,
     KILN_HMI_STR_NONE_STORED,
 
     /* Confirmation */
     KILN_HMI_STR_START_FIRING_Q,
     KILN_HMI_STR_ABORT_FIRING_Q,
+    /* SWR-CFG-09.  Phrased as what it destroys rather than as its name: an
+     * operator who misreads "factory reset" as "restore defaults" loses their
+     * firing history and their WiFi credentials to a single press. */
+    KILN_HMI_STR_ERASE_ALL_Q,
+    KILN_HMI_STR_ERASED,
     KILN_HMI_STR_YES,
     KILN_HMI_STR_NO,
     KILN_HMI_STR_TURN_THEN_PRESS,
@@ -92,9 +101,12 @@ typedef enum {
      * translation. */
     KILN_HMI_STR_CASE,
     KILN_HMI_STR_AMPS,
-    KILN_HMI_STR_POWER,
-    KILN_HMI_STR_USED,
     KILN_HMI_STR_DUTY,
+    /* The diagnostics row, where all three door states are spelled out. */
+    KILN_HMI_STR_DOOR_LABEL,
+    KILN_HMI_STR_DOOR_OPEN,
+    KILN_HMI_STR_DOOR_SHUT,
+    KILN_HMI_STR_DOOR_NONE,
     KILN_HMI_STR_UPTIME,
     KILN_HMI_STR_TUNED,
     KILN_HMI_STR_UNTUNED,

@@ -44,6 +44,7 @@ const char *const k_str[KILN_HMI_STR_COUNT][KILN_LANG_COUNT] = {
     { "HEAT",              "HEIZ" },
     { "HOLD",              "WARTET" },
     { "ACK?",              "QUIT?" },
+    { "DOOR",              "TUER" },
 
     /* Menu */
     { "Start program",     "Programm starten" },
@@ -51,11 +52,14 @@ const char *const k_str[KILN_HMI_STR_COUNT][KILN_LANG_COUNT] = {
     { "Resume",            "Fortsetzen" },
     { "Pause/Resume",      "Pause/Fortsetzen" },
     { "Abort",             "Abbrechen" },
+    { "Erase everything",  "Alles loeschen" },
     { "none stored",       "keine gespeichert" },
 
     /* Confirmation */
     { "Start firing?",     "Brennen starten?" },
     { "Abort firing?",     "Brennen abbrechen?" },
+    { "Erase all data?",   "Alle Daten loeschen?" },
+    { "erased",            "geloescht" },
     { "YES",               "JA" },
     { "NO",                "NEIN" },
     { "turn to choose, press", "drehen, dann druecken" },
@@ -82,9 +86,11 @@ const char *const k_str[KILN_HMI_STR_COUNT][KILN_LANG_COUNT] = {
     /* Diagnostics and info */
     { "case",              "Geh." },
     { "amps",              "Strom" },
-    { "power",             "Leist" },
-    { "used",              "Verbr" },
     { "duty",              "Takt" },
+    { "door",              "Tuer" },
+    { "OPEN",              "OFFEN" },
+    { "shut",              "zu" },
+    { "no switch",         "kein Schalter" },
     { "up",                "Lauf" },
     { "tuned",             "abgestimmt" },
     { "UNTUNED defaults",  "NICHT abgestimmt" },

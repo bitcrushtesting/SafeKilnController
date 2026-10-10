@@ -48,19 +48,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: kiln_core has no platform dependency (SWR-TST-01, SWA-14)
+      - name: Three architecture decisions, structurally (SWA-14, SWA-03, SWA-02)
         run: |
-          # The property SWA-14 rests on, and the one that erodes first: one
-          # esp_*/freertos include in the core and the host tests stop building,
-          # which is how a testability driver gets quietly dropped.  The full
-          # check over preprocessor output is tasklist C5; a grep already catches
-          # every way this has actually happened.
-          if grep -rnE '#include[[:space:]]*[<"](esp_|freertos/|driver/|soc/|hal/|nvs|sdkconfig)' \
-                  firmware/controller/components/kiln_core firmware/controller/components/kiln_ports; then
-            echo "::error::kiln_core or kiln_ports references a platform header"
-            exit 1
-          fi
-          echo "clean"
+          # tools/layercheck.sh, which replaced the grep that used to be here
+          # and says in its own header why. Three decisions that held by
+          # discipline alone are now checked:
+          #
+          #   SWA-14  the core includes no platform header, read from the
+          #           preprocessor's own record rather than from include lines,
+          #           so an indirect or ESP_PLATFORM-guarded one is caught too.
+          #   SWA-03  no mutable file-scope state in the core, read from the
+          #           object code, which also catches a function-local static.
+          #   SWA-02  no direct clock read in the core, read from its
+          #           undefined symbols.
+          #
+          # The last two are what make a 168 h firing testable in milliseconds,
+          # and both would break silently: the tests keep passing, they just
+          # stop testing what they claim to.
+          #
+          # Its own self-test runs first, because a gate nobody has seen fail
+          # is a gate nobody should trust.
+          tools/layercheck.sh --self-test
+          # The host build is needed for the object-code checks; the target
+          # build is not available in this job, and the script says which
+          # checks it skipped rather than reporting a pass it did not make.
+          cmake -B build-host -S firmware/controller/test/host >/dev/null
+          cmake --build build-host -j"$(nproc)" --target kiln_core >/dev/null
+          tools/layercheck.sh
 
       - name: kiln_ports is headers only (architecture 4, rule 2)
         run: |
@@ -80,6 +94,12 @@ jobs:
           python3 tools/update-manifest.py --self-test
           python3 tools/secure-boot.py --self-test
           python3 tools/sbom.py --self-test
+          # logdump decodes a log partition with an implementation written from
+          # the format's documentation rather than from kiln_core, so the two
+          # agreeing is evidence that the firmware records what it claims. Its
+          # self-test ends by decoding the committed fixture that the C++
+          # encoder produced, which is the half a round trip cannot prove.
+          python3 tools/logdump.py --self-test
 
       - name: SPDX header on every source file (SWR-NFR-18, UR-CON-04)
         run: |
@@ -586,6 +606,7 @@ jobs:
           command: |
             idf.py -B build-hw -D SDKCONFIG=build-hw/sdkconfig -D SDKCONFIG_DEFAULTS="sdkconfig.defaults" build
             idf.py -B build-hw size > build-hw/size.txt
+            cd ../.. && TARGET_BUILD=firmware/controller/build-hw HOST_BUILD=none tools/layercheck.sh
 
       - name: Summarise the hardware image size
         if: always()

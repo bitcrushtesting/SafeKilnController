@@ -434,3 +434,4 @@ KILN_TEST(the_stores_validate_their_arguments)
     CHECK_ERR(kiln_settings_load(NULL, NULL), KILN_ERR_INVALID_ARG);
     CHECK_ERR(kiln_settings_save(NULL, NULL), KILN_ERR_INVALID_ARG);
 }
+

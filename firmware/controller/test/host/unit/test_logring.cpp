@@ -521,3 +521,76 @@ KILN_TEST(the_erase_count_for_150_hours_matches_the_endurance_analysis)
      * present rather than merely survivable. */
     CHECK(!ring.wrapped);
 }
+
+/* ===========================================================================
+ * A RECORD BEFORE ANY RUN  (SWR-LOG-16, SWA-09)
+ * ===========================================================================
+ * Until SWR-LOG-16's security events existed, nothing ever appended outside a
+ * run: every emitter ran inside a firing and begin_run() had always claimed a
+ * sector first. An abnormal reset is logged at boot, which is outside any run,
+ * and the record went into a sector with no header -- which iterate() skips,
+ * because it selects runs from headers, and which the next begin_run() erases.
+ * The record was written, stored, counted and lost.
+ *
+ * The fix claims a sector lazily, tagged run 0 for "not part of a run", and
+ * the bookkeeping is the part that bit: claim_sector writes a header and
+ * nothing else, so the first version left head_seq at 0, begin_run() then
+ * issued the same sequence number to the run's sector, and two sectors tied
+ * for highest. Mount resolves order from the sequence number alone
+ * (architecture 10.3), so the tie made an idle record the newest in the ring
+ * and SWA-09's power-loss journal read the wrong one. Three recovery tests in
+ * another suite caught that, which is the only reason this test exists here.
+ */
+
+/*
+ * @relation(SWR-LOG-16, scope=function)
+ */
+KILN_TEST(swrlog16_a_record_before_any_run_is_kept_and_does_not_outrank_the_run)
+{
+    static rig_t r;
+    rig_init(&r);
+    (void)kiln_logring_mount(&r.ring, &r.port);
+
+    /* Two records outside any run, as a boot-time security event is. */
+    CHECK_OK(append(&r, 1u, 20.0f));
+    CHECK_OK(append(&r, 2u, 20.1f));
+
+    /* They are retrievable, which they were not before: iterate() selects by
+     * sector header, and an unheadered sector is invisible. */
+    CHECK_EQ_UINT(count_all(&r, 0u).count, 2u);
+    /* Tagged run 0, meaning "not part of a run", so a query for a real run
+     * does not pick them up. */
+    CHECK_EQ_UINT(count_all(&r, 7u).count, 0u);
+
+    /* Now a run starts and writes more. */
+    CHECK_OK(kiln_logring_begin_run(&r.ring, 7u));
+    for (uint32_t i = 0; i < 4u; i++) {
+        CHECK_OK(append(&r, 100u + i, 500.0f + (float)i));
+    }
+    CHECK_EQ_UINT(count_all(&r, 7u).count, 4u);
+    CHECK_EQ_UINT(count_all(&r, 0u).count, 6u);
+
+    /* The sequence numbers must not tie, or mount cannot tell which sector is
+     * the head and SWA-09's journal reads whichever came first in address
+     * order. This is the assertion that would have caught the defect. */
+    CHECK(r.ring.head_seq >= 2u);
+
+    /* Across a remount, the newest record in the ring is the run's last one
+     * and not the idle record that was written first. */
+    kiln_logring_t again;
+    CHECK_OK(kiln_logring_mount(&again, &r.port));
+    uint8_t rec[KILN_LOG_RECORD_BYTES];
+    CHECK_OK(kiln_logring_last_record(&again, 0u, rec));
+    kiln_log_sample_t s;
+    CHECK_OK(kiln_logrec_decode(rec, &s));
+    CHECK_MSG(s.t_rel_ms == 103u,
+              "the newest record in the ring is t=%u, not the run's last: a "
+              "sequence-number tie has made an earlier sector look newest",
+              (unsigned)s.t_rel_ms);
+
+    /* And the run's own journal is the same record, which is what recovery
+     * actually asks for. */
+    CHECK_OK(kiln_logring_last_record(&again, 7u, rec));
+    CHECK_OK(kiln_logrec_decode(rec, &s));
+    CHECK_EQ_UINT(s.t_rel_ms, 103u);
+}

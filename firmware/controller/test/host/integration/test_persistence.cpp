@@ -691,3 +691,273 @@ KILN_TEST(swa09_recovery_needs_no_write_of_its_own)
     CHECK_EQ_UINT(s.state, KILN_STATE_RUNNING);
     CHECK(s.setpoint_c > 20.0f);
 }
+
+/* ===========================================================================
+ * THE FACTORY RESET  (SWR-CFG-09, SEC-14, tasklist N4)
+ * ===========================================================================
+ * The requirement is unusually specific about how to test it, and it is right
+ * to be: "the test for this requirement shall read the raw partition back and
+ * look for the secret rather than asking the API whether it is still
+ * configured." Asking the API proves an entry is delisted. Somebody selling a
+ * kiln is asking whether the bytes are gone.
+ *
+ * On NVS an erase marks an entry dead and leaves its content in the page until
+ * a garbage collection that may never come, which is why the implementation
+ * overwrites and commits before erasing -- and why these tests search the
+ * store's backing bytes rather than trusting its answers.
+ */
+
+/* Does the key/value store hold this byte sequence anywhere, in any entry,
+ * whether or not that entry is still listed? This is the question the
+ * requirement asks, and the only one worth asking of a device about to change
+ * hands. */
+static bool kv_holds(const kiln_host_kv_t *kv, const char *needle)
+{
+    const size_t n = strlen(needle);
+    for (size_t i = 0; i < KILN_HOST_KV_ENTRIES; i++) {
+        const kiln_host_kv_entry_t *e = &kv->entries[i];
+        /* Deliberately not gated on e->used: a reset that only clears the
+         * flag is exactly the defect being tested for. */
+        if (e->len < n) { continue; }
+        for (size_t off = 0; off + n <= e->len; off++) {
+            if (memcmp(&e->value[off], needle, n) == 0) { return true; }
+        }
+    }
+    return false;
+}
+
+/*
+ * @relation(SWR-CFG-09, scope=function)
+ */
+KILN_TEST(swrcfg09_a_factory_reset_leaves_no_passphrase_in_the_store)
+{
+    static medium_t m;
+    static boot_t   b;
+    medium_init(&m);
+    CHECK_OK(boot(&b, &m, KILN_RESET_POWER_ON, -1.0f, 20.0f));
+
+    /* A passphrase a search can find, long enough that a partial overwrite
+     * would leave a recognisable tail. */
+    static const char secret[] = "correct-horse-battery-staple-9271";
+    (void)snprintf(b.app.cfg.wifi_pass, sizeof(b.app.cfg.wifi_pass), "%s", secret);
+    (void)snprintf(b.app.cfg.wifi_ssid, sizeof(b.app.cfg.wifi_ssid), "%s", "workshop");
+    CHECK_OK(kiln_settings_save(&b.kv_port, &b.app.cfg));
+
+    /* It really is in there first, or the search below proves nothing: a test
+     * that looks for an absent string in an empty store passes for the wrong
+     * reason, and this is the kind of test that gets written once and trusted
+     * for years. */
+    CHECK_MSG(kv_holds(&m.kv, secret),
+              "the passphrase was never stored, so this test is vacuous");
+
+    kiln_factory_reset_t rep = {};
+    CHECK_OK(kiln_app_factory_reset(&b.app, &rep));
+    CHECK(rep.config);
+    CHECK(rep.credentials);
+
+    /* Checked by experiment, not by assumption: with the overwrite removed
+     * from kiln_app_factory_reset, this assertion fails with exactly this
+     * message. The fake had to be made faithful first -- it used to memset a
+     * whole entry on erase, and to reuse the slot on the next write, either of
+     * which made this pass with no code behind it. */
+    CHECK_MSG(!kv_holds(&m.kv, secret),
+              "the passphrase is still in the store's bytes after a factory "
+              "reset: it was delisted rather than erased");
+    /* And the SSID with it, which identifies the owner's network to whoever
+     * buys the kiln. */
+    CHECK(!kv_holds(&m.kv, "workshop"));
+
+    /* It stays gone across a reboot, which is when a new owner would first
+     * power it up. */
+    static boot_t b2;
+    CHECK_OK(boot(&b2, &m, KILN_RESET_POWER_ON, -1.0f, 20.0f));
+    CHECK(!kv_holds(&m.kv, secret));
+    CHECK_EQ_UINT(strlen(b2.app.cfg.wifi_pass), 0u);
+}
+
+/*
+ * @relation(SWR-CFG-09, scope=function)
+ */
+KILN_TEST(swrcfg09_it_erases_the_history_and_the_counters_too)
+{
+    static medium_t m;
+    static boot_t   b;
+    medium_init(&m);
+    CHECK_OK(boot(&b, &m, KILN_RESET_POWER_ON, -1.0f, 20.0f));
+
+    for (uint32_t i = 1; i <= 5u; i++) {
+        kiln_run_record_t rec = {};
+        kiln_runstate_record_init(&rec, i);
+        rec.end_reason = (uint8_t)KILN_END_COMPLETE;
+        rec.duration_s = 3600u * i;
+        CHECK_OK(kiln_run_index_append(&b.fs_port, &rec));
+    }
+    CHECK_EQ_UINT(kiln_run_index_count(&b.fs_port), 5u);
+
+    kiln_factory_reset_t rep = {};
+    CHECK_OK(kiln_app_factory_reset(&b.app, &rep));
+
+    CHECK_EQ_UINT(kiln_run_index_count(&b.fs_port), 0u);
+    CHECK_EQ_UINT(rep.runs_erased, 5u);
+    CHECK(rep.log);
+    CHECK(rep.counters);
+
+    /* The numbering restarts: a kiln whose first firing is number 94 tells its
+     * new owner something false about its history. */
+    CHECK_EQ_UINT(kiln_run_index_next_run_id(&b.fs_port), 1u);
+
+    /* Defaults are back in RAM too, so the device is usable without a reboot
+     * and is not still serving what was just erased from flash. */
+    kiln_config_t def;
+    kiln_config_defaults(&def);
+    CHECK_NEAR(b.app.cfg.max_temp_c, def.max_temp_c, 0.01f);
+}
+
+/*
+ * @relation(SWR-CFG-09, scope=function)
+ */
+KILN_TEST(swrcfg09_it_is_refused_while_the_kiln_is_firing)
+{
+    static medium_t m;
+    static boot_t   b;
+    medium_init(&m);
+    CHECK_OK(boot(&b, &m, KILN_RESET_POWER_ON, -1.0f, 20.0f));
+
+    static const char secret[] = "keep-me-while-firing";
+    (void)snprintf(b.app.cfg.wifi_pass, sizeof(b.app.cfg.wifi_pass), "%s", secret);
+    CHECK_OK(kiln_settings_save(&b.kv_port, &b.app.cfg));
+
+    kiln_program_t p;
+    CHECK_OK(kiln_profile_example(0, &p));
+    CHECK_OK(kiln_app_start(&b.app, &p));
+
+    kiln_factory_reset_t rep = {};
+    CHECK_ERR(kiln_app_factory_reset(&b.app, &rep), KILN_ERR_STATE);
+    CHECK(kv_holds(&m.kv, secret));
+
+    /* A refusal must not leave a report that reads like a partial success. */
+    CHECK(!rep.config && !rep.credentials && !rep.log);
+    CHECK_EQ_UINT(rep.runs_erased, 0u);
+
+    CHECK_OK(kiln_app_abort(&b.app));
+    CHECK_OK(kiln_app_factory_reset(&b.app, &rep));
+    CHECK(!kv_holds(&m.kv, secret));
+}
+
+/* ===========================================================================
+ * SECURITY EVENTS, AND THE OWNER'S OPT-OUT  (SWR-LOG-16, tasklist N4)
+ * ===========================================================================
+ * UR-REG-004 asks for the opt-out as explicitly as it asks for the log, and
+ * the reason is worth keeping in view: a device that records access to itself
+ * regardless of its owner's wishes is a surveillance feature rather than a
+ * security one.
+ *
+ * What the opt-out may NOT switch off is the other half of the test. A fault,
+ * a state change and the periodic sample are the evidence of what a kiln did;
+ * that is a safety record, and no configuration item removes it.
+ */
+
+/* Count the records of one event code in the log, by draining the queue and
+ * reading the ring back the way /api/log does. */
+typedef struct { uint8_t want; unsigned n; } event_tally_t;
+
+/* The visitor sees the raw record, as /api/log does: the store deals in bytes
+ * and the codec turns them back into a sample, which is the layering that
+ * lets logdump.py decode the same bytes with no firmware involved. */
+static bool tally_event(void *user, uint32_t run_id,
+                        const uint8_t rec[KILN_LOG_RECORD_BYTES])
+{
+    (void)run_id;
+    event_tally_t *c = static_cast<event_tally_t *>(user);
+    kiln_log_sample_t s;
+    if (kiln_logrec_decode(rec, &s) == KILN_OK && s.event == c->want) {
+        c->n++;
+    }
+    return true;
+}
+
+static unsigned count_events(boot_t *b, kiln_log_event_t want)
+{
+    (void)kiln_app_log_drain(&b->app, 64u);
+    event_tally_t c = { (uint8_t)want, 0u };
+    (void)kiln_logring_iterate(&b->ring, 0u, tally_event, &c);
+    return c.n;
+}
+
+/*
+ * @relation(SWR-LOG-16, scope=function)
+ */
+KILN_TEST(swrlog16_security_events_are_recorded_and_can_be_switched_off)
+{
+    static medium_t m;
+    static boot_t   b;
+    medium_init(&m);
+
+    /* Default on, because the default has to be the one that helps an owner
+     * who has not thought about it. */
+    kiln_config_t def;
+    kiln_config_defaults(&def);
+    CHECK(def.log_security_events);
+
+    /* An abnormal reset is a security event: this one is a watchdog. */
+    CHECK_OK(boot(&b, &m, KILN_RESET_TASK_WDT, -1.0f, 20.0f));
+    CHECK_EQ_UINT(count_events(&b, KILN_LOGE_SEC_RESET), 1u);
+
+    /* A factory reset records itself, as the first entry of the new owner's
+     * log: a log that begins mid-history with no explanation reads like a
+     * fault rather than like a sale. */
+    kiln_factory_reset_t rep = {};
+    CHECK_OK(kiln_app_factory_reset(&b.app, &rep));
+    CHECK_EQ_UINT(count_events(&b, KILN_LOGE_SEC_ERASE), 1u);
+
+    /* Now the owner opts out. */
+    b.app.cfg.log_security_events = false;
+    CHECK_OK(kiln_app_apply_config(&b.app, &b.app.cfg, nullptr));
+    const unsigned erases_before = count_events(&b, KILN_LOGE_SEC_ERASE);
+
+    kiln_app_log_event(&b.app, KILN_LOGE_SEC_ERASE);
+    kiln_app_log_event(&b.app, KILN_LOGE_SEC_NET_JOIN);
+    kiln_app_log_event(&b.app, KILN_LOGE_SEC_RESET);
+    CHECK_EQ_UINT(count_events(&b, KILN_LOGE_SEC_ERASE), erases_before);
+    CHECK_EQ_UINT(count_events(&b, KILN_LOGE_SEC_NET_JOIN), 0u);
+
+    /* And the safety record is untouched by that choice. */
+    const unsigned faults_before = count_events(&b, KILN_LOGE_FAULT);
+    kiln_app_log_event(&b.app, KILN_LOGE_FAULT);
+    kiln_app_log_event(&b.app, KILN_LOGE_STATE_CHANGE);
+    kiln_app_log_event(&b.app, KILN_LOGE_SAMPLE);
+    CHECK_EQ_UINT(count_events(&b, KILN_LOGE_FAULT), faults_before + 1u);
+    CHECK(count_events(&b, KILN_LOGE_STATE_CHANGE) > 0u);
+    CHECK(count_events(&b, KILN_LOGE_SAMPLE) > 0u);
+
+    /* Switched back on, it records again: an opt-out is a setting, not a
+     * one-way door. */
+    b.app.cfg.log_security_events = true;
+    CHECK_OK(kiln_app_apply_config(&b.app, &b.app.cfg, nullptr));
+    kiln_app_log_event(&b.app, KILN_LOGE_SEC_NET_JOIN);
+    CHECK_EQ_UINT(count_events(&b, KILN_LOGE_SEC_NET_JOIN), 1u);
+}
+
+/*
+ * @relation(SWR-LOG-16, scope=function)
+ */
+KILN_TEST(swrlog16_a_normal_restart_is_not_a_security_event)
+{
+    /* A power-on is how a kiln starts every morning. Logging it as a security
+     * event would fill the record with noise, and a log nobody reads is the
+     * same as no log. */
+    static medium_t m;
+    static boot_t   b;
+    medium_init(&m);
+    CHECK_OK(boot(&b, &m, KILN_RESET_POWER_ON, -1.0f, 20.0f));
+    CHECK_EQ_UINT(count_events(&b, KILN_LOGE_SEC_RESET), 0u);
+
+    /* A cause the adapter could not identify IS one, deliberately: a reset
+     * nobody can account for is exactly what a log should carry, and treating
+     * UNKNOWN as normal would hide the case where the adapter is wrong. */
+    static medium_t m2;
+    static boot_t   b2;
+    medium_init(&m2);
+    CHECK_OK(boot(&b2, &m2, KILN_RESET_UNKNOWN, -1.0f, 20.0f));
+    CHECK_EQ_UINT(count_events(&b2, KILN_LOGE_SEC_RESET), 1u);
+}

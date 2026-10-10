@@ -97,6 +97,12 @@ typedef struct {
     uint8_t  value[KILN_HOST_KV_VALUE_MAX];
     size_t   len;
     bool     used;
+    /* Erased but not yet collected, which is the state NVS leaves an entry in:
+     * delisted, with its bytes still in the page until a garbage collection
+     * that may never come.  A new write does NOT land here, for the same
+     * reason it does not on NVS, which is what makes SWR-CFG-09's "overwrite
+     * before you erase" a property a test can actually fail. */
+    bool     delisted;
 } kiln_host_kv_entry_t;
 
 typedef struct {
@@ -107,6 +113,12 @@ typedef struct {
 } kiln_host_kv_t;
 
 void kiln_host_kv_init(kiln_host_kv_t *kv);
+
+/* Collect the delisted entries, zeroing their bytes.  NVS does this when a
+ * page fills; nothing in the firmware can make it happen, which is exactly
+ * why a credential must be overwritten rather than left to it.  Here so a test
+ * can reclaim slots deliberately, never automatically. */
+void kiln_host_kv_collect(kiln_host_kv_t *kv);
 void kiln_host_kv_bind(kiln_host_kv_t *kv, kiln_port_kvstore_t *out);
 
 /* --- file store -------------------------------------------------------- */

@@ -474,6 +474,29 @@ void hmi_apply(const kiln_hmi_action_t *a)
         break;
     }
 
+    case KILN_HMI_ACT_FACTORY_RESET: {
+        /* SWR-CFG-09.  Reported rather than merely done: an owner about to
+         * sell the kiln deserves to see what went, and a failure here is the
+         * one case where "it finished" would be a lie with consequences. */
+        kiln_factory_reset_t r = {};
+        e = kiln_app_factory_reset(&s_app, &r);
+        ESP_LOGW(TAG, "factory reset: config %s, credentials %s, log %s, "
+                      "counters %s, %u run records, %u failures",
+                 r.config ? "erased" : "KEPT",
+                 r.credentials ? "overwritten and erased" : "KEPT",
+                 r.log ? "erased" : "KEPT",
+                 r.counters ? "zeroed" : "KEPT",
+                 (unsigned)r.runs_erased, (unsigned)r.failures);
+        if (e == KILN_OK) {
+            /* The WiFi credentials are gone from flash, so the radio is now
+             * joined to a network the device can no longer re-join after a
+             * reboot. Saying so is better than leaving it connected and
+             * looking configured. */
+            ESP_LOGW(TAG, "set up WiFi again at the display when needed");
+        }
+        break;
+    }
+
     case KILN_HMI_ACT_WIFI_SCAN:
         /* SWR-NET-11.  The results arrive asynchronously; the view builder
          * collects them once the driver says the scan is done. */
@@ -482,7 +505,15 @@ void hmi_apply(const kiln_hmi_action_t *a)
               ? s_net_port.scan_begin(s_net_port.ctx) : KILN_ERR_UNSUPPORTED;
         break;
 
-    case KILN_HMI_ACT_WIFI_CONNECT: {
+    case KILN_HMI_ACT_WIFI_CONNECT:
+        /* SWR-LOG-16: a join commanded at the display is a security event --
+         * somebody standing at the kiln pointed it at a network. The SSID is
+         * NOT recorded and the passphrase certainly is not: the requirement
+         * says the log may contain nothing the device does not already show,
+         * and a log that records which network a kiln joined is a record of
+         * where it lives. */
+    {
+        kiln_app_log_event(&s_app, KILN_LOGE_SEC_NET_JOIN);
         /* SWR-NET-12.  Persist first, then join: a device that joins without
          * remembering comes back from a power cut with no network and nobody
          * at the display, which is the state this whole screen exists to get

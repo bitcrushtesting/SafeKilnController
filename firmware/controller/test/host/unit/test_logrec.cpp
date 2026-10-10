@@ -3,6 +3,7 @@
  * kiln_core/logrec -- SWR-LOG-02, SWR-LOG-08, SWR-LOG-10, SWR-LOG-11, SWA-18.
  */
 
+#include <stdio.h>
 #include <string.h>
 #include "kiln_check.h"
 #include "kiln_core/logrec.h"
@@ -284,4 +285,123 @@ KILN_TEST(the_decimator_validates_its_arguments)
     const kiln_log_sample_t s = sample(0, 100.0f, 0.0f);
     kiln_decimator_push(NULL, &s);
     kiln_decimator_push(&d, NULL);
+}
+
+/* ===========================================================================
+ * THE WIRE FORMAT, AGAINST A COMMITTED FIXTURE  (SWA-18, tasklist C7)
+ * ===========================================================================
+ * `firmware/controller/test/host/fixtures/logring.bin` is two log sectors
+ * produced by this encoder and checked into git. Two things read it and
+ * neither may drift:
+ *
+ *   this test, which re-encodes the same samples and compares bytes, so the
+ *   firmware cannot change the format without the fixture changing too;
+ *
+ *   tools/logdump.py, which decodes it with an implementation written from
+ *   the format's documentation rather than from this code.
+ *
+ * That second reader is the point. A log is the only evidence of what a kiln
+ * did before it failed, and "did the firmware record this correctly" cannot
+ * be answered by the firmware's own decoder: a codec that encodes and decodes
+ * with the same wrong idea round-trips perfectly and proves nothing. Two
+ * implementations agreeing is evidence; one agreeing with itself is a
+ * tautology.
+ *
+ * If this test fails, the question is which side moved. If the format changed
+ * deliberately, the sector header's format_version changes with it and the
+ * fixture is regenerated; if it did not, the encoder has a bug that would
+ * have made every log on every device unreadable by the tooling.
+ */
+
+/*
+ * @relation(SWA-18, scope=function)
+ */
+KILN_TEST(swa18_the_encoder_still_produces_the_committed_wire_format)
+{
+    const char *path = KILN_FIXTURE_DIR "/logring.bin";
+    FILE *fh = fopen(path, "rb");
+    CHECK_MSG(fh != nullptr, "cannot open the fixture at %s", path);
+    if (fh == nullptr) { return; }
+
+    static uint8_t want[2 * KILN_LOG_SECTOR_BYTES];
+    const size_t n = fread(want, 1, sizeof(want), fh);
+    (void)fclose(fh);
+    CHECK_EQ_UINT(n, sizeof(want));
+
+    /* The same two headers and three samples the fixture was built from. The
+     * values are chosen for what a decoder gets wrong: a negative
+     * temperature, the segment sentinel, every flag at once, a non-sample
+     * event, and each field at the edge of its scale. */
+    static uint8_t got[2 * KILN_LOG_SECTOR_BYTES];
+    memset(got, 0xFF, sizeof(got));
+
+    const struct { uint32_t seq, run; } secs[2] = { {9, 2}, {8, 2} };
+    for (int s = 0; s < 2; s++) {
+        kiln_log_sector_hdr_t h = {};
+        h.magic          = KILN_LOG_MAGIC;
+        h.seq            = secs[s].seq;
+        h.run_id         = secs[s].run;
+        h.format_version = KILN_LOG_FORMAT_VERSION;
+        uint8_t hb[KILN_LOG_HEADER_BYTES];
+        kiln_logrec_encode_hdr(&h, hb);
+        memcpy(&got[(size_t)s * KILN_LOG_SECTOR_BYTES], hb, sizeof(hb));
+    }
+
+    kiln_log_sample_t a = {};
+    a.t_rel_ms = 1000; a.kiln_raw_c = 20.5f; a.kiln_filt_c = 20.4f;
+    a.setpoint_c = 100.0f; a.case_c = 30.0f; a.current_a = 12.34f;
+    a.duty_permille = 500; a.segment = 3; a.state = 1; a.flags = 0;
+    a.current_flags = 1; a.event = 0;
+
+    kiln_log_sample_t b = a;
+    b.t_rel_ms = 2000; b.kiln_raw_c = -12.3f; b.setpoint_c = 0.0f;
+    b.segment = KILN_SEG_NONE; b.state = 0; b.flags = 0xF0; b.event = 3;
+    b.duty_permille = 0; b.current_a = 0.0f;
+
+    kiln_log_sample_t c = a;
+    c.t_rel_ms = 3000; c.kiln_raw_c = 1285.0f; c.kiln_filt_c = 1284.9f;
+    c.setpoint_c = 1300.0f; c.case_c = 55.5f; c.current_a = 31.75f;
+    c.duty_permille = 1000; c.segment = 4; c.state = 5; c.flags = 0x10;
+    c.event = 2; c.current_flags = 0;
+
+    /* Sector 1 holds the older two, sector 0 the newest: deliberately out of
+     * address order, so anything that reads the ring by address rather than by
+     * sequence number interleaves two firings. */
+    const struct { int sector; const kiln_log_sample_t *s; } rows[] = {
+        { 1, &a }, { 1, &b }, { 0, &c },
+    };
+    size_t used[2] = {0, 0};
+    for (size_t i = 0; i < sizeof(rows) / sizeof(rows[0]); i++) {
+        uint8_t rec[KILN_LOG_RECORD_BYTES];
+        kiln_logrec_encode(rows[i].s, rec);
+        const size_t off = (size_t)rows[i].sector * KILN_LOG_SECTOR_BYTES
+                         + KILN_LOG_HEADER_BYTES
+                         + used[rows[i].sector] * KILN_LOG_RECORD_BYTES;
+        memcpy(&got[off], rec, sizeof(rec));
+        used[rows[i].sector]++;
+    }
+
+    /* Byte for byte, and the first difference is reported: "the images differ"
+     * sends the reader to a hex dump, while an offset sends them to a field. */
+    size_t first_diff = sizeof(got);
+    for (size_t i = 0; i < sizeof(got); i++) {
+        if (got[i] != want[i]) { first_diff = i; break; }
+    }
+    CHECK_MSG(first_diff == sizeof(got),
+              "the encoder no longer produces the committed format: first "
+              "difference at byte %zu (sector %zu, offset %zu in it), got "
+              "0x%02X want 0x%02X",
+              first_diff, first_diff / KILN_LOG_SECTOR_BYTES,
+              first_diff % KILN_LOG_SECTOR_BYTES,
+              (unsigned)got[first_diff < sizeof(got) ? first_diff : 0],
+              (unsigned)want[first_diff < sizeof(want) ? first_diff : 0]);
+
+    /* And the round trip, so a change that is symmetrical in the codec but
+     * wrong against the fixture is still caught above rather than here. */
+    kiln_log_sample_t back = {};
+    CHECK_OK(kiln_logrec_decode(&want[KILN_LOG_SECTOR_BYTES + KILN_LOG_HEADER_BYTES],
+                                &back));
+    CHECK_EQ_UINT(back.t_rel_ms, 1000u);
+    CHECK_NEAR(back.kiln_raw_c, 20.5f, 0.051f);
+    CHECK_EQ_UINT(back.segment, 3u);
 }

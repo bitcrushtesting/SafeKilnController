@@ -208,3 +208,165 @@ KILN_TEST(swrnfr23_german_labels_still_fit_the_display)
                   l, strlen(l));
     }
 }
+
+/* ===========================================================================
+ * WHAT THE PANEL CAN ACTUALLY SHOW  (SWR-NFR-23, SWR-HMI-06, tasklist M4/J1)
+ * ===========================================================================
+ * Two properties of this table that nothing checked, both of which failed.
+ *
+ * The 5x7 font in kiln_hmi carries the 95 printable ASCII glyphs and nothing
+ * else. The labels had always been transliterated -- VERSCHWEISST, KEINE
+ * WAERME -- and the long causes had not: 31 of them contained umlauts, which
+ * reach the panel as blanks. A German operator read a fault screen with holes
+ * in the instruction.
+ *
+ * And the fault screen holds five rows of 21 characters. The full causes run
+ * to 279, because the browser shows them as a paragraph and does so well. On
+ * the panel the tail was simply dropped, and for KILN_FAULT_CONTACTOR_WELDED
+ * the tail was "ISOLATE THE KILN AT ITS SUPPLY NOW".
+ *
+ * These two tests are the reason the panel form exists, and they are written
+ * to name the offender: a bound nobody can fail is not a bound, and one that
+ * fails without saying which string is a bound nobody can fix.
+ */
+
+/* The fault screen's own word wrap, which is what the bound has to be measured
+ * against rather than a character count: it breaks on spaces, so a long word
+ * can waste most of a row. Returns the rows used, or 0 if a single word cannot
+ * fit a row at all. */
+static unsigned wrapped_rows(const char *s)
+{
+    unsigned rows = 0;
+    while (*s != '\0') {
+        unsigned take = 0, last_space = 0;
+        while (take < KILN_PANEL_COLS && s[take] != '\0') {
+            if (s[take] == ' ') { last_space = take; }
+            take++;
+        }
+        if (s[take] != '\0' && last_space > 0) { take = last_space; }
+        else if (s[take] != '\0' && last_space == 0) {
+            /* A word longer than a row. The screen cuts it mid-word, which the
+             * wrap's own comment calls out as unacceptable: a word split in a
+             * hurry reads as a different word, and German compounds are where
+             * this happens -- "Thermoelement-Messeingang" is 25 characters.
+             * Reported as its own failure rather than counted as rows. */
+            return 0;
+        }
+        rows++;
+        s += take;
+        while (*s == ' ') { s++; }
+    }
+    return rows;
+}
+
+/*
+ * @relation(SWR-NFR-23, scope=function)
+ */
+KILN_TEST(swrnfr23_every_string_in_the_table_is_ascii_the_font_can_draw)
+{
+    for (unsigned lang = 0; lang < (unsigned)KILN_LANG_COUNT; lang++) {
+        const kiln_lang_t l = (kiln_lang_t)lang;
+        for (unsigned f = 0; f < (unsigned)KILN_FAULT_MAX; f++) {
+            const char *strs[] = { kiln_fault_label_in((kiln_fault_t)f, l),
+                                   kiln_fault_cause_in((kiln_fault_t)f, l),
+                                   kiln_fault_panel_in((kiln_fault_t)f, l) };
+            for (size_t i = 0; i < 3; i++) {
+                for (const char *c = strs[i]; *c != '\0'; c++) {
+                    const unsigned char u = (unsigned char)*c;
+                    CHECK_MSG(u >= 0x20u && u <= 0x7Eu,
+                              "fault %u lang %u string %zu has byte 0x%02X: "
+                              "the 5x7 font cannot draw it", f, lang, i,
+                              (unsigned)u);
+                }
+            }
+        }
+        for (unsigned w = 0; w < (unsigned)KILN_WARN_COUNT; w++) {
+            const char *strs[] = { kiln_warn_label_in((kiln_warn_bit_t)w, l),
+                                   kiln_warn_cause_in((kiln_warn_bit_t)w, l),
+                                   kiln_warn_panel_in((kiln_warn_bit_t)w, l) };
+            for (size_t i = 0; i < 3; i++) {
+                for (const char *c = strs[i]; *c != '\0'; c++) {
+                    const unsigned char u = (unsigned char)*c;
+                    CHECK_MSG(u >= 0x20u && u <= 0x7Eu,
+                              "warning %u lang %u string %zu has byte 0x%02X",
+                              w, lang, i, (unsigned)u);
+                }
+            }
+        }
+        for (unsigned r = 0; r < (unsigned)KILN_SUP_REASON_COUNT; r++) {
+            const char *strs[] = { kiln_sup_reason_label_in((kiln_sup_reason_t)r, l),
+                                   kiln_sup_reason_cause_in((kiln_sup_reason_t)r, l),
+                                   kiln_sup_reason_panel_in((kiln_sup_reason_t)r, l) };
+            for (size_t i = 0; i < 3; i++) {
+                for (const char *c = strs[i]; *c != '\0'; c++) {
+                    const unsigned char u = (unsigned char)*c;
+                    CHECK_MSG(u >= 0x20u && u <= 0x7Eu,
+                              "sup reason %u lang %u string %zu has byte 0x%02X",
+                              r, lang, i, (unsigned)u);
+                }
+            }
+        }
+    }
+}
+
+/*
+ * @relation(SWR-HMI-06, scope=function)
+ */
+KILN_TEST(swrhmi06_every_panel_cause_fits_the_fault_screen_whole)
+{
+    /* SWR-HMI-06 says the fault screen is not dismissible while the condition
+     * holds, which is only worth anything if what it shows is complete. */
+    for (unsigned lang = 0; lang < (unsigned)KILN_LANG_COUNT; lang++) {
+        const kiln_lang_t l = (kiln_lang_t)lang;
+
+        for (unsigned f = 0; f < (unsigned)KILN_FAULT_MAX; f++) {
+            const char *s = kiln_fault_panel_in((kiln_fault_t)f, l);
+            const unsigned rows = wrapped_rows(s);
+            CHECK_MSG(rows > 0 && rows <= KILN_PANEL_ROWS,
+                      "fault %u lang %u: %s (%u chars) -- \"%s\"", f, lang,
+                      rows == 0 ? "a word is longer than a row"
+                                : "too many rows for the panel",
+                      (unsigned)strlen(s), s);
+        }
+        for (unsigned w = 0; w < (unsigned)KILN_WARN_COUNT; w++) {
+            const char *s = kiln_warn_panel_in((kiln_warn_bit_t)w, l);
+            const unsigned rows = wrapped_rows(s);
+            CHECK_MSG(rows > 0 && rows <= KILN_PANEL_ROWS,
+                      "warning %u lang %u needs %u rows (%u chars): \"%s\"",
+                      w, lang, rows, (unsigned)strlen(s), s);
+        }
+        for (unsigned r = 0; r < (unsigned)KILN_SUP_REASON_COUNT; r++) {
+            const char *s = kiln_sup_reason_panel_in((kiln_sup_reason_t)r, l);
+            const unsigned rows = wrapped_rows(s);
+            CHECK_MSG(rows > 0 && rows <= KILN_PANEL_ROWS,
+                      "sup reason %u lang %u needs %u rows (%u chars): \"%s\"",
+                      r, lang, rows, (unsigned)strlen(s), s);
+        }
+    }
+}
+
+/*
+ * @relation(SWR-NFR-23, scope=function)
+ */
+KILN_TEST(swrnfr23_the_panel_form_says_the_same_thing_as_the_cause)
+{
+    /* A short form is allowed to be terser; it is not allowed to be about
+     * something else, and it is not allowed to be empty. The check that can be
+     * automated is that where a panel form exists it is genuinely shorter than
+     * the cause it replaces, and that the fallback works where none exists --
+     * the rest is review, which is what the table being one readable block is
+     * for. */
+    for (unsigned lang = 0; lang < (unsigned)KILN_LANG_COUNT; lang++) {
+        const kiln_lang_t l = (kiln_lang_t)lang;
+        for (unsigned f = 0; f < (unsigned)KILN_FAULT_MAX; f++) {
+            const char *full  = kiln_fault_cause_in((kiln_fault_t)f, l);
+            const char *panel = kiln_fault_panel_in((kiln_fault_t)f, l);
+            CHECK(panel[0] != '\0');
+            if (panel != full) {
+                CHECK_MSG(strlen(panel) < strlen(full),
+                          "fault %u lang %u has a panel form no shorter than "
+                          "its cause, so it buys nothing", f, lang);
+            }
+        }
+    }
+}

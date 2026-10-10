@@ -964,3 +964,79 @@ KILN_TEST(swrnet12_the_knob_stays_where_the_last_character_left_it)
     CHECK_EQ_UINT(h.charset_sel, landed);
     CHECK_EQ_INT(h.pass[0], h.pass[1]);       /* the same character twice */
 }
+
+/*
+ * @relation(SWR-SAF-31, scope=function)
+ */
+KILN_TEST(swrsaf31_the_display_says_when_the_door_is_why_it_is_not_heating)
+{
+    /* The controller has known the door state since SWR-SAF-31 was
+     * implemented and showed it nowhere: an operator in front of an idle kiln
+     * could see HEAT missing and had to guess why. The badge goes in the slot
+     * that would say HEAT, because the two cannot both be true. */
+    kiln_hmi_t h; kiln_hmi_init(&h, 0);
+    kiln_hmi_view_t v = base_view();
+
+    v.snap.door_monitoring = true;
+    v.snap.door_open       = false;
+    v.snap.heat_authorised = true;
+    (void)feed(&h, &v, KILN_INPUT_NONE);
+    const int heating = ink(&h, 30, 40, 30, 8);
+    CHECK(heating > 0);                  /* HEAT is there */
+
+    /* Door open: authority is gone, and the slot says so instead. */
+    v.snap.door_open       = true;
+    v.snap.heat_authorised = false;
+    (void)feed(&h, &v, KILN_INPUT_NONE);
+    const int door = ink(&h, 30, 40, 30, 8);
+    CHECK(door > 0);
+    CHECK_MSG(door != heating, "DOOR renders the same as HEAT");
+
+    /* Neither: an idle kiln with the door shut says nothing in that slot. */
+    v.snap.door_open       = false;
+    v.snap.heat_authorised = false;
+    (void)feed(&h, &v, KILN_INPUT_NONE);
+    CHECK_EQ_INT(ink(&h, 30, 40, 30, 8), 0);
+
+    /* And an unmonitored door never claims to be open, whatever the pin
+     * reads: with no switch fitted the value means nothing (warning 113). */
+    v.snap.door_monitoring = false;
+    v.snap.door_open       = true;
+    (void)feed(&h, &v, KILN_INPUT_NONE);
+    CHECK_EQ_INT(ink(&h, 30, 40, 30, 8), 0);
+}
+
+/*
+ * @relation(SWR-SAF-31, scope=function)
+ */
+KILN_TEST(swrsaf31_diagnostics_tells_the_three_door_states_apart)
+{
+    /* Three states, not two: "open" and "shut" both presuppose a switch, and a
+     * kiln with none fitted must not read as one whose door is shut. That is
+     * the case warning 113 exists for and the one wrong answer here. */
+    kiln_hmi_t h; kiln_hmi_init(&h, 0);
+    kiln_hmi_view_t v = base_view();
+
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+    for (int i = 0; i < 4; i++) { (void)feed(&h, &v, KILN_INPUT_CW); }
+    (void)feed(&h, &v, KILN_INPUT_PRESS);
+    CHECK_EQ_INT(h.screen, KILN_HMI_SCREEN_DIAG);
+
+    v.snap.door_monitoring = true;
+    v.snap.door_open       = false;
+    (void)feed(&h, &v, KILN_INPUT_NONE);
+    const int shut = ink(&h, 0, 52, 128, 10);
+
+    v.snap.door_open = true;
+    (void)feed(&h, &v, KILN_INPUT_NONE);
+    const int open = ink(&h, 0, 52, 128, 10);
+
+    v.snap.door_monitoring = false;
+    (void)feed(&h, &v, KILN_INPUT_NONE);
+    const int none = ink(&h, 0, 52, 128, 10);
+
+    CHECK(shut > 0 && open > 0 && none > 0);
+    CHECK_MSG(shut != open, "open and shut render the same");
+    CHECK_MSG(none != open && none != shut,
+              "a kiln with no door switch renders as one that has one");
+}

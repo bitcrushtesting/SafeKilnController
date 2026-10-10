@@ -43,6 +43,15 @@ kiln_err_t kiln_run_index_mark_truncated(const kiln_port_filestore_t *fs,
                                          uint32_t oldest_logged_run_id);
 
 /* SWR-SAF-12's baseline across the stored history. */
+/* SWR-CFG-09: remove one slot's record, for the factory reset.
+ *
+ * Here rather than in the reset itself because this file owns the naming: the
+ * file store has no enumeration (and deliberately so), so the only thing that
+ * knows a run record is called "/r/07" is the code that writes it. Returns
+ * KILN_ERR_NOT_FOUND for a slot that held nothing, which the caller counts
+ * rather than treats as a failure. */
+kiln_err_t kiln_run_index_erase_slot(const kiln_port_filestore_t *fs, uint8_t slot);
+
 kiln_err_t kiln_run_index_baseline(const kiln_port_filestore_t *fs,
                                    uint8_t min_runs,
                                    kiln_insulation_baseline_t *out);
