@@ -46,6 +46,7 @@ include_source_paths = [
 include_doc_paths = [
   "docs/01_user_req.sdoc",
   "docs/02_system_req.sdoc",
+  "docs/03_hardware_req.sdoc",
   "docs/03_software_req.sdoc",
   "docs/04_software_arch.sdoc",
   "docs/safety.sdoc",

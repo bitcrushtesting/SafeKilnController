@@ -1,0 +1,425 @@
+[DOCUMENT]
+TITLE: Safe Kiln Controller, Hardware Requirements
+UID: HWREQ
+VERSION: 0.1
+CLASSIFICATION: Public
+OPTIONS:
+  REQUIREMENT_STYLE: Table
+
+[GRAMMAR]
+ELEMENTS:
+- TAG: TEXT
+  FIELDS:
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+- TAG: REQUIREMENT
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: TITLE
+    TYPE: String
+    REQUIRED: False
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: PRIORITY
+    TYPE: SingleChoice(M, S, C)
+    REQUIRED: False
+  - TITLE: VERIFICATION
+    TYPE: String
+    REQUIRED: False
+  RELATIONS:
+  - TYPE: Parent
+    ROLE: Refines
+
+[TEXT]
+STATEMENT: >>>
+Level 3 of the V-model, the hardware branch, parallel to
+[`03_software_req.sdoc`](03_software_req.sdoc). Both refine `SYS-`.
+
+`SYS-HW-*` in [`02_system_req.sdoc`](02_system_req.sdoc) says what the system
+needs: two switching devices in series, a buzzer, an interlock input. These
+are the board-level consequences, with the numbers. A requirement is here when
+getting it wrong is a hardware change rather than a firmware one.
+
+Verification: **I** inspection or review, **A** analysis or calculation,
+**T** bench measurement, **H** on the HIL fixture.
+
+Each item's open work is tracked in section A of
+[`tasklist.md`](../tasklist.md); this document is what the board has to achieve,
+not the list of fixes outstanding.
+<<<
+
+[[SECTION]]
+UID: SECT-HW-1
+TITLE: 1. Heat authority
+
+[REQUIREMENT]
+UID: HWR-01
+TITLE: Charge-pump release inside one second
+STATEMENT: >>>
+The charge pump shall release the contactor within **1 s** of `HEAT_EN` ceasing to toggle, and shall pass through the MOSFET's linear region fast enough that the contactor cannot rest partially closed.
+
+Present circuit: `HEAT_EN` → R19 → C23 (10 µF) → D5 (BAT54S) → `HEAT_EN_DC` → C24 (3.3 µF) ∥ R20 (47 k) → Q3 gate. Two numbers need establishing rather than assuming: the pumped level is about 3.3 V − 2·V<sub>f</sub> ≈ 2.7 V, below the 4.5 V at which the AO3400A's R<sub>DS(on)</sub> is specified; and decay is τ ≈ 155 ms, so release is a slide rather than an edge.
+
+This is the circuit [LINK: SYS-SAF-02] rests on and the design's most fragile idea. If the margin is thin, a comparator or a retriggerable monostable buys a crisp threshold for a few cents.
+<<<
+PRIORITY: M
+VERIFICATION: A, H
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-07
+  ROLE: Refines
+- TYPE: Parent
+  VALUE: SYS-SAF-02
+  ROLE: Refines
+
+[REQUIREMENT]
+UID: HWR-02
+TITLE: Outputs default to de-energised
+STATEMENT: >>>
+Every heater and contactor control output shall carry an external pull-down to the de-energised state, and shall avoid strapping pins and pins that glitch during reset.
+
+The window this covers is reset to first instruction, where a GPIO is high-impedance and the net sits wherever the board leaks to.
+<<<
+PRIORITY: M
+VERIFICATION: I, T
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-08
+  ROLE: Refines
+
+[REQUIREMENT]
+UID: HWR-03
+TITLE: The supervisor's permit needs its own pull-down
+STATEMENT: >>>
+The supervisor's permit output is active high, so its series element shall have an external pull-down. Without one there is a window at every supervisor reset in which the element's state is whatever the board leaks to.
+<<<
+PRIORITY: M
+VERIFICATION: I, T
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-26
+  ROLE: Refines
+
+[REQUIREMENT]
+UID: HWR-04
+TITLE: Freewheel across the coil
+STATEMENT: >>>
+The coil's freewheel diode shall sit across the coil itself, on the kiln side of every series interrupting element, so opening any of them leaves the current a path to decay through.
+
+Referenced to the raw supply instead, the inductive transient appears across the opening contacts and erodes the lid switch.
+<<<
+PRIORITY: M
+VERIFICATION: I
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-25
+  ROLE: Refines
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SECT-HW-2
+TITLE: 2. Temperature acquisition
+
+[REQUIREMENT]
+UID: HWR-05
+TITLE: Separate buses for the two front ends
+STATEMENT: >>>
+The chamber MAX31856 shall be on the supervisor's SPI bus and the enclosure one on the controller's. Neither shall share a bus, a chip select or a `~DRDY` line with the other.
+
+A supervisor whose chamber reading can be disturbed by the controller's bus traffic, or whose chip select can be driven by a controller that has crashed with a pin latched, is not independent of it.
+<<<
+PRIORITY: M
+VERIFICATION: I
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-02
+  ROLE: Refines
+
+[REQUIREMENT]
+UID: HWR-06
+TITLE: Open-drain outputs are pulled up
+STATEMENT: >>>
+Every MAX31856 `~DRDY` and `~FAULT` output shall carry a pull-up. They are open-drain and read as asserted when floating.
+<<<
+PRIORITY: M
+VERIFICATION: I
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-02
+  ROLE: Refines
+
+[REQUIREMENT]
+UID: HWR-07
+TITLE: Chip selects are defined through reset
+STATEMENT: >>>
+`TC1_CS` and `TC2_CS` shall be pulled to their idle level. Both float during reset and boot, and a chip select asserted by leakage starts a conversion nobody asked for.
+<<<
+PRIORITY: S
+VERIFICATION: I
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-08
+  ROLE: Refines
+
+[REQUIREMENT]
+UID: HWR-08
+TITLE: Thermocouple inputs are clamped
+STATEMENT: >>>
+The thermocouple inputs shall be clamped to the front end's supply rails, and `VBIAS` shall be decoupled.
+
+A thermocouple is a multi-metre unshielded pair routed beside a switching multi-kilowatt load. R24/R25 (10 k/10 k off +3V3) currently present about 5 kΩ to the bias node with no local capacitance.
+<<<
+PRIORITY: M
+VERIFICATION: I, T
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-15
+  ROLE: Refines
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SECT-HW-3
+TITLE: 3. Current measurement
+
+[REQUIREMENT]
+UID: HWR-09
+TITLE: Full scale fits the ADC without clipping
+STATEMENT: >>>
+The CT front end shall put **60 A** ([LINK: SWR-CUR-02]'s full scale) at roughly **0.5 V<sub>rms</sub>** about the mid-rail bias, and the resulting LSB shall be recorded against the 0.1 A resolution the same requirement asks for.
+
+J10 is annotated "CT 30 A/1 V". At 60 A that delivers 2 V<sub>rms</sub> = ±2.83 V<sub>pk</sub> about the 1.65 V bias: the clamp conducts and the reading saturates across the whole upper half of the required range. Even at 30 A the swing reaches 0.24 V to 3.06 V, where the ESP32-S3 ADC is least linear.
+<<<
+PRIORITY: M
+VERIFICATION: A, T
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-17
+  ROLE: Refines
+
+[REQUIREMENT]
+UID: HWR-10
+TITLE: The anti-alias filter is below Nyquist
+STATEMENT: >>>
+The CT anti-alias corner shall sit **below half the sample rate**. Pick the sample rate first, then the filter.
+
+R26 (1 k) + C25 (220 nF) gives f<sub>c</sub> ≈ 723 Hz against a 1 kHz sample rate whose Nyquist is 500 Hz: the corner is above Nyquist and the filter does not anti-alias. Either 4–8 kHz sampling with a corner near 300 Hz, or a corner near 200 Hz for 1 kHz.
+<<<
+PRIORITY: M
+VERIFICATION: A, T
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-17
+  ROLE: Refines
+
+[REQUIREMENT]
+UID: HWR-11
+TITLE: An absent CT is electrically recognisable
+STATEMENT: >>>
+`CURR_SENSE` shall carry a defined bias that the CT winding cannot produce, so an open input is distinguishable from genuinely zero current.
+
+With J10 open the node is held only by C25 and diode leakage, so it drifts. [LINK: SWR-CUR-11] has to tell those two cases apart and [LINK: SWR-CUR-12] refuses to start a run on the second.
+<<<
+PRIORITY: M
+VERIFICATION: I, T
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-17
+  ROLE: Refines
+
+[REQUIREMENT]
+UID: HWR-12
+TITLE: The clamp holds the ADC inside its absolute maximum
+STATEMENT: >>>
+The CT node shall be clamped to within the ADC pin's absolute maximum of −0.3 V to V<sub>DD</sub>+0.3 V, through a series resistor that limits clamp current.
+
+A **Schottky** clamp is required rather than preferred: at 1 mA a BAT54S drops about 0.32 V and holds the node near 3.6 V, while a silicon diode's 0.7 V would hold it at 4.0 V and exceed the pin's rating by 0.4 V. D9 is a BAT54S, which is correct; what is open is the scaling of [LINK: HWR-09], which currently drives the clamp during normal operation.
+<<<
+PRIORITY: M
+VERIFICATION: A, I
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-17
+  ROLE: Refines
+
+[REQUIREMENT]
+UID: HWR-13
+TITLE: The CT is specified on the schematic
+STATEMENT: >>>
+The CT's required characteristics shall appear as a schematic note, and no CT-related part shall be annotated "(opt)" without the behaviour of its absence being defined.
+
+A split-core CT fitted to the wrong conductor reads a current that is real and not the heater's.
+<<<
+PRIORITY: S
+VERIFICATION: I
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-16
+  ROLE: Refines
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SECT-HW-4
+TITLE: 4. Power and protection
+
+[REQUIREMENT]
+UID: HWR-14
+TITLE: The +5 V rail is budgeted, and coil inrush does not reach the MCU
+STATEMENT: >>>
+The +5 V rail shall be budgeted for the contactor coil, the buzzer and the MCU together, and coil inrush shall not be able to brown out the MCU.
+
+The coil is the largest and least constant load on the board, and the one that switches while a kiln is at temperature.
+<<<
+PRIORITY: M
+VERIFICATION: A, T
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-05
+  ROLE: Refines
+
+[REQUIREMENT]
+UID: HWR-15
+TITLE: The regulator has dropout and thermal margin
+STATEMENT: >>>
+The 3V3 regulator shall hold regulation at the lowest input the design accepts, with its junction temperature inside its rating at full load and the highest specified ambient.
+
+An AMS1117 at the worst case is the part to check first.
+<<<
+PRIORITY: M
+VERIFICATION: A
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-05
+  ROLE: Refines
+
+[REQUIREMENT]
+UID: HWR-16
+TITLE: Input transients are clamped
+STATEMENT: >>>
+`V_IN` shall have transient protection. The fuse and series diode cover overcurrent and reverse polarity; neither clamps a surge, and the board sits next to a switching multi-kilowatt load.
+<<<
+PRIORITY: S
+VERIFICATION: I
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-05
+  ROLE: Refines
+
+[REQUIREMENT]
+UID: HWR-17
+TITLE: USB is protected and decoupled
+STATEMENT: >>>
+`USB_DP`/`USB_DM` shall have low-capacitance ESD protection, and `VBUS` shall be decoupled. The data pair currently runs from the connector to the ESP32-S3's native USB pins unprotected.
+<<<
+PRIORITY: S
+VERIFICATION: I
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-05
+  ROLE: Refines
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SECT-HW-5
+TITLE: 5. Operator interface and boot
+
+[REQUIREMENT]
+UID: HWR-18
+TITLE: Boot-mode and encoder inputs are defined
+STATEMENT: >>>
+`MCU_IO0` shall have an external pull-up, and the encoder inputs shall have a defined network whose time constant is compatible with the quadrature decoder's expectations.
+
+IO0 is pulled to ground by SW2 with nothing holding it otherwise; R10–R12 with C20–C22 need their corner checked against the knob's fastest realistic rotation.
+<<<
+PRIORITY: S
+VERIFICATION: I, T
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-04
+  ROLE: Refines
+
+[REQUIREMENT]
+UID: HWR-19
+TITLE: The supervisor's programming interface is reachable
+STATEMENT: >>>
+The supervisor's SWD pins shall come out to test points rather than being left as pads, and the clear button of [LINK: SYS-HW-28] shall be wired to the supervisor and to nothing else.
+
+The independence argument rests on that firmware being reviewable and flashable on its own.
+<<<
+PRIORITY: M
+VERIFICATION: I
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-26
+  ROLE: Refines
+
+[REQUIREMENT]
+UID: HWR-20
+TITLE: Test points survive the chain they outlived
+STATEMENT: >>>
+Each thermocouple `~FAULT` net shall retain its own test point, and the coil drive and permit nets shall each have one.
+
+The discrete fault chain is superseded ([LINK: SYS-HW-24]); the test points cost nothing and are how a front end is diagnosed on a bench.
+<<<
+PRIORITY: S
+VERIFICATION: I
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-24
+  ROLE: Refines
+
+[[/SECTION]]
+
+[[SECTION]]
+UID: SECT-HW-6
+TITLE: 6. Documentation and review
+
+[REQUIREMENT]
+UID: HWR-21
+TITLE: One pin map, generated
+STATEMENT: >>>
+There shall be a single pin-map artefact, derived from the schematic rather than maintained beside it, covering both microcontrollers.
+
+Pin assignments currently live in the schematic, in `board_pins.h` and in the supervisor's README, which is three places that can disagree.
+<<<
+PRIORITY: M
+VERIFICATION: I
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-10
+  ROLE: Refines
+
+[REQUIREMENT]
+UID: HWR-22
+TITLE: ERC is clean or its exclusions are recorded
+STATEMENT: >>>
+Electrical rule check shall pass, and every exclusion shall carry its reason in the project file. The shared SPI `SDO` is the known one.
+<<<
+PRIORITY: M
+VERIFICATION: I
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-10
+  ROLE: Refines
+
+[REQUIREMENT]
+UID: HWR-23
+TITLE: Mains-adjacent routing is reviewed before fabrication
+STATEMENT: >>>
+The coil interrupt and every mains-adjacent net shall be reviewed for clearance and creepage before a board is ordered. The PCB currently has no tracks at all, so this is a requirement on work not yet done rather than a check on work done.
+<<<
+PRIORITY: M
+VERIFICATION: I
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-05
+  ROLE: Refines
+
+[[/SECTION]]

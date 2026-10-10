@@ -6,1168 +6,308 @@ SPDX-License-Identifier: GPL-3.0-or-later
 # Safe Kiln Controller Task List
 
 **Outstanding work only.** An item leaves this file when it is done; what was
-done and why is in the commit that did it, not here. Checked against
-[`docs/03_software_req.sdoc`](docs/03_software_req.sdoc),
-[`docs/architecture.md`](docs/architecture.md), [`docs/safety.md`](docs/safety.md)
-and [`docs/security.md`](docs/security.md).
+done and why is in the commit that did it. Item IDs are stable and cited from
+commit messages, so gaps in the numbering are closed items.
 
-Item IDs are stable and referenced from commit messages, so a letter is never
-reused: gaps in the numbering are items that have been closed.
+Priorities: **P1** safety-relevant or blocking, before the next board revision
+and before any firing. **P2** needed for a release that claims the
+requirements are met. **P3** polish.
 
-| | Meaning |
-|---|---|
-| **P1** | Safety-relevant or blocking. Do before the next board revision, and before any firing. |
-| **P2** | Required for a release that claims the requirements are met. |
-| **P3** | Correctness polish, consistency, cleanup. |
-
-## State, 2026-10-09
+## State, 2026-10-10
 
 | | |
 |---|---|
-| **Firmware logic** | Complete and tested. C++20, 398 host tests green plain and under ASan/UBSan, `clang-tidy` clean on host, target and webhost with no suppressions baseline, `esp32s3` builds with zero warnings at 246 kB (88 % of the OTA slot free). QEMU boots the image and fires it, on a developer machine and in CI: `tools/qemu-smoke.sh` runs it for 180 s and asserts seven things, ending with the simulated kiln passing 100 degC without latching a fault. |
-| **Firmware on hardware** | 15 of 16 ports are wired on the target. Only `update` has nothing behind it (`H2`). **None of it has been run against real hardware** (`L2`, `O3`, `P4`, `M3`). |
-| **Schematic** | ERC clean apart from one known `SDO` false positive (`A11`). Carries the lid interlock and the thermocouple-fault interlock. Does not carry the phase strap (`HR-22`) or the second and third CT inputs (`HR-23`). |
-| **PCB** | Updated from the schematic and placement started. **Not routed at all** (`A23`, `K4`). |
-| **Blocking release** | No field update path (`H2`, `SRR-11`). The web interface is read-only by design, so local control is the only control (`H3`). |
-
-## Where the open items are
-
-| | | Open |
-|---|---|---|
-| [A](#a-schematic-and-pcb) | Schematic and PCB | 22 |
-| [C](#c-build-test-and-ci-infrastructure) | Build, test and CI | 7 |
-| [D](#d-documentation-and-open-questions) | Documentation and open questions | 2 |
-| [F](#f-static-analysis) | Static analysis | 2 |
-| [G](#g-door-interlock-sr-31) | Door interlock | 3 |
-| [H](#h-field-update-and-local-control) | Field update and local control | 2 |
-| [I](#i-current-measurement) | Current measurement | 1 |
-| [J](#j-german-translation-nfr-23) | German translation | 4 |
-| [K](#k-hardware-interlock-chain) | Hardware interlock chain | 5 |
-| [L](#l-target-adapters) | Target adapters | 2 |
-| [M](#m-kiln_hmi-the-local-interface) | `kiln_hmi` | 3 |
-| [N](#n-security-obligations-and-the-cyber-resilience-act) | Security obligations and the CRA | 5 |
-| [O](#o-wifi-fr-net) | WiFi | 4 |
-| [P](#p-http-transport-and-the-api) | HTTP transport and the API | 3 |
-| [Q](#q-the-file-store-ad-21) | The file store | 5 |
-| [R](#r-the-independent-safety-supervisor-ad-22) | Independent safety supervisor | 6 |
+| **Firmware logic** | Complete and tested. 26 host suites green plain and under ASan/UBSan, `kiln_core` lines 91.8 %, clang-tidy clean on host and target, both IDF configurations build. QEMU boots and fires the simulated image with seven assertions. |
+| **Firmware on hardware** | 15 of 16 ports wired; only `update` has nothing behind it (`H2`). **None of it has run against hardware** (`L2`, `O3`, `P4`, `M3`). |
+| **Schematic** | ERC clean apart from one known `SDO` false positive. Carries the lid interlock; does not carry the supervisor (`R6`). |
+| **PCB** | Placement started, **not routed at all** (`A23`). |
+| **Documents** | Requirements, architecture, safety, security and the supervisor's unit design all build in CI and gate it. |
 
 ---
 
 ## A. Schematic and PCB
 
-### A.1 Blocking electrical defects (P1)
+The board-level specification is now
+[`docs/03_hardware_req.sdoc`](docs/03_hardware_req.sdoc) (`HWR-01` to
+`HWR-23`), which carries the numbers and the reasoning. These are the open
+changes against it.
 
-- [ ] **A1. Add pull-ups to the MAX31856 `~DRDY` outputs.** The `~FAULT` outputs got theirs in section K (`R28`, `R29`); `~DRDY` still has none, confirmed by query. Original note: All four
-  are open-drain and have no pull-up anywhere in the netlist. `TC1_DRDY`
-  (U3.7 → U1 IO14) and `TC2_DRDY` (U4.7 → U1 IO21) therefore float between
-  assertions, so acquisition timing is undefined. Add 10 k to +3V3 on
-  `TC1_DRDY`, `TC2_DRDY`, `TC1_FAULT`, `TC2_FAULT`. Affects SWR-ACQ-03,
-  SWR-ACQ-10, SWR-SAF-04.
-
-- [ ] **A3. Bypass `VBIAS`.** R24/R25 (10 k/10 k off +3V3) present ~5 kΩ of
-  source impedance, and the CT secondary returns into that node through J10.2.
-  The "mid-rail" reference is therefore modulated by the signal it is supposed
-  to reference. Add 10 µF ∥ 100 nF from `VBIAS` to GND. SYS-HW-17.
-
-- [ ] **A4. Fix the CT anti-alias filter.** R26 (1 k) + C25 (220 nF) gives
-  f<sub>c</sub> ≈ 723 Hz. SWR-CUR-03 specifies sampling at ≥ 1 kHz, whose Nyquist
-  frequency is 500 Hz, the filter corner sits *above* Nyquist and does not
-  anti-alias. Either raise the sample rate (4–8 kHz) and keep a corner near
-  300 Hz, or lower the corner to ~200 Hz for a 1 kHz rate. Pick the sample rate
-  first, then the filter. SYS-HW-17, SWR-CUR-03.
-
-- [ ] **A5. Rescale the CT front end for the specified range.** J10 is annotated
-  "CT 30A/1V" but SWR-CUR-02 requires 0–60 A. At 60 A a 30 A/1 V CT delivers
-  2 V<sub>rms</sub> = ±2.83 V<sub>pk</sub> about the 1.65 V bias, which D9 clamps , 
-  the reading saturates across the whole upper half of the required range. Even
-  at 30 A the swing is 0.24 V to 3.06 V, in the region where the ESP32-S3 ADC is
-  least linear. Specify a CT ratio (or add an attenuator) that puts full-scale
-  current at roughly 0.5 V<sub>rms</sub>, and record the resulting LSB against
-  SWR-CUR-02's 0.1 A resolution.
-
-- [ ] **A6. Define `CURR_SENSE` when the CT is absent.** With J10 open there is
-  no DC path to the node; it is held only by C25 and diode leakage, so it
-  drifts. SWR-CUR-11 requires distinguishing "CT disconnected" from "genuinely
-  zero current", and SWR-CUR-12 requires refusing to start a run when monitoring
-  is unavailable. Add a defined bias (e.g. a high-value resistor to a level the
-  CT winding cannot produce) so an open input is electrically recognisable, and
-  write down the detection rule the firmware will use.
-
-- [ ] **A7. Work out the charge-pump release threshold properly.** This is the
-  circuit the whole SYS-SAF-02 / SYS-HW-07 safety property rests on, and architecture
-  §16 already flags it as the design's most fragile idea.
-  `HEAT_EN` → R19 → C23 (10 µF) → D5 (BAT54S) → `HEAT_EN_DC` → C24 (3.3 µF) ∥
-  R20 (47 k) → Q3 gate. Two things need numbers rather than intent:
-  - Pumped level is roughly 3.3 V − 2·V<sub>f</sub> ≈ 2.7 V, which is below the
-    4.5 V at which the AO3400A's R<sub>DS(on)</sub> is characterised.
-  - Decay is τ = 47 k × 3.3 µF ≈ 155 ms through a MOSFET threshold, so release
-    is a slow slide through the linear region, not an edge. Establish that the
-    contactor's drop-out voltage is reached inside SWR-NFR-04's 1 s, that Q3 does not
-    dissipate meaningfully on the way through, and that the contactor cannot sit
-    partially closed.
-
-  If the margin is thin, a comparator or a retriggerable monostable gives a crisp
-  threshold for a few cents. Verify on the HIL jig by halting the safety task
-  (SWR-TST-17, SYS-SAF-02, SWR-NFR-04).
-
-- [ ] **A8. Budget the +5 V rail and protect the MCU from coil inrush.** J8 feeds
-  the contactor coil from the same +5 V node as the LDO, behind the 1.5 A PTC
-  (F1). Add up ESP32-S3 WiFi peaks, the LDO's input current, the coil's holding
-  and inrush current, both SSR inputs and the buzzer, then confirm F1 and the
-  external supply (SYS-HW-14 requires MCU + display + coil simultaneously). C1 is
-  only 100 µF; coil energisation will sag the rail that the MCU brownout detector
-  watches. Consider feeding J8 from `V_FUSED` ahead of D1 so coil transients
-  cannot pull the MCU rail down. SYS-HW-14, SWR-NFR-15, SWR-SAF-15.
-
+- [ ] **A1. Pull up the MAX31856 `~DRDY` outputs.** Open-drain, read as
+  asserted when floating. `HWR-06`.
+- [ ] **A3. Bypass `VBIAS`.** R24/R25 present ~5 kΩ with no local
+  capacitance. `HWR-08`.
+- [ ] **A4. Fix the CT anti-alias filter.** Corner ≈ 723 Hz sits above a
+  1 kHz rate's Nyquist. Pick the sample rate first. `HWR-10`.
+- [ ] **A5. Rescale the CT front end.** A 30 A/1 V CT clips across the upper
+  half of `SWR-CUR-02`'s 0–60 A. `HWR-09`.
+- [ ] **A6. Define `CURR_SENSE` with no CT fitted.** Open input drifts, so
+  "disconnected" and "zero current" are indistinguishable. `HWR-11`.
+- [ ] **A7. Work out the charge-pump release threshold. P1.** The circuit the
+  whole `SYS-SAF-02` property rests on: pumped level ≈ 2.7 V against an
+  AO3400A characterised at 4.5 V, decay τ ≈ 155 ms. `HWR-01`.
+- [ ] **A8. Budget the +5 V rail against coil inrush.** `HWR-14`.
 - [ ] **A9. Confirm the 5 V contactor coil is a real part choice.** Mains
-  contactors are commonly 24 V AC/DC or 230 V AC coils; pinning J8 to 5 V narrows
-  the field sharply. Either name a specific 5 V-coil contactor in the BOM, or
-  change the interface to drive an intermediate relay / a higher coil voltage.
-  SYS-HW-07, SYS-SAF-03.
-
-### A.2 Required before fabrication (P2)
-
-- [ ] **A10. Add VBUS decoupling.** The design review flags `VBUS` as having no
-  decoupling at all. Add 1 µF (USB spec caps bulk VBUS capacitance at 10 µF)
-  plus 100 nF near J2.
-
-- [ ] **A11. Record an ERC exclusion for the shared SPI `SDO`.** ERC reports one
-  error: U3.11 and U4.11 (`SDO`, both Output) are connected. This is correct for
-  a shared SPI bus, the MAX31856 tri-states `SDO` when `~CS` is high, but the
-  project currently carries zero ERC exclusions, so the schematic cannot be
-  gated on a clean ERC. Add the exclusion with a comment, and make a clean ERC a
-  CI gate.
-
-- [ ] **A12. ESD protection on the USB data pair.** `USB_DP`/`USB_DM` go straight
-  from J2 to the ESP32-S3 native USB pins with no clamping. Add a low-capacitance
-  array (USBLC6-2SC6 class) at the connector.
-
-- [ ] **A13. Clamp the thermocouple inputs.** SYS-HW-15 requires the TC inputs to be
-  *filtered and protected*. The filtering is there (R4/R5 100 R, C8 10 nF
-  differential, C9/C10 100 pF common-mode; same for TC2) but there is no
-  clamping. A thermocouple is a multi-metre unshielded pair routed beside a
-  switching multi-kilowatt load, add TVS or clamp diodes to the rails on all
-  four TC terminals.
-
-- [ ] **A14. Pull up `TC1_CS` and `TC2_CS`.** Both float during reset and boot
-  while the MAX31856s are already powered, so a spurious chip select can
-  misconfigure a front end. 10 k to +3V3 each.
-
-- [ ] **A15. Pull up `MCU_IO0`.** SW2 pulls IO0 to GND with no external pull-up;
-  the design relies on the module's internal pull-up alone, and the BOOT button's
-  wiring is an unterminated stub. Add 10 k to +3V3 (most ESP32-S3 reference
-  designs also add 100 nF).
-
-- [ ] **A16. Check the AMS1117's dropout and thermal margin.** Worst case the LDO
-  sees USB VBUS at 4.75 V minus D2's forward drop ≈ 4.3 V, against a 1.1–1.3 V
-  dropout at ESP32-S3 WiFi peaks, close to falling out of regulation.
-  Dissipation is ~0.5–0.7 W in SOT-223, roughly +40 °C over ambient; with SWR-SAF-11
-  permitting a 70 °C enclosure, the junction has little headroom and the LDO sits
-  on the same board as the cold-junction reference. Either move to a low-dropout
-  part with better thermals or a small buck, or document the measured rise and
-  the ambient limit it implies.
-
-- [ ] **A17. Add input transient protection on `V_IN`.** F1 and the series D1
-  cover overcurrent and reverse polarity, but nothing clamps a surge. The board
-  shares an enclosure with a switching contactor coil. Add a TVS / MOV across
-  `V_IN`.
-
-- [ ] **A18. Resolve the "(opt)" annotations.** J10 is labelled "CT 30A/1V (opt)",
-  but SYS-HW-11 makes the current transformer mandatory and SWR-CUR-12 makes a run
-  refuse to start without it. Re-label, and keep J7 "SSR2 CTRL (opt)" which
-  genuinely is optional (SYS-HW-12).
-
-- [ ] **A19. Put SYS-HW-16 on the schematic as a note.** The CT must be a
-  voltage-output type with an integral burden resistor; a current-output CT whose
-  burden can be disconnected develops dangerous voltages on an open secondary.
-  That is a hard BOM constraint and a safety one, it belongs on the sheet next
-  to J10, not only in the requirements. Same for SYS-HW-18: state the required CT
-  insulation rating, since the CT is the only galvanic isolation in the design.
-
-- [ ] **A20. Review the encoder input network.** R10–R12 (10 k) with C20–C22
-  (100 nF) gives a ~1 ms edge into non-Schmitt ESP32-S3 GPIOs feeding the pulse
-  counter (SYS-HW-05). Slow edges dwelling near V<sub>IH</sub> can double-count.
-  Either lower to ~4.7 k/10 nF and lean on the PCNT glitch filter, or verify the
-  current values on hardware before committing.
-
-- [ ] **A21. Create the single pin-map artefact SYS-HW-10 requires.** Pin assignments
-  exist only as schematic net names; there is no `hardware/pinmap.*` and no
-  firmware header. One file per board variant, referenced by both.
-
-### A.3 Cleanup and layout follow-up (P3)
-
-- [ ] **A23a. Rename the KiCad project to `safekiln`.** The project was renamed
-  to Safe Kiln Controller everywhere except `hardware/`, which was left alone
-  for two reasons: the files were being edited at the time, and the name is not
-  only a filename there. `kilncontrol` appears in several hundred internal
-  references, as `(project "kilncontrol")` in every symbol instance of the
-  schematic and as `(sheetfile "safekiln.kicad_sch")` in every footprint of
-  the PCB. Do it with KiCad's own Save As / rename rather than `git mv` plus a
-  substitution, so the cross-references are rewritten by the tool that owns
-  them. `board_pins.h` cites the schematic filename and will follow.
-
-- [ ] **A23. PCB review is still outstanding.** `hardware/safekiln.kicad_pcb`
-  has placement but no copper: zero tracks, zero vias, sixteen zones untouched.
-  Creepage and clearance for the mains section, the coil interrupt chain (`K4`),
-  star-grounding of the analogue front end, and the thermal path of the LDO
-  (`A16`) all want checking against the layout rather than the schematic, and
-  none of that can be judged until the board is routed.
+  contactors with 5 V coils are uncommon; a 12 V or 24 V coil changes the rail.
+- [ ] **A10. Decouple `VBUS`.** `HWR-17`.
+- [ ] **A11. Record the ERC exclusion for the shared SPI `SDO`.** `HWR-22`.
+- [ ] **A12. ESD protection on the USB data pair.** `HWR-17`.
+- [ ] **A13. Clamp the thermocouple inputs.** `HWR-08`.
+- [ ] **A14. Pull up `TC1_CS` and `TC2_CS`.** Both float through reset.
+  `HWR-07`.
+- [ ] **A15. Pull up `MCU_IO0`.** SW2 pulls it low with nothing holding it
+  otherwise. `HWR-18`.
+- [ ] **A16. Check the AMS1117's dropout and thermal margin.** `HWR-15`.
+- [ ] **A17. Transient protection on `V_IN`.** `HWR-16`.
+- [ ] **A18. Resolve the "(opt)" annotations.** `HWR-13`.
+- [ ] **A19. Put the CT specification on the schematic as a note.** `HWR-13`.
+- [ ] **A20. Review the encoder input network.** `HWR-18`.
+- [ ] **A21. One generated pin map.** Assignments live in three places that
+  can disagree. `HWR-21`.
+- [ ] **A23a. Finish the KiCad rename to `safekiln`.** Files are renamed;
+  check no stale references remain.
+- [ ] **A23. Route the board, and review the mains-adjacent nets. P1.** No
+  tracks and no vias exist yet. `HWR-23`.
 
 ---
 
 ## C. Build, test and CI infrastructure
 
-- [x] **C5. `tools/layercheck.sh` exists and blocks CI. Done 2026-10-10.**
-  It replaced the grep that stood in for it, and the grep's own comment said
-  this was the real check. What a grep over include lines cannot see is the
-  only two ways this has any chance of going wrong: a platform header reached
-  **indirectly**, through a project header that includes it, and one inside
-  `#if defined(ESP_PLATFORM)`, which the host build never compiles -- so the
-  core would stop being portable while every gate stayed green.
-
-  So the include check reads the preprocessor's own record of every header it
-  opened, from the target build where those headers are on the path and a
-  mistake would actually resolve. Ninja keeps that in a binary log rather than
-  in `.d` files, so it comes from `ninja -t deps`: 202 headers on the current
-  build, none of them an IDF component the core may not reach.
-
-  The component graph is checked from each component's `REQUIRES`, for layering
-  against architecture section 4 and for cycles. Seven components, layered and
-  acyclic.
-
-  It also carries `C13`'s other two checks, and a `--self-test` that proves
-  each one can fail, because a gate nobody has seen fail is a gate nobody
-  should trust.
-
-- [ ] **C6. Requirement-to-test traceability.** *Superseded in approach:* see
-  section 7 of [`docs/test-concept.md`](docs/test-concept.md). The recommendation
-  is not to build `tools/trace` but to use StrictDoc source traceability, which
-  now owns the requirements, and have the existing `requirements` CI job publish
-  the matrix. Today 28 of 268 requirements appear in a test name and 147 appear
-  in no test file at all. Original item follows.
-
-  **`tools/trace`.** Requirement-ID traceability from `docs/` to test
-  names; fails on an untraced mandatory requirement, on a test naming a
-  nonexistent ID, and on any `SR-*` without an automated test
-  (SWR-TST-22, SWR-TST-23, SWR-TST-26).
-
-- [x] **C7. `tools/logdump.py` exists, and the cross-check is the point. Done
-  2026-10-10.** It decodes a `kilnlog` partition dump to CSV -- walking the
-  ring in sequence order rather than address order, so a wrap does not
-  interleave two firings -- and takes the dump from `esptool read_flash`,
-  which needs no cooperation from a device that will not boot.
-
-  It would have been less code to link `kiln_core` and call
-  `kiln_logrec_decode`, and that is exactly what it must not do. A log is the
-  only evidence of what a kiln did before it failed, and "did the firmware
-  record this correctly" cannot be answered by the firmware's own decoder: a
-  codec that encodes and decodes with the same wrong idea round-trips
-  perfectly and proves nothing.
-
-  So the decoder is written from the format as `logrec.h` and architecture
-  10.2 document it, and both implementations are pinned to **one committed
-  artefact**: `test/host/fixtures/logring.bin`, two sectors the C++ encoder
-  produced, with records chosen for what a decoder gets wrong -- a negative
-  temperature, the segment sentinel, every flag at once, a non-sample event,
-  each field at the edge of its scale, and the sectors deliberately out of
-  address order. A host test re-encodes those samples and compares bytes; the
-  Python self-test decodes the same file and checks every field. Neither side
-  can drift without the other saying so, and the fixture's README says what to
-  do when it fails: ask which side moved.
-
-  55 self-test checks, in CI beside the other tool self-tests.
-
-- [ ] **C11. `main.cpp` and `httpd.cpp` are analysed by nothing.** Found while
-  starting section P. `tools/tidy.sh` drives from the host compile database,
-  which cannot reach either file; `tools/tidy-target.sh` hardcodes
-  `kiln_hal_esp32s3/src`, so it does not either. Subtracting the host database
-  from the target one gives 14 target-only translation units, and two of them
-  are outside every gate in the project.
-
-  Widening the script is three lines -- the set should be *computed* as "in the
-  target build, not in the host build", which also cannot drift when the next
-  target-only file appears -- but it is **102 findings**: 20 in `httpd.cpp`
-  and 82 in `main.cpp`. 54 of those are inside `ESP_LOGx` and
-  `ESP_ERROR_CHECK` and want the same component-scoped exemption
-  `kiln_hal_esp32s3` already carries, which for `main.cpp` is a clean
-  `firmware/controller/main/.clang-tidy` but for `httpd.cpp` cannot be, because
-  `kiln_web/src` also holds the host-analysed `api.cpp` and `json.cpp` and must
-  keep those checks. The remaining ~48 are the ordinary `F2`/`F4`/`F5`/`F6`
-  passes that never ran on these two files.
-
-  Nothing here is hard; it is the size of the diff that makes it its own
-  commit rather than a detour inside another one.
-
-- [ ] **C12. Build the HIL fixture.** Designed in section 5 of
-  [`docs/test-concept.md`](docs/test-concept.md), which closes `SWR-TST-17` and
-  `SWR-TST-28` on paper and nothing in hardware. The shape: the plant model is
-  `kiln_sim` running on a host, so an L4 scenario can be the same scenario as
-  an L2 test with the same seed, and a disagreement isolates to the adapters
-  and the electricals. The I/O board is close to dumb but timestamps in
-  hardware, because USB latency is fine for a 10 Hz thermal model and useless
-  for measuring a 10 ms SSR window.
-
-  Two parts are not obvious and are worked through there. The thermocouple
-  simulator has to *subtract* the cold-junction compensation the MAX31856 adds,
-  and the loop closes itself because the supervisor already reports `cj_c` ten
-  times a second. And the current side needs a fixture-controlled bypass across
-  the load, not a signal generator, because `SWR-SAF-27` discriminates a shorted SSR
-  from a welded contactor by dropping the contactor and re-measuring, and that
-  needs real contacts behaving both ways.
-
-  The single most valuable scenario it enables: hold the ESP32 in reset, drive
-  the chamber above 1350 degC, confirm the contactor opens. That is the one
-  experiment that distinguishes this design from the one it replaced, and it
-  exists at no other level.
-
-- [x] **C13. The three decisions are structural now. Done 2026-10-10.** All
-  three were true and none was checked, which is the state a decision is in
-  just before it stops being true.
-
-  **`SWA-18`, the 20-byte log record**, now has `static_assert`s beside the
-  encoder: the size, that the CRC is the last byte, and that architecture
-  10.4's 204 records per sector follows from it. It guards a persisted format,
-  so the point is that changing the number without changing the sector
-  header's `format_version` makes every log already written decode as
-  plausible nonsense -- plausible because the CRC would be recomputed over
-  whatever the new layout produced.
-
-  **`SWA-03`, no mutable state in the core**, and **`SWA-02`, time is
-  injected**, are checked in `tools/layercheck.sh` from the **object code**
-  rather than by grep, which is strictly stronger. A mutable file-scope object
-  lands in `.data` or `.bss`, so `nm` finds it whatever it is called -- and
-  including a function-local `static`, which is the form that gets past a
-  reviewer looking for globals. A direct clock read leaves an undefined symbol
-  for `time`, `clock_gettime`, `esp_timer_get_time` and the rest, with nowhere
-  to hide it.
-
-  Both currently hold: zero writable symbols and zero clock references in
-  `libkiln_core.a`. What they buy is the 168-hour firing a test exercises in
-  milliseconds and the 15-minute runaway timer it does the same to, and both
-  would have broken silently -- the tests keep passing, they just stop testing
-  what they claim to.
-
-- [ ] **C10. Coverage gate.** 90 % lines on control, safety, setpoint, program and
-  autotune is enforced; 100 % of safety decision branches (`SWR-TST-19`) is not.
-  Branch coverage was around 83 % when last measured.
+- [ ] **C6. Publish the requirement-to-test matrix.** Use StrictDoc's own
+  traceability rather than building `tools/trace`; have the `requirements` job
+  publish it. Today 147 of 268 requirements appear in no test file.
+- [ ] **C10. Gate branch coverage on the safety decisions.** Lines are gated
+  at 90 %; `SWR-TST-19`'s 100 % of safety branches is not. Last measured 81 %.
+- [ ] **C11. `main.cpp` and `httpd.cpp` are analysed by nothing.** Both
+  scripts miss them; the set should be computed as "in the target build, not in
+  the host build" so it cannot drift. 102 findings, 54 of them `ESP_LOGx` and
+  `ESP_ERROR_CHECK` wanting the component-scoped exemption `kiln_hal_esp32s3`
+  already has.
+- [ ] **C12. Build the HIL fixture. P1.** Designed in section 5 of
+  [`docs/test-concept.md`](docs/test-concept.md). The thermocouple simulator
+  has to subtract the cold-junction compensation the MAX31856 adds, and the
+  current side needs a fixture-controlled bypass across the load rather than a
+  signal generator, because `SWR-SAF-27` discriminates a shorted SSR from a
+  welded contactor by dropping the contactor and re-measuring. The scenario it
+  exists for: hold the ESP32 in reset, drive the chamber above 1350 °C, confirm
+  the contactor opens.
 
 ---
 
 ## D. Documentation and open questions
 
-- [ ] **D5. Write the documentation SWR-NFR-26 lists:** assembly and wiring, mains
+- [ ] **D5. Write the manuals `SWR-NFR-26` lists:** assembly and wiring, mains
   safety, commissioning, autotuning, program authoring, the REST API, the log
-  record format, and current-transformer fitting and calibration. The CT
-  commissioning procedure is called out in architecture §16 as the mitigation for
-  a CT fitted to the wrong conductor.
-
-- [ ] **D6. Remaining open questions to close:** OQ-01 (cone-based targets),
-  OQ-03 (whole-life run-summary retention), OQ-05 (3-zone variant, affects
-  whether the control path is written for one zone or N), OQ-07 (element
-  temperature coefficient measured or entered).
+  format, CT fitting and calibration.
+- [ ] **D6. Close `OQ-01`** (cone-based targets), **`OQ-03`** (whole-life run
+  retention), **`OQ-05`** (3-zone variant, which decides whether the control
+  path is written for one zone or N), **`OQ-07`** (element temperature
+  coefficient measured or entered).
 
 ---
 
 ## F. Static analysis
 
-Both of these are decisions rather than tasks: the work is understood and the
-question is whether it is worth its cost.
+Both are decisions rather than tasks: the work is understood, the question is
+whether it is worth its cost.
 
-- [ ] **F3. `cppcoreguidelines-use-enum-class`: 31 enums, 223 enumerators,
-  2 530 references across 85 files.** Still deferred, and now with the blocking
-  question answered rather than open.
-
-  **The C-callability half is settled: the port layer is not C-callable.**
-  There is no `extern "C"` anywhere in the firmware except `app_main`, which
-  ESP-IDF requires. So `SWA-01`'s boundary is a C++ boundary already, and that
-  is no longer a reason not to do this.
-
-  What remains is not a technical blocker but a cost. The enumerator names are
-  the project's vocabulary: `KILN_FAULT_DOOR_OPEN` is greppable from `SWR-SAF-31`
-  in the requirements, and `tools/trace` parses test names on the same
-  convention (`SWR-TST-22`, `SWR-TST-23`). Scoping renames all 223 of them. The
-  transform is compiler-verified -- every unconverted site is a hard error --
-  but the naming choice (`kiln_fault_t::DOOR_OPEN`, idiomatic but breaks the
-  greps, versus `kiln_fault_t::KILN_FAULT_DOOR_OPEN`, redundant but traceable)
-  is a decision about the project's vocabulary rather than about the code.
-
-  Two enums would also get worse: `kiln_warn_bit_t` and `kiln_inject_t` are bit
-  *positions*, and scoping them puts a `static_cast` at every mask site --
-  precisely the cast noise the signed-bitwise and C-cast passes removed.
-
-- [ ] **F9. `kiln_run_record_t` carries 9 padding bytes where 1 is optimal**
-  (`clang-analyzer-optin.performance.Padding`, disabled). Reordering would
-  invalidate every run record already on a device, so it can only change
-  alongside a record-format version bump, if at all.
+- [ ] **F3. `cppcoreguidelines-use-enum-class`.** 31 enums, 223 enumerators,
+  2 530 references. The C-callability objection is settled (nothing is
+  `extern "C"` but `app_main`), so what remains is the project's vocabulary:
+  `KILN_FAULT_DOOR_OPEN` is greppable from `SWR-SAF-31`, and scoping renames
+  all 223. Two bit-position enums would get worse, gaining a `static_cast` at
+  every mask site.
+- [ ] **F9. `kiln_run_record_t` wastes 9 padding bytes.** Reordering
+  invalidates every run record on every device, so it can only move with a
+  record-format version bump, if at all.
 
 ---
 
 ## G. Door interlock, SWR-SAF-31
 
-- [ ] **G2. HIL: confirm the series contact actually breaks the coil.** As with
-  the charge pump (M4), the claim that matters is a hardware one and cannot be
-  verified in simulation. Open the door on the bench jig with the safety task
-  halted, and observe the contactor.
-
-- [ ] **G3. Decide whether the interlock should be mandatory.** `SYS-HW-21` is a
-  *should* because many existing kilns have no door furniture to take a switch,
-  and making it a *shall* would make the controller unfittable to them. The
-  consequence is RR-10: a kiln without one has nothing at all against HZ-13.
-  Warning 113 makes the gap visible rather than silent, which is the compromise
- , revisit if the first real installations suggest otherwise.
-
-- [x] **G4. The door state is in the API and on both displays. Done
-  2026-10-10.** The safety cycle had read the pin every 100 ms since
-  `SWR-SAF-31` was implemented and shown it nowhere, so an operator in front
-  of an idle kiln could see that `HEAT` was absent and had to guess why.
-
-  It is published in the snapshot, taken from the input the rule actually
-  used rather than re-read, because a second sample of a safety input at a
-  different instant is how two parts of one device come to disagree about
-  whether the door is open.
-
-  **Three states and not two**, in all three places: `open` and `shut` both
-  presuppose a switch, and a kiln with none fitted must not read as one whose
-  door is shut. `/api/status` therefore carries `door` as a string rather than
-  a boolean, the OLED's diagnostics screen spells out all three, and the main
-  screen puts `DOOR` in the slot that would say `HEAT` -- the two cannot both
-  be true, so the badge that says why the kiln is hot says why it is not. The
-  web dashboard raises a pill only for `open`: `unmonitored` is a standing
-  condition that already has warning 113 in the banner, and repeating it on
-  every idle kiln without an interlock would train the operator to ignore the
-  row.
-
-  Making room on the diagnostics screen cost the power and energy labels,
-  which now share one row with the units doing the naming; two strings left
-  the table rather than staying in it unused. Four tests, including that an
-  unmonitored door never renders as a shut one.
+- [ ] **G2. HIL: confirm the series contact breaks the coil. P1.** Open the
+  door with the safety task halted and watch the contactor. Cannot be settled
+  in simulation.
+- [ ] **G3. Decide whether the interlock is mandatory.** `SYS-HW-21` is a
+  *should* because many kilns have no door furniture to take a switch; a
+  *shall* makes the controller unfittable to them. The consequence is `RR-10`,
+  and warning 113 makes the gap visible rather than silent. Revisit after the
+  first real installations.
 
 ---
 
 ## H. Field update and local control
 
-- [ ] **H2. The update path is specified and entirely unbuilt.** `OQ-08` is
-  resolved as of 2026-10-09: the device **pulls** a signed static manifest from
-  `update.bitcrushtesting.com` once a day, announces an available release on the
-  local display, and installs it only on a deliberate confirmation there. The
-  web interface stays read-only and gains no exception, which is why pull was
-  chosen over staging an image over the LAN: `SEC-00` keeps its absolute form.
-  `SWR-UPD-09` to `SWR-UPD-16` and `SWR-HMI-16` are the requirements,
-  [`docs/security.md` §6.2](docs/security.md) the reasoning, and
-  [`docs/architecture.md` §13.5](docs/architecture.md) the sequence.
+- [ ] **H2. The update path is specified and unbuilt. P2, blocks release
+  (`SRR-11`).** `SWR-UPD-09` to `SWR-UPD-16`, with
+  [`docs/architecture.md` §13.5](docs/architecture.md) the sequence. In
+  dependency order:
 
-  **This still blocks release** (`SRR-11`), because none of it exists. What has
-  to be written, roughly in dependency order:
+  1. **Generate the manifest signing key** on a machine it can then leave.
+     `tools/update-manifest.py keygen` exists; the key does not, so
+     `update_pubkey.h` is uncommitted and nothing verifies anything.
+  2. **The verifier, host-tested first:** signature, semver against
+     `kiln_fw_info_t::version`, target, and refusing anything not strictly
+     newer. Pure logic, and the suite should beat on a tampered manifest, a
+     wrong key, a truncated image and a replayed release.
+  3. **The adapter:** `esp_https_ota` behind `check` and `install`, streaming
+     into the inactive slot. The partitions already exist.
+  4. **The screen** (`SWR-HMI-16`), the only place an install is authorised,
+     so part of the security design rather than of the interface.
+  5. **The late `confirm_running()`** of `SWR-UPD-15`, called once the
+     supervisor link, both couples, the config and the display have proved
+     themselves. Calling it at start-up is the defect the requirement exists
+     to prevent.
+  6. **`update.check_enabled` and `update.url`,** with the opt-out reachable
+     from the display.
+  7. **`tools/update.py`** for `SWR-UPD-14`'s USB recovery: write `ota_0`,
+     erase `otadata`, leave `nvs`, `kilnfs`, `kilnlog` and `prod` alone.
 
-  1. **Generate the manifest signing key**, on a machine it can then leave.
-     `tools/update-manifest.py keygen` exists and the format it signs is in
-     [`docs/architecture.md` §13.5](docs/architecture.md); what does not exist
-     is the key, so `firmware/controller/main/update_pubkey.h` is not committed
-     and nothing can verify anything yet. One command, and then the key is an
-     obligation for the whole support period (`SRR-12`).
-  2. **The verifier, host-tested first.** Signature check, semver comparison
-     against `kiln_fw_info_t::version`, target check, and the refusal of
-     anything not strictly newer (`SWR-UPD-13`). All of it is pure logic and
-     belongs in a component the host suite can beat on with a tampered manifest,
-     a wrong key, a truncated image and a replayed old release.
-  3. **The adapter**, `esp_https_ota` behind `check` and `install` in
-     `port_update.h` (both already declared there), streaming into the inactive
-     slot. `otadata`, `ota_0` and `ota_1` already exist in `partitions.csv`, so
-     the layout needs nothing.
-  4. **The screen** (`SWR-HMI-16`), which is the only place an install can be
-     authorised and therefore part of the security design rather than of the
-     interface. Needs the German strings too (`J`).
-  5. **`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` is already on**; what is missing
-     is the late `confirm_running()` of `SWR-UPD-15`, called when the supervisor
-     link, both couples, the config, the programs and the display have all been
-     seen working. Calling it in start-up code is the defect this requirement
-     exists to prevent.
-  6. **The `update.check_enabled` and `update.url` configuration items**, with
-     the opt-out reachable from the display, since the web interface cannot
-     write configuration.
-  7. **`tools/update.py`** for `SWR-UPD-14`'s USB recovery: write to `ota_0`,
-     erase `otadata`, and leave `nvs`, `kilnfs`, `kilnlog` and `prod` alone. The
-     mistake it exists to prevent is erasing the production data block.
+  Not firmware, and not discharged by any: the release channel with an
+  advisory per security release, the declared support period (`N3`), and the
+  CRA Article 14 reporting route (`N2`), live since **11 September 2026**.
 
-  Two things that are project work rather than firmware work, and that no amount
-  of firmware discharges: the release channel with an advisory per security
-  release and a **declared support period** (`SWR-UPD-16`, at least five years),
-  and the CRA Article 14 reporting route, which is live from **11 September
-  2026** while the main obligations start on 11 December 2027.
+  The security events of `SWR-LOG-16` that carry a version and a refusal
+  reason belong here: neither fits a 20-byte record.
 
-  It also depends on `P`: there is still no HTTP stack on the target, and this
-  needs an HTTPS *client* even though it needs no server.
-
-- [ ] **H3. Local control is now the only control, and it has never been
-  operated.** The web interface is read-only by design, so starting, pausing,
-  aborting and acknowledging are reachable *only* through `kiln_hmi`. That
-  component now exists, carries those five actions, passes 21 tests and is
-  wired into `main`. What keeps this open is that no one has ever used it: it
-  is verified by pixel counts and nothing else (`M3`), its German is not
-  length-checked against the screen (`M4`), and the encoder direction is a
-  guess (`M5`). Until those close on real hardware, **the only path to
-  starting a firing is unexercised.**
-
----
-
-## I. Current measurement
-
-- [x] **I3. Apparent power, and it stays apparent. Closed 2026-10-10.**
-  Recorded in `SWR-CUR-07` rather than left as an implied limitation. Real
-  power needs a voltage channel: a mains-referenced measurement with its own
-  isolation, calibration and creepage distances on a board that touches mains
-  in one place. What the assumption costs is small enough to state precisely:
-  a kiln element is within a percent or two of unity power factor, so apparent
-  power is real power to better than the accuracy of the mains voltage an
-  installer types in -- and both uses of the number, "what did this firing
-  cost" and `SWR-SAF-12`'s comparison between firings, depend on relative
-  accuracy between runs rather than absolute. The loads where it would be
-  wrong, phase-angle control and inductive loads, are excluded by `SYS-ASM-03`
-  and are not what an element is.
+- [ ] **H3. Local control is the only control, and nobody has used it.**
+  Starting, pausing, aborting and acknowledging are reachable only through
+  `kiln_hmi`, which is verified by pixel counts (`M3`) with an encoder
+  direction that is a guess (`M5`).
 
 ---
 
 ## J. German translation, SWR-NFR-23
 
-- [x] **J1. The font carries ASCII and nothing else, and 31 strings did not.
-  Answered 2026-10-09, enforced on the whole table 2026-10-10.** Not a hardware
-  question after all: `draw.cpp` defines the 95 printable ASCII glyphs, so there
-  are no umlauts and no sharp s to draw with, at any encoding.
-
-  The claim that "the labels avoid umlauts for that reason" was true of the
-  labels and **false of the causes**: 68 non-ASCII characters across 31 German
-  cause strings, every one of which reached the panel as a blank. A German
-  operator read a fault screen with holes in the instruction, and nothing
-  checked. All of them are now transliterated and a test holds every string in
-  `kiln_core/faults` and `kiln_hmi/strings` to 0x20-0x7E, so one umlaut typed
-  into either table fails the build rather than reaching a workshop.
-
-- [x] **J2. The display renders the long causes. Done.** `kiln_hmi` exists and
-  the fault screen word-wraps the cause from `kiln_core/faults` in the
-  configured language, at 21 columns, wrapping on spaces rather than cutting
-  words -- these sentences are the operator's instructions, and a word split
-  across two lines in a hurry reads as a different word. German's extra 15 per
-  cent is absorbed by the wrap rather than by a shorter translation.
-
-- [ ] **J3. Config item names and units are still English.** `/api/config`
-  returns keys like `safety.max_temp_c` with English descriptions. The keys
-  are an API contract and should stay, but the human-readable descriptions
-  beside them in the settings screen are untranslated.
-
-- [ ] **J4. No German review by a native speaker.** The translations are
-  careful but unreviewed. `VERSCHWEISST` for a welded contactor and
-  `KEINE WAERME` for no heat are the two worth checking first, being the most
-  safety-critical messages a German-speaking operator would act on.
+- [ ] **J3. Config descriptions are English.** `/api/config` keys are an API
+  contract and stay; the human-readable descriptions beside them are not
+  translated.
+- [ ] **J4. No native-speaker review.** `VERSCHWEISST` for a welded contactor
+  and `KEINE WAERME` for no heat are the two to check first, being the most
+  safety-critical messages a German operator would act on.
 
 ---
 
 ## K. Hardware interlock chain
 
-**Superseded 2026-10-10 by the independent supervisor (`R7`).** The discrete
-chain in this section existed to put the thermocouple front ends' `FAULT`
-outputs in series with the contactor coil (`SYS-HW-24`). The supervisor reads
-the chamber front end itself, decides on a persistent fault, and holds its own
-series element, which is the same property delivered without the chain's
-caveats: a front end that is dead, absent or unconfigured does not answer the
-supervisor either, and not answering is a trip rather than a documented limit.
+Superseded by the supervisor: `SYS-HW-24` is rewritten rather than deleted,
+and the chain is not built. What is left is unrelated to it.
 
-`SYS-HW-24` is rewritten rather than deleted, because what it reached for is now
-delivered differently, and it keeps the one part worth keeping: each `FAULT` net
-retains its own test point.
-
-- [x] **K1. Answered rather than mitigated.** The chain was not
-  firmware-independent: open-drain outputs leave the path closed when a front
-  end is unpowered or absent, and a MAX31856 reports an open circuit only once
-  its fault mask has been configured, which is firmware work. That is why this
-  was recorded as a limitation rather than a protection. The supervisor has
-  neither caveat.
-
-- [x] **K2. Dissolved.** The question was whether an enclosure thermocouple
-  fault should stop a firing, given that `SWR-SAF-11` is a backstop and a
-  nuisance trip is how protections get disabled (`HZ-10`). The enclosure
-  channel is not in the supervisor's remit at all, by decision: it stays an
-  ESP32 rule and can never cause the supervisor's trip. There is no branch to
-  depopulate because there is no chain.
-
-- [x] **K5. Reduced to three tests, and they are still hardware tests.** Four
-  elements in series became three: the lid contact, the controller's charge
-  pump, and the supervisor's permit. Each must drop the contactor on its own,
-  which is `G2`'s class of claim and cannot be settled in simulation. The
-  `FAULT`-pin tests are gone with the chain.
-
-- [ ] **K3. `D7` is an unwired LED.** Pre-existing, not from this change: the
-  coil indicator's cathode is on `COIL_DRV` and its anode goes nowhere. It
-  needs a series resistor to the coil supply. Note that taking it from
-  `LID_SWITCH` rather than `+5V` makes it indicate "coil actually energised"
-  rather than "the MCU asked".
-
-- [ ] **K4. The board carries the chain that is no longer wanted, and is not
-  routed.** `J9`, `Q5`, `Q6` and `R28`–`R31` are placed on the PCB for an
-  interlock the design has dropped, and the supervisor's own parts are not on
-  it at all: that is `R6`, the schematic. **There are no tracks and no vias on
-  the board**, and the coil interrupt is a mains-adjacent net, so routing it is
-  not a formality: see `A23`. Depopulating the chain's parts is the smaller
-  half of this; the supervisor and its series element are the larger.
+- [ ] **K3. `D7` is an unwired LED.** Pre-existing: the coil indicator's
+  cathode is on `COIL_DRV` and its anode goes nowhere. Taking it from
+  `LID_SWITCH` rather than `+5V` makes it indicate "coil energised" rather
+  than "the MCU asked".
+- [ ] **K4. Depopulate the chain's parts from the board.** `J9`, `Q5`, `Q6`
+  and `R28`–`R31` are placed for an interlock the design dropped. The larger
+  half of this is `R6`, the supervisor the board does not carry.
 
 ---
 
 ## L. Target adapters
 
-- [ ] **L2. None of this has touched hardware.** Every adapter compiles and
-  passes analysis, and that is the whole of the evidence. QEMU does not
-  emulate SPI, I2C, PCNT or the ADC in any way that would exercise them, so
-  the MAX31856 register decode, the SSD1306 init sequence, the quadrature
-  decoding and the ADC scaling are all unverified against a real part. This is
-  the same class of claim as `G2` and `K5`, and it is the largest untested
-  surface in the project.
-
-- [x] **L6. The hardware build is in CI. Done 2026-10-09.** It was a second
-  `idf.py` invocation with a different `SDKCONFIG_DEFAULTS`, and it is the
-  configuration that matters for a release: its first build failed on two
-  `-Wformat-truncation` errors, one of them older than the WiFi work it was
-  found with. See `O3`.
+- [ ] **L2. None of this has touched hardware. P1.** Every adapter compiles
+  and passes analysis, and that is the whole of the evidence. QEMU emulates
+  none of SPI, I2C, PCNT or the ADC, so the MAX31856 register decode, the
+  SSD1306 init sequence, the quadrature decoding and the ADC scaling are all
+  unverified against a real part. The largest untested surface in the project.
 
 ---
 
 ## M. kiln_hmi, the local interface
 
-- [ ] **M3. Nobody has looked at it.** Every screen is verified by pixel counts
-  and state assertions on the host. No one has seen a glyph on a real SSD1306,
-  and the init sequence, the page addressing and the 5x7 font are all
-  unverified against glass. Layout judgements -- whether 15x21 really is
-  legible at two metres, whether the fault cause wraps readably -- cannot be
-  made from a test. Same class as `L2`.
-
-- [x] **M4. The fault screen now shows its cause whole. Done 2026-10-10.** The
-  fear was right and the scale was worse than stated: the causes run to **279
-  characters** against a panel that holds **five rows of 21**, so 27 of them
-  were truncated, in both languages. For `KILN_FAULT_CONTACTOR_WELDED` the part
-  being dropped was "ISOLATE THE KILN AT ITS SUPPLY NOW".
-
-  Shortening them was the wrong fix, because the same strings are what
-  `/api/status` sends and a browser renders a paragraph well. So each entry may
-  now carry a **panel form** as well: the same meaning, action first, trimmed
-  to what the screen can render, and absent where the full cause already fits,
-  so there is no second string to drift from the first. The display asks for
-  the panel form and always gets something it can show completely.
-
-  Two tests enforce it, both written to name the offender rather than just
-  fail: every panel form fits five rows under the screen's own word wrap, and
-  no word is longer than a row -- which is a real constraint in German, where
-  `Thermoelement-Messeingang` is 25 characters and the wrap would cut it
-  mid-word. `kiln_hmi/draw.cpp`'s own comment says why that is unacceptable: a
-  word split in a hurry reads as a different word.
-
-- [ ] **M5. The encoder direction is a guess.** The quadrature channel actions
-  in `hal_input.cpp` assume one wiring of A and B. If the knob turns the menu
-  the wrong way on real hardware, swap the two `pcnt_channel_set_edge_action`
-  pairs; it is a one-line fix and not a design error, but it will be wrong half
-  the time until somebody turns a real knob.
+- [ ] **M3. Nobody has seen a glyph on real glass. P1.** The init sequence,
+  the page addressing and the 5x7 font are unverified against hardware, and
+  layout judgements, whether 15x21 is legible at two metres, cannot be made
+  from a test.
+- [ ] **M5. The encoder direction is a guess.** If the knob turns the menu the
+  wrong way, swap the two `pcnt_channel_set_edge_action` pairs. A one-line fix
+  that will be wrong half the time until somebody turns a real knob.
 
 ---
 
 ## N. Security obligations and the Cyber Resilience Act
 
-The inventory is [`docs/security.md` §13](docs/security.md), split into the
-firmware half and the half that is not firmware. These are the items it leaves
-open, and the order below is the order of [§13.3](docs/security.md): the live
-weakness first, the deadline second, the sentence third, the engineering last.
+Inventory in [`docs/security.md` §13](docs/security.md).
 
-- [x] **N1. Resolved by deletion. Closed 2026-10-09.** The live weakness was
-  an access point that would start with no passphrase, offered as flexibility
-  and failing the CRA's secure-default requirement. The fix turned out not to
-  be a bound in the configuration table: the access point is **gone**, with
-  `SWR-NET-02` and `SWR-NET-05` withdrawn, `net.ap_ssid` and `net.ap_pass` out
-  of the schema, and `TH-11`, `SRR-08` and `OQ-S4` closed with them. The
-  surface is deleted rather than regulated, which is the only kind of fix that
-  cannot be misconfigured back. WiFi is set up at the display (`O4`).
+- [ ] **N2. The Article 14 procedure, and the mailbox. P2.** `SECURITY.md`
+  names `security@bitcrushtesting.com` as the Article 13(17) contact; **that
+  mailbox has to exist and be read by a person.** Behind it: a written
+  procedure for an actively exploited vulnerability: ENISA and the relevant
+  CSIRT within 24 hours, notification within 72, final report within 14 days,
+  users told without undue delay. Live from **11 September 2026**, and it does
+  not wait for firmware. `SRR-14`.
+- [ ] **N3. Choose the support period and declare it. P2.** At least five
+  years (`SWR-UPD-16`); the service life of a kiln controller is well beyond
+  that. The number gates what users are told, how long the SBOM is kept, and
+  how long the update host and its signing key must exist (`SRR-12`). Half of
+  `OQ-R5`; the other half is the conformity route, where a kiln controller
+  appears in neither Annex list, so self-assessment should be available, but
+  record the conclusion rather than assume it.
+- [ ] **N4. Two loose ends on the SBOM.** Retention for the support period
+  needs `N3` answered. `--require-licences` can be turned on once four
+  ESP-IDF v6.0.1 components resolve: `cmock`, `esp_netif_stack`,
+  `http_parser` and `protobuf-c` carry no SPDX tag, three ship a licence file
+  and `esp_netif_stack` ships neither, which is worth raising upstream. The
+  flag stays off by default rather than gating a release on a vendor tree's
+  tagging habits.
 
-- [ ] **N2. The Article 14 reporting procedure, and the mailbox behind
-  `SECURITY.md`.** `SECURITY.md` exists and names
-  `security@bitcrushtesting.com` as the single point of contact required by
-  Article 13(17); **that mailbox has to exist and be read by a person**. Behind
-  it: a written procedure for an actively exploited vulnerability or a severe
-  incident, being an early warning to ENISA and the relevant CSIRT within 24
-  hours, a notification within 72, a final report within 14 days, and users
-  informed without undue delay. **This applies from 11 September 2026**, more
-  than a year before the Act's main obligations, and it does not wait for the
-  firmware. Carried as `SRR-14`.
-
-- [ ] **N3. Choose the support period, and declare it.** At least five years
-  (`SWR-UPD-16`), and the service life of a kiln controller is well beyond that
-  floor. The number gates the information given to users, how long the SBOM has
-  to be kept, and how long `update.bitcrushtesting.com` and its signing key have
-  to keep existing (`SRR-12`). It is a sentence to write and an obligation to
-  mean, and it is half of `OQ-R5`; the other half is the conformity assessment
-  route, where a kiln controller does not appear in the Act's important or
-  critical lists, so self-assessment should be available. Record the conclusion
-  rather than assume it.
-
-- [ ] **N4. Three requirements with no implementation.** Each was a gap nobody
-  had named until 2026-10-09:
-
-  - [~] `SWR-LOG-16`, **security event logging, partly done 2026-10-10.** The
-    mechanism and the opt-out exist: three appended event codes,
-    `log.security_events` defaulting to on, and the opt-out applied in the one
-    place every event passes through so no emitter can forget it. It removes
-    only the security events -- a fault, a state change and a sample are the
-    evidence of what a kiln did, and no setting switches those off.
-
-    Recorded now: an abnormal reset cause, including one the adapter cannot
-    identify; a factory reset, logged last so it is the first entry of the new
-    owner's log and explains why the rest is missing; a network join commanded
-    at the display, without the SSID, since that would record where the kiln
-    lives; and configuration changes, which were already there.
-
-    **Still open, and waiting on `H2` rather than on effort:** the update-path
-    events need a version string and a refusal reason, and neither fits a
-    20-byte record (`SWA-18`). They need a second record type or their own
-    channel, and they arrive with the update path. Adding codes now that could
-    carry no detail would have looked like progress and recorded nothing.
-
-    Finding, fixed with it: a record appended **outside a run** was lost. It
-    went into a sector with no header, which `iterate` skips and the next
-    `begin_run` erases, so the first boot-time security event would have been
-    written, stored, counted and never read. The ring claims a sector lazily
-    now, tagged run 0. The bookkeeping was the part that bit: the first fix
-    left `head_seq` at 0, `begin_run` reissued the same sequence number, two
-    sectors tied for newest, and `SWA-09`'s power-loss journal read the wrong
-    record. Three recovery tests caught that, and there is now a test for the
-    property itself.
-    The opt-out is required as explicitly as the log, and the log must not
-    become a second copy of `SRR-05` by capturing credentials.
-  - [x] `SWR-CFG-09`, **the factory reset, done 2026-10-10.** Last entry of
-    the display's menu, behind the confirmation an abort uses and defaulting
-    to "no"; erases the configuration and the credentials in it, the latched
-    fault, every run record, the log and the wear counters; restarts the run
-    numbering; leaves the production block and the firmware alone; refused
-    while running or autotuning; reports counts rather than only success.
-
-    The interesting part was the test. Overwrite-then-erase is the
-    implementation, because an NVS erase delists an entry and leaves its bytes
-    in the page, and proving it needed the host key/value fake to stop being
-    kinder than the medium: it cleared a whole entry on erase and reused the
-    delisted slot on the next write, either of which made "the secret is gone"
-    pass with nothing behind it. The fake now delists and keeps the bytes. With
-    the overwrite removed the test fails; with it restored it passes. Which is
-    what `SRR-05`'s disposal obligation turning into a function of the product
-    looks like, and `ADV-4`'s only answer.
-  - **The SBOM's two loose ends.** `tools/sbom.py` satisfies `SWR-NFR-28` and
-    runs in CI and in the release workflow, which leaves **retention** of the
-    published documents for the support period, needing `N3` answered first,
-    and turning on `--require-licences` once four ESP-IDF v6.0.1 components
-    resolve: `cmock`, `esp_netif_stack`, `http_parser` and `protobuf-c` carry
-    no SPDX tag in their sources, three ship a licence file the SBOM points at
-    and `esp_netif_stack` ships neither, which is worth raising upstream. The
-    flag stays off by default because it would gate a release on a vendor
-    tree's tagging habits.
-
-  Also unowned, and not requirements because they are process: somebody has to
-  **read ESP-IDF and mbedTLS advisories**, and the Annex II information for
-  users (contact, point of contact, intended use, limitations, how updates
-  arrive, end of support, secure disposal) has to be written with the
-  instructions `SYS-SAF-24` already shapes.
-
-- [ ] **N5. Two decisions that are now requirements rather than preferences.**
-  `OQ-S3`, flash encryption, stops being a trade the project may decline on the
-  SoldUnits route: the Act requires stored data to be protected by
+  Also unowned, and process rather than requirements: somebody has to read
+  ESP-IDF and mbedTLS advisories, and the Annex II information for users has
+  to be written.
+- [ ] **N5. Two decisions that are now requirements. P2.** `OQ-S3`, flash
+  encryption: the Act requires stored data to be protected by
   state-of-the-art means and `net.wifi_pass` is plaintext in NVS. And secure
   boot, which exists as an opt-in provisioning step, should be **on by default
-  for a sold unit**, which is a production-line decision nobody has recorded.
-  Both may legitimately differ between the two routes to market, as `OQ-S2`
-  already let secure boot be a per-unit decision; what cannot happen is either
-  staying open while units ship.
+  for a sold unit**, a production-line decision nobody has recorded. Both may
+  legitimately differ between the two routes to market; what cannot happen is
+  either staying open while units ship.
 
-  Framing worth keeping: `security.md` §13.1 marks six of the Annex I Part I
-  items as **evidence rather than work**, because the read-only interface, the
-  absence of `malloc`, the isolation of control from the network and the test
-  apparatus already satisfy them. The job there is citing them in a conformity
-  file, not building anything.
+  Framing worth keeping: `security.md` §13.1 marks six Annex I Part I items as
+  **evidence rather than work**, because the read-only interface, the absence
+  of `malloc`, the isolation of control from the network and the test
+  apparatus already satisfy them. The job is citing them in a conformity file.
 
 ---
 
 ## O. WiFi, FR-NET
 
-- [x] **O2. The hardware image is 945 kB, 54 % of the slot free.** A record
-  rather than a task, re-measured 2026-10-10 after mDNS, the embedded assets,
-  the event stream and the German strings all landed: 0xec520 bytes against a
-  2 MB slot. The
-  simulated build that CI publishes is **246 kB** and contains no WiFi and no
-  HTTP server at all, which is worth keeping straight when reading a size
-  report: `CONFIG_KILN_PLANT_SIM` compiles both out.
+- [ ] **O3. Untested against a radio. P1.** Nobody has watched it associate,
+  recover from a dropped connection, or sync time. The WiFi setup matters more
+  than the rest because it is now the **only** way credentials reach the
+  device: a scan that returns nothing, or a join that silently fails, leaves a
+  kiln with no network and no second route to one.
 
-  `SWR-NFR-13` holds with room. The web assets measure **18 kB gzipped** in
-  total against architecture 12.4's 44 kB budget (`index.html` 2.2, `app.css`
-  3.6, `app.js` 8.6, `chart.js` 4.2). That budget had never been measured; it
-  has now, and it passes. Of the growth since 888 kB, mDNS is 32 kB and the
-  assets 18 kB; the rest is the event stream, the string table and the
-  supervisor link.
-
-- [ ] **O3. Untested against a radio, and until today it did not even
-  compile.** The claim here used to be "it compiles and passes analysis", and
-  that was false in a way nothing could have caught: every CI job builds
-  `sdkconfig.qemu`, which sets `CONFIG_KILN_PLANT_SIM` and compiles the WiFi,
-  the HTTP server and the hardware path out of `main.cpp`. The configuration
-  that ships was guarded by no build at all.
-
-  Built for the first time on 2026-10-09 and it failed on two
-  `-Wformat-truncation` errors, one of them older than the WiFi work. Both are
-  fixed and CI now builds the hardware configuration on every push, so this
-  cannot recur.
-
-  What remains is what the heading says. Nobody has watched it associate,
-  recover from a dropped connection, or sync time.
-
-  The WiFi setup of `O4` is in the same position and matters more, because it
-  is now the **only** way credentials reach the device: a scan that returns
-  nothing on real hardware, or a join that silently fails, leaves a kiln with
-  no network and no second route to one. First hardware session should be, in
-  order: scan in a crowded band, join a WPA2 network with a passphrase
-  containing symbols, power-cycle and confirm it comes back, then join a
-  different network to confirm it replaces rather than accumulates.
-
-- [x] **O4. The provisioning AP is gone; WiFi is set up at the display.**
-  Done in firmware and unproven on hardware, which is `O3`'s session rather
-  than a task of its own. `SWR-NET-02` and `SWR-NET-05` are
-  withdrawn, `SWR-NET-11` and `SWR-NET-12` replace them, `net.ap_ssid` and
-  `net.ap_pass` leave the schema, and `TH-11`, `SRR-08` and `OQ-S4` close with
-  them: the surface is deleted rather than regulated.
-
-  What is written: the scan list and the character-by-character passphrase
-  entry in `kiln_hmi`, nine host tests over them including one that walks the
-  whole character set, `esp_wifi_scan_*` behind `port_net`, and the join wired
-  through the composition root, persisting credentials before attempting the
-  radio.
-
-  What was left on 2026-10-09 is now done, except the hardware session:
-
-  - **The display speaks German.** Every screen title, the whole menu, both
-    answers to a confirmation and every footer were English literals at their
-    draw sites, so a device set to German announced its faults in German inside
-    an English frame. They are now one table in `kiln_hmi/strings`, 46 strings
-    in two languages, with the transliteration `kiln_core/faults` has always
-    used because the 5x7 font carries the 95 printable ASCII glyphs and nothing
-    else. That answers `J1` from the code rather than from a hardware session.
-    Six tests: nothing missing, nothing over the panel's 21 columns, no byte
-    the font cannot draw, an unknown language falls back to English, and the
-    menu and the confirmation actually change when the language does. `J4`
-    still stands: no native speaker has read it.
-
-  - **The knob resumes where the last character left it**, and always did; what
-    was missing was a test saying so, which is now there. A passphrase repeats
-    characters and clusters inside a region of the set, so not sending the knob
-    back to `a` is usually several turns saved and never more, and it is the
-    sort of property one "sensible" reset silently reverses.
-
-  - **A failed join says so, with the radio's reason code.** `last_reason` was
-    recorded in the adapter and reported to nobody. The network screen now
-    distinguishes a join in flight from one the radio refused, and prints the
-    code: 15 is a failed four-way handshake, which is a wrong passphrase in
-    almost every case, and 201 is "no AP of that name answered". The number is
-    there to be read out over a phone to somebody who can look it up, which
-    beats a sentence that guesses. With the display the only route in, guessing
-    was the entire cost of getting it wrong.
-
-  What remains is the hardware session of `O3`, and nothing else.
+  First hardware session, in order: scan in a crowded band, join WPA2 with a
+  passphrase containing symbols, power-cycle and confirm it comes back, then
+  join a different network to confirm it replaces rather than accumulates.
 
 ---
 
 ## P. HTTP transport and the API
 
-- [x] **P2. The telemetry stream is implemented. Done 2026-10-10.** The
-  payload had been written and tested since `kiln_api_telemetry_event` landed,
-  and the browser had been asking for it all along: `app.js` opens an
-  `EventSource` on `/api/events` and listens for a `telemetry` event. Nothing
-  answered, so the dashboard went stale after four seconds exactly as
-  `SWR-WEB-25` says it should.
-
-  It does not stream from the handler, and that is the whole design.
-  `esp_http_server` runs one task and serialises handlers on it, so a handler
-  looping once a second would hold that task for as long as a browser tab
-  stayed open and the kiln would appear to hang the moment somebody left a
-  dashboard open and then loaded the log. Instead the handler parks the socket
-  with `httpd_req_async_handler_begin` and returns; one task at priority 3
-  pushes to at most two parked subscribers once a second, with a comment frame
-  every fifteen pushes so an idle proxy does not drop a stream that is working.
-  A third subscriber gets `503` with `Retry-After`. Six sockets rather than
-  four, because `SWR-WEB-21` counts clients and a client with the dashboard
-  open needs a second socket for everything else.
-
-  The framing is in `kiln_web/api`, host-tested, and shared with the
-  development harness: a frame that does not fit is not written at all and a
-  payload with a newline is refused, because half a frame does not fail
-  visibly, it moves the frame boundary into the middle of a JSON document and
-  every frame after it is misread. Five tests.
-
-  Verified against a real client, not only by unit test: the harness served
-  four frames in three and a half seconds over a socket, each
-  `event: telemetry` with a parseable payload and a rising temperature. That
-  also found a bug nothing else would have: the harness announced
-  `Transfer-Encoding: chunked` on the event stream and then sent unframed SSE,
-  a response whose body contradicts its own headers, which a browser may
-  reject outright. The log stream is chunked and stays chunked; the event
-  stream now declares neither length nor chunking and ends with the
-  connection, which is what an event stream is.
-
-- [x] **P3. The program store is gone. Done 2026-10-10.** The decision was
-  pre-compiled profiles with nothing editing them, which left `SWR-PRG-04`
-  asking for 20 program slots in non-volatile storage to hold a copy of the
-  three programs that arrive in the image. It is withdrawn, the store is
-  deleted, and the profiles are read from `kiln_profile_example` by the API,
-  the HMI and the development harness alike.
-
-  It is a deletion that makes the device better rather than smaller:
-
-  - **The local start path worked for the first time.** `KILN_HMI_ACT_START`
-    returned `KILN_ERR_NOT_FOUND` on hardware with a note that there was no
-    program store, and the view builder never filled the program list, so a
-    device carrying three firing profiles in its own flash showed "none
-    stored" and its menu's first entry did nothing. Both are now wired to the
-    compiled-in profiles, which is `SWR-HMI-10` delivered rather than written.
-  - **A device whose flash will not mount still has its programs.** The list
-    used to answer `503` for programs the firmware was carrying.
-  - **A factory reset no longer costs the operator their programs.** The
-    partition holds run history, and losing history is what a reset is for.
-  - **The first boot has nothing to get wrong.** Seeding was idempotent and
-    tested, and still a flash write on every power-on of a new device.
-
-  About 200 lines of implementation and nine tests went with it. The three
-  properties worth keeping were re-pointed rather than dropped: every
-  compiled-in example is a valid program with a distinct name and an index past
-  the end is refused, the atomic-replace-on-power-cut property is now driven
-  through `run_index`, which is what still writes to the store, and the
-  partition-sharing test became the measurement that 20 of 64 regions are used.
-  The mount cost of `Q2` halves with it: **488 reads and 31 888 bytes**.
-
-  `SWR-PRG-05` stays, and the reason is `safety.max_temp_c`: the programs are
-  trusted as data, but an operator can lower the ceiling below a program's
-  peak, and validation on start is what refuses that firing rather than running
-  it into a limit.
-
-- [ ] **P4. The API has been driven by a client; `esp_http_server` has not.**
-  Narrowed on 2026-10-10 rather than closed. The development harness is a real
-  socket server running the same handler code, and it has now answered real
-  requests over TCP: the program routes, an id past the end as `404`, the
-  storage response, a log query with its chunk framing and terminator, and four
-  SSE frames in three and a half seconds each carrying a parseable payload.
-  That found a bug no unit test would have, the harness announcing
-  `Transfer-Encoding: chunked` and then sending unframed SSE.
-
-  What remains unverified is specifically `esp_http_server`, which the harness
-  does not use and which no host test can reach: URI splitting in its parser,
-  `httpd_resp_send_chunk` against a real client, the socket limit with two
-  sessions parked on streams, the async handler's lifetime when a browser tab
-  closes mid-push, and whether a slow client can hold the shared 4 kB response
-  buffer long enough to matter. All of it needs the device.
-
----
-
-## Q. The file store, SWA-21
-
-- [x] **Q1. Wear is now handled at the write. Done 2026-10-09.** The store had
-  never seen a worn sector, and the failure mode it was written against was the
-  wrong one: a NOR sector at the end of its life does not report an error, it
-  takes the write, returns success and holds something else. The CRC caught that
-  on the next read, which on this device is after a firing rather than during
-  the write it could still have redirected.
-
-  Every write is now read back and re-validated through the same path a mount
-  uses before the index points at it. A copy that does not verify retires its
-  region and the write is re-attempted in a free region at a higher seq, up to
-  three regions; the caller gets `KILN_OK`, because the file is stored and only
-  its location changed. Retirement needs no bad-block table: the old region is
-  erased best effort after the new copy verifies, and if that erase fails, which
-  is what a finished sector does, the stale copy stays at a lower seq, two
-  regions claim one name, and mount resolves it by seq and retires the loser.
-  The erase is what stops a deleted file from coming back at the next mount.
-
-  Still no wear levelling, and deliberately: the endurance arithmetic of
-  architecture 10.4 has four orders of magnitude of headroom, so a region keeps
-  its file for as long as it works.
-
-  Five new host tests, driven by two new knobs on the flash fake that model a
-  sector which accepts a write and keeps zeros, and a sector that will not
-  erase. The retired count is logged at boot and is the only warning anybody
-  gets that the part is going.
-
-- [x] **Q2. The mount cost is measured. Done 2026-10-09.** It was described
-  rather than measured, and the description was low by a third. On the medium
-  this firmware actually produces, a mount costs **488 reads and 31 888 bytes**
-  of CRC: 20 run records of 554 bytes, both copies valid. It was 768 reads and
-  47 808 bytes while the programs were stored too, which `P3` ended. A partition full
-  of maximum-size files with both copies valid costs **8 192 reads and 524 288
-  bytes**, the whole partition.
-
-  Both are asserted in `test_fileslots`, against a model derived in the test
-  rather than a constant, so making mount lazy fails the suite instead of
-  happening quietly. 47 kB of flash reads is not a start-up problem on this
-  part, so there is nothing here to optimise; if a board ever says otherwise,
-  the only thing mount needs eagerly is which copy of each region wins, and the
-  payload CRC could move to the read.
-
-- [x] **Q4. A name longer than 63 bytes is refused rather than truncated.
-  Recorded 2026-10-09.** `KILN_PATH_MAX` is 64 including the terminator and the
-  name field is exactly that, so a longer path returns `KILN_ERR_INVALID_ARG`.
-  Both callers produce five-character slot paths, so nothing generates one
-  today; storing a file under a name the caller did not ask for is the worse
-  failure. Now stated where it is enforced, in `port_filestore.h` and
-  architecture 10.6, with the test that proves it, rather than only here.
-
-- [x] **Q5. The run index walks all 20 slots, and that is where it stays.
-  Recorded 2026-10-09.** Append reads every slot to find the oldest, and
-  `mark_truncated` and `baseline` walk them too. Twenty reads answered from the
-  in-RAM index plus one region write, once per firing, is not a cost worth a
-  mechanism. It is the one place where the store being a fixed array rather
-  than a directory costs anything, and that is now recorded in `run_index.cpp`
-  where somebody revisiting the file will see it.
+- [ ] **P4. `esp_http_server` has never served a request. P1.** The API layer
+  has been driven over real sockets by the development harness; the transport
+  has not. Unverified: URI splitting in its parser, `httpd_resp_send_chunk`
+  against a real client, the socket limit with two sessions parked on streams,
+  the async handler's lifetime when a tab closes mid-push, and whether a slow
+  client can hold the shared 4 kB response buffer long enough to matter.
 
 ---
 
 ## R. The independent safety supervisor, SWA-22
 
-Designed in [`docs/safety-supervisor.md`](docs/safety-supervisor.md). That
-intro said nothing below could start until `R1` to `R4` were answered, because
-each of them changed the supervisor's pin count or a requirement. They are
-answered, and the firmware, the requirement deltas and the link tests are done:
-what is left in this section is **hardware**, which is `R6` the schematic and
-`R11` the button on the panel.
+The firmware, the requirement deltas and the link tests are done. What is left
+is hardware.
 
-- [x] **R9. `sense.tc_type` is retired. Done 2026-10-10.** The chamber front
-  end belongs to the supervisor, which linearises for type K, so an item that
-  let this side change the type would change what the supervisor's backstop
-  means. `kiln_suplink`'s `configure` already refused, which made the config
-  item a setting an operator could set and believe while nothing acted on it.
-
-  `KILN_CFG_SCHEMA_VERSION` is 2, and the migration is the interesting part.
-  Every earlier version change added fields, which a prefix copy handles; this
-  one *removes* a byte from the middle, so every field after the hole sits one
-  lower. A prefix copy would have landed the whole sensing, control and network
-  block one byte out of place -- the stored line filter frequency reading as
-  half of itself plus half a calibration offset -- and the CRC would have
-  passed on the way in, so nothing would have reported it. A device would come
-  back from an update quietly mis-calibrated.
-
-  `kiln_config_decode` therefore splices version 1 explicitly, which is
-  `SWR-CFG-05`'s "older: migrate" met rather than answered with defaults. The
-  test forges a real version 1 blob and checks fields on both sides of the hole
-  plus a re-encode round trip. `SWR-CFG-02` records that there is no chamber TC
-  type, and a test asserts the item does not come back.
-
-  `kiln_app_boot` now passes `KILN_TC_TYPE_K` to the chamber port from the code
-  rather than from configuration: refused on the product, which is the point,
-  and correct on the simulated build where the port accepts it.
-
-- [x] **R5. The requirement deltas are written. Done 2026-10-10.** Six new
-  requirements and nine changed ones. The supervisor appeared nowhere in the
-  system or safety requirements before this, which meant the design document
-  was the only place it existed: a part holding one element of the contactor
-  coil, with no requirement to satisfy and nothing to verify against.
-
-  **New**, in `02_system_req.sdoc`: `SYS-HW-26` the separate microcontroller
-  with its own clock, watchdog, front end, series element and programming
-  interface, and the external pull-down the reset window needs; `SYS-HW-27` the
-  one-direction report-only link, with no message able to raise the threshold
-  or clear the latch; `SYS-HW-28` the local clear button, edge triggered, a
-  stuck line never arming it; `SYS-SAF-25` the compiled-in backstop and
-  persistent-fault trip; `SYS-SAF-26` the latch and what clears it, including
-  why it deliberately does not survive a power cycle; `SYS-SAF-27` the 4 Hz
-  report, silence as a sensor fault, and the trip acting within one acquisition
-  period whether or not anything is listening.
-
-  **Changed**: `SWR-ACQ-01` (the chamber front end is the supervisor's, and a
-  report is the controller's sample), `SYS-HW-02` (separate buses on different
-  microcontrollers, where a shared bus is now exactly what must not happen),
-  `SYS-HW-24` (superseded, rewritten, test points kept), `SYS-HW-25` (its
-  freewheel reference follows), `SWA-04` (two supervisors, and which one every
-  sentence means), `SWA-05` (the charge pump is one of two paths, and why the
-  supervisor's element is deliberately a static level instead), `SG-01`
-  (strengthened on MCU failure, and more exposed on the sensor), `SG-03` ("two"
-  became "at least two", and "independent control" became true).
-  `SWR-SAF-23` and `SWR-ACQ-02` were already done.
-
-  `safety.md` gains **L2S**, lettered rather than numbered because the layer
-  numbers are cited from `safety.sdoc`, the firmware and the hardware design,
-  and renumbering to open a gap would break every citation to no benefit. Its
-  section says what the layer protects against -- the failure of the entire
-  controller, which no layer above it could cover -- and what it deliberately
-  does not do.
-
-  `safety.md`'s system-boundary diagram and its coil-path table are updated
-  with it: three elements break the coil now rather than four, and the diagram
-  carries a dashed line between the two front ends that is not a signal, so
-  that it cannot be read as two independent temperature channels when both
-  MAX31856 read one junction.
-
-  Section 6's independence table gains the three rows the design asked for: a
-  genuine **yes** for the supervisor against the controller, sharing only the
-  3V3 rail; an explicit **no** for the chamber couple, which both
-  microcontrollers read from one junction; and the thermal-versus-current row
-  **promoted from defence in depth to load-bearing**, because with one couple
-  the CT is the only physically independent detection channel left. The second
-  part made the processor-failure row writable and the couple row worse at the
-  same time, and both are said.
-
-- [x] **R7. What the supervisor supersedes is removed. Done 2026-10-10.**
-  Section K is superseded: `K1` is answered rather than mitigated, `K2`
-  dissolves, `K5` drops from four tests to three. `SYS-HW-24` is rewritten
-  rather than deleted and keeps its test points. `SWR-SAF-31` and `SYS-HW-21`
-  are unchanged, as the design said they should be: the lid's series contact
-  depends on no firmware at all, costs nothing and stays, and the lid sense
-  stays the controller's input because `SWR-SAF-31`'s latch is gated on a
-  heating state only the controller knows. A supervisor latching on the lid
-  regardless would trip on every cold load.
-
-  What is left in section K is `K3`, an unwired indicator LED that predates all
-  of this, and `K4`, which has grown rather than shrunk: the board carries the
-  chain the design has dropped and does not carry the supervisor at all.
-
-- [ ] **R11. The clear button on the panel.** `R4` decided a local button and
-  the firmware implements it (edge triggered, held 0.5 s, and a line stuck low
-  never arms, so a short fails towards the latch holding). What is left is
-  physical: the button itself, its position relative to the HMI, and whether it
-  is labelled as clearing the *supervisor* or clearing *a fault*, which are not
-  the same thing and the operator cannot see the difference. The ESP32's own
-  latched fault still needs its own acknowledgement (`SWR-SAF-17`), so there are two
-  acknowledgements and the panel should not imply there is one.
-
-- [ ] **R6. Draw the supervisor.** The part and the pin map are settled:
-  STM32G031K8T6, LQFP32, and the assignment is in
-  [`firmware/supervisor/README.md`](firmware/supervisor/README.md), taken from ST's own pinout
-  and alternate-function database rather than assumed. What is left is the
-  schematic.
-
-  Three things the pin map asks of the hardware. The permit line is active
-  high and every GPIO is high-impedance between reset and the first
-  instruction, so **the series element needs an external pull-down** or there
-  is a window at every reset where its state is whatever the board leaks to.
-  SWD on `PA13`/`PA14` must come out to test points, not be left as pads,
-  because the independence argument rests on this firmware being reviewable and
-  flashable on its own. And on the ESP32 side the link lands on
-  `KILN_PIN_EXP_IO2` or `KILN_PIN_EXP_IO42`, one pin, receive only; `UART0` is
-  the console and must not be used.
-
-- [x] **R8. The supervisor's firmware and its test strategy. Done 2026-10-10.**
-  The firmware is 3 488 bytes of program memory across four source files, which
-  is the design constraint met rather than aspired to, and it has its own
-  host-testable core on `SWA-01`'s argument: `trip`, `selfcheck`, `max31856`
-  and the wire protocol all build and run on a development host with no
-  hardware, with MC/DC over the trip logic and a generated Unit Design
-  Document.
-
-  The link test this asked for is now there, and it was the piece genuinely
-  missing. Each stage was tested and the chain was not: `test_suplink` proved
-  silence and a stale sequence number both become `KILN_TC_FAULT_COMMS`,
-  `test_safety_thermal` proved that bit becomes `KILN_FAULT_TC_COMMS`, and
-  other tests proved a latched fault withholds heat. An assembly of proven
-  parts is not a proven assembly, and the chamber temperature enters this
-  firmware at exactly one place, over a wire.
-
-  Two integration tests now run the real application with the real decoder
-  bound as the chamber port, the way `main.cpp` binds it on the board, and
-  watch the heater: **silence** takes the heat away and opens the contactor
-  after `SWR-SAF-04`'s grace, and so does **a supervisor repeating itself** --
-  well-formed frames, good CRC, plausible temperature, sequence number
-  stuck -- which is the failure that looks like health and which a link check
-  counting bytes would have called a working channel while the kiln ran on a
-  reading from minutes ago. Both assert the kiln was heating first, so neither
-  can pass for the wrong reason.
+- [ ] **R6. Draw the supervisor. P1.** Part and pin map are settled:
+  STM32G031K8T6, LQFP32, assignment in
+  [`firmware/supervisor/README.md`](firmware/supervisor/README.md). Three
+  things the pin map asks of the board: the permit line needs an external
+  pull-down (`HWR-03`), SWD must come out to test points (`HWR-19`), and on the
+  ESP32 side the link lands on one receive-only pin, and `UART0` is the console
+  and must not be used.
+- [ ] **R11. The clear button on the panel.** The firmware implements it
+  (edge triggered, held 0.5 s, a line stuck low never arms). What is left is
+  physical: the button, its position relative to the HMI, and whether it is
+  labelled as clearing the *supervisor* or clearing *a fault*, which are not the same
+  thing, and the operator cannot see the difference. There are two
+  acknowledgements and the panel must not imply there is one.

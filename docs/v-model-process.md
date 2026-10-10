@@ -35,6 +35,7 @@ User Requirements  ────────────────────�
 |---|-----------------------|------------------------|------------|------------------|-------------------|
 | 1 | User Requirements     | `01_user_req.sdoc`     | `UR-`      | –                | Acceptance Tests  |
 | 2 | System Requirements   | `02_system_req.sdoc`   | `SYS-`     | `UR-`            | System Tests      |
+| 3 | Hardware Requirements | `03_hardware_req.sdoc` | `HWR-`     | `SYS-`           | Inspection, bench, HIL |
 | 3 | Software Requirements | `03_software_req.sdoc` | `SWR-`     | `SYS-`           | Integration Tests |
 | 4 | Software Architecture | `04_software_arch.sdoc`| `SWA-`     | `SWR-`           | Software Tests    |
 | 5 | Unit Design           | Doxygen in the source  | see §4.5   | `SWA-`           | Unit Tests        |
@@ -47,6 +48,12 @@ User Requirements  ────────────────────�
 | 9  | Integration Tests | `09_integration_tests.sdoc` | `IT-`      | `SWR-`   |
 | 10 | System Tests      | `10_system_tests.sdoc`      | `ST-`      | `SYS-`   |
 | 11 | Acceptance Tests  | `11_acceptance_tests.sdoc`  | `AT-`      | `UR-`    |
+
+**Level 3 has two branches**, which is the classic V and was implicit here
+until the hardware one was written down. `SYS-HW-*` says what the system needs;
+`HWR-*` says what the board has to achieve, with the numbers. A requirement
+belongs in the hardware branch when getting it wrong is a board change rather
+than a firmware one.
 
 ## 4. Specification Phases (Left Side)
 
