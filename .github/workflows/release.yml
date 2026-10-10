@@ -5,9 +5,12 @@
 #
 #     git tag -a v0.2.0 -m 'what changed' && git push origin v0.2.0
 #
-# Read the warning in the generated notes before flashing anything.  Until
-# kiln_hal_esp32s3 exists, the only configuration that builds is the one with
-# the kiln process simulated, and it drives no outputs at all.
+# Read the warning in the generated notes before flashing anything.  The
+# published image is the one with the kiln process simulated, and it drives no
+# outputs at all.  The hardware configuration builds too, and CI builds it on
+# every push, but nothing in it has been run against a board: it is not
+# published here, because an image that looks flashable and has never driven a
+# contactor is the most dangerous artefact this repository could offer.
 
 name: Release
 
@@ -162,13 +165,22 @@ jobs:
             echo '> [!CAUTION]'
             echo '> **This build cannot control a kiln. Do not flash it to one.**'
             echo '>'
-            echo '> The hardware adapters (`kiln_hal_esp32s3`) do not exist yet, so the'
-            echo '> only configuration that builds is the one with the kiln process'
-            echo '> *simulated* (`CONFIG_KILN_PLANT_SIM`). The SSR and contactor outputs'
+            echo '> What is published here is the configuration with the kiln process'
+            echo '> *simulated* (`CONFIG_KILN_PLANT_SIM`): the SSR and contactor outputs'
             echo '> are never driven and the temperatures it reports are invented.'
             echo '>'
-            echo '> It is published so that the control and safety logic can be run and'
-            echo '> reviewed on an emulated ESP32-S3.'
+            echo '> The hardware configuration does build, and CI builds it on every'
+            echo '> push, so `kiln_hal_esp32s3` is no longer absent. **None of it has'
+            echo '> been run against a board.** No thermocouple front end, no SSR, no'
+            echo '> contactor, no current transformer, no supervisor link and no display'
+            echo '> has been exercised on hardware, and the charge-pump release of'
+            echo '> `SWA-05`, which is the central safety property of the design, cannot'
+            echo '> be verified anywhere but on a board. That image is deliberately not'
+            echo '> in this release: one that looks flashable and has never driven a'
+            echo '> contactor is the most dangerous thing this repository could offer.'
+            echo '>'
+            echo '> This one is published so that the control and safety logic can be'
+            echo '> run and reviewed on an emulated ESP32-S3.'
             echo
             echo '## Running it'
             echo
@@ -265,8 +277,8 @@ jobs:
         run: |
           tag='${{ steps.version.outputs.tag }}'
           # Marked a prerelease for as long as the published image is the
-          # simulated one.  Drop --prerelease once there is a build that can
-          # actually drive a kiln.
+          # simulated one.  Drop --prerelease once there is a build that has
+          # actually driven a kiln -- built is not the bar, run is.
           gh release create "$tag" \
             --title "$tag" \
             --notes-file release-notes.md \
