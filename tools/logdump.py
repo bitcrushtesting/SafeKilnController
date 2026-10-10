@@ -58,8 +58,13 @@ FORMAT_VERSION = 1
 CRC16_INIT = 0xFFFF
 
 STATES = ["IDLE", "RUNNING", "PAUSED", "MANUAL", "AUTOTUNE", "COMPLETE", "FAULT"]
+# Index is the persisted code, so the order is the format and not a choice.
+# The last three are SWR-LOG-16's security events; the update-path ones that
+# requirement also lists arrive with the update path itself, because a version
+# string and a refusal reason do not fit a 20-byte record.
 EVENTS = ["sample", "run_start", "run_end", "state_change", "fault", "warning",
-          "config_change", "operator"]
+          "config_change", "operator",
+          "sec_reset", "sec_erase", "sec_net_join"]
 SEG_NONE = 0xFF
 
 # High nibble of the state/flags byte.
@@ -288,6 +293,12 @@ def self_test() -> int:
     check("a short record says so", decode_record(b"\x00" * 4, 0, 0, 1), "short")
     check("an unknown event is named rather than dropped",
           decode_record(make_record(event=200), 0, 0, 1).event, "event_200")
+    check("a security event decodes by name",
+          decode_record(make_record(event=9), 0, 0, 1).event, "sec_erase")
+    check("the process events keep the codes old logs gave them",
+          [decode_record(make_record(event=i), 0, 0, 1).event for i in range(8)],
+          ["sample", "run_start", "run_end", "state_change", "fault",
+           "warning", "config_change", "operator"])
 
     # A whole dump, including the ring's order: sector 1 is older than sector
     # 0, and reading in address order would interleave them.

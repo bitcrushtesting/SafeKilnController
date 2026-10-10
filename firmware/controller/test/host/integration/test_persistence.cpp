@@ -843,3 +843,121 @@ KILN_TEST(swrcfg09_it_is_refused_while_the_kiln_is_firing)
     CHECK_OK(kiln_app_factory_reset(&b.app, &rep));
     CHECK(!kv_holds(&m.kv, secret));
 }
+
+/* ===========================================================================
+ * SECURITY EVENTS, AND THE OWNER'S OPT-OUT  (SWR-LOG-16, tasklist N4)
+ * ===========================================================================
+ * UR-REG-004 asks for the opt-out as explicitly as it asks for the log, and
+ * the reason is worth keeping in view: a device that records access to itself
+ * regardless of its owner's wishes is a surveillance feature rather than a
+ * security one.
+ *
+ * What the opt-out may NOT switch off is the other half of the test. A fault,
+ * a state change and the periodic sample are the evidence of what a kiln did;
+ * that is a safety record, and no configuration item removes it.
+ */
+
+/* Count the records of one event code in the log, by draining the queue and
+ * reading the ring back the way /api/log does. */
+typedef struct { uint8_t want; unsigned n; } event_tally_t;
+
+/* The visitor sees the raw record, as /api/log does: the store deals in bytes
+ * and the codec turns them back into a sample, which is the layering that
+ * lets logdump.py decode the same bytes with no firmware involved. */
+static bool tally_event(void *user, uint32_t run_id,
+                        const uint8_t rec[KILN_LOG_RECORD_BYTES])
+{
+    (void)run_id;
+    event_tally_t *c = static_cast<event_tally_t *>(user);
+    kiln_log_sample_t s;
+    if (kiln_logrec_decode(rec, &s) == KILN_OK && s.event == c->want) {
+        c->n++;
+    }
+    return true;
+}
+
+static unsigned count_events(boot_t *b, kiln_log_event_t want)
+{
+    (void)kiln_app_log_drain(&b->app, 64u);
+    event_tally_t c = { (uint8_t)want, 0u };
+    (void)kiln_logring_iterate(&b->ring, 0u, tally_event, &c);
+    return c.n;
+}
+
+/*
+ * @relation(SWR-LOG-16, scope=function)
+ */
+KILN_TEST(swrlog16_security_events_are_recorded_and_can_be_switched_off)
+{
+    static medium_t m;
+    static boot_t   b;
+    medium_init(&m);
+
+    /* Default on, because the default has to be the one that helps an owner
+     * who has not thought about it. */
+    kiln_config_t def;
+    kiln_config_defaults(&def);
+    CHECK(def.log_security_events);
+
+    /* An abnormal reset is a security event: this one is a watchdog. */
+    CHECK_OK(boot(&b, &m, KILN_RESET_TASK_WDT, -1.0f, 20.0f));
+    CHECK_EQ_UINT(count_events(&b, KILN_LOGE_SEC_RESET), 1u);
+
+    /* A factory reset records itself, as the first entry of the new owner's
+     * log: a log that begins mid-history with no explanation reads like a
+     * fault rather than like a sale. */
+    kiln_factory_reset_t rep = {};
+    CHECK_OK(kiln_app_factory_reset(&b.app, &rep));
+    CHECK_EQ_UINT(count_events(&b, KILN_LOGE_SEC_ERASE), 1u);
+
+    /* Now the owner opts out. */
+    b.app.cfg.log_security_events = false;
+    CHECK_OK(kiln_app_apply_config(&b.app, &b.app.cfg, nullptr));
+    const unsigned erases_before = count_events(&b, KILN_LOGE_SEC_ERASE);
+
+    kiln_app_log_event(&b.app, KILN_LOGE_SEC_ERASE);
+    kiln_app_log_event(&b.app, KILN_LOGE_SEC_NET_JOIN);
+    kiln_app_log_event(&b.app, KILN_LOGE_SEC_RESET);
+    CHECK_EQ_UINT(count_events(&b, KILN_LOGE_SEC_ERASE), erases_before);
+    CHECK_EQ_UINT(count_events(&b, KILN_LOGE_SEC_NET_JOIN), 0u);
+
+    /* And the safety record is untouched by that choice. */
+    const unsigned faults_before = count_events(&b, KILN_LOGE_FAULT);
+    kiln_app_log_event(&b.app, KILN_LOGE_FAULT);
+    kiln_app_log_event(&b.app, KILN_LOGE_STATE_CHANGE);
+    kiln_app_log_event(&b.app, KILN_LOGE_SAMPLE);
+    CHECK_EQ_UINT(count_events(&b, KILN_LOGE_FAULT), faults_before + 1u);
+    CHECK(count_events(&b, KILN_LOGE_STATE_CHANGE) > 0u);
+    CHECK(count_events(&b, KILN_LOGE_SAMPLE) > 0u);
+
+    /* Switched back on, it records again: an opt-out is a setting, not a
+     * one-way door. */
+    b.app.cfg.log_security_events = true;
+    CHECK_OK(kiln_app_apply_config(&b.app, &b.app.cfg, nullptr));
+    kiln_app_log_event(&b.app, KILN_LOGE_SEC_NET_JOIN);
+    CHECK_EQ_UINT(count_events(&b, KILN_LOGE_SEC_NET_JOIN), 1u);
+}
+
+/*
+ * @relation(SWR-LOG-16, scope=function)
+ */
+KILN_TEST(swrlog16_a_normal_restart_is_not_a_security_event)
+{
+    /* A power-on is how a kiln starts every morning. Logging it as a security
+     * event would fill the record with noise, and a log nobody reads is the
+     * same as no log. */
+    static medium_t m;
+    static boot_t   b;
+    medium_init(&m);
+    CHECK_OK(boot(&b, &m, KILN_RESET_POWER_ON, -1.0f, 20.0f));
+    CHECK_EQ_UINT(count_events(&b, KILN_LOGE_SEC_RESET), 0u);
+
+    /* A cause the adapter could not identify IS one, deliberately: a reset
+     * nobody can account for is exactly what a log should carry, and treating
+     * UNKNOWN as normal would hide the case where the adapter is wrong. */
+    static medium_t m2;
+    static boot_t   b2;
+    medium_init(&m2);
+    CHECK_OK(boot(&b2, &m2, KILN_RESET_UNKNOWN, -1.0f, 20.0f));
+    CHECK_EQ_UINT(count_events(&b2, KILN_LOGE_SEC_RESET), 1u);
+}

@@ -250,6 +250,38 @@ kiln_err_t kiln_logring_append(kiln_logring_t *r,
         return KILN_ERR_IO;
     }
 
+    /* A record can arrive before any run has begun, and until SWR-LOG-16's
+     * security events existed nothing ever did: every emitter ran inside a
+     * firing, and begin_run() had always claimed a sector first.
+     *
+     * An abnormal reset is logged at boot, which is outside any run. Without a
+     * claimed sector the bytes went into a sector with no header -- which
+     * iterate() skips, because it selects runs from headers, and which the next
+     * begin_run() erases. The record was written, stored, counted and lost.
+     *
+     * So claim lazily, tagged run 0, meaning "not part of a run". On a device
+     * with history this never fires: mount recovers a head with a sequence
+     * number and the append lands in the current sector. On a fresh one it
+     * claims the sector the first begin_run() would have claimed anyway, so it
+     * costs no erase. */
+    if ((r->head_seq == 0u) && (r->head_slot == 0u)) {
+        const kiln_err_t claim = claim_sector(r, r->head_sector, 1u, 0u);
+        if (claim != KILN_OK) {
+            r->write_errors++;
+            return claim;
+        }
+        /* The bookkeeping matters as much as the claim.  claim_sector writes
+         * the header and nothing else, so head_seq has to be advanced here --
+         * the first version of this did not, begin_run() then issued the SAME
+         * sequence number to the run's sector, and two sectors tied for
+         * highest.  Mount resolves the order from the sequence number alone
+         * (architecture 10.3), so the tie made an idle sample the newest
+         * record in the ring and the power-loss journal of SWA-09 read the
+         * wrong one.  Three recovery tests caught it. */
+        r->head_seq = 1u;
+        r->run_id   = 0u;
+    }
+
     if (r->head_slot >= r->recs_per_sector) {
         /* Wrap.  Erase the next sector now, immediately before writing it --
          * never in advance (architecture 10.3). */

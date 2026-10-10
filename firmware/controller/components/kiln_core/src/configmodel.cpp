@@ -113,6 +113,11 @@ const kiln_cfg_item_t k_items[] = {
 
     /* logging */
     NUM("log.interval_s",             "s",     "SWR-LOG-03",   KILN_CFG_T_U16,   log_interval_s,          1,   600,       10, 0),
+    /* SWR-LOG-16's opt-out.  Default on: the default has to be the one that
+     * helps an owner who has not thought about it.  Not SAFE-flagged, because
+     * switching it off cannot make a kiln less safe -- it removes a record of
+     * access to the device, not a protection. */
+    NUM("log.security_events",        "",      "SWR-LOG-16",   KILN_CFG_T_BOOL,  log_security_events,     0,     1,        1, 0),
 
     /* HMI */
     ENUMI("hmi.units",                         "SWR-HMI-13",   units, k_units_names, KILN_UNITS_COUNT, KILN_UNITS_C, 0),

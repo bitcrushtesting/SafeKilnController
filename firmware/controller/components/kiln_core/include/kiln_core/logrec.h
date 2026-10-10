@@ -39,8 +39,45 @@ typedef enum {
     KILN_LOGE_WARNING,
     KILN_LOGE_CONFIG_CHANGE,
     KILN_LOGE_OPERATOR,
+
+    /* SWR-LOG-16: security-relevant events, distinguishable from the process
+     * events above because they are the ones an owner may switch off.
+     *
+     * New codes rather than a flag, and appended rather than inserted: the
+     * event byte is persisted, so 0 to 7 keep the meaning every log already
+     * written gives them.  A reader that does not know these codes shows the
+     * number, which is why logdump names an unknown event rather than
+     * dropping the record.
+     *
+     * The update-path events the requirement also lists -- an offer, a
+     * confirmation, an install, a refusal with its version and reason, a
+     * failed signature, a rollback -- are NOT here, and not by oversight: a
+     * version string and a refusal reason do not fit a 20 byte record
+     * (SWA-18), so they arrive with the update path itself (tasklist H2) and
+     * will need either a second record type or their own channel. Recording
+     * that here is better than inventing a code now that carries no detail. */
+    KILN_LOGE_SEC_RESET,        /* an abnormal reset cause (SWR-NFR-15)      */
+    KILN_LOGE_SEC_ERASE,        /* a factory reset (SWR-CFG-09)              */
+    KILN_LOGE_SEC_NET_JOIN,     /* a network join commanded at the display   */
+
     KILN_LOGE_COUNT,
 } kiln_log_event_t;
+
+/* Is this one of the events SWR-LOG-16 lets the owner switch off?
+ *
+ * The configuration change is included: it is a process event and a security
+ * event at once, and the requirement lists it under security, which is the
+ * reading that matters -- somebody who does not want their device recording
+ * what they change about it has said so.
+ *
+ * A fault, a state change or a sample is NOT included, whatever the owner
+ * asks: those are the evidence of what a kiln did, which is a safety record
+ * rather than a record of access to the device. */
+static inline bool kiln_log_event_is_security(kiln_log_event_t e)
+{
+    return (e == KILN_LOGE_CONFIG_CHANGE) || (e == KILN_LOGE_SEC_RESET) ||
+           (e == KILN_LOGE_SEC_ERASE)     || (e == KILN_LOGE_SEC_NET_JOIN);
+}
 
 typedef struct {
     uint32_t t_rel_ms;      /* since run start; 49 days of range */
