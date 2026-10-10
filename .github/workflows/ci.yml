@@ -94,6 +94,12 @@ jobs:
           python3 tools/update-manifest.py --self-test
           python3 tools/secure-boot.py --self-test
           python3 tools/sbom.py --self-test
+          # logdump decodes a log partition with an implementation written from
+          # the format's documentation rather than from kiln_core, so the two
+          # agreeing is evidence that the firmware records what it claims. Its
+          # self-test ends by decoding the committed fixture that the C++
+          # encoder produced, which is the half a round trip cannot prove.
+          python3 tools/logdump.py --self-test
 
       - name: SPDX header on every source file (SWR-NFR-18, UR-CON-04)
         run: |
