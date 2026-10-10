@@ -180,9 +180,13 @@ void draw_fault(kiln_hmi_t *h, const kiln_hmi_view_t *v)
     /* The cause, wrapped to the panel.  Word wrapping rather than hard cuts:
      * these sentences are the operator's instructions, and a word split across
      * two lines in a hurry reads as a different word. */
+    /* The PANEL form, not the full cause.  The full ones run to 279
+     * characters, which is a paragraph in a browser and five lines of 21 on
+     * this screen: what fell off the bottom was the end of the sentence, and
+     * in an instruction the end of the sentence is the instruction. */
     const char *cause = sup_blame
-                      ? kiln_sup_reason_cause_in(v->sup_reason, v->language)
-                      : kiln_fault_cause_in(v->fault, v->language);
+                      ? kiln_sup_reason_panel_in(v->sup_reason, v->language)
+                      : kiln_fault_panel_in(v->fault, v->language);
     const int   cols  = KILN_DISPLAY_W / 6;
     int         y     = 16;
     while ((*cause != '\0') && y < (KILN_DISPLAY_H - 8)) {

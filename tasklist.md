@@ -442,14 +442,18 @@ question is whether it is worth its cost.
 
 ## J. German translation, SWR-NFR-23
 
-- [x] **J1. The font carries ASCII and nothing else. Answered 2026-10-09.**
-  Not a hardware question after all: `draw.cpp` defines the 95 printable ASCII
-  glyphs, so there are no umlauts and no sharp s to draw with, at any encoding.
-  Every German string in the firmware is therefore transliterated (AE OE UE
-  SS), and a test over `kiln_hmi/strings` rejects any byte outside 0x20 to 0x7E
-  so that one umlaut typed into the table cannot reach a workshop as a blank.
-  The bound that matters is 21 characters, the panel's width at scale 1, and it
-  is asserted on every string rather than on a sample.
+- [x] **J1. The font carries ASCII and nothing else, and 31 strings did not.
+  Answered 2026-10-09, enforced on the whole table 2026-10-10.** Not a hardware
+  question after all: `draw.cpp` defines the 95 printable ASCII glyphs, so there
+  are no umlauts and no sharp s to draw with, at any encoding.
+
+  The claim that "the labels avoid umlauts for that reason" was true of the
+  labels and **false of the causes**: 68 non-ASCII characters across 31 German
+  cause strings, every one of which reached the panel as a blank. A German
+  operator read a fault screen with holes in the instruction, and nothing
+  checked. All of them are now transliterated and a test holds every string in
+  `kiln_core/faults` and `kiln_hmi/strings` to 0x20-0x7E, so one umlaut typed
+  into either table fails the build rather than reaching a workshop.
 
 - [x] **J2. The display renders the long causes. Done.** `kiln_hmi` exists and
   the fault screen word-wraps the cause from `kiln_core/faults` in the
@@ -546,11 +550,25 @@ retains its own test point.
   legible at two metres, whether the fault cause wraps readably -- cannot be
   made from a test. Same class as `L2`.
 
-- [ ] **M4. German text is not length-checked against the screen.** The fault
-  *labels* are held to 16 characters by a test (`J1`), but the long *causes*
-  that the fault screen wraps are not, and German runs roughly 15 per cent
-  longer than English. A cause that overflows the panel loses its last line,
-  which on a fault screen is where the instruction tends to be.
+- [x] **M4. The fault screen now shows its cause whole. Done 2026-10-10.** The
+  fear was right and the scale was worse than stated: the causes run to **279
+  characters** against a panel that holds **five rows of 21**, so 27 of them
+  were truncated, in both languages. For `KILN_FAULT_CONTACTOR_WELDED` the part
+  being dropped was "ISOLATE THE KILN AT ITS SUPPLY NOW".
+
+  Shortening them was the wrong fix, because the same strings are what
+  `/api/status` sends and a browser renders a paragraph well. So each entry may
+  now carry a **panel form** as well: the same meaning, action first, trimmed
+  to what the screen can render, and absent where the full cause already fits,
+  so there is no second string to drift from the first. The display asks for
+  the panel form and always gets something it can show completely.
+
+  Two tests enforce it, both written to name the offender rather than just
+  fail: every panel form fits five rows under the screen's own word wrap, and
+  no word is longer than a row -- which is a real constraint in German, where
+  `Thermoelement-Messeingang` is 25 characters and the wrap would cut it
+  mid-word. `kiln_hmi/draw.cpp`'s own comment says why that is unacceptable: a
+  word split in a hurry reads as a different word.
 
 - [ ] **M5. The encoder direction is a guess.** The quadrature channel actions
   in `hal_input.cpp` assume one wiring of A and B. If the knob turns the menu
