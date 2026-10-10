@@ -106,6 +106,30 @@ uint16_t get_u16(const uint8_t *p)
 
 /* --- record ------------------------------------------------------------- */
 
+/* SWA-18, held to the code rather than to discipline (tasklist C13).
+ *
+ * Twenty bytes is a PERSISTED format: every log sector on every device in the
+ * field is a sequence of them, and the sector header carries a format version
+ * precisely so that this number can only change deliberately. Changing the
+ * constant without changing the version would make an old log decode as
+ * nonsense -- plausible nonsense, since the CRC would be recomputed over
+ * whatever the new layout produced.
+ *
+ * The three assertions below are the whole of what the encoder relies on: the
+ * record is 20 bytes, the CRC is its last byte, and the payload the CRC covers
+ * is everything before it. The 204 records per sector of architecture 10.4
+ * follow from the first, which is why the arithmetic is asserted too rather
+ * than recomputed in a comment. */
+static_assert(KILN_LOG_RECORD_BYTES == 20u,
+              "SWA-18: the log record is 20 bytes. Changing it invalidates "
+              "every log already written, so it changes with the sector "
+              "header's format_version and not before");
+static_assert(KILN_LOG_RECORD_BYTES >= 2u,
+              "the CRC needs a payload to cover");
+static_assert((KILN_LOG_SECTOR_BYTES - KILN_LOG_HEADER_BYTES) / KILN_LOG_RECORD_BYTES == 204u,
+              "architecture 10.4's 204 records per sector, and the 290 h of "
+              "capacity computed from it, follow from the record size");
+
 void kiln_logrec_encode(const kiln_log_sample_t *s, uint8_t out[KILN_LOG_RECORD_BYTES])
 {
     memset(out, 0, KILN_LOG_RECORD_BYTES);

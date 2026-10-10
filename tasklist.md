@@ -217,9 +217,27 @@ reused: gaps in the numbering are items that have been closed.
 
 ## C. Build, test and CI infrastructure
 
-- [ ] **C5. `tools/layercheck`.** CI-blocking check that `kiln_core` references no
-  IDF or RTOS header and that the component graph is acyclic and layered
-  (SWR-TST-01, SWR-TST-07, SWA-14).
+- [x] **C5. `tools/layercheck.sh` exists and blocks CI. Done 2026-10-10.**
+  It replaced the grep that stood in for it, and the grep's own comment said
+  this was the real check. What a grep over include lines cannot see is the
+  only two ways this has any chance of going wrong: a platform header reached
+  **indirectly**, through a project header that includes it, and one inside
+  `#if defined(ESP_PLATFORM)`, which the host build never compiles -- so the
+  core would stop being portable while every gate stayed green.
+
+  So the include check reads the preprocessor's own record of every header it
+  opened, from the target build where those headers are on the path and a
+  mistake would actually resolve. Ninja keeps that in a binary log rather than
+  in `.d` files, so it comes from `ninja -t deps`: 202 headers on the current
+  build, none of them an IDF component the core may not reach.
+
+  The component graph is checked from each component's `REQUIRES`, for layering
+  against architecture section 4 and for cycles. Seven components, layered and
+  acyclic.
+
+  It also carries `C13`'s other two checks, and a `--self-test` that proves
+  each one can fail, because a gate nobody has seen fail is a gate nobody
+  should trust.
 
 - [ ] **C6. Requirement-to-test traceability.** *Superseded in approach:* see
   section 7 of [`docs/test-concept.md`](docs/test-concept.md). The recommendation
@@ -279,14 +297,32 @@ reused: gaps in the numbering are items that have been closed.
   experiment that distinguishes this design from the one it replaced, and it
   exists at no other level.
 
-- [ ] **C13. Make three architecture decisions structural.** Each holds today
-  by discipline alone and is cheap to enforce, per section 6 of the test
-  concept. `SWA-18`, the 20-byte log record, has no `static_assert` anywhere,
-  and it guards a persisted format. `SWA-03`, no globals in the core, is true
-  (zero mutable file-scope objects in `kiln_core`) with
-  `cppcoreguidelines-avoid-non-const-global-variables` switched off. `SWA-02`,
-  time is injected, is true (zero direct clock reads in the core) and is a
-  grep. Three decisions that are currently claims.
+- [x] **C13. The three decisions are structural now. Done 2026-10-10.** All
+  three were true and none was checked, which is the state a decision is in
+  just before it stops being true.
+
+  **`SWA-18`, the 20-byte log record**, now has `static_assert`s beside the
+  encoder: the size, that the CRC is the last byte, and that architecture
+  10.4's 204 records per sector follows from it. It guards a persisted format,
+  so the point is that changing the number without changing the sector
+  header's `format_version` makes every log already written decode as
+  plausible nonsense -- plausible because the CRC would be recomputed over
+  whatever the new layout produced.
+
+  **`SWA-03`, no mutable state in the core**, and **`SWA-02`, time is
+  injected**, are checked in `tools/layercheck.sh` from the **object code**
+  rather than by grep, which is strictly stronger. A mutable file-scope object
+  lands in `.data` or `.bss`, so `nm` finds it whatever it is called -- and
+  including a function-local `static`, which is the form that gets past a
+  reviewer looking for globals. A direct clock read leaves an undefined symbol
+  for `time`, `clock_gettime`, `esp_timer_get_time` and the rest, with nowhere
+  to hide it.
+
+  Both currently hold: zero writable symbols and zero clock references in
+  `libkiln_core.a`. What they buy is the 168-hour firing a test exercises in
+  milliseconds and the 15-minute runaway timer it does the same to, and both
+  would have broken silently -- the tests keep passing, they just stop testing
+  what they claim to.
 
 - [ ] **C10. Coverage gate.** 90 % lines on control, safety, setpoint, program and
   autotune is enforced; 100 % of safety decision branches (`SWR-TST-19`) is not.
