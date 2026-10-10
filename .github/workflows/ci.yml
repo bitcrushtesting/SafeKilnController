@@ -484,7 +484,19 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq doxygen graphviz
 
       - name: Generate, with documentation warnings as errors
-        run: tools/udd.sh | tee udd.log
+        run: |
+          # `set -o pipefail`, and it is not decoration: GitHub runs these
+          # steps with `bash -e` and NOT pipefail, so `tools/udd.sh | tee`
+          # reported tee's exit status and swallowed the script's. This gate
+          # had been green on those terms for as long as it has existed, and
+          # the release workflow -- which runs udd.sh without a pipe -- is
+          # what found the Doxygen failure this job could not fail on.
+          #
+          # The same mistake as the `|| true` that hid the QEMU job's three
+          # different failures. A gate that cannot fail is worse than no gate,
+          # because it is counted as evidence.
+          set -o pipefail
+          tools/udd.sh | tee udd.log
 
       - name: Summarise what the document covers
         if: always()
