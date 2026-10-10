@@ -691,3 +691,155 @@ KILN_TEST(swa09_recovery_needs_no_write_of_its_own)
     CHECK_EQ_UINT(s.state, KILN_STATE_RUNNING);
     CHECK(s.setpoint_c > 20.0f);
 }
+
+/* ===========================================================================
+ * THE FACTORY RESET  (SWR-CFG-09, SEC-14, tasklist N4)
+ * ===========================================================================
+ * The requirement is unusually specific about how to test it, and it is right
+ * to be: "the test for this requirement shall read the raw partition back and
+ * look for the secret rather than asking the API whether it is still
+ * configured." Asking the API proves an entry is delisted. Somebody selling a
+ * kiln is asking whether the bytes are gone.
+ *
+ * On NVS an erase marks an entry dead and leaves its content in the page until
+ * a garbage collection that may never come, which is why the implementation
+ * overwrites and commits before erasing -- and why these tests search the
+ * store's backing bytes rather than trusting its answers.
+ */
+
+/* Does the key/value store hold this byte sequence anywhere, in any entry,
+ * whether or not that entry is still listed? This is the question the
+ * requirement asks, and the only one worth asking of a device about to change
+ * hands. */
+static bool kv_holds(const kiln_host_kv_t *kv, const char *needle)
+{
+    const size_t n = strlen(needle);
+    for (size_t i = 0; i < KILN_HOST_KV_ENTRIES; i++) {
+        const kiln_host_kv_entry_t *e = &kv->entries[i];
+        /* Deliberately not gated on e->used: a reset that only clears the
+         * flag is exactly the defect being tested for. */
+        if (e->len < n) { continue; }
+        for (size_t off = 0; off + n <= e->len; off++) {
+            if (memcmp(&e->value[off], needle, n) == 0) { return true; }
+        }
+    }
+    return false;
+}
+
+/*
+ * @relation(SWR-CFG-09, scope=function)
+ */
+KILN_TEST(swrcfg09_a_factory_reset_leaves_no_passphrase_in_the_store)
+{
+    static medium_t m;
+    static boot_t   b;
+    medium_init(&m);
+    CHECK_OK(boot(&b, &m, KILN_RESET_POWER_ON, -1.0f, 20.0f));
+
+    /* A passphrase a search can find, long enough that a partial overwrite
+     * would leave a recognisable tail. */
+    static const char secret[] = "correct-horse-battery-staple-9271";
+    (void)snprintf(b.app.cfg.wifi_pass, sizeof(b.app.cfg.wifi_pass), "%s", secret);
+    (void)snprintf(b.app.cfg.wifi_ssid, sizeof(b.app.cfg.wifi_ssid), "%s", "workshop");
+    CHECK_OK(kiln_settings_save(&b.kv_port, &b.app.cfg));
+
+    /* It really is in there first, or the search below proves nothing: a test
+     * that looks for an absent string in an empty store passes for the wrong
+     * reason, and this is the kind of test that gets written once and trusted
+     * for years. */
+    CHECK_MSG(kv_holds(&m.kv, secret),
+              "the passphrase was never stored, so this test is vacuous");
+
+    kiln_factory_reset_t rep = {};
+    CHECK_OK(kiln_app_factory_reset(&b.app, &rep));
+    CHECK(rep.config);
+    CHECK(rep.credentials);
+
+    /* Checked by experiment, not by assumption: with the overwrite removed
+     * from kiln_app_factory_reset, this assertion fails with exactly this
+     * message. The fake had to be made faithful first -- it used to memset a
+     * whole entry on erase, and to reuse the slot on the next write, either of
+     * which made this pass with no code behind it. */
+    CHECK_MSG(!kv_holds(&m.kv, secret),
+              "the passphrase is still in the store's bytes after a factory "
+              "reset: it was delisted rather than erased");
+    /* And the SSID with it, which identifies the owner's network to whoever
+     * buys the kiln. */
+    CHECK(!kv_holds(&m.kv, "workshop"));
+
+    /* It stays gone across a reboot, which is when a new owner would first
+     * power it up. */
+    static boot_t b2;
+    CHECK_OK(boot(&b2, &m, KILN_RESET_POWER_ON, -1.0f, 20.0f));
+    CHECK(!kv_holds(&m.kv, secret));
+    CHECK_EQ_UINT(strlen(b2.app.cfg.wifi_pass), 0u);
+}
+
+/*
+ * @relation(SWR-CFG-09, scope=function)
+ */
+KILN_TEST(swrcfg09_it_erases_the_history_and_the_counters_too)
+{
+    static medium_t m;
+    static boot_t   b;
+    medium_init(&m);
+    CHECK_OK(boot(&b, &m, KILN_RESET_POWER_ON, -1.0f, 20.0f));
+
+    for (uint32_t i = 1; i <= 5u; i++) {
+        kiln_run_record_t rec = {};
+        kiln_runstate_record_init(&rec, i);
+        rec.end_reason = (uint8_t)KILN_END_COMPLETE;
+        rec.duration_s = 3600u * i;
+        CHECK_OK(kiln_run_index_append(&b.fs_port, &rec));
+    }
+    CHECK_EQ_UINT(kiln_run_index_count(&b.fs_port), 5u);
+
+    kiln_factory_reset_t rep = {};
+    CHECK_OK(kiln_app_factory_reset(&b.app, &rep));
+
+    CHECK_EQ_UINT(kiln_run_index_count(&b.fs_port), 0u);
+    CHECK_EQ_UINT(rep.runs_erased, 5u);
+    CHECK(rep.log);
+    CHECK(rep.counters);
+
+    /* The numbering restarts: a kiln whose first firing is number 94 tells its
+     * new owner something false about its history. */
+    CHECK_EQ_UINT(kiln_run_index_next_run_id(&b.fs_port), 1u);
+
+    /* Defaults are back in RAM too, so the device is usable without a reboot
+     * and is not still serving what was just erased from flash. */
+    kiln_config_t def;
+    kiln_config_defaults(&def);
+    CHECK_NEAR(b.app.cfg.max_temp_c, def.max_temp_c, 0.01f);
+}
+
+/*
+ * @relation(SWR-CFG-09, scope=function)
+ */
+KILN_TEST(swrcfg09_it_is_refused_while_the_kiln_is_firing)
+{
+    static medium_t m;
+    static boot_t   b;
+    medium_init(&m);
+    CHECK_OK(boot(&b, &m, KILN_RESET_POWER_ON, -1.0f, 20.0f));
+
+    static const char secret[] = "keep-me-while-firing";
+    (void)snprintf(b.app.cfg.wifi_pass, sizeof(b.app.cfg.wifi_pass), "%s", secret);
+    CHECK_OK(kiln_settings_save(&b.kv_port, &b.app.cfg));
+
+    kiln_program_t p;
+    CHECK_OK(kiln_profile_example(0, &p));
+    CHECK_OK(kiln_app_start(&b.app, &p));
+
+    kiln_factory_reset_t rep = {};
+    CHECK_ERR(kiln_app_factory_reset(&b.app, &rep), KILN_ERR_STATE);
+    CHECK(kv_holds(&m.kv, secret));
+
+    /* A refusal must not leave a report that reads like a partial success. */
+    CHECK(!rep.config && !rep.credentials && !rep.log);
+    CHECK_EQ_UINT(rep.runs_erased, 0u);
+
+    CHECK_OK(kiln_app_abort(&b.app));
+    CHECK_OK(kiln_app_factory_reset(&b.app, &rep));
+    CHECK(!kv_holds(&m.kv, secret));
+}

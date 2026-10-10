@@ -231,12 +231,15 @@ const char *menu_label(uint8_t i, const kiln_hmi_view_t *v)
     case 3: return S(v, KILN_HMI_STR_NETWORK);
     case 4: return S(v, KILN_HMI_STR_DIAGNOSTICS);
     case 5: return S(v, KILN_HMI_STR_INFO);
+    /* SWR-CFG-09, last on purpose: it is the one entry that destroys
+     * something, and it is a long way from "Start program" by a knob. */
+    case 6: return S(v, KILN_HMI_STR_FACTORY_RESET);
     default: return "";
     }
 }
 
 } // namespace
-constexpr int MENU_ITEMS = 6;
+constexpr int MENU_ITEMS = 7;
 
 namespace {
 
@@ -277,7 +280,9 @@ void draw_confirm(kiln_hmi_t *h, const kiln_hmi_view_t *v)
     /* SWR-HMI-11: starting and aborting both require this step. */
     const char *what = (h->pending == KILN_HMI_ACT_START)
                      ? S(v, KILN_HMI_STR_START_FIRING_Q)
-                     : S(v, KILN_HMI_STR_ABORT_FIRING_Q);
+                     : (h->pending == KILN_HMI_ACT_FACTORY_RESET
+                          ? S(v, KILN_HMI_STR_ERASE_ALL_Q)
+                          : S(v, KILN_HMI_STR_ABORT_FIRING_Q));
     kiln_fb_text(&h->fb, 0, 4, what, 1, true);
 
     if (h->pending == KILN_HMI_ACT_START && h->pending_program < v->program_count) {
@@ -596,7 +601,15 @@ kiln_hmi_action_t kiln_hmi_update(kiln_hmi_t *h, const kiln_hmi_view_t *view,
                     break;
                 case 3: h->screen = KILN_HMI_SCREEN_NETWORK; break;
                 case 4: h->screen = KILN_HMI_SCREEN_DIAG;    break;
-                default: h->screen = KILN_HMI_SCREEN_INFO;   break;
+                case 5: h->screen = KILN_HMI_SCREEN_INFO;    break;
+                default:
+                    /* SWR-CFG-09.  Confirmed like an abort, and defaulting to
+                     * NO for the same reason: the knob's first position must
+                     * not be the destructive one. */
+                    h->pending     = KILN_HMI_ACT_FACTORY_RESET;
+                    h->confirm_yes = false;
+                    h->screen      = KILN_HMI_SCREEN_CONFIRM;
+                    break;
                 }
             }
             break;

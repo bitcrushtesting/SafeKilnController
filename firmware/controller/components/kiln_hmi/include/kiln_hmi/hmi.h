@@ -60,6 +60,11 @@ typedef enum {
      * second. */
     KILN_HMI_ACT_WIFI_SCAN,
     KILN_HMI_ACT_WIFI_CONNECT,
+    /* SWR-CFG-09.  Reachable only from the display, because the web interface
+     * cannot write anything (SWR-WEB-26) and because an owner erasing a kiln
+     * they are about to sell should have to be standing at it.  Goes through
+     * the confirmation screen, like starting and aborting. */
+    KILN_HMI_ACT_FACTORY_RESET,
 } kiln_hmi_action_kind_t;
 
 typedef struct {

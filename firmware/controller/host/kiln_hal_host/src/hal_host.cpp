@@ -177,6 +177,18 @@ void kiln_host_flash_bind(kiln_host_flash_t *f, kiln_port_flash_t *out)
 
 /* --- key/value store --------------------------------------------------- */
 
+void kiln_host_kv_collect(kiln_host_kv_t *kv)
+{
+    if (kv == nullptr) {
+        return;
+    }
+    for (size_t i = 0; i < KILN_HOST_KV_ENTRIES; i++) {
+        if (kv->entries[i].delisted) {
+            memset(&kv->entries[i], 0, sizeof(kv->entries[i]));
+        }
+    }
+}
+
 void kiln_host_kv_init(kiln_host_kv_t *kv)
 {
     if (kv != nullptr) {
@@ -242,8 +254,15 @@ kiln_err_t kv_set(void *ctx, const char *ns, const char *key,
 
     kiln_host_kv_entry_t *e = kv_find(kv, ns, key);
     if (e == nullptr) {
+        /* A delisted entry is skipped, not reused: on NVS the new value is
+         * appended and the old bytes stay where they are.  Reusing the slot
+         * here would quietly destroy the evidence SWR-CFG-09's test is looking
+         * for, and the test would pass without the code doing anything. */
         for (size_t i = 0; i < KILN_HOST_KV_ENTRIES; i++) {
-            if (!kv->entries[i].used) { e = &kv->entries[i]; break; }
+            if (!kv->entries[i].used && !kv->entries[i].delisted) {
+                e = &kv->entries[i];
+                break;
+            }
         }
         if (e == nullptr) {
             return KILN_ERR_NO_SPACE;
@@ -271,7 +290,22 @@ kiln_err_t kv_erase(void *ctx, const char *ns, const char *key)
     if (e == nullptr) {
         return KILN_ERR_NOT_FOUND;
     }
-    memset(e, 0, sizeof(*e));
+    /* NVS semantics, deliberately: an erase DELISTS the entry and leaves its
+     * bytes in the page until a garbage collection that may never come.
+     *
+     * This used to memset the whole entry, which made every "is the secret
+     * gone" test pass whether or not the code under test had overwritten
+     * anything -- a fake kinder than the medium, which is the worst kind. The
+     * flash fake models NOR's refusal to un-clear a bit for the same reason:
+     * a fake that cannot reproduce the failure cannot be used to prove it does
+     * not happen.
+     *
+     * So the name and the flag go and the value stays. SWR-CFG-09's erasure is
+     * the caller's job: overwrite, commit, then erase. */
+    e->used     = false;
+    e->delisted = true;
+    memset(e->ns, 0, sizeof(e->ns));
+    memset(e->key, 0, sizeof(e->key));
     return KILN_OK;
 }
 

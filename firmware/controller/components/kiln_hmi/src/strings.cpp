@@ -52,11 +52,14 @@ const char *const k_str[KILN_HMI_STR_COUNT][KILN_LANG_COUNT] = {
     { "Resume",            "Fortsetzen" },
     { "Pause/Resume",      "Pause/Fortsetzen" },
     { "Abort",             "Abbrechen" },
+    { "Erase everything",  "Alles loeschen" },
     { "none stored",       "keine gespeichert" },
 
     /* Confirmation */
     { "Start firing?",     "Brennen starten?" },
     { "Abort firing?",     "Brennen abbrechen?" },
+    { "Erase all data?",   "Alle Daten loeschen?" },
+    { "erased",            "geloescht" },
     { "YES",               "JA" },
     { "NO",                "NEIN" },
     { "turn to choose, press", "drehen, dann druecken" },

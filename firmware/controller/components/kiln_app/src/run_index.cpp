@@ -158,6 +158,19 @@ kiln_err_t kiln_run_index_find(const kiln_port_filestore_t *fs, uint32_t run_id,
     return KILN_ERR_NOT_FOUND;
 }
 
+kiln_err_t kiln_run_index_erase_slot(const kiln_port_filestore_t *fs, uint8_t slot)
+{
+    if ((fs == nullptr) || (fs->remove == nullptr)) {
+        return KILN_ERR_INVALID_ARG;
+    }
+    if (slot >= (uint8_t)KILN_RUN_SLOTS) {
+        return KILN_ERR_INVALID_ARG;
+    }
+    char path[KILN_PATH_MAX];
+    slot_path(slot, path);
+    return fs->remove(fs->ctx, path);
+}
+
 uint8_t kiln_run_index_count(const kiln_port_filestore_t *fs)
 {
     if ((fs == nullptr) || (fs->read == nullptr)) {
