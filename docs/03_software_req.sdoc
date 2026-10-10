@@ -1555,6 +1555,10 @@ It shall require a deliberate confirmation of the same kind as a firmware instal
 **Erasure means gone, not unreferenced.** A flash region holding a credential shall be erased or overwritten, not merely delisted, and the test for this requirement shall read the raw partition back and look for the secret rather than asking the API whether it is still configured.
 
 This is the requirement that turns [LINK: SRR-05]'s disposal obligation from a line in a manual into a function of the product, which is how [LINK: UR-REG-004]'s requirement to permanently remove all data and settings is met. Until it exists, the only honest instruction is "erase the flash with a cable before you sell it", and most owners will not.
+
+**Implemented 2026-10-10.** `kiln_app_factory_reset` is reachable from the last entry of the display's menu, behind the same confirmation an abort uses and defaulting to "no". It erases the configuration and the WiFi credentials inside it, the latched fault, every run record, the sample log and the wear counters; it restarts the run numbering, because a kiln whose first firing is number 94 tells its new owner something false; and it leaves the production data block and the firmware alone. Refused while running, paused or autotuning. It reports counts rather than only success, and does as much as it can rather than stopping at the first failure, because a reset that gave up half way would leave an owner with some of their data erased and no idea which.
+
+**What the test had to establish, and how.** The credential is overwritten with zeros and committed *before* the key is erased, since an NVS erase delists an entry and leaves its bytes in the page until a garbage collection that may never come. Proving that needed the host key/value fake to stop being kinder than the medium: it used to clear a whole entry on erase and to reuse the delisted slot on the next write, either of which made "the secret is gone" pass with no implementation behind it. It now delists and keeps the bytes, as NVS does, with collection available only when a test asks for it. With the overwrite removed from the implementation, the test fails; with it restored, it passes. That experiment is the evidence this requirement asked for.
 <<<
 PRIORITY: M
 VERIFICATION: T
@@ -1898,6 +1902,12 @@ VERIFICATION: T
 UID: SWR-CUR-07
 STATEMENT: >>>
 The system shall derive and expose apparent power and cumulative energy per run from the measured current and a configured mains voltage, stating that a resistive load is assumed.
+
+**Apparent power, and it stays apparent. Closed 2026-10-10 (tasklist I3).** Real power would need a voltage channel: a mains-referenced measurement with its own isolation, its own calibration and its own creepage distances on a board that currently touches mains in exactly one place. The design does not have one and should not grow one for this.
+
+What the assumption costs is small and worth stating rather than leaving implied. A kiln element is very nearly a pure resistance ([LINK: SYS-ASM-09]), so the power factor is within a percent or two of unity and apparent power is real power to better than the accuracy of the configured mains voltage, which an installer types in and which varies by more than that over a day. The number is for an operator asking "what does a firing cost" and for [LINK: SWR-SAF-12]'s energy comparison between firings, and both are served by a figure whose *relative* accuracy between runs is what matters.
+
+Where it would be wrong is a load this controller is not for: phase-angle control, which [LINK: SYS-ASM-03] excludes in favour of zero-cross switching, or an inductive load, which an element is not. Both are out of scope rather than unhandled.
 <<<
 PRIORITY: S
 VERIFICATION: T

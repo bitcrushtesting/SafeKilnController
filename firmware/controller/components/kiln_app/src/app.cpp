@@ -1262,6 +1262,97 @@ kiln_err_t kiln_app_autotune(kiln_app_t *app, float setpoint_c)
     return e;   /* KILN_ERR_RANGE: running, but clamped below what was asked */
 }
 
+/* --- SWR-CFG-09, SEC-14: the owner erases everything -------------------- */
+
+kiln_err_t kiln_app_factory_reset(kiln_app_t *app, kiln_factory_reset_t *out)
+{
+    if ((app == nullptr) || (out == nullptr)) {
+        return KILN_ERR_INVALID_ARG;
+    }
+    *out = kiln_factory_reset_t{};
+
+    /* Not mid-firing, and not mid-autotune.  Both are states where erasing
+     * the configuration underneath the running rules would be a different
+     * kind of hazard from the one this exists to prevent. */
+    if (is_heating_state(app->state) || app->state == KILN_STATE_PAUSED ||
+        app->state == KILN_STATE_AUTOTUNE) {
+        return KILN_ERR_STATE;
+    }
+
+    const kiln_port_kvstore_t *kv = app->ports.kvstore;
+    if ((kv != nullptr) && (kv->set != nullptr) && (kv->erase != nullptr)) {
+        /* Overwrite, commit, then erase.
+         *
+         * The order is the requirement.  On NVS an erase marks the entry dead
+         * and leaves its bytes in the page until a garbage collection that
+         * may never come, so a credential would still be in the flash of a
+         * kiln somebody has just sold.  Writing zeros over it first means the
+         * bytes that survive are zeros.
+         *
+         * The configuration blob carries `net.wifi_pass`, which is why it is
+         * treated as a credential rather than as a setting. */
+        static const uint8_t zeros[sizeof(kiln_config_t)] = {};
+        const bool over = kv->set(kv->ctx, KILN_NVS_NAMESPACE, KILN_NVS_KEY_CONFIG,
+                                  zeros, sizeof(zeros)) == KILN_OK;
+        if (over && (kv->commit != nullptr)) {
+            (void)kv->commit(kv->ctx, KILN_NVS_NAMESPACE);
+        }
+        const bool gone = kv->erase(kv->ctx, KILN_NVS_NAMESPACE,
+                                    KILN_NVS_KEY_CONFIG) == KILN_OK;
+        out->config      = gone;
+        out->credentials = over && gone;
+        if (!gone) { out->failures++; }
+
+        if (kv->erase(kv->ctx, KILN_NVS_NAMESPACE, KILN_NVS_KEY_FAULT) == KILN_OK) {
+            out->latched_fault = true;
+        }
+        if (kv->commit != nullptr) {
+            (void)kv->commit(kv->ctx, KILN_NVS_NAMESPACE);
+        }
+    }
+    else {
+        out->failures++;
+    }
+
+    /* The run history.  By slot rather than by enumeration: the file store has
+     * no list (and deliberately so), and run_index owns the naming, so this
+     * asks it to remove each slot it could have written. */
+    for (uint8_t slot = 0; slot < (uint8_t)KILN_RUN_SLOTS; slot++) {
+        if (kiln_run_index_erase_slot(app->ports.filestore, slot) == KILN_OK) {
+            out->runs_erased++;
+        }
+    }
+
+    if ((app->ports.logstore != nullptr) && (app->ports.logstore->erase_all != nullptr)) {
+        out->log = app->ports.logstore->erase_all(app->ports.logstore->ctx) == KILN_OK;
+        if (!out->log) { out->failures++; }
+    }
+
+    if ((app->ports.counters != nullptr) && (app->ports.counters->reset != nullptr)) {
+        const kiln_switch_counters_t zero = {};
+        out->counters = app->ports.counters->reset(app->ports.counters->ctx,
+                                                   &zero) == KILN_OK;
+        if (!out->counters) { out->failures++; }
+        app->counters = zero;
+    }
+
+    /* The configuration in RAM goes back to its defaults, so the device is
+     * usable immediately rather than only after a reboot, and so that nothing
+     * keeps serving the credentials that were just erased from flash. */
+    kiln_config_defaults(&app->cfg);
+    (void)kiln_app_apply_config(app, &app->cfg, nullptr);
+    app->fault    = KILN_FAULT_NONE;
+    app->warnings = 0u;
+    app->state    = KILN_STATE_IDLE;
+
+    /* The run-id sequence restarts, because the records it counted are gone
+     * and a kiln whose first firing is number 94 tells its new owner
+     * something false about its history. */
+    app->next_run_id = 1u;
+
+    return (out->failures == 0u) ? KILN_OK : KILN_ERR_IO;
+}
+
 kiln_err_t kiln_app_idle(kiln_app_t *app)
 {
     if (app == nullptr) {

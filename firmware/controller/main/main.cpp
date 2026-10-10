@@ -474,6 +474,29 @@ void hmi_apply(const kiln_hmi_action_t *a)
         break;
     }
 
+    case KILN_HMI_ACT_FACTORY_RESET: {
+        /* SWR-CFG-09.  Reported rather than merely done: an owner about to
+         * sell the kiln deserves to see what went, and a failure here is the
+         * one case where "it finished" would be a lie with consequences. */
+        kiln_factory_reset_t r = {};
+        e = kiln_app_factory_reset(&s_app, &r);
+        ESP_LOGW(TAG, "factory reset: config %s, credentials %s, log %s, "
+                      "counters %s, %u run records, %u failures",
+                 r.config ? "erased" : "KEPT",
+                 r.credentials ? "overwritten and erased" : "KEPT",
+                 r.log ? "erased" : "KEPT",
+                 r.counters ? "zeroed" : "KEPT",
+                 (unsigned)r.runs_erased, (unsigned)r.failures);
+        if (e == KILN_OK) {
+            /* The WiFi credentials are gone from flash, so the radio is now
+             * joined to a network the device can no longer re-join after a
+             * reboot. Saying so is better than leaving it connected and
+             * looking configured. */
+            ESP_LOGW(TAG, "set up WiFi again at the display when needed");
+        }
+        break;
+    }
+
     case KILN_HMI_ACT_WIFI_SCAN:
         /* SWR-NET-11.  The results arrive asynchronously; the view builder
          * collects them once the driver says the scan is done. */

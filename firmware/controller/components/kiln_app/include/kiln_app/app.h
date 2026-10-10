@@ -218,6 +218,40 @@ kiln_err_t kiln_app_manual(kiln_app_t *app, uint16_t duty_permille);
 kiln_err_t kiln_app_autotune(kiln_app_t *app, float setpoint_c);
 kiln_err_t kiln_app_idle(kiln_app_t *app);
 
+/* --- SWR-CFG-09: the owner erases everything ---------------------------
+ *
+ * What the owner's data is, and what it is not. Everything this removes was
+ * put there by whoever owns the kiln: the configuration, the WiFi
+ * credentials, the run history, the sample log, the wear counters, the
+ * latched fault. The production data block of SWR-PROD-01 and the firmware
+ * stay: those identify the unit for its whole life and belong to the unit
+ * rather than to its owner.
+ *
+ * **Erasure means gone, not unreferenced.** A key holding a credential is
+ * overwritten with zeros and committed BEFORE it is erased, because on NVS an
+ * erase marks an entry dead and leaves its bytes in the page until the next
+ * garbage collection -- and "the API says it is not configured" is not the
+ * question somebody selling a kiln is asking. The test for this reads the raw
+ * store back and looks for the passphrase.
+ *
+ * Refused while a run or an autotune is going, for the obvious reason, and it
+ * reports what it erased rather than only that it finished: an owner who is
+ * about to sell the thing deserves to see counts. */
+typedef struct {
+    bool     config;        /* the configuration blob                      */
+    bool     credentials;   /* the WiFi passphrase, overwritten then erased */
+    bool     latched_fault;
+    bool     log;           /* the sample log partition                    */
+    bool     counters;      /* switching-operation wear counters           */
+    uint8_t  runs_erased;   /* run records removed from the file store     */
+    uint8_t  failures;      /* how many of the above could not be done     */
+} kiln_factory_reset_t;
+
+/* KILN_ERR_STATE while running or autotuning. Otherwise it does as much as it
+ * can and reports the rest: a reset that stopped at the first failure would
+ * leave an owner with some of their data erased and no idea which. */
+kiln_err_t kiln_app_factory_reset(kiln_app_t *app, kiln_factory_reset_t *out);
+
 void kiln_app_snapshot(const kiln_app_t *app, kiln_snapshot_t *out);
 
 /* SWR-CUR-07: apparent power and cumulative energy from the measured current

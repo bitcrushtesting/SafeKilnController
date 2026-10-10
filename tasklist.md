@@ -512,11 +512,18 @@ question is whether it is worth its cost.
 
 ## I. Current measurement
 
-- [ ] **I3. Real power, not apparent.** `SWR-CUR-07` says apparent power and
-  assumes a resistive load (`SYS-ASM-09`), which for a kiln element is very nearly
-  true. Measuring real power would need a voltage channel, which the design
-  does not have and probably should not grow. Worth closing explicitly rather
-  than leaving as an implied limitation.
+- [x] **I3. Apparent power, and it stays apparent. Closed 2026-10-10.**
+  Recorded in `SWR-CUR-07` rather than left as an implied limitation. Real
+  power needs a voltage channel: a mains-referenced measurement with its own
+  isolation, calibration and creepage distances on a board that touches mains
+  in one place. What the assumption costs is small enough to state precisely:
+  a kiln element is within a percent or two of unity power factor, so apparent
+  power is real power to better than the accuracy of the mains voltage an
+  installer types in -- and both uses of the number, "what did this firing
+  cost" and `SWR-SAF-12`'s comparison between firings, depend on relative
+  accuracy between runs rather than absolute. The loads where it would be
+  wrong, phase-angle control and inductive loads, are excluded by `SYS-ASM-03`
+  and are not what an element is.
 
 ---
 
@@ -707,11 +714,22 @@ weakness first, the deadline second, the sentence third, the engineering last.
     the display.
     The opt-out is required as explicitly as the log, and the log must not
     become a second copy of `SRR-05` by capturing credentials.
-  - `SWR-CFG-09`, **a factory reset that erases rather than unlinks**
-    (`SEC-14`). Reachable from the display, leaving the production data block
-    alone, with a test that reads the raw partition back and looks for the
-    secret. This is what turns `SRR-05`'s disposal obligation from a line in a
-    manual into a function of the product, and it is `ADV-4`'s only answer.
+  - [x] `SWR-CFG-09`, **the factory reset, done 2026-10-10.** Last entry of
+    the display's menu, behind the confirmation an abort uses and defaulting
+    to "no"; erases the configuration and the credentials in it, the latched
+    fault, every run record, the log and the wear counters; restarts the run
+    numbering; leaves the production block and the firmware alone; refused
+    while running or autotuning; reports counts rather than only success.
+
+    The interesting part was the test. Overwrite-then-erase is the
+    implementation, because an NVS erase delists an entry and leaves its bytes
+    in the page, and proving it needed the host key/value fake to stop being
+    kinder than the medium: it cleared a whole entry on erase and reused the
+    delisted slot on the next write, either of which made "the secret is gone"
+    pass with nothing behind it. The fake now delists and keeps the bytes. With
+    the overwrite removed the test fails; with it restored it passes. Which is
+    what `SRR-05`'s disposal obligation turning into a function of the product
+    looks like, and `ADV-4`'s only answer.
   - **The SBOM's two loose ends.** `tools/sbom.py` satisfies `SWR-NFR-28` and
     runs in CI and in the release workflow, which leaves **retention** of the
     published documents for the support period, needing `N3` answered first,

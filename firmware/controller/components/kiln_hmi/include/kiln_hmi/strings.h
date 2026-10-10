@@ -62,11 +62,17 @@ typedef enum {
     KILN_HMI_STR_RESUME,
     KILN_HMI_STR_PAUSE_RESUME,
     KILN_HMI_STR_ABORT,
+    KILN_HMI_STR_FACTORY_RESET,
     KILN_HMI_STR_NONE_STORED,
 
     /* Confirmation */
     KILN_HMI_STR_START_FIRING_Q,
     KILN_HMI_STR_ABORT_FIRING_Q,
+    /* SWR-CFG-09.  Phrased as what it destroys rather than as its name: an
+     * operator who misreads "factory reset" as "restore defaults" loses their
+     * firing history and their WiFi credentials to a single press. */
+    KILN_HMI_STR_ERASE_ALL_Q,
+    KILN_HMI_STR_ERASED,
     KILN_HMI_STR_YES,
     KILN_HMI_STR_NO,
     KILN_HMI_STR_TURN_THEN_PRESS,
