@@ -706,12 +706,34 @@ weakness first, the deadline second, the sentence third, the engineering last.
 - [ ] **N4. Three requirements with no implementation.** Each was a gap nobody
   had named until 2026-10-09:
 
-  - `SWR-LOG-16`, **security event logging with an owner opt-out** (`SEC-13`).
-    The event log records process events; nothing records a refused manifest, a
-    rollback or a configuration change. The fourth example this used to give,
-    a client joining the provisioning access point, went with the access point
-    itself (`N1`); the join attempts worth logging now are the ones made at
-    the display.
+  - [~] `SWR-LOG-16`, **security event logging, partly done 2026-10-10.** The
+    mechanism and the opt-out exist: three appended event codes,
+    `log.security_events` defaulting to on, and the opt-out applied in the one
+    place every event passes through so no emitter can forget it. It removes
+    only the security events -- a fault, a state change and a sample are the
+    evidence of what a kiln did, and no setting switches those off.
+
+    Recorded now: an abnormal reset cause, including one the adapter cannot
+    identify; a factory reset, logged last so it is the first entry of the new
+    owner's log and explains why the rest is missing; a network join commanded
+    at the display, without the SSID, since that would record where the kiln
+    lives; and configuration changes, which were already there.
+
+    **Still open, and waiting on `H2` rather than on effort:** the update-path
+    events need a version string and a refusal reason, and neither fits a
+    20-byte record (`SWA-18`). They need a second record type or their own
+    channel, and they arrive with the update path. Adding codes now that could
+    carry no detail would have looked like progress and recorded nothing.
+
+    Finding, fixed with it: a record appended **outside a run** was lost. It
+    went into a sector with no header, which `iterate` skips and the next
+    `begin_run` erases, so the first boot-time security event would have been
+    written, stored, counted and never read. The ring claims a sector lazily
+    now, tagged run 0. The bookkeeping was the part that bit: the first fix
+    left `head_seq` at 0, `begin_run` reissued the same sequence number, two
+    sectors tied for newest, and `SWA-09`'s power-loss journal read the wrong
+    record. Three recovery tests caught that, and there is now a test for the
+    property itself.
     The opt-out is required as explicitly as the log, and the log must not
     become a second copy of `SRR-05` by capturing credentials.
   - [x] `SWR-CFG-09`, **the factory reset, done 2026-10-10.** Last entry of

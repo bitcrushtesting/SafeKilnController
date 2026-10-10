@@ -283,6 +283,15 @@ void kiln_app_log_event(kiln_app_t *app, kiln_log_event_t event)
         return;
     }
 
+    /* SWR-LOG-16's opt-out, applied in the one place every event passes
+     * through so that no emitter can forget it.  Only the security events go:
+     * a fault, a state change or a sample is the evidence of what a kiln did,
+     * which is a safety record and not a record of access to the device, and
+     * no configuration item switches those off. */
+    if (kiln_log_event_is_security(event) && !app->cfg.log_security_events) {
+        return;
+    }
+
     kiln_log_sample_t s;
     build_sample(app, event, &s);
     log_enqueue(app, &s);
@@ -929,6 +938,26 @@ kiln_err_t kiln_app_boot(kiln_app_t *app, kiln_reset_cause_t cause, float outage
 
     app->last_logged_state    = (uint8_t)app->state;
     app->last_logged_warnings = app->warnings;
+
+    /* SWR-LOG-16, SWR-NFR-15: an abnormal reset cause is recorded.
+     *
+     * "Abnormal" is anything but a power-on, a requested restart or an
+     * external reset: a panic, any of the three watchdogs, a brownout, or a
+     * cause the adapter could not identify. The last one is in deliberately --
+     * a reset nobody can account for is exactly the kind a log should carry,
+     * and treating UNKNOWN as normal would hide the case where the adapter
+     * itself is wrong.
+     *
+     * Logged after the recovery decision above, so the record sits beside the
+     * state the device came back into rather than before it. */
+    const bool normal_reset = (cause == KILN_RESET_POWER_ON) ||
+                              (cause == KILN_RESET_SOFTWARE) ||
+                              (cause == KILN_RESET_EXTERNAL) ||
+                              (cause == KILN_RESET_DEEPSLEEP);
+    if (!normal_reset) {
+        kiln_app_log_event(app, KILN_LOGE_SEC_RESET);
+    }
+
     return result;
 }
 
@@ -1349,6 +1378,13 @@ kiln_err_t kiln_app_factory_reset(kiln_app_t *app, kiln_factory_reset_t *out)
      * and a kiln whose first firing is number 94 tells its new owner
      * something false about its history. */
     app->next_run_id = 1u;
+
+    /* SWR-LOG-16.  Logged last, because the log it would have been written to
+     * was erased a moment ago: this record is the first entry of the new
+     * owner's log, saying that the previous owner wiped it.  That is the
+     * honest thing for it to say -- a log that begins mid-history with no
+     * explanation reads like a fault. */
+    kiln_app_log_event(app, KILN_LOGE_SEC_ERASE);
 
     return (out->failures == 0u) ? KILN_OK : KILN_ERR_IO;
 }

@@ -26,7 +26,7 @@
  * be read as a version 2 one; kiln_config_decode carries the splice that
  * migrates it, and SWR-CFG-05's "older: migrate" is met rather than answered
  * with defaults. */
-constexpr uint16_t KILN_CFG_SCHEMA_VERSION = 2;
+constexpr uint16_t KILN_CFG_SCHEMA_VERSION = 3;
 
 constexpr size_t KILN_CFG_STR_LEN     = 33;  /* WiFi SSID is 32 + NUL */
 constexpr size_t KILN_CFG_PASS_LEN    = 65;
@@ -179,6 +179,17 @@ typedef struct {
     char     timezone[KILN_CFG_HOST_LEN];
 
     /* security */
+    /* SWR-LOG-16, and UR-REG-004 asks for this opt-out as explicitly as it
+     * asks for the log: a device that records access to itself regardless of
+     * its owner's wishes is a surveillance feature rather than a security one.
+     * Default on, because the default has to be the one that helps an owner
+     * who has not thought about it.
+     *
+     * Appended at the END of the struct deliberately. A field added here is
+     * the case SWR-CFG-05's migration was designed for -- an older blob is
+     * shorter, the prefix copies, and the new item takes its default. A field
+     * inserted in the middle is the case schema 2 had to splice. */
+    bool     log_security_events;
 } kiln_config_t;
 
 void kiln_config_defaults(kiln_config_t *cfg);
