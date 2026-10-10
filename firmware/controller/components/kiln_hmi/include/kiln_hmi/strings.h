@@ -52,6 +52,9 @@ typedef enum {
     KILN_HMI_STR_HEAT,
     KILN_HMI_STR_HOLD,
     KILN_HMI_STR_ACK,
+    /* SWR-SAF-31: shown in the slot that would say HEAT, because an open door
+     * is why the kiln is not heating. */
+    KILN_HMI_STR_DOOR,
 
     /* Menu */
     KILN_HMI_STR_START_PROGRAM,
@@ -92,9 +95,12 @@ typedef enum {
      * translation. */
     KILN_HMI_STR_CASE,
     KILN_HMI_STR_AMPS,
-    KILN_HMI_STR_POWER,
-    KILN_HMI_STR_USED,
     KILN_HMI_STR_DUTY,
+    /* The diagnostics row, where all three door states are spelled out. */
+    KILN_HMI_STR_DOOR_LABEL,
+    KILN_HMI_STR_DOOR_OPEN,
+    KILN_HMI_STR_DOOR_SHUT,
+    KILN_HMI_STR_DOOR_NONE,
     KILN_HMI_STR_UPTIME,
     KILN_HMI_STR_TUNED,
     KILN_HMI_STR_UNTUNED,

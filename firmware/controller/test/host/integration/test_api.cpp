@@ -76,6 +76,10 @@ static void rig_init(rig_t *r)
     ports.heat      = &r->sim_ports.heat;
     ports.current   = &r->sim_ports.current;
     ports.counters  = &r->sim_ports.counters;
+    /* SWR-SAF-31: bound so /api/status reports a door at all.  With no port
+     * the snapshot reports no monitoring, which is a real state of a real
+     * kiln but not the one most of these tests are about. */
+    ports.door      = &r->sim_ports.door;
     ports.logstore  = &r->log_port;
     ports.kvstore   = &r->kv_port;
     ports.filestore = &r->fs_port;
@@ -292,6 +296,47 @@ KILN_TEST(swrrun05_status_exposes_everything_the_requirement_lists)
     CHECK(kiln_json_find(resp.body, g_toks, n, 0, "holdback") > 0);
     CHECK(kiln_json_find(resp.body, g_toks, n, 0, "warnings") > 0);
     CHECK(kiln_json_find(resp.body, g_toks, n, 0, "fault") > 0);
+
+    /* SWR-WEB-04, SWR-SAF-31. A string and not a boolean, so that a client
+     * cannot read an unmonitored door as a shut one: the three cases have
+     * three different remedies, and "there is no switch" is the one warning
+     * 113 exists to make visible. */
+    char door[16];
+    str_of(&resp, n, "door", door, sizeof(door));
+    CHECK_STR_EQ(door, "shut");
+}
+
+/*
+ * @relation(SWR-SAF-31, scope=function)
+ */
+KILN_TEST(swrsaf31_the_api_reports_all_three_door_states)
+{
+    static rig_t r;
+    rig_init(&r);
+    rig_run(&r, 1.0);
+
+    char door[16];
+    kiln_api_resp_t resp;
+
+    kiln_sim_inject(&r.sim, KILN_INJ_DOOR_SWITCH_OPEN);
+    rig_run(&r, 1.0);
+    resp = call(&r, KILN_HTTP_GET, "/api/status", NULL, NULL);
+    str_of(&resp, parse_resp(&resp), "door", door, sizeof(door));
+    CHECK_STR_EQ(door, "open");
+
+    kiln_sim_clear(&r.sim, KILN_INJ_DOOR_SWITCH_OPEN);
+    rig_run(&r, 1.0);
+    resp = call(&r, KILN_HTTP_GET, "/api/status", NULL, NULL);
+    str_of(&resp, parse_resp(&resp), "door", door, sizeof(door));
+    CHECK_STR_EQ(door, "shut");
+
+    /* A kiln with no interlock fitted: the switch is absent, so the reading
+     * means nothing and the API says that rather than guessing. */
+    kiln_sim_inject(&r.sim, KILN_INJ_DOOR_ABSENT);
+    rig_run(&r, 1.0);
+    resp = call(&r, KILN_HTTP_GET, "/api/status", NULL, NULL);
+    str_of(&resp, parse_resp(&resp), "door", door, sizeof(door));
+    CHECK_STR_EQ(door, "unmonitored");
 }
 
 /*

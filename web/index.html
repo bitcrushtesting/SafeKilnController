@@ -82,6 +82,11 @@ telemetry, nothing that reaches off the box.
       <span id="s-time" class="muted"></span>
       <span id="s-heat" class="pill hot" hidden>HEAT</span>
       <span id="s-hold" class="pill warn" hidden>HOLDBACK</span>
+      <!-- SWR-SAF-31, SWR-WEB-04. Shown only when the door is open, which is
+           the only one of the three states that needs acting on: "shut" is
+           the normal case and "unmonitored" is warning 113's job in the
+           banner, where it belongs with the other standing conditions. -->
+      <span id="s-door" class="pill warn" hidden>DOOR OPEN</span>
     </div>
 
     <div class="chart-wrap">

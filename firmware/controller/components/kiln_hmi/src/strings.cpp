@@ -44,6 +44,7 @@ const char *const k_str[KILN_HMI_STR_COUNT][KILN_LANG_COUNT] = {
     { "HEAT",              "HEIZ" },
     { "HOLD",              "WARTET" },
     { "ACK?",              "QUIT?" },
+    { "DOOR",              "TUER" },
 
     /* Menu */
     { "Start program",     "Programm starten" },
@@ -82,9 +83,11 @@ const char *const k_str[KILN_HMI_STR_COUNT][KILN_LANG_COUNT] = {
     /* Diagnostics and info */
     { "case",              "Geh." },
     { "amps",              "Strom" },
-    { "power",             "Leist" },
-    { "used",              "Verbr" },
     { "duty",              "Takt" },
+    { "door",              "Tuer" },
+    { "OPEN",              "OFFEN" },
+    { "shut",              "zu" },
+    { "no switch",         "kein Schalter" },
     { "up",                "Lauf" },
     { "tuned",             "abgestimmt" },
     { "UNTUNED defaults",  "NICHT abgestimmt" },

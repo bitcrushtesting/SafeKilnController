@@ -229,6 +229,11 @@ function renderDash() {
     ? `${fmtDur(s.elapsed_s)} elapsed · ${fmtDur(s.remaining_s)} left` : '';
   $('s-heat').hidden = !s.heat_authorised;
   $('s-hold').hidden = !s.holdback;
+  /* Only 'open' raises it. 'unmonitored' is a standing condition rather than
+   * an event, and it already has warning 113 in the banner; repeating it here
+   * on every idle kiln with no interlock fitted would train the operator to
+   * ignore this row. */
+  $('s-door').hidden = s.door !== 'open';
 
 
   renderBanner(s);

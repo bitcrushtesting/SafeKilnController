@@ -335,6 +335,12 @@ void write_status(kiln_api_ctx_t *ctx, kiln_json_t *j)
     kiln_json_kv_bool(j, "heat_authorised", s.heat_authorised);
     kiln_json_kv_bool(j, "holdback", s.holdback_active);
     kiln_json_kv_bool(j, "duty_saturated", s.duty_saturated);
+    /* SWR-WEB-04, SWR-SAF-31.  Three states, not two: "open" and "shut" both
+     * presuppose a switch, and a kiln with none fitted must not be reported as
+     * a kiln whose door is shut.  `door` is therefore a string, and the client
+     * cannot accidentally read an absent interlock as a safe one. */
+    kiln_json_kv_str(j, "door", !s.door_monitoring ? "unmonitored"
+                                                   : (s.door_open ? "open" : "shut"));
 
     kiln_json_kv_num(j, "current_a", s.current_a, 2);
     kiln_json_kv_num(j, "current_ref_a", s.current_ref_a, 2);

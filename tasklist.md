@@ -357,10 +357,31 @@ question is whether it is worth its cost.
   Warning 113 makes the gap visible rather than silent, which is the compromise
  , revisit if the first real installations suggest otherwise.
 
-- [ ] **G4. Expose the door state in the API and on the display.** The
-  supervisor knows; `/api/status` and the OLED do not yet say. Wanted for
-  SWR-WEB-04 and the default screen, and it is the cheap half of making
-  warning 113 actually visible.
+- [x] **G4. The door state is in the API and on both displays. Done
+  2026-10-10.** The safety cycle had read the pin every 100 ms since
+  `SWR-SAF-31` was implemented and shown it nowhere, so an operator in front
+  of an idle kiln could see that `HEAT` was absent and had to guess why.
+
+  It is published in the snapshot, taken from the input the rule actually
+  used rather than re-read, because a second sample of a safety input at a
+  different instant is how two parts of one device come to disagree about
+  whether the door is open.
+
+  **Three states and not two**, in all three places: `open` and `shut` both
+  presuppose a switch, and a kiln with none fitted must not read as one whose
+  door is shut. `/api/status` therefore carries `door` as a string rather than
+  a boolean, the OLED's diagnostics screen spells out all three, and the main
+  screen puts `DOOR` in the slot that would say `HEAT` -- the two cannot both
+  be true, so the badge that says why the kiln is hot says why it is not. The
+  web dashboard raises a pill only for `open`: `unmonitored` is a standing
+  condition that already has warning 113 in the banner, and repeating it on
+  every idle kiln without an interlock would train the operator to ignore the
+  row.
+
+  Making room on the diagnostics screen cost the power and energy labels,
+  which now share one row with the units doing the naming; two strings left
+  the table rather than staying in it unused. Four tests, including that an
+  unmonitored door never renders as a shut one.
 
 ---
 
@@ -534,10 +555,11 @@ retains its own test point.
   the same class of claim as `G2` and `K5`, and it is the largest untested
   surface in the project.
 
-- [ ] **L6. The hardware build is not in CI.** CI builds the simulated
-  configuration only. The hardware one is a second `idf.py` invocation with a
-  different `SDKCONFIG_DEFAULTS`, and it is the configuration that matters for
-  a release.
+- [x] **L6. The hardware build is in CI. Done 2026-10-09.** It was a second
+  `idf.py` invocation with a different `SDKCONFIG_DEFAULTS`, and it is the
+  configuration that matters for a release: its first build failed on two
+  `-Wformat-truncation` errors, one of them older than the WiFi work it was
+  found with. See `O3`.
 
 ---
 
@@ -585,14 +607,14 @@ firmware half and the half that is not firmware. These are the items it leaves
 open, and the order below is the order of [§13.3](docs/security.md): the live
 weakness first, the deadline second, the sentence third, the engineering last.
 
-- [ ] **N1. The access point will start without a passphrase.** `OQ-S4`, and of
-  everything the CRA asks of this project it is the only item that is a live
-  weakness in code that exists today rather than something unbuilt or on paper.
-  A product must ship in a **secure default configuration**; an open AP, offered
-  as flexibility, is not one. The fix is a bound in the configuration table and
-  a refusal in the WiFi adapter: either enforce a minimum length on
-  `net.ap_pass` or refuse to start the AP without one, and say which in
-  `TH-11`'s goal, since that threat still has none. Overlaps `O`.
+- [x] **N1. Resolved by deletion. Closed 2026-10-09.** The live weakness was
+  an access point that would start with no passphrase, offered as flexibility
+  and failing the CRA's secure-default requirement. The fix turned out not to
+  be a bound in the configuration table: the access point is **gone**, with
+  `SWR-NET-02` and `SWR-NET-05` withdrawn, `net.ap_ssid` and `net.ap_pass` out
+  of the schema, and `TH-11`, `SRR-08` and `OQ-S4` closed with them. The
+  surface is deleted rather than regulated, which is the only kind of fix that
+  cannot be misconfigured back. WiFi is set up at the display (`O4`).
 
 - [ ] **N2. The Article 14 reporting procedure, and the mailbox behind
   `SECURITY.md`.** `SECURITY.md` exists and names
@@ -620,7 +642,10 @@ weakness first, the deadline second, the sentence third, the engineering last.
 
   - `SWR-LOG-16`, **security event logging with an owner opt-out** (`SEC-13`).
     The event log records process events; nothing records a refused manifest, a
-    rollback, a configuration change or a client joining the provisioning AP.
+    rollback or a configuration change. The fourth example this used to give,
+    a client joining the provisioning access point, went with the access point
+    itself (`N1`); the join attempts worth logging now are the ones made at
+    the display.
     The opt-out is required as explicitly as the log, and the log must not
     become a second copy of `SRR-05` by capturing credentials.
   - `SWR-CFG-09`, **a factory reset that erases rather than unlinks**
