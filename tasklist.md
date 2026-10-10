@@ -251,8 +251,31 @@ reused: gaps in the numbering are items that have been closed.
   nonexistent ID, and on any `SR-*` without an automated test
   (SWR-TST-22, SWR-TST-23, SWR-TST-26).
 
-- [ ] **C7. `tools/logdump`.** Decode a log partition dump to CSV, also the
-  cross-check for the `logrec` codec.
+- [x] **C7. `tools/logdump.py` exists, and the cross-check is the point. Done
+  2026-10-10.** It decodes a `kilnlog` partition dump to CSV -- walking the
+  ring in sequence order rather than address order, so a wrap does not
+  interleave two firings -- and takes the dump from `esptool read_flash`,
+  which needs no cooperation from a device that will not boot.
+
+  It would have been less code to link `kiln_core` and call
+  `kiln_logrec_decode`, and that is exactly what it must not do. A log is the
+  only evidence of what a kiln did before it failed, and "did the firmware
+  record this correctly" cannot be answered by the firmware's own decoder: a
+  codec that encodes and decodes with the same wrong idea round-trips
+  perfectly and proves nothing.
+
+  So the decoder is written from the format as `logrec.h` and architecture
+  10.2 document it, and both implementations are pinned to **one committed
+  artefact**: `test/host/fixtures/logring.bin`, two sectors the C++ encoder
+  produced, with records chosen for what a decoder gets wrong -- a negative
+  temperature, the segment sentinel, every flag at once, a non-sample event,
+  each field at the edge of its scale, and the sectors deliberately out of
+  address order. A host test re-encodes those samples and compares bytes; the
+  Python self-test decodes the same file and checks every field. Neither side
+  can drift without the other saying so, and the fixture's README says what to
+  do when it fails: ask which side moved.
+
+  55 self-test checks, in CI beside the other tool self-tests.
 
 - [ ] **C11. `main.cpp` and `httpd.cpp` are analysed by nothing.** Found while
   starting section P. `tools/tidy.sh` drives from the host compile database,

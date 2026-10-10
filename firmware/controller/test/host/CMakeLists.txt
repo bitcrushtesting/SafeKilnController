@@ -69,6 +69,11 @@ enable_testing()
 function(kiln_add_test name)
     add_executable(${name} ${ARGN})
     target_link_libraries(${name} PRIVATE kiln_web kiln_hmi kiln_app kiln_core kiln_sim kiln_hal_host kiln_check)
+    # Where the committed wire-format fixtures live. A test is run from the
+    # build directory, so it cannot find them relatively, and a fixture that
+    # is silently not found is a test that silently proves nothing.
+    target_compile_definitions(${name} PRIVATE
+        KILN_FIXTURE_DIR="${CMAKE_CURRENT_LIST_DIR}/fixtures")
     add_test(NAME ${name} COMMAND ${name})
 endfunction()
 
