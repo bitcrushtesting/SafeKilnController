@@ -132,7 +132,16 @@ void draw_main(kiln_hmi_t *h, const kiln_hmi_view_t *v)
     /* Duty, and the two states worth seeing at a glance. */
     (void)snprintf(buf, sizeof(buf), "%u%%", (unsigned)(v->snap.duty_permille / 10u));
     kiln_fb_text(&h->fb, 0, 40, buf, 1, true);
-    if (v->snap.heat_authorised) { kiln_fb_text(&h->fb, 30, 40, S(v, KILN_HMI_STR_HEAT), 1, true); }
+    /* SWR-SAF-31, in the slot that would otherwise say HEAT.  The two cannot
+     * both be true -- an open door removes heat authority -- so the badge that
+     * says why the kiln is hot says why it is not, which is the question an
+     * operator standing in front of an idle kiln is actually asking. */
+    if (v->snap.door_monitoring && v->snap.door_open) {
+        kiln_fb_text(&h->fb, 30, 40, S(v, KILN_HMI_STR_DOOR), 1, true);
+    }
+    else if (v->snap.heat_authorised) {
+        kiln_fb_text(&h->fb, 30, 40, S(v, KILN_HMI_STR_HEAT), 1, true);
+    }
     if (v->snap.holdback_active) { kiln_fb_text(&h->fb, 62, 40, S(v, KILN_HMI_STR_HOLD), 1, true); }
     if (v->awaiting_ack)         { kiln_fb_text(&h->fb, 94, 40, S(v, KILN_HMI_STR_ACK), 1, true); }
 
@@ -434,16 +443,28 @@ void draw_diag(kiln_hmi_t *h, const kiln_hmi_view_t *v)
                    (double)v->snap.current_a);
     kiln_fb_text(&h->fb, 0, 23, buf, 1, true);
 
-    /* SWR-CUR-07, in the units a kiln owner thinks in. */
-    (void)snprintf(buf, sizeof(buf), "%-5s %.2fkW", S(v, KILN_HMI_STR_POWER),
-                   v->power_w / 1000.0);
+    /* SWR-CUR-07, in the units a kiln owner thinks in.  Power and energy share
+     * a row so the door state gets one: five rows fit under the rule, and the
+     * two are read together anyway -- "it is drawing this much, it has used
+     * that much".  Their row labels are gone with the merge, and the units do
+     * the naming instead: kW is a rate and kWh is a total, which is a
+     * distinction a kiln owner makes before a firmware engineer does.  Two
+     * strings left the table rather than staying in it unused. */
+    (void)snprintf(buf, sizeof(buf), "%.2fkW %.1fkWh",
+                   v->power_w / 1000.0, v->energy_wh / 1000.0);
     kiln_fb_text(&h->fb, 0, 33, buf, 1, true);
-    (void)snprintf(buf, sizeof(buf), "%-5s %.2fkWh", S(v, KILN_HMI_STR_USED),
-                   v->energy_wh / 1000.0);
-    kiln_fb_text(&h->fb, 0, 43, buf, 1, true);
 
     (void)snprintf(buf, sizeof(buf), "%-5s %u%%", S(v, KILN_HMI_STR_DUTY),
                    (unsigned)(v->snap.duty_permille / 10u));
+    kiln_fb_text(&h->fb, 0, 43, buf, 1, true);
+
+    /* Three states and not two (SWR-SAF-31).  "shut" and "open" both
+     * presuppose a switch; a kiln with none fitted is the case warning 113
+     * exists for, and showing it as "shut" would be the one wrong answer. */
+    const char *door = !v->snap.door_monitoring ? S(v, KILN_HMI_STR_DOOR_NONE)
+                     : (v->snap.door_open ? S(v, KILN_HMI_STR_DOOR_OPEN)
+                                          : S(v, KILN_HMI_STR_DOOR_SHUT));
+    (void)snprintf(buf, sizeof(buf), "%-5s %s", S(v, KILN_HMI_STR_DOOR_LABEL), door);
     kiln_fb_text(&h->fb, 0, 53, buf, 1, true);
 }
 

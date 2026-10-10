@@ -131,6 +131,12 @@ typedef struct {
     double   run_elapsed_s;
     float    alarm_timer_s;
 
+    /* SWR-SAF-31, as the safety cycle last read it.  Published in the snapshot
+     * rather than re-read by the display, so the panel and the API cannot
+     * disagree with the rule that acted. */
+    bool     door_open;
+    bool     door_monitoring;
+
     /* SWR-RUN-06 */
     bool     complete_pending;
 

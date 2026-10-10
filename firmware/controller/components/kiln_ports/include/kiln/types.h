@@ -229,6 +229,17 @@ typedef struct {
     bool     duty_saturated;
     bool     kiln_valid;        /* false while inside the SWR-ACQ-12 grace period */
     bool     case_valid;
+    /* SWR-SAF-31, SWR-WEB-04.  The controller's *knowledge* of the door, which
+     * is not the interlock: SYS-HW-21 puts the switch in the coil circuit as
+     * well (see port_door.h).  Published so the display and the API can say
+     * why a kiln is not heating, and so that "no switch fitted" is visible
+     * rather than only being warning 113 in a list.
+     *
+     * `door_monitoring` false means no interlock is fitted or it is configured
+     * off, in which case `door_open` says nothing and must not be shown as
+     * though it did. */
+    bool     door_open;
+    bool     door_monitoring;
 } kiln_snapshot_t;
 
 /* --- heater current (FR-CUR) ------------------------------------------- */

@@ -651,6 +651,7 @@ void build_safety_input(const kiln_app_t *app, kiln_safety_input_t *in)
         in->door_open       = false;
     }
 
+
     /* SWR-CUR-11 against SWR-CUR-12, and the distinction matters: monitoring is
      * *on* whenever it is configured on, even if the channel is not answering.
      *
@@ -689,6 +690,14 @@ void kiln_app_safety_cycle(kiln_app_t *app, float dt_s)
 
     kiln_safety_input_t in;
     build_safety_input(app, &in);
+
+    /* Published so the display and the API can say why a kiln is not heating
+     * (SWR-WEB-04, SWR-SAF-31).  Taken from the input the rule actually used
+     * rather than re-read: a second sample of a safety input at a different
+     * instant is how two parts of one device come to disagree about whether
+     * the door is open. */
+    app->door_open       = in.door_open;
+    app->door_monitoring = in.door_monitoring;
 
     /* SWR-NFR-17: the checked form, so a contract violation here is counted rather
      * than absorbed into a fail-safe verdict nobody looks at. */
@@ -1299,4 +1308,6 @@ void kiln_app_snapshot(const kiln_app_t *app, kiln_snapshot_t *out)
     out->duty_saturated = app->pid.saturated;
     out->kiln_valid     = app->kiln_valid;
     out->case_valid     = app->case_valid;
+    out->door_open      = app->door_open;
+    out->door_monitoring= app->door_monitoring;
 }
