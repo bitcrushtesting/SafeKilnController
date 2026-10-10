@@ -82,7 +82,7 @@ documented in @ref selfcheck.h :
 
 @section udd_diagrams The two diagrams
 
-Both are drawn from `\dot` blocks in the headers beside the code they
+Both are drawn from @c \\dot blocks in the headers beside the code they
 describe, so they are versioned with it and cannot drift from it the way a
 picture in another document does:
 
