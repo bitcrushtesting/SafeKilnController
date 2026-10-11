@@ -70,7 +70,12 @@ pcb_hole_d     = 3.4;  // M3 clearance
 h_terminal   = 11.0;   // MX126-5.0 body above the board
 h_esp_module =  3.5;   // ESP32-S3-WROOM-1 can
 h_encoder    = 14.0;   // EC11E body above the board, before the shaft
-h_buzzer     =  9.5;   // TMB12A05
+h_buzzer     =  5.5;   // FST-9650B-5V, SMD; was 9.5 for the TMB12A05
+// UNDERSTATED, and this one is used: it sets pcb_stack and so the box width.
+// The terminal blocks' pins protrude 3.50 mm, measured from the part's own 3D
+// mesh and matching the KF301's stated pin length, not 2.5. Correcting it
+// widens the box by 1 mm and changes the panel cut-out, so it is a reprint
+// rather than an edit: tracked as B6 rather than changed here.
 h_below      =  2.5;   // THT lead protrusion under the board
 
 // Positions on the board, x from the left edge, y from the bottom edge.
