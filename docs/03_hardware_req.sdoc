@@ -1,10 +1,17 @@
 [DOCUMENT]
 TITLE: Safe Kiln Controller, Hardware Requirements
-UID: HWREQ
-VERSION: 0.1
-CLASSIFICATION: Public
+UID: SAFEKILN-HWR
+VERSION: 0.1 (draft)
+DATE: 2026-10-11
 OPTIONS:
-  REQUIREMENT_STYLE: Table
+  MARKUP: Markdown
+  VIEW_STYLE: Table
+  NODE_IN_TOC: True
+METADATA:
+  SPDX-FileCopyrightText: 2026 Bitcrush Testing
+  SPDX-License-Identifier: GPL-3.0-or-later
+  Status: For review
+  Project: Safe Kiln Controller, PID kiln controller
 
 [GRAMMAR]
 ELEMENTS:
