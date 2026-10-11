@@ -1,0 +1,10 @@
+(fp_lib_table
+	(version 7)
+	(lib
+		(name "safekiln")
+		(type "KiCad")
+		(uri "${KIPRJMOD}/safekiln.pretty")
+		(options "")
+		(descr "Footprints this project owns, for parts KiCad does not carry")
+	)
+)
