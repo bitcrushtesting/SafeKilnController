@@ -138,17 +138,53 @@ core_lib() {
     find "$HOST_BUILD" -name 'libkiln_core.a' 2>/dev/null | head -1 || true
 }
 
+# Symbols that live in a genuinely WRITABLE section, printed as "section name".
+#
+# Read from the section rather than from nm's one-letter class, and that
+# distinction is the whole of this function. A `const` table of POINTERS needs
+# its pointers relocated at load time, so on ELF it lands in .data.rel.ro --
+# which nm calls 'd', the same letter as real mutable data. The first version
+# of this check used the letter, passed on Mach-O where such tables stay in
+# __const, and flagged eight legitimate const tables in kiln_core the moment it
+# ran on Linux. A check that fires on correct code is worse than no check,
+# because the next person deletes it.
+#
+# GNU nm's sysv format carries a Section column; Apple's leaves it empty, so
+# the Mach-O branch asks `nm -m` instead. Both reject the same thing: data and
+# bss, thread-local included. Neither rejects relocated read-only data.
+writable_syms() {
+    local lib=$1
+    local sysv
+    sysv=$(nm --format=sysv "$lib" 2>/dev/null | awk -F'|' 'NF >= 7 {
+        name = $1; sect = $7;
+        gsub(/^[ \t]+|[ \t]+$/, "", name);
+        gsub(/^[ \t]+|[ \t]+$/, "", sect);
+        if (sect != "") { print sect" "name }
+    }' || true)
+    if [ -n "$sysv" ]; then
+        # Writable sections, naming them rather than pattern-matching so that
+        # a section nobody anticipated is reported and not silently allowed.
+        # `*COM*` is a C common symbol, which is mutable state by another
+        # spelling. `.data.rel.ro` is the relocated-read-only case this
+        # function exists to let through; a bare `.data.rel` is not.
+        printf '%s\n' "$sysv" | awk '
+            $1 == ".data"  || $1 == ".bss"   ||
+            $1 == ".tdata" || $1 == ".tbss"  || $1 == "*COM*" ||
+            ($1 ~ /^\.data\.rel/ && $1 !~ /^\.data\.rel\.ro/)' | sort -u
+        return 0
+    fi
+    nm -m "$lib" 2>/dev/null \
+      | awk '/\(__DATA,__(data|bss|common)\)/ { print $2" "$NF }' | sort -u || true
+}
+
 check_no_mutable_state() {
     local lib; lib=$(core_lib)
     if [ -z "$lib" ]; then
         note "SWA-03:    skipped, no host build at $HOST_BUILD"
         return
     fi
-    # d/D: initialised writable data. b/B: zero-initialised. Lower case is
-    # local linkage, which is exactly where a function-local static lands --
-    # the form that looks innocent in review.
     local syms
-    syms=$(nm "$lib" 2>/dev/null | awk '$2 ~ /^[dDbB]$/ { print $2" "$3 }' | sort -u || true)
+    syms=$(writable_syms "$lib")
     if [ -n "$syms" ]; then
         err "SWA-03: kiln_core has mutable file-scope state:"
         printf '%s\n' "$syms" >&2
@@ -270,13 +306,36 @@ EOF
 #include <time.h>
 long now(void) { return (long)time(nullptr); }
 EOF
-    c++ -std=c++20 -c "$tmp/global.cpp" -o "$tmp/global.o" 2>/dev/null
-    c++ -std=c++20 -c "$tmp/clock.cpp"  -o "$tmp/clock.o"  2>/dev/null
-    ar rcs "$tmp/libbad.a" "$tmp/global.o" "$tmp/clock.o" 2>/dev/null
+    # The case that matters as much as the violations: a const table of
+    # POINTERS, which is what kiln_core is full of. On ELF its pointers are
+    # relocated at load time and it lands in .data.rel.ro, which nm's class
+    # letter cannot be told apart from real mutable data. If this is ever
+    # reported as mutable state, the check is wrong and not the code.
+    cat > "$tmp/consttable.cpp" <<'EOF'
+namespace {
+const char *const k_names[] = { "alpha", "beta", "gamma" };
+struct row { const char *key; int lo, hi; };
+const row k_rows[] = { { "a", 0, 1 }, { "b", 2, 3 } };
+}
+const char *name_of(int i) { return k_names[i]; }
+int hi_of(int i) { return k_rows[i].hi; }
+EOF
+    c++ -std=c++20 -c "$tmp/global.cpp"     -o "$tmp/global.o"     2>/dev/null
+    c++ -std=c++20 -c "$tmp/clock.cpp"      -o "$tmp/clock.o"      2>/dev/null
+    c++ -std=c++20 -c "$tmp/consttable.cpp" -o "$tmp/consttable.o" 2>/dev/null
+    ar rcs "$tmp/libbad.a"   "$tmp/global.o" "$tmp/clock.o" 2>/dev/null
+    ar rcs "$tmp/libconst.a" "$tmp/consttable.o" 2>/dev/null
 
+    # Through writable_syms itself rather than a copy of its nm invocation:
+    # the first version of this self-test duplicated the command it was meant
+    # to be testing, which is why it could not catch the false positive.
     local n
-    n=$(nm "$tmp/libbad.a" 2>/dev/null | awk '$2 ~ /^[dDbB]$/' | wc -l | tr -d ' ')
-    t "a global and a function-local static are both seen" "$([ "$n" -ge 2 ] && echo yes || echo no)" "yes"
+    n=$(writable_syms "$tmp/libbad.a" | wc -l | tr -d ' ')
+    t "a global and a function-local static are both seen" \
+      "$([ "$n" -ge 2 ] && echo yes || echo no)" "yes"
+
+    n=$(writable_syms "$tmp/libconst.a" | wc -l | tr -d ' ')
+    t "a const table of pointers is NOT mutable state" "$n" "0"
 
     n=$(nm -u "$tmp/libbad.a" 2>/dev/null | awk '{print $NF}' \
           | grep -cE '^_?time$' || true)
@@ -286,7 +345,7 @@ EOF
     # fires on everything is as useless as one that fires on nothing.
     local lib; lib=$(core_lib)
     if [ -n "$lib" ]; then
-        n=$(nm "$lib" 2>/dev/null | awk '$2 ~ /^[dDbB]$/' | wc -l | tr -d ' ')
+        n=$(writable_syms "$lib" | wc -l | tr -d ' ')
         t "kiln_core has no mutable state" "$n" "0"
         n=$(nm -u "$lib" 2>/dev/null | awk '{print $NF}' | grep -cE '^_?time$' || true)
         t "kiln_core calls no time()" "$n" "0"
