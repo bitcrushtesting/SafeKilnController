@@ -19,8 +19,8 @@ requirements are met. **P3** polish.
 |---|---|
 | **Firmware logic** | Complete and tested. 26 host suites green plain and under ASan/UBSan, `kiln_core` lines 91.8 %, clang-tidy clean on host and target, both IDF configurations build. QEMU boots and fires the simulated image with seven assertions. |
 | **Firmware on hardware** | 15 of 16 ports wired; only `update` has nothing behind it (`H2`). **None of it has run against hardware** (`L2`, `O3`, `P4`, `M3`). |
-| **Schematic** | ERC clean apart from one known `SDO` false positive. Carries the lid interlock; does not carry the supervisor (`R6`). |
-| **PCB** | Placement started, **not routed at all** (`A23`). |
+| **Schematic** | ERC clean apart from one known `SDO` false positive. Carries the lid interlock, the supervisor (`U5`, STM32G031K8Tx), both MAX31856 and the SWD tag-connect. |
+| **PCB** | 182 tracks and 9 vias placed, so routing is started and not finished. 14 of 125 footprints sit outside the outline (`A24`), and there are no mounting holes (`A25`). |
 | **Documents** | Requirements, architecture, safety, security and the supervisor's unit design all build in CI and gate it. |
 
 ---
@@ -65,8 +65,37 @@ changes against it.
   can disagree. `HWR-21`.
 - [ ] **A23a. Finish the KiCad rename to `safekiln`.** Files are renamed;
   check no stale references remain.
-- [ ] **A23. Route the board, and review the mains-adjacent nets. P1.** No
-  tracks and no vias exist yet. `HWR-23`.
+- [ ] **A23. Finish routing, and review the mains-adjacent nets. P1.** 182
+  tracks and 9 vias exist, so this is unfinished rather than unstarted.
+  `HWR-23`.
+- [ ] **A24. 14 of 125 footprints sit outside the outline.** `U4`, the second
+  MAX31856, is at y = 117.9 against an outline ending at 110, and `J7`, the
+  second thermocouple terminal, at y = 73.2 against 70. A part outside the
+  outline is not placed: it will not be fabricated where it appears.
+  `HWR-25`.
+- [ ] **A25. The board has no mounting holes. P1.** Nothing fixes it to
+  anything. The enclosure proposes four M3 at 4 mm in from each corner;
+  `HWR-24`.
+
+---
+
+## B. Enclosure
+
+Designed in [`hardware/enclosure`](hardware/enclosure/README.md): panel-mount,
+three printed parts, every dimension read from the PCB. Renders and slices, and
+nothing has been printed.
+
+- [ ] **B1. Print the knob and check its bore.** `knob_bore` is 6.15 mm for a
+  splined EC11E shaft. One 27-minute print decides it, and it gates the other
+  two.
+- [ ] **B2. Check the OLED module against the three `CHECK` parameters.** The
+  window, the module outline and the 4 × M2 grid are the common 0.96″ variant
+  and modules differ.
+- [ ] **B3. Decide the material.** PLA softens at 55 to 60 °C and this bolts
+  to a kiln's panel, which `SWR-SAF-11` exists because of. Measure the panel
+  at temperature; PETG or ASA slices from the same profile.
+- [ ] **B4. Check the SWD probe clearance.** The shell's opening is positioned
+  from `J4`, but a TC2030 needs the probe square to the pads (`HWR-19`).
 
 ---
 
@@ -298,13 +327,13 @@ Inventory in [`docs/security.md` §13](docs/security.md).
 The firmware, the requirement deltas and the link tests are done. What is left
 is hardware.
 
-- [ ] **R6. Draw the supervisor. P1.** Part and pin map are settled:
-  STM32G031K8T6, LQFP32, assignment in
-  [`firmware/supervisor/README.md`](firmware/supervisor/README.md). Three
-  things the pin map asks of the board: the permit line needs an external
-  pull-down (`HWR-03`), SWD must come out to test points (`HWR-19`), and on the
-  ESP32 side the link lands on one receive-only pin, and `UART0` is the console
-  and must not be used.
+- [ ] **R6. Finish the supervisor's schematic. P1.** It is drawn, not
+  finished: `U5` (STM32G031K8Tx, LQFP32), both MAX31856 and the SWD
+  tag-connect `J4` are placed. What the pin map still asks of the board is the
+  permit line's external pull-down (`HWR-03`), SWD out to test points
+  (`HWR-19`), and the link landing on one receive-only ESP32 pin, since
+  `UART0` is the console and must not be used. `U4` is also outside the
+  outline (`A24`).
 - [ ] **R11. The clear button on the panel.** The firmware implements it
   (edge triggered, held 0.5 s, a line stuck low never arms). What is left is
   physical: the button, its position relative to the HMI, and whether it is

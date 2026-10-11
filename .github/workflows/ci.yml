@@ -111,6 +111,7 @@ jobs:
                      '*.cpp' '*.h' '*.md' '*.sdoc' 'CMakeLists.txt' '*/CMakeLists.txt' \
                      'firmware/controller/**/Kconfig*' 'firmware/controller/*.csv' 'firmware/controller/sdkconfig.*' \
                      'tools/*.sh' 'tools/*.py' '.github/workflows/*.yml' 'strictdoc.toml' \
+                     '*.scad' 'hardware/enclosure/*.ini' 'hardware/enclosure/*.sh' \
                    | grep -v '^LICENSE' \
                    | grep -vE '^fixture/(board|firmware)/')
             # fixture/board and fixture/firmware are generated verbatim by

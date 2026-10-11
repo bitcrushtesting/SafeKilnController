@@ -382,6 +382,38 @@ RELATIONS:
   VALUE: SYS-HW-24
   ROLE: Refines
 
+[REQUIREMENT]
+UID: HWR-24
+TITLE: The board has mounting holes
+STATEMENT: >>>
+The PCB shall carry **four M3 mounting holes**, 4 mm in from each corner of the 100 × 70 outline, plated or with keep-out to the nearest copper.
+
+There are none today. Nothing fixes the board to anything, so the enclosure's standoffs ([`hardware/enclosure`](../hardware/enclosure/README.md)) are a proposal the board has to adopt rather than a fit to something that exists. A controller held in place by its own wiring is a controller whose terminal blocks take the weight of the loom.
+
+The positions are the enclosure's, not the other way round, because the enclosure is printed from a parameterised model and the board is not.
+<<<
+PRIORITY: M
+VERIFICATION: I
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-05
+  ROLE: Refines
+
+[REQUIREMENT]
+UID: HWR-25
+TITLE: Every footprint is inside the outline
+STATEMENT: >>>
+Every footprint shall sit inside the board outline, and the placement shall be reviewed against it before routing continues.
+
+**14 of 125 do not**, measured 2026-10-11 against the `gr_rect` at 50,40 to 150,110: `U4` (the second MAX31856) at y = 117.9 and `J7` (the second thermocouple terminal) at y = 73.2 are the two that matter, with a cluster of decoupling capacitors and test points beside them. A part outside the outline is not placed at all: it will not be fabricated where it appears, and the netlist that routes to it is routing into free space.
+<<<
+PRIORITY: M
+VERIFICATION: I
+RELATIONS:
+- TYPE: Parent
+  VALUE: SYS-HW-10
+  ROLE: Refines
+
 [[/SECTION]]
 
 [[SECTION]]
