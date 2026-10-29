@@ -132,14 +132,15 @@ VERIFICATION: I
 [REQUIREMENT]
 UID: SYS-HW-02
 STATEMENT: >>>
-Both thermocouple front ends shall be MAX31856 devices, and they shall be on **separate SPI buses belonging to different microcontrollers**:
+The two **chamber** thermocouple front ends shall be MAX31856 devices, both read by the supervisor ([LINK: SYS-HW-26]) and by nothing else, each on **its own SPI bus**. They shall share no bus line, chip select or `~DRDY` with each other, and the controller shall be connected to neither bus.
 
-- the **chamber** front end on the supervisor's bus ([LINK: SYS-HW-26]), read by the supervisor and by nothing else;
-- the **enclosure** front end on the controller's bus, read by the controller.
+**Amended 2026-10-22 with the second chamber couple ([LINK: SWR-SAF-37]).** This said the chamber front end was on the supervisor's bus and the enclosure front end on the controller's. The supervisor now reads two chamber couples, and the board carries those two front ends and no third. Two buses rather than two chip selects on one: a shared bus makes both readings depend on the same shift register and clock, so one failure there would take both couples at once.
+
+The **enclosure** channel this requirement used to place has no front end on the board. [LINK: SWR-ACQ-01], [LINK: SWR-SAF-11] and the requirements that log and display enclosure temperature still assume one, and how it is to be measured is open.
 
 **Amended 2026-10-10 with the supervisor (SWA-22).** This said "a shared SPI bus with individual chip selects", which was true when one microcontroller read both. A shared bus is now exactly what must not happen: a supervisor whose chamber reading can be disturbed by the controller's bus traffic, or whose chip select can be driven by a controller that has crashed with a pin latched, is not independent of it, and independence is the whole of what the second part buys.
 
-One **common cause** survives any bus arrangement, and it is the chamber couple itself: both microcontrollers derive chamber temperature from the same junction, so the independence this requirement buys is independence against software and silicon, not against the sensor. It is recorded in `safety.md` section 6 and in section 9 of the supervisor's design rather than claimed away here.
+The **common cause** this requirement used to record, a single chamber couple from which both microcontrollers derived chamber temperature, is recorded in `safety.md` section 6 and in section 9 of the supervisor's design. It is now answered by comparison rather than only by interrogation: [LINK: SWR-SAF-37] reads two couples and acts on the higher. What remains shared is the installation, since two couples in one thermowell are placed by the same hand.
 <<<
 PRIORITY: M
 VERIFICATION: I
@@ -195,7 +196,9 @@ VERIFICATION: I, T
 [REQUIREMENT]
 UID: SYS-HW-09
 STATEMENT: >>>
-The system shall carry an **on-board** audible alarm: a 5 V active (self-driving) magnetic buzzer switched low-side from the alarm GPIO, so that annunciation needs no external component or field wiring.
+The system shall carry an **on-board** audible alarm: a 12 V active (self-driving) magnetic buzzer on the supply rail of [LINK: SYS-HW-14], switched low-side from the alarm GPIO, so that annunciation needs no external component or field wiring.
+
+**Amended 2026-10-29 with the 12 V supply.** This said 5 V, which was the supply rail when the board took 5 V in. The buzzer stays on the unregulated rail rather than moving to the 3V3 logic rail, so that its switching current never shares a regulator with the MCU.
 <<<
 PRIORITY: M
 VERIFICATION: I
@@ -351,7 +354,11 @@ VERIFICATION: I
 [REQUIREMENT]
 UID: SYS-HW-14
 STATEMENT: >>>
-The controller electronics shall be supplied from a regulated source able to power the MCU, display and contactor coil simultaneously, and shall not rely on a USB host for operating power.
+The controller electronics shall be supplied from a single **12 V DC** input able to power the MCU, display and contactor coil simultaneously, and shall not rely on a USB host for operating power. The contactor coil, the buzzer and the SSR drive run from that 12 V rail directly; the logic rail is derived from it by a switching regulator.
+
+USB carries data only. `VBUS` powers nothing, so there is no state in which the logic runs from a USB host while the coil, SSR and buzzer sit at a voltage too low to act.
+
+**Amended 2026-10-29 with the 12 V supply.** This said "a regulated source" and the board took 5 V, with `VBUS` diode-OR'd onto the same rail. A 12 V coil cannot be driven from 5 V, and a USB host on that rail would have produced a half-powered board: the logic running, the SSR input able to switch, the coil unable to pull in and the buzzer silent.
 <<<
 PRIORITY: M
 VERIFICATION: I

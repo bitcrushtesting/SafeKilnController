@@ -842,8 +842,10 @@ extern "C" void app_main(void)
                       "so no heat");
     }
 
-    /* The enclosure channel is still this firmware's own MAX31856 (SYS-HW-02), and
-     * is optional: SWR-SAF-11 stands down without it rather than refusing to run. */
+    /* The enclosure channel would be this firmware's own MAX31856, and is
+     * optional: SWR-SAF-11 stands down without it rather than refusing to run.
+     * Rev A has no front end for it (SYS-HW-02, HWR-05), so on this board the
+     * call below reports KILN_ERR_UNSUPPORTED and takes the warning path. */
     if (kiln_hal_tc_init(1, &s_case_tc_port) == KILN_OK) {
         ports.case_tc = &s_case_tc_port;
     } else {

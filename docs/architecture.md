@@ -753,7 +753,7 @@ runs on the board.
 
 ### 10.7 What the buzzer sounds like
 
-The buzzer is a 5 V active part that makes its own tone (`SYS-HW-09`), so the
+The buzzer is a 12 V active part that makes its own tone (`SYS-HW-09`), so the
 only thing the firmware chooses is the rhythm, and `SWR-SAF-20` asks for two
 annunciations an operator can tell apart without looking.
 

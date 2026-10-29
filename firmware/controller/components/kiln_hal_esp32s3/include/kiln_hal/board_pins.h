@@ -22,39 +22,45 @@
  * pair.
  *
  * ---------------------------------------------------------------------------
- * Only one ADC channel is available, which is why there is only one CT
+ * Only ADC1 is usable, which is why there is only one CT
  * ---------------------------------------------------------------------------
  * On the ESP32-S3, ADC1 is GPIO1..GPIO10 and ADC2 is GPIO11..GPIO20.  **ADC2
  * cannot be used while WiFi is active**, which for this device means it cannot
- * be used at all (SWR-NET-01).  Every GPIO1..GPIO10 pin on this board is taken,
- * so CURR_SENSE is the only analogue input there is and there is no room for
- * a second.
+ * be used at all (SWR-NET-01).  CURR_SENSE on IO1 is the only analogue input
+ * the board uses.
  *
  * That costs nothing today: the project supports single-phase kilns only, and
  * a single-phase kiln needs exactly one transformer (SYS-HW-11).  It is written
  * down because it will bite whoever next wants an analogue input for anything
  * at all, and because it is the reason three-phase support was dropped rather
- * than merely deferred.
+ * than merely deferred.  IO9 and IO10 are ADC1 and have been unrouted since the
+ * thermocouple bus moved to the supervisor (HWR-05); IO3 is ADC1 too, but a
+ * strapping pin, and IO5 is held for SYS-HW-12.
  */
 #ifndef KILN_HAL_BOARD_PINS_H
 #define KILN_HAL_BOARD_PINS_H
 
-/* --- thermocouple front ends (SYS-HW-02, SYS-HW-03) ---------------------------- */
-/* One SPI bus, two chip selects.  SPI2 (FSPI) because SPI0/SPI1 are the flash
- * controller's and SYS-HW-03 wants the TC bus free of anything that can stall it. */
-constexpr int KILN_PIN_SPI_SCK = 12;
-constexpr int KILN_PIN_SPI_MOSI = 11;
-constexpr int KILN_PIN_SPI_MISO = 13;
-constexpr int KILN_PIN_TC1_CS = 10;                     /* chamber   */
-constexpr int KILN_PIN_TC2_CS = 9;                      /* enclosure */
-constexpr int KILN_PIN_TC1_DRDY = 14;
-constexpr int KILN_PIN_TC2_DRDY = 21;
-/* The FAULT outputs are not read by the firmware: SYS-HW-24 wires them into the
- * contactor coil in hardware, and SWR-SAF-04 reads the fault register over SPI.
- * They are deliberately absent from this map. */
+#include <stdint.h>
+
+/* --- thermocouple front ends (SYS-HW-02, HWR-05) -------------------------------- */
+/* None on this side.  Both MAX31856s are the supervisor's, each on its own SPI
+ * bus, and HWR-05 forbids an ESP32-S3 pin on either, so there is no SPI, chip
+ * select, DRDY or FAULT pin to give here.  The chamber temperature arrives over
+ * the supervisor link below.
+ *
+ * The enclosure channel SYS-HW-02 used to put on this side has no front end on
+ * rev A, and how it is to be measured is open.  This is 0 rather than absent so
+ * that hal_tc.cpp can say so: kiln_hal_tc_init then returns KILN_ERR_UNSUPPORTED
+ * and SWR-SAF-11 stands down, instead of binding a channel to pins that go
+ * nowhere.  The SPI driver does not notice a missing part, so without this the
+ * enclosure port would come up and read whatever a floating MISO reads. */
+#define KILN_HAL_BOARD_HAS_CASE_TC 0
 
 /* --- heat output (SYS-HW-06, SYS-HW-07, SWA-05) --------------------------------- */
 constexpr int KILN_PIN_SSR1 = 4;
+/* IO5 is not routed on rev A: the board has one SSR output, J6.  The pin is kept
+ * for SYS-HW-12's optional second channel, and driving an unrouted pin low is
+ * harmless. */
 constexpr int KILN_PIN_SSR2 = 5;
 /* SWA-05: a software-generated square wave into a charge pump, never a static
  * level and never a hardware PWM peripheral.  See hal_heat.cpp. */
@@ -72,7 +78,9 @@ constexpr int KILN_HAL_CURR_ADC_CHANNEL = 0;
 /* --- interlocks -------------------------------------------------------- */
 /* SWR-SAF-31 / SYS-HW-21.  The lid contacts are in the coil circuit; this senses the
  * node through the R30/R31 divider, so it reads the *coil supply*, not a bare
- * switch: high means the lid is shut and the coil may be fed. */
+ * switch: high means the lid is shut and the coil may be fed.  The divider is
+ * sized for the internal pull-down hal_io.cpp enables (HWR-27), and D10 clamps
+ * the pin, so turning that pull-down off moves the threshold. */
 constexpr int KILN_PIN_LID_SENSE = 38;
 
 /* --- local interface (SYS-HW-04, SYS-HW-05) ------------------------------------ */

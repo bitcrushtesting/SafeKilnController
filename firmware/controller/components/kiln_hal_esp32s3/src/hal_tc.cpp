@@ -38,14 +38,19 @@
  * either way -- so this costs diagnosis, not safety.  Recorded rather than
  * papered over.
  */
+#include "kiln_hal/board_pins.h"
+#include "kiln_hal/hal_esp32s3.h"
+
+/* Rev A has no front end on this side (HWR-05), so everything below the #if is
+ * the adapter for a board that has one, and the #else at the end is what this
+ * board gets: both entry points report the channel as not fitted. */
+#if KILN_HAL_BOARD_HAS_CASE_TC
+
 #include <string.h>
 
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
 #include "esp_log.h"
-
-#include "kiln_hal/board_pins.h"
-#include "kiln_hal/hal_esp32s3.h"
 
 namespace {
 
@@ -331,3 +336,20 @@ kiln_err_t kiln_hal_tc_init(uint8_t which, kiln_port_tc_t *out)
     out->read      = tc_read;
     return KILN_OK;
 }
+
+#else /* !KILN_HAL_BOARD_HAS_CASE_TC */
+
+kiln_err_t kiln_hal_tc_bus_init(void)
+{
+    return KILN_ERR_UNSUPPORTED;
+}
+
+kiln_err_t kiln_hal_tc_init(uint8_t which, kiln_port_tc_t *out)
+{
+    if ((out == nullptr) || (which > 1u)) {
+        return KILN_ERR_INVALID_ARG;
+    }
+    return KILN_ERR_UNSUPPORTED;
+}
+
+#endif /* KILN_HAL_BOARD_HAS_CASE_TC */
