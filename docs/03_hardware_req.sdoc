@@ -172,7 +172,7 @@ TITLE: 2. Temperature acquisition
 UID: HWR-05
 TITLE: Separate buses for the two front ends
 STATEMENT: >>>
-Both chamber MAX31856 front ends shall be on the supervisor, each on its own SPI bus, as [LINK: SWR-SAF-37] requires. They shall share no `SCK`, `SDI`, `SDO`, chip select or `~DRDY` line with each other, and the controller shall be connected to none of them.
+Both chamber MAX31856 front ends shall be on the supervisor, each on its own SPI bus, as [LINK: SWR-SAF-37] requires. They shall share no `SCK`, `SDI`, `SDO`, chip select or `~FAULT` line with each other, and the controller shall be connected to none of them. `~DRDY` is not connected at all ([LINK: HWR-06]).
 
 Present circuit: U3 (`TC1_*`) on PA4 to PA7 and U4 (`TC2_*`) on PB5 to PB8 of U5, with no ESP32 pin on either bus.
 
@@ -187,9 +187,17 @@ RELATIONS:
 
 [REQUIREMENT]
 UID: HWR-06
-TITLE: Open-drain outputs are pulled up
+TITLE: Fault outputs are pulled up, and DRDY is not connected
 STATEMENT: >>>
-Every MAX31856 `~DRDY` and `~FAULT` output shall carry a pull-up. They are open-drain and read as asserted when floating.
+Every MAX31856 `~FAULT` output shall carry an external pull-up to +3V3. It is open-drain and reads as asserted when floating. `~DRDY` shall not be connected, and nothing shall depend on it.
+
+Present circuit: R36 (10 k) on `TC1_FAULT` and R37 (10 k) on `TC2_FAULT`, both to +3V3, beside U3 and U4. `~DRDY` on both parts carries a no-connect flag.
+
+The supervisor also enables its internal pull-ups on PA3 and PB4, but those exist only once its firmware has configured the pins. The external resistors hold the lines through reset and boot, and for a supervisor that never gets that far.
+
+`~DRDY` is not needed because the supervisor runs each part in continuous conversion and reads temperature and fault status in one burst, so it never waits on a conversion edge. At start-up it waits for the first conversion by reading the registers, not the pin. Unconnected, the pin is an open-drain output with nothing to pull it up and draws no current, which is why it gets no resistor either.
+
+**Amended 2026-10-29.** This required pull-ups on `~DRDY` and `~FAULT` both, and the board had neither: `~FAULT` relied on the supervisor's internal pull-ups, and `~DRDY` was unconnected, where a pull-up would serve nothing because nothing reads it.
 <<<
 PRIORITY: M
 VERIFICATION: I

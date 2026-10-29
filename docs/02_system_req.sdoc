@@ -132,7 +132,7 @@ VERIFICATION: I
 [REQUIREMENT]
 UID: SYS-HW-02
 STATEMENT: >>>
-The two **chamber** thermocouple front ends shall be MAX31856 devices, both read by the supervisor ([LINK: SYS-HW-26]) and by nothing else, each on **its own SPI bus**. They shall share no bus line, chip select or `~DRDY` with each other, and the controller shall be connected to neither bus.
+The two **chamber** thermocouple front ends shall be MAX31856 devices, both read by the supervisor ([LINK: SYS-HW-26]) and by nothing else, each on **its own SPI bus**. They shall share no bus line, chip select or `~FAULT` with each other, and the controller shall be connected to neither bus. `~DRDY` is not used ([LINK: HWR-06]).
 
 **Amended 2026-10-22 with the second chamber couple ([LINK: SWR-SAF-37]).** This said the chamber front end was on the supervisor's bus and the enclosure front end on the controller's. The supervisor now reads two chamber couples, and the board carries those two front ends and no third. Two buses rather than two chip selects on one: a shared bus makes both readings depend on the same shift register and clock, so one failure there would take both couples at once.
 
