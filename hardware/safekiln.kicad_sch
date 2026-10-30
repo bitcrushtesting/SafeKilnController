@@ -9355,6 +9355,12 @@
 		(uuid "96327422-1fd2-4310-98ca-a5c78c6136de")
 	)
 	(junction
+		(at 454.66 256.54)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "9b1511d0-a099-42ef-a4bf-81ffb48f036b")
+	)
+	(junction
 		(at 77.47 48.26)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -9607,7 +9613,7 @@
 		(uuid "daaa1380-dfbd-4515-abb3-fce869b2dc8a")
 	)
 	(no_connect
-		(at 111.76 85.09)
+		(at 102.87 80.01)
 		(uuid "ddf3473e-0f19-4bb2-88fd-7121ee572a70")
 	)
 	(no_connect
@@ -10186,7 +10192,7 @@
 	)
 	(wire
 		(pts
-			(xy 463.55 281.94) (xy 473.71 281.94)
+			(xy 455.93 281.94) (xy 473.71 281.94)
 		)
 		(stroke
 			(width 0)
@@ -10426,7 +10432,7 @@
 	)
 	(wire
 		(pts
-			(xy 106.68 92.71) (xy 104.14 92.71)
+			(xy 97.79 87.63) (xy 95.25 87.63)
 		)
 		(stroke
 			(width 0)
@@ -10683,16 +10689,6 @@
 			(type default)
 		)
 		(uuid "54a1a166-5117-46d4-bf53-bf1d388f8780")
-	)
-	(wire
-		(pts
-			(xy 566.42 256.54) (xy 574.04 256.54)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "559ef29e-e1f0-4976-932d-e61ac2f51624")
 	)
 	(wire
 		(pts
@@ -11126,7 +11122,7 @@
 	)
 	(wire
 		(pts
-			(xy 463.55 287.02) (xy 473.71 287.02)
+			(xy 455.93 287.02) (xy 473.71 287.02)
 		)
 		(stroke
 			(width 0)
@@ -11276,7 +11272,7 @@
 	)
 	(wire
 		(pts
-			(xy 463.55 292.1) (xy 473.71 292.1)
+			(xy 455.93 292.1) (xy 473.71 292.1)
 		)
 		(stroke
 			(width 0)
@@ -11336,7 +11332,7 @@
 	)
 	(wire
 		(pts
-			(xy 116.84 90.17) (xy 119.38 90.17)
+			(xy 107.95 85.09) (xy 110.49 85.09)
 		)
 		(stroke
 			(width 0)
@@ -11526,7 +11522,7 @@
 	)
 	(wire
 		(pts
-			(xy 116.84 92.71) (xy 119.38 92.71)
+			(xy 107.95 87.63) (xy 110.49 87.63)
 		)
 		(stroke
 			(width 0)
@@ -11623,6 +11619,16 @@
 			(type default)
 		)
 		(uuid "b0825e96-da60-4010-bc97-27d584e98797")
+	)
+	(wire
+		(pts
+			(xy 454.66 256.54) (xy 431.8 256.54)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b203db23-b0f4-46c1-baaa-a3e3d65b6b4f")
 	)
 	(wire
 		(pts
@@ -11796,7 +11802,7 @@
 	)
 	(wire
 		(pts
-			(xy 106.68 90.17) (xy 104.14 90.17)
+			(xy 97.79 85.09) (xy 95.25 85.09)
 		)
 		(stroke
 			(width 0)
@@ -11906,7 +11912,7 @@
 	)
 	(wire
 		(pts
-			(xy 473.71 256.54) (xy 466.09 256.54)
+			(xy 473.71 256.54) (xy 454.66 256.54)
 		)
 		(stroke
 			(width 0)
@@ -11996,13 +12002,23 @@
 	)
 	(wire
 		(pts
-			(xy 463.55 284.48) (xy 473.71 284.48)
+			(xy 455.93 284.48) (xy 473.71 284.48)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
 		(uuid "d41e572d-caa2-413e-be78-ae001f3314db")
+	)
+	(wire
+		(pts
+			(xy 454.66 256.54) (xy 454.66 259.08)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d635f213-87fc-4193-a369-33c84b5ddaeb")
 	)
 	(wire
 		(pts
@@ -12196,7 +12212,7 @@
 	)
 	(wire
 		(pts
-			(xy 463.55 289.56) (xy 473.71 289.56)
+			(xy 455.93 289.56) (xy 473.71 289.56)
 		)
 		(stroke
 			(width 0)
@@ -12905,7 +12921,7 @@
 		(uuid "27630410-d45e-4add-9c5d-4fc770a9c413")
 	)
 	(label "TC2_CS"
-		(at 463.55 284.48 0)
+		(at 455.93 284.48 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -12945,7 +12961,7 @@
 		(uuid "32e46539-8071-4bfa-9185-93f01b2effd0")
 	)
 	(label "USB_DN"
-		(at 104.14 92.71 180)
+		(at 95.25 87.63 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -13025,7 +13041,7 @@
 		(uuid "3fd22e4d-ca93-40ba-9396-332a9b1ea9f2")
 	)
 	(label "TC2_SCK"
-		(at 463.55 292.1 0)
+		(at 455.93 292.1 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -13145,7 +13161,7 @@
 		(uuid "5f8705c1-1f58-469a-9427-ba0f258274eb")
 	)
 	(label "TC2_FAULT"
-		(at 463.55 281.94 0)
+		(at 455.93 281.94 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -13235,7 +13251,7 @@
 		(uuid "75645d28-3090-49e9-bbf2-762ce312b1c6")
 	)
 	(label "TC2_MISO"
-		(at 463.55 287.02 0)
+		(at 455.93 287.02 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -13285,7 +13301,7 @@
 		(uuid "84e75121-3e6c-4dc1-b76f-7aa864727e77")
 	)
 	(label "USB_DN"
-		(at 119.38 92.71 0)
+		(at 110.49 87.63 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -13325,7 +13341,7 @@
 		(uuid "8c6e922f-3485-489b-90de-52580fefe211")
 	)
 	(label "TC2_MOSI"
-		(at 463.55 289.56 0)
+		(at 455.93 289.56 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -13395,7 +13411,7 @@
 		(uuid "972101d7-e6c8-4a49-8ede-993be6b7caf6")
 	)
 	(label "USB_DP"
-		(at 119.38 90.17 0)
+		(at 110.49 85.09 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -13405,7 +13421,7 @@
 		(uuid "972bc7b2-a8cf-416f-aa60-8a5835b0fc53")
 	)
 	(label "USB_DP"
-		(at 104.14 90.17 180)
+		(at 95.25 85.09 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -13995,12 +14011,12 @@
 		(uuid "f5fd8e53-bd5c-41a9-b9d7-d70cc3b76d59")
 	)
 	(label "SUPERVISOR_RESET"
-		(at 466.09 256.54 180)
+		(at 431.8 256.54 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
-			(justify right bottom)
+			(justify left bottom)
 		)
 		(uuid "f848be5b-07c6-4ceb-838f-f2a0b7298298")
 	)
@@ -14063,16 +14079,6 @@
 			(justify left bottom)
 		)
 		(uuid "fc2611e6-754f-454c-ad07-1440d4ee65fe")
-	)
-	(label "SUPERVISOR_RESET"
-		(at 574.04 256.54 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "ffa9e80e-0a4d-486e-9236-c0db64b5150e")
 	)
 	(symbol
 		(lib_id "Connector:Screw_Terminal_01x02")
@@ -14138,6 +14144,17 @@
 			)
 		)
 		(property "LCSC" "C474881"
+			(at 346.71 290.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "FT Rotation Offset" "180"
 			(at 346.71 290.83 0)
 			(hide yes)
 			(show_name no)
@@ -14427,7 +14444,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "03ba48d6-dea5-4695-911a-ed722e7f4809")
 		(property "Reference" "TP15"
@@ -15330,7 +15347,7 @@
 	)
 	(symbol
 		(lib_id "Device:C")
-		(at 566.42 260.35 0)
+		(at 454.66 262.89 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -15340,7 +15357,7 @@
 		(dnp no)
 		(uuid "0f3d0cde-d424-466f-b803-7f970b216823")
 		(property "Reference" "C15"
-			(at 567.055 257.81 0)
+			(at 455.295 260.35 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15351,7 +15368,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 567.055 262.89 0)
+			(at 455.295 265.43 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15362,7 +15379,7 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
-			(at 566.42 260.35 0)
+			(at 454.66 262.89 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15373,7 +15390,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 566.42 260.35 0)
+			(at 454.66 262.89 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15384,7 +15401,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 566.42 260.35 0)
+			(at 454.66 262.89 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15394,7 +15411,7 @@
 			)
 		)
 		(property "LCSC" "C1525"
-			(at 566.42 260.35 0)
+			(at 454.66 262.89 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15774,7 +15791,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "1788727b-37d1-4bdb-9bef-6e51b02b1763")
@@ -16009,7 +16026,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "19f1e75c-3224-4422-aab3-7098f3aa4b17")
@@ -16088,7 +16105,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "1a4e3a6a-f969-403a-8a63-045dca112a9c")
 		(property "Reference" "TP33"
@@ -16161,9 +16178,9 @@
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "1a6bcedd-6645-4b51-98f8-8b14c2c1982a")
 		(property "Reference" "TP39"
@@ -16407,7 +16424,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "21389f5f-96fa-4ecd-8a33-a1428f801b2b")
 		(property "Reference" "TP34"
@@ -17393,7 +17410,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "318dccf0-d69b-4f53-ab9d-9139beceffbc")
 		(property "Reference" "TP19"
@@ -17986,7 +18003,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "34b262da-bfea-4f2b-9a04-fb876ae3d712")
 		(property "Reference" "TP7"
@@ -18205,6 +18222,17 @@
 				)
 			)
 		)
+		(property "FT Rotation Offset" "180"
+			(at 344.17 226.06 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "f8b87786-80cd-4b88-8409-076c67d9b948")
 		)
@@ -18294,6 +18322,17 @@
 				)
 			)
 		)
+		(property "FT Rotation Offset" "270"
+			(at 58.42 173.99 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "A"
 			(uuid "764cae2d-9aea-4fde-b5b0-66818364de17")
 		)
@@ -18326,7 +18365,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "36ce296a-dcd5-4f6d-a449-8a72c797f031")
 		(property "Reference" "TP21"
@@ -18395,7 +18434,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 111.76 97.79 0)
+		(at 102.87 92.71 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -18405,7 +18444,7 @@
 		(dnp no)
 		(uuid "37175037-6d2e-41d4-80e6-ee7a8fab0726")
 		(property "Reference" "#PWR088"
-			(at 111.76 104.14 0)
+			(at 102.87 99.06 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -18416,7 +18455,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 111.76 101.6 0)
+			(at 102.87 96.52 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -18426,7 +18465,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 111.76 97.79 0)
+			(at 102.87 92.71 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -18437,7 +18476,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 111.76 97.79 0)
+			(at 102.87 92.71 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -18448,7 +18487,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 111.76 97.79 0)
+			(at 102.87 92.71 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -18566,7 +18605,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "3882768a-12e3-4533-9df3-7d581dc5eecd")
 		(property "Reference" "TP10"
@@ -19336,7 +19375,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "4b995369-c15f-4a64-a927-8ec47eb5ba5f")
 		(property "Reference" "TP1"
@@ -19411,7 +19450,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "4d3ecb7c-62b1-4e48-9eb5-c1673964d347")
 		(property "Reference" "TP17"
@@ -19552,6 +19591,17 @@
 				)
 			)
 		)
+		(property "FT Rotation Offset" "180"
+			(at 297.18 363.22 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "7c9ed35a-d556-43fc-9c65-3846d93776ba")
 		)
@@ -19575,7 +19625,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "4f644575-e878-488b-b544-9b3048b3d2d0")
 		(property "Reference" "TP16"
@@ -19806,7 +19856,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "515d9668-9686-49e6-b1ca-e5169fa78832")
@@ -20825,7 +20875,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "5d4f35b0-650b-4796-b970-cdef943f7dd6")
 		(property "Reference" "TP3"
@@ -21407,7 +21457,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "66689f50-1d3d-4fcb-9c4f-64a1d0331b91")
 		(property "Reference" "TP4"
@@ -21482,7 +21532,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "69a8b718-f639-4a3c-ab86-1974c857c27c")
 		(property "Reference" "TP23"
@@ -21633,7 +21683,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "6a9ebc65-0658-40f8-96ea-4240945197e7")
 		(property "Reference" "TP30"
@@ -21708,7 +21758,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "6c70294b-4e8e-411d-8244-ca094c3aa425")
 		(property "Reference" "TP9"
@@ -22369,7 +22419,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "705b95df-9081-4dda-8cc1-5b58b24c1ee2")
 		(property "Reference" "TP26"
@@ -22780,7 +22830,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "776a7b64-a406-435b-9ac8-c79e5b6dff4e")
 		(property "Reference" "TP32"
@@ -23280,7 +23330,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "7d09633c-bc8a-4ad4-af71-21c86e6983a3")
 		(property "Reference" "TP13"
@@ -23482,7 +23532,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "80569b6c-648a-424b-a224-a9a8b85d133e")
 		(property "Reference" "TP20"
@@ -23557,7 +23607,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "80dc827b-8a31-44d0-bd68-12166fbf7fe6")
 		(property "Reference" "TP2"
@@ -23632,7 +23682,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "829352f1-5b8f-4b3f-bb89-a1e56a7a9e71")
@@ -23777,6 +23827,17 @@
 				)
 			)
 		)
+		(property "FT Position Offset" "0,1.6"
+			(at 38.1 83.82 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "A1"
 			(uuid "e31f1d6f-10d8-4062-a75a-20b510cfebd4")
 		)
@@ -23839,7 +23900,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "85cda399-78df-4737-86ad-1f633af73a7a")
 		(property "Reference" "TP14"
@@ -23914,7 +23975,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "8605ad44-4be5-4f56-98fe-78fe69fcdf74")
 		(property "Reference" "TP28"
@@ -24055,6 +24116,17 @@
 				)
 			)
 		)
+		(property "FT Rotation Offset" "180"
+			(at 344.17 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "1365206f-7d6e-4b36-98a7-855f2d7bc576")
 		)
@@ -24154,7 +24226,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "90b252f9-0209-46e9-9740-7931a375785a")
 		(property "Reference" "TP35"
@@ -24365,6 +24437,17 @@
 			)
 		)
 		(property "LCSC" "C191884"
+			(at 110.49 54.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "FT Rotation Offset" "90"
 			(at 110.49 54.61 0)
 			(hide yes)
 			(show_name no)
@@ -24755,7 +24838,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 566.42 264.16 0)
+		(at 454.66 266.7 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -24766,7 +24849,7 @@
 		(fields_autoplaced yes)
 		(uuid "974ca356-dedf-4974-a368-573fc474eada")
 		(property "Reference" "#PWR036"
-			(at 566.42 270.51 0)
+			(at 454.66 273.05 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24777,7 +24860,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 566.42 269.24 0)
+			(at 454.66 271.78 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -24787,7 +24870,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 566.42 264.16 0)
+			(at 454.66 266.7 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24798,7 +24881,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 566.42 264.16 0)
+			(at 454.66 266.7 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24809,7 +24892,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 566.42 264.16 0)
+			(at 454.66 266.7 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -25283,7 +25366,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "9d5ec73c-bc3b-44fb-81a3-0939d32291c8")
 		(property "Reference" "TP27"
@@ -26557,7 +26640,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "a3c87345-b0a6-4482-8430-d7c658bb7dfd")
 		(property "Reference" "TP25"
@@ -26882,7 +26965,7 @@
 	)
 	(symbol
 		(lib_id "Power_Protection:USBLC6-2SC6")
-		(at 111.76 90.17 0)
+		(at 102.87 85.09 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -26892,7 +26975,7 @@
 		(dnp no)
 		(uuid "a9818a21-9a32-42ba-abe2-008412962344")
 		(property "Reference" "U6"
-			(at 112.395 84.455 0)
+			(at 103.505 79.375 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -26903,7 +26986,7 @@
 			)
 		)
 		(property "Value" "USBLC6-2SC6"
-			(at 112.395 86.36 0)
+			(at 103.505 81.28 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -26914,7 +26997,7 @@
 			)
 		)
 		(property "Footprint" "Package_TO_SOT_SMD:SOT-23-6"
-			(at 111.76 90.17 0)
+			(at 102.87 85.09 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26925,7 +27008,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 111.76 90.17 0)
+			(at 102.87 85.09 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26936,7 +27019,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 111.76 90.17 0)
+			(at 102.87 85.09 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -26946,7 +27029,18 @@
 			)
 		)
 		(property "LCSC" "C7519"
-			(at 111.76 90.17 0)
+			(at 102.87 85.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "FT Rotation Offset" "90"
+			(at 102.87 85.09 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26991,7 +27085,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "a99fcb5c-940b-4643-bbc2-0c83d45a4d2d")
 		(property "Reference" "TP18"
@@ -27658,7 +27752,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "acf5bc9a-e871-4e6a-80ed-96fc0045dfbf")
 		(property "Reference" "TP31"
@@ -27946,7 +28040,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C236933"
+		(property "LCSC" "C37704"
 			(at 0 0 0)
 			(hide yes)
 			(show_name no)
@@ -28209,6 +28303,17 @@
 			)
 		)
 		(property "LCSC" "C474881"
+			(at 435.61 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "FT Rotation Offset" "180"
 			(at 435.61 146.05 0)
 			(hide yes)
 			(show_name no)
@@ -29559,7 +29664,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "c1e06905-9b1a-4d3e-b0e3-5c589284f90b")
 		(property "Reference" "TP6"
@@ -29855,6 +29960,17 @@
 				)
 			)
 		)
+		(property "FT Rotation Offset" "180"
+			(at 435.61 73.66 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "92bac822-a12b-4d6b-aff2-799f7ee5fa5b")
 		)
@@ -29967,7 +30083,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "c5c35a42-ae7d-4be1-b2dc-6ad4d4bae6aa")
 		(property "Reference" "TP29"
@@ -30118,9 +30234,9 @@
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "c7e52ed3-c682-46dc-a40c-3d327f0a3487")
 		(property "Reference" "J11"
@@ -30654,7 +30770,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "cff3aa6e-603a-4586-978e-6d7ec1a46380")
@@ -31069,7 +31185,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "d2ce38eb-9ee3-48d9-85c5-b5bbfda93448")
 		(property "Reference" "TP24"
@@ -32593,7 +32709,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "ee5385e1-92e0-4151-99f5-3e3e0f5ce8fe")
 		(property "Reference" "TP12"
@@ -32666,9 +32782,9 @@
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "ef1b19f9-eca5-4dcf-bb24-e7a713cc132a")
@@ -33162,7 +33278,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "f054c17e-29b9-43a5-9497-dfaf8a4cde44")
 		(property "Reference" "TP37"
@@ -33326,7 +33442,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "f300a9b4-8345-4e17-aac5-43cc11a04824")
 		(property "Reference" "TP8"
@@ -33458,6 +33574,17 @@
 			)
 		)
 		(property "LCSC" "C474881"
+			(at 29.21 48.26 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "FT Rotation Offset" "180"
 			(at 29.21 48.26 0)
 			(hide yes)
 			(show_name no)
@@ -33879,7 +34006,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "f8268c0e-8f52-4dbd-a742-c59c40fb1bd0")
 		(property "Reference" "TP36"
@@ -34121,7 +34248,7 @@
 		(exclude_from_sim no)
 		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "f8fd719f-eb33-4abe-9800-8198ee1388b3")
 		(property "Reference" "TP38"
@@ -34450,9 +34577,9 @@
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
-		(in_pos_files yes)
+		(in_pos_files no)
 		(dnp no)
 		(uuid "ff5a4fae-c51b-4ab1-82c0-9d3c76f77d6f")
 		(property "Reference" "J5"

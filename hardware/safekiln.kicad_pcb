@@ -188,7 +188,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start 0.95 -0.95)
@@ -302,6 +302,7 @@
 		(property "Value" "USB-C"
 			(at 0 5.1 90)
 			(layer "F.Fab")
+			(hide yes)
 			(uuid "d4f99d0d-21b7-42c2-a3dc-7e1481fc293b")
 			(effects
 				(font
@@ -342,6 +343,19 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "6b52517f-38d4-41ec-af0e-2c59a3d777d8")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "FT Position Offset" "0,1.4"
+			(at 0 0 270)
+			(unlocked yes)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "fb104420-d9a5-45c8-9ed0-2572f7f9f470")
 			(effects
 				(font
 					(size 1 1)
@@ -1411,7 +1425,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -2014,6 +2028,19 @@
 				)
 			)
 		)
+		(property "FT Rotation Offset" "90"
+			(at 0 0 0)
+			(unlocked yes)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "ad8e614b-0e2a-4412-815b-428898f385c3")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
 		(property ki_fp_filters "SOT?23*")
 		(path "/9183b08f-650a-4b47-bae0-455aeb517aee")
 		(sheetname "/")
@@ -2372,6 +2399,19 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "f4a11b63-a4d3-424d-91cf-f56fbe9531d7")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "FT Rotation Offset" "180"
+			(at 0 0 270)
+			(unlocked yes)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "75c6443d-c821-4e40-b0d2-c4c13d516a19")
 			(effects
 				(font
 					(size 1 1)
@@ -2970,7 +3010,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -3665,6 +3705,19 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "9c5bc808-1353-477d-8427-56e9972cfdbf")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "FT Rotation Offset" "180"
+			(at 0 0 90)
+			(unlocked yes)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "b7d387ba-4e70-4842-8406-f27a450fd009")
 			(effects
 				(font
 					(size 1 1)
@@ -4865,7 +4918,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -5024,7 +5077,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -5126,6 +5179,7 @@
 		(property "Reference" "R21"
 			(at 0 -1.43 0)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "94cbaf6e-3861-4e89-94b5-725234294c0d")
 			(effects
 				(font
@@ -5137,6 +5191,7 @@
 		(property "Value" "2.2k"
 			(at 0 1.43 0)
 			(layer "F.Fab")
+			(hide yes)
 			(uuid "27df0b48-6281-4e13-afb7-3c1ea874a849")
 			(effects
 				(font
@@ -6044,7 +6099,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -6987,7 +7042,7 @@
 				)
 			)
 		)
-		(attr smd)
+		(attr smd exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -9.2 -12.9)
@@ -7921,7 +7976,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start 0.95 -0.95)
@@ -8453,7 +8508,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -8930,7 +8985,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -9085,7 +9140,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -9593,7 +9648,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -9760,7 +9815,7 @@
 				(pins "1" "2" "3" "4" "5" "6")
 			)
 		)
-		(attr through_hole)
+		(attr through_hole exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -1.38 -1.38)
@@ -10314,7 +10369,7 @@
 			)
 		)
 		(property "Value" "SSR CTRL"
-			(at 2.25 4.92 90)
+			(at 1.55 5.1825 90)
 			(layer "F.Fab")
 			(uuid "22444430-3500-4927-b3a5-48a95bb344a8")
 			(effects
@@ -10352,6 +10407,19 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "5658edb1-9f8a-4060-9a27-4741264b19c9")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "FT Rotation Offset" "180"
+			(at 0 0 270)
+			(unlocked yes)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "5e342e15-61f6-49b1-9f31-787c648273d1")
 			(effects
 				(font
 					(size 1 1)
@@ -12129,7 +12197,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -12284,7 +12352,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start 0.95 -0.95)
@@ -12439,7 +12507,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -13399,7 +13467,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -13511,7 +13579,7 @@
 			)
 		)
 		(property "Value" "LID SWITCH"
-			(at 2.25 4.92 90)
+			(at 2.7 5.1825 90)
 			(layer "F.Fab")
 			(uuid "fe64e888-5102-434e-b1cb-b88160a0a8aa")
 			(effects
@@ -13549,6 +13617,19 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "876bbeac-8b28-4d10-8ccd-c8b08a743962")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "FT Rotation Offset" "180"
+			(at 0 0 270)
+			(unlocked yes)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "f8584ca0-b094-4fd1-902d-90df48be3b58")
 			(effects
 				(font
 					(size 1 1)
@@ -14469,7 +14550,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -14624,7 +14705,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -14779,7 +14860,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start 0.95 -0.95)
@@ -15095,7 +15176,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -15251,7 +15332,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_circle
 			(center 0 0)
@@ -15688,7 +15769,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -15844,7 +15925,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_circle
 			(center 0 0)
@@ -16340,7 +16421,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start 0.95 0.95)
@@ -17831,6 +17912,19 @@
 				)
 			)
 		)
+		(property "FT Rotation Offset" "90"
+			(at 0 0 180)
+			(unlocked yes)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "c96b82da-77ee-4bf1-bbc2-ae6901c6a68b")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
 		(property ki_fp_filters "SOT?23*")
 		(path "/a9818a21-9a32-42ba-abe2-008412962344")
 		(sheetname "/")
@@ -18188,6 +18282,19 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "e696c2dc-121b-4db3-8925-1ee0c587639f")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "FT Rotation Offset" "180"
+			(at 0 0 270)
+			(unlocked yes)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "67b7bac7-d58c-4183-b8ad-6e50a43a30f9")
 			(effects
 				(font
 					(size 1 1)
@@ -18625,7 +18732,7 @@
 				(pins "1" "5" "3" "4" "2" "6")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -1.905 1.27)
@@ -18836,6 +18943,7 @@
 		(property "Value" "SS14"
 			(at 0 2.6 90)
 			(layer "F.Fab")
+			(hide yes)
 			(uuid "0168e92c-a47e-4bdb-974f-f50c1ce16035")
 			(effects
 				(font
@@ -19128,7 +19236,7 @@
 			)
 		)
 		(property "Value" "COIL"
-			(at 0 1.43 0)
+			(at 7.5175 -3 90)
 			(layer "F.Fab")
 			(uuid "2f1cf293-7827-48a5-abcc-abcd2e857631")
 			(effects
@@ -19543,7 +19651,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -19859,7 +19967,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start 0.95 -0.95)
@@ -20018,7 +20126,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -20338,7 +20446,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -20976,7 +21084,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -21132,7 +21240,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_circle
 			(center 0 0)
@@ -21232,7 +21340,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -21391,7 +21499,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -21711,6 +21819,7 @@
 				(pins "1")
 			)
 		)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -22831,7 +22940,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start 0.95 -0.95)
@@ -24457,6 +24566,7 @@
 		(property "Reference" "J1"
 			(at 2.25 -5.12 90)
 			(layer "F.SilkS")
+			(hide yes)
 			(uuid "11acdcfd-c9ac-418b-b2ae-a5cba62c5e12")
 			(effects
 				(font
@@ -24504,6 +24614,19 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "ca155746-81e8-4744-8e98-9678bb203a6a")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "FT Rotation Offset" "180"
+			(at 0 0 90)
+			(unlocked yes)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "1b07745e-f74a-46ca-9c47-1c253aecd8a3")
 			(effects
 				(font
 					(size 1 1)
@@ -24938,7 +25061,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_circle
 			(center 0 0)
@@ -25038,7 +25161,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start 0.95 0.95)
@@ -26625,7 +26748,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -26784,7 +26907,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -28294,7 +28417,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
@@ -28405,7 +28528,7 @@
 			)
 		)
 		(property "Value" "OLED 128x64 I2C"
-			(at 0 10.39 180)
+			(at -2.65 3.61 270)
 			(layer "F.Fab")
 			(uuid "eb9b5f0f-9885-4a4f-b0c3-3789db422fdd")
 			(effects
@@ -28460,7 +28583,7 @@
 				(pins "1" "2" "3" "4")
 			)
 		)
-		(attr through_hole)
+		(attr through_hole exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start 1.33 1.27)
@@ -28737,6 +28860,19 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "e95314d0-d5e9-4dc9-8310-00f7c3d2b047")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "FT Rotation Offset" "180"
+			(at 0 0 270)
+			(unlocked yes)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "2a64f853-4de0-4d9a-ae1e-c0fc9109da33")
 			(effects
 				(font
 					(size 1 1)
@@ -29331,7 +29467,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start 0.95 -0.950001)
@@ -29989,6 +30125,7 @@
 		(property "Value" "ENCODER"
 			(at 7.5 10.4 0)
 			(layer "F.Fab")
+			(hide yes)
 			(uuid "4991dc4d-e1a5-48e5-9a61-83e9b57c2b20")
 			(effects
 				(font
@@ -30029,6 +30166,19 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "f1d26771-4f49-40c4-8da3-05fc928791aa")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "FT Rotation Offset" "270"
+			(at 0 0 0)
+			(unlocked yes)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "acdb5a3a-a43a-4c4c-b32a-39972fdc84f9")
 			(effects
 				(font
 					(size 1 1)
@@ -30457,7 +30607,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C236933"
+		(property "LCSC" "C37704"
 			(at 0 0 0)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -30853,7 +31003,7 @@
 				(pins "1")
 			)
 		)
-		(attr exclude_from_bom)
+		(attr exclude_from_pos_files exclude_from_bom)
 		(duplicate_pad_numbers_are_jumpers no)
 		(fp_line
 			(start -0.95 -0.95)
