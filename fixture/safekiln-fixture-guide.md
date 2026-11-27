@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 Bitcrush Testing
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 ## The guide plate
 
 `36` holes at **1.78 mm**, unplated, with no copper anywhere on the board. It is a

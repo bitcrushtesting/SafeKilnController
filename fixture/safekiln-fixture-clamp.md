@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 Bitcrush Testing
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 # safekiln-fixture: pinned stack
 
 Held through its mounting holes, to +/-0.479 mm.

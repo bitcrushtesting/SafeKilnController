@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 Bitcrush Testing
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 # safekiln-fixture-plate-nest
 
 108.2 x 94.1 x 9.5 mm. Print it the right way up, no supports, ASA, four perimeters round the pin seats.
