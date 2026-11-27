@@ -9006,6 +9006,16 @@
 		)
 		(uuid "29ae6f95-c60b-47f5-935f-a18553db16df")
 	)
+	(text "Thermocouple K-Type"
+		(exclude_from_sim no)
+		(at 423.926 75.438 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "31903341-48ec-4456-b399-4c86634a094a")
+	)
 	(text "DISPLAY"
 		(exclude_from_sim no)
 		(at 24.13 147.32 0)
@@ -9042,6 +9052,16 @@
 			(justify left)
 		)
 		(uuid "7ca3ae12-7d98-418c-b85f-3dd3c7ecdd90")
+	)
+	(text "Thermocouple K-Type"
+		(exclude_from_sim no)
+		(at 424.434 147.574 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "7e525a28-a86e-445d-a028-33010a0c24f1")
 	)
 	(text "CURRENT SENSE"
 		(exclude_from_sim no)
@@ -32799,7 +32819,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "ESP32-S3-WROOM-1"
+		(property "Value" "ESP32-S3-WROOM-1-N8"
 			(at 300.7995 76.2 0)
 			(show_name no)
 			(do_not_autoplace no)
