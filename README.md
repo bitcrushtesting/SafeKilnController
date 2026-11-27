@@ -220,13 +220,26 @@ three-phase kiln, so it is out of scope rather than partially supported.
 | Temperature | MAX31856 front ends, type-K. The controller reads chamber and enclosure; the **supervisor reads its own chamber couples on its own SPI buses**, so neither processor depends on the other for a temperature |
 | Display | 128×64 monochrome OLED, I²C |
 | Input | Rotary encoder with push button |
-| Output | Zero-cross SSR in series with a safety contactor |
+| Output | Zero-cross SSR in series with a 2-pole safety relay |
 | Supply | **Single phase only.** One current transformer on the heater conductor |
 | Door interlock | Optional normally-closed switch, stops the heater immediately when the door opens |
 | Connectivity | WiFi station only. **No access point:** the network is selected and its passphrase typed at the display, so setting it up needs somebody at the kiln. Reachable at `kiln.local` over mDNS, and by IP, which the display shows |
 
 Details and rationale are in
 [requirements §6](docs/03_software_req.sdoc).
+
+### Wiring
+
+![Wiring diagram: mains in through -X1 to -X3, the 2-pole relay -K1, the SSR -V1 and the current transformer on L out to the kiln elements; the 12 V supply -G1 feeding the board, which drives the relay coil and the SSR input and reads the CT, the lid switch and both thermocouples](docs/images/wiring.svg)
+
+The relay breaks both L and N, so a reversed plug cannot leave the elements
+live. The SSR switches L, and the current transformer sits downstream of both.
+The terminal-by-terminal wiring tables, the parts and the two-part wall-mount
+housing are in [`hardware/enclosure/README.md`](hardware/enclosure/README.md#wiring).
+
+The full board schematic is exported as
+[`docs/hardware/safekiln-schematic.pdf`](docs/hardware/safekiln-schematic.pdf);
+the source is [`hardware/safekiln.kicad_sch`](hardware/safekiln.kicad_sch).
 
 ## Credit
 
