@@ -159,7 +159,9 @@ jobs:
   # content under its current names (cppcoreguidelines-*, bugprone-*, cert-*).
   tidy:
     name: Static analysis (clang-tidy)
-    runs-on: ubuntu-latest
+    # Pinned: apt.llvm.org publishes no llvm-toolchain repository for 26.04
+    # (resolute), which ubuntu-latest became, so the install below 404s there.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -326,7 +328,9 @@ jobs:
   # -fcoverage-mcdc rather than the gcovr used for kiln_core's line floor.
   supervisor:
     name: Supervisor tests and MC/DC
-    runs-on: ubuntu-latest
+    # Pinned: apt.llvm.org publishes no llvm-toolchain repository for 26.04
+    # (resolute), which ubuntu-latest became, so the install below 404s there.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
