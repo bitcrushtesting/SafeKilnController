@@ -6,8 +6,8 @@
 #
 #   ./slice.sh              the panel enclosure: shell, bezel, knob
 #   ./slice.sh knob         one part
-#   ./slice.sh mainsbox mainslid stemknob
-#                           the wall-mount mains box (safekiln-mainsbox.scad)
+#   ./slice.sh mainsbase mainstop knob
+#                           the wall-mount housing (safekiln-mainsbox.scad)
 #   ./slice.sh --stl-only   render, do not slice
 #
 # Output lands in build/. Nothing is committed from here.
@@ -35,14 +35,13 @@ PROFILE=${PROFILE:-pla-0.2mm.ini}
 OUT=${OUT:-build}
 
 # Each part names its model and the `part` value that model takes. The mains
-# box is never in the default set: it holds live terminals, and the PLA
+# housing is never in the default set: it holds live terminals, and the PLA
 # profile this script checks for is the wrong material for it (README.md).
 model_for() {
     case "$1" in
     shell|bezel|knob) echo "safekiln-enclosure.scad $1" ;;
-    mainsbox)         echo "safekiln-mainsbox.scad box" ;;
-    mainslid)         echo "safekiln-mainsbox.scad lid" ;;
-    stemknob)         echo "safekiln-mainsbox.scad knob" ;;
+    mainsbase)        echo "safekiln-mainsbox.scad base" ;;
+    mainstop)         echo "safekiln-mainsbox.scad top" ;;
     esac
 }
 
@@ -64,7 +63,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
     --stl-only) stl_only=1; shift ;;
     -h|--help)  sed -n '4,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    shell|bezel|knob|mainsbox|mainslid|stemknob) parts+=("$1"); shift ;;
+    shell|bezel|knob|mainsbase|mainstop) parts+=("$1"); shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
 done
@@ -94,12 +93,12 @@ slicer_args_for() {
     # The knob is 25 mm across and 16 tall, so its first layer is small and
     # its grip ends up at the top where any wobble shows. Slower first layer,
     # and one more top layer than the profile for the face under a thumb.
-    knob|stemknob)
+    knob)
            echo "--brim-width 2 --first-layer-speed 15 --top-solid-layers 6" ;;
-    # The mains box is 232 mm across its ears and stands 138 mm tall, so it
-    # gets a brim like the shell. The lid prints face-down and does not.
-    mainsbox) echo "--brim-width 3" ;;
-    mainslid) echo "--brim-width 0" ;;
+    # The base is 185 mm across its ears and stands 77 mm tall on its back,
+    # so it gets a brim like the shell. The top prints face-down and does not.
+    mainsbase) echo "--brim-width 3" ;;
+    mainstop)  echo "--brim-width 0" ;;
     esac
 }
 
