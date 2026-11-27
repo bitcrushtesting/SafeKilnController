@@ -10,6 +10,8 @@ fp-info-cache
 # Generated exports; regenerate with kicad-cli
 *.net
 *-schematic.pdf
+# except the one the README links to; re-export it when the schematic changes
+!docs/hardware/safekiln-schematic.pdf
 gerbers/
 jlcpcb/
 
